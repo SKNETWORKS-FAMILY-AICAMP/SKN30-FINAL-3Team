@@ -1,0 +1,4 @@
+interface:
+  display_name: "백엔드"
+  short_description: "DDD·테스트·API·배치·이벤트의 유지보수 개발 권장안을 제공"
+  default_prompt: "$backend를 사용해 백엔드 아키텍처와 테스트 권장안을 참고하세요."

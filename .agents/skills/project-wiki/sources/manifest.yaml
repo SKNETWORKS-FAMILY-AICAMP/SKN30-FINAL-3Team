@@ -1,0 +1,43 @@
+version: 1
+updated: "2026-08-12"
+
+sources:
+  - id: "claude-code-memory"
+    type: "official-documentation"
+    url: "https://code.claude.com/docs/en/memory"
+    accessed: "2026-08-12"
+    reflected_in:
+      - "CLAUDE.md"
+      - "references/decisions/ADR-0004-cross-agent-instructions.md"
+    scope: "CLAUDE.md의 AGENTS.md import와 @path import 규칙"
+
+  - id: "claude-code-skills"
+    type: "official-documentation"
+    url: "https://code.claude.com/docs/en/slash-commands"
+    accessed: "2026-08-12"
+    reflected_in:
+      - ".claude/skills/*/SKILL.md"
+      - "references/decisions/ADR-0004-cross-agent-instructions.md"
+    scope: "프로젝트 스킬 위치, SKILL.md 형식, 점진적 로딩과 @path import"
+
+  - id: "f1-requirements-2026-08-12"
+    type: "user-provided-document"
+    location: 'C:\Users\playdata2\Downloads\F1_요구사항정의서.html'
+    received: "2026-08-12"
+    reflected_in:
+      - ".agents/skills/backend/SKILL.md"
+      - ".agents/skills/backend/references/architecture.md"
+      - ".agents/skills/backend/references/testing-and-quality.md"
+      - ".agents/skills/backend/references/decisions/ADR-0001-contextual-architecture-defaults.md"
+    scope: "대량 조회, 동시성, 개인정보, 감사 이력과 저장·조회 요구에서 도메인 중립적인 백엔드 품질 특성만 반영"
+
+  - id: "mvp-functional-spec-2026-08-12"
+    type: "user-provided-document"
+    location: 'C:\Users\playdata2\Downloads\기능명세서_MVP.html'
+    received: "2026-08-12"
+    reflected_in:
+      - ".agents/skills/backend/SKILL.md"
+      - ".agents/skills/backend/references/architecture.md"
+      - ".agents/skills/backend/references/testing-and-quality.md"
+      - ".agents/skills/backend/references/decisions/ADR-0001-contextual-architecture-defaults.md"
+    scope: "장시간 작업, 승인 후 반영, 배치, 이벤트 연동과 재시도 요구에서 도메인 중립적인 백엔드 품질 특성만 반영"

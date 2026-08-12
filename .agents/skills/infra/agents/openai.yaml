@@ -1,0 +1,4 @@
+interface:
+  display_name: "인프라"
+  short_description: "AWS·RunPod 네트워크·배포·관측성의 유지보수 개발 권장안을 제공"
+  default_prompt: "$infra를 사용해 인프라 모듈의 개발 권장안을 참고하세요."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "프로젝트 위키"
+  short_description: "프로젝트 지식을 효율적으로 탐색하고 검증하며 안전하게 갱신"
+  default_prompt: "프로젝트 정보를 확인하고 갱신할 때 $project-wiki를 사용하세요."

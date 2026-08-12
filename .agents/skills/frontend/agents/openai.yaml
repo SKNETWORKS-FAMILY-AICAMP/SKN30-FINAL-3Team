@@ -1,0 +1,4 @@
+interface:
+  display_name: "프론트엔드"
+  short_description: "React UI·상태·접근성·API 연동의 유지보수 개발 권장안을 제공"
+  default_prompt: "$frontend를 사용해 프론트엔드 모듈의 개발 권장안을 참고하세요."

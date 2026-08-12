@@ -1,0 +1,4 @@
+interface:
+  display_name: "에이전트"
+  short_description: "멀티에이전트 실행 경계와 유지보수 가능한 개발 권장안을 제공"
+  default_prompt: "$agent를 사용해 에이전트 모듈의 개발 권장안을 참고하세요."
