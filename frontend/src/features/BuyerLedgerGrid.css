@@ -1,0 +1,52 @@
+.buyer-ledger-grid {
+  display: flex;
+  min-height: 560px;
+  flex-direction: column;
+  width: 100%;
+  background: #fff;
+}
+
+.buyer-ledger-grid__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid #d2d2d2;
+  border-bottom: 0;
+}
+
+.buyer-ledger-grid__period {
+  display: flex;
+  gap: 4px;
+}
+
+.buyer-ledger-grid__toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  color: #3c3f42;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.buyer-ledger-grid__toolbar select {
+  min-height: 32px;
+  padding: 4px 28px 4px 8px;
+  border: 1px solid #b8bbbe;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.buyer-ledger-grid__count {
+  margin-left: auto;
+  color: #3c3f42;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.buyer-ledger-grid__table {
+  min-height: 520px;
+  height: calc(100vh - 220px);
+}

@@ -15,6 +15,9 @@ export const PROTOTYPE_ASSUMPTIONS = Object.freeze({
     demoRowCount: 7200,
     undoLimit: 20,
   }),
+  campaign: Object.freeze({
+    batchWarningCount: 8,
+  }),
   timing: Object.freeze({
     f2ProcessingStepMs: 900,
     f3ProcessingStepMs: 900,

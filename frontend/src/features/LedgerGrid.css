@@ -15,6 +15,95 @@
   min-height: 480px;
 }
 
+.ledger-grid__controls {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #d2d2d2;
+  border-bottom: 0;
+  background: #fff;
+}
+
+.ledger-grid__value-filter-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3c3f42;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ledger-grid__value-filter-select select {
+  min-height: 32px;
+  padding: 4px 28px 4px 8px;
+  border: 1px solid #b8bbbe;
+  border-radius: 3px;
+  background: #fff;
+  color: #151515;
+}
+
+.ledger-grid__value-filter {
+  position: relative;
+}
+
+.ledger-grid__value-filter summary {
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid #b8bbbe;
+  border-radius: 3px;
+  color: #0066cc;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  list-style: none;
+}
+
+.ledger-grid__value-filter summary::-webkit-details-marker { display: none; }
+
+.ledger-grid__value-filter-menu {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 250px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #b8bbbe;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(21, 21, 21, .16);
+}
+
+.ledger-grid__value-filter-menu label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.ledger-grid__value-filter-menu small { color: #6a6e73; }
+
+.ledger-grid__value-filter-actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d2d2d2;
+}
+
+.ledger-grid__value-filter-actions button {
+  padding: 0;
+  border: 0;
+  color: #0066cc;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+}
+
 .ledger-grid .ag-root-wrapper {
   border-color: #b8bbbe;
   border-radius: 0;
@@ -115,22 +204,19 @@
   white-space: nowrap;
 }
 
-.ledger-grid__status--save-검토-필요,
-.ledger-grid__status--ai-분석-실패 {
+.ledger-grid__status--save-임시저장 {
   border-color: #f0ab00;
   color: #795600;
   background: #fff8e1;
 }
 
-.ledger-grid__status--save-저장-완료,
-.ledger-grid__status--ai-분석-완료 {
+.ledger-grid__status--save-저장-완료 {
   border-color: #6a9c78;
   color: #1e4f2c;
   background: #edf7ef;
 }
 
-.ledger-grid__status--save-작성-중,
-.ledger-grid__status--ai-대기 {
+.ledger-grid__status--save-작성-중 {
   border-color: #b8bbbe;
   color: #4f5255;
   background: #f5f5f5;

@@ -1,4 +1,13 @@
 :root {
+  --color-primary: var(--pf-t--global--color--brand--default);
+  --color-surface: var(--pf-t--global--background--color--primary--default);
+  --color-text: var(--pf-t--global--text--color--regular);
+  --color-text-subtle: var(--pf-t--global--text--color--subtle);
+  --color-border: var(--pf-t--global--border--color--default);
+  --color-danger: var(--pf-t--global--color--status--danger--default);
+  --color-success: var(--pf-t--global--color--status--success--default);
+  --color-warning: var(--pf-t--global--color--status--warning--default);
+  --color-focus: var(--pf-t--global--focus-ring--color--default);
 }
 
 * {
@@ -18,4 +27,15 @@ body {
   margin-inline: auto;
   overflow: hidden;
   position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

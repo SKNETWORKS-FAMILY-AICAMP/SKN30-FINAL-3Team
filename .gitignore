@@ -38,6 +38,7 @@ frontend/build/
 frontend/.vite/
 frontend/coverage/
 frontend/.nyc_output/
+frontend/artifacts/
 
 # Node logs
 npm-debug.log*

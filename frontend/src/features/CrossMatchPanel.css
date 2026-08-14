@@ -170,6 +170,33 @@
   margin-bottom: 0.375rem;
 }
 
+.cross-match-panel__grade.is-collapsed details {
+  border: 1px solid var(--cross-match-border);
+  border-radius: 0.25rem;
+}
+
+.cross-match-panel__grade.is-collapsed .cross-match-panel__grade-heading {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  cursor: pointer;
+}
+
+.cross-match-panel__grade.is-collapsed .cross-match-panel__grade-heading > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.cross-match-panel__grade-note {
+  color: var(--cross-match-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.cross-match-panel__grade.is-collapsed .cross-match-panel__candidate-list {
+  padding: 0 0.75rem 0.75rem;
+}
+
 .cross-match-panel__grade-heading h4 {
   margin: 0;
   font-size: 0.8125rem;
@@ -393,6 +420,24 @@
 .cross-match-panel__detail-loading {
   gap: 0.75rem;
   padding-top: 0.5rem;
+}
+
+.cross-match-panel__sequential-anchor {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  color: var(--cross-match-muted);
+  font-size: 0.8125rem;
+  background: var(--pf-t--global--background--color--secondary--default, #f5f5f5);
+  border-inline-start: 0.25rem solid var(--pf-t--global--border--color--clicked, #0066cc);
+}
+
+.cross-match-panel__sql-preview {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  color: var(--cross-match-muted);
+  font-size: 0.8125rem;
 }
 
 .cross-match-panel__state-card {

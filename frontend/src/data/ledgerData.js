@@ -4,7 +4,8 @@ const owners = ["박이서", "이정민", "윤서준", "최유진", "한도윤",
 const assignees = ["김이순", "실장", "박소장"];
 const directions = ["남향", "남동향", "남서향", "동향"];
 const listingTypes = ["", "매매", "전세", "월세"];
-const saveStates = ["저장 완료", "저장 완료", "저장 완료", "검토 필요", "작성 중"];
+// 장부 목록에서 노출하는 저장 상태는 F2 처리 상태와 독립적인 두 값만 사용한다.
+const saveStates = ["저장 완료", "저장 완료", "저장 완료", "임시저장", "임시저장"];
 const aiStates = ["대기", "대기", "분석 완료", "분석 실패"];
 
 const seedRows = [
@@ -41,7 +42,7 @@ const seedRows = [
     complex: "래미안 원베일리",
     building: "101",
     unit: "204",
-    saveState: "검토 필요",
+    saveState: "임시저장",
     aiState: "분석 완료",
     householdState: "매물화",
     area: "33평",
@@ -67,7 +68,7 @@ const seedRows = [
     complex: "래미안 원베일리",
     building: "101",
     unit: "205",
-    saveState: "작성 중",
+    saveState: "임시저장",
     aiState: "대기",
     householdState: "일반",
     area: "33평",
@@ -159,6 +160,34 @@ function buildGeneratedRow(index) {
   };
 }
 
+/**
+ * 13.1 매물장 33개 컬럼에 맞춘 표시용 필드를 보완한다.
+ * 기존 상세 화면이 사용하는 필드명은 호환을 위해 그대로 보존한다.
+ */
+function withPropertyColumns(row) {
+  const listingType = row.listingType || "";
+  return {
+    ...row,
+    type: row.type || "J1",
+    loan: row.loan || "",
+    receivedAt: row.receivedAt || row.createdAt || "",
+    clearance: row.clearance || row.moveIn || "",
+    saleFlag: row.saleFlag || (listingType === "매매" ? "Y" : ""),
+    leaseFlag: row.leaseFlag || (listingType === "전세" ? "Y" : ""),
+    monthlyFlag: row.monthlyFlag || (listingType === "월세" ? "Y" : ""),
+    salePrice: row.salePrice || (listingType === "매매" ? row.price || "" : ""),
+    leaseDeposit: row.leaseDeposit || (listingType === "전세" ? row.price || "" : ""),
+    rentCondition: row.rentCondition || (listingType === "월세" ? [row.deposit, row.rent].filter(Boolean).join(" / ") : ""),
+    spec: row.spec || [row.rooms && `${row.rooms}실`, row.baths && `${row.baths}욕실`].filter(Boolean).join(" "),
+    builtIn: row.builtIn || "",
+    facilityState: row.facilityState || row.tax || "",
+    ownerPhone: row.ownerPhone || row.phone || "",
+    brokerage: row.brokerage || "",
+    tenantPhone: row.tenantPhone || "",
+    user1: row.user1 || "",
+  };
+}
+
 export function createLedgerRows(count) {
   if (!Number.isInteger(count) || count < 0) {
     throw new TypeError("createLedgerRows에는 0 이상의 행 수를 명시적으로 전달해야 합니다.");
@@ -166,7 +195,7 @@ export function createLedgerRows(count) {
   const generated = Array.from({ length: Math.max(0, count - seedRows.length) }, (_, index) =>
     buildGeneratedRow(index + seedRows.length),
   );
-  return [...seedRows, ...generated];
+  return [...seedRows, ...generated].map(withPropertyColumns);
 }
 
 export const emptyDraftRow = {
@@ -174,7 +203,7 @@ export const emptyDraftRow = {
   complex: "",
   building: "",
   unit: "",
-  saveState: "작성 중",
+  saveState: "임시저장",
   aiState: "대기",
   householdState: "일반",
   area: "",
@@ -186,6 +215,77 @@ export const emptyDraftRow = {
   log: "",
   assignee: "김이순",
   consent: "미확인",
+  type: "",
+  loan: "",
+  receivedAt: "",
+  clearance: "",
+  saleFlag: "",
+  leaseFlag: "",
+  monthlyFlag: "",
+  salePrice: "",
+  leaseDeposit: "",
+  rentCondition: "",
+  spec: "",
+  builtIn: "",
+  facilityState: "",
+  ownerPhone: "",
+  brokerage: "",
+  tenantPhone: "",
+  user1: "",
+};
+
+const buyerSeedRows = [
+  {
+    id: "B-0001", date: "2026-08-12", area: "33평", category: "매수", budget: "28억선",
+    complex: "래미안 원베일리", buyer: "인천사모님", phone: "010-3312-8871", brokerage: "대송",
+    moveDate: "2026-10-01", content: "남향, 10월 입주 희망", stage: "매물 탐색", completion: "진행",
+    assignee: "김이순", background: "", expiry: "2028-01-31", classification: "실거주", memo: "",
+  },
+  {
+    id: "B-0002", date: "2026-07-30", area: "25 33평", category: "전세", budget: "12억 이하",
+    complex: "아크로리버파크", buyer: "414동 세입자", phone: "010-5521-3409", brokerage: "",
+    moveDate: "2026-09-15", content: "입주일 조정 가능", stage: "조건 확인", completion: "진행",
+    assignee: "실장", background: "", expiry: "2026-09-30", classification: "전세", memo: "만기 임박",
+  },
+];
+
+function buildBuyerRow(index) {
+  const ordinal = index + 1;
+  const category = ["매수", "전세", "월세", "매도"][index % 4];
+  return {
+    id: `B-${String(ordinal).padStart(4, "0")}`,
+    date: `2026-08-${String((index % 12) + 1).padStart(2, "0")}`,
+    area: ["25평", "33평", "25 33평"][index % 3],
+    category,
+    budget: category === "매수" ? `${24 + (index % 8)}억선` : category === "전세" ? `${10 + (index % 5)}억 이하` : "협의",
+    complex: complexes[index % complexes.length],
+    buyer: ["인천사모님", "414동 세입자", "30억이하 엄마", "김손님"][index % 4],
+    phone: `010-${String(2000 + (index * 31) % 7000)}-${String(1200 + (index * 53) % 7000)}`,
+    brokerage: index % 3 === 0 ? "대송" : "",
+    moveDate: `2026-${String((index % 6) + 8).padStart(2, "0")}-15`,
+    content: index % 2 ? "가격 협의 가능" : "입주 시점 우선",
+    stage: ["매물 탐색", "조건 확인", "방문 일정"][index % 3],
+    completion: index % 5 === 0 ? "완료" : "진행",
+    assignee: assignees[index % assignees.length],
+    background: "",
+    expiry: index % 4 === 0 ? `2026-${String((index % 8) + 8).padStart(2, "0")}-30` : "",
+    classification: category,
+    memo: index % 6 === 0 ? "후속 연락 필요" : "",
+  };
+}
+
+export function createBuyerRows(count = 12) {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new TypeError("createBuyerRows에는 0 이상의 행 수를 명시적으로 전달해야 합니다.");
+  }
+  const generated = Array.from({ length: Math.max(0, count - buyerSeedRows.length) }, (_, index) => buildBuyerRow(index + buyerSeedRows.length));
+  return [...buyerSeedRows, ...generated];
+}
+
+export const emptyBuyerRow = {
+  id: "BUYER-DRAFT-NEW", date: "", area: "", category: "매수", budget: "", complex: "", buyer: "", phone: "",
+  brokerage: "", moveDate: "", content: "", stage: "", completion: "진행", assignee: "김이순", background: "",
+  expiry: "", classification: "", memo: "", saveState: "임시저장", consent: "미확인",
 };
 
 export const candidateMatches = [

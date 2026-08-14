@@ -11,8 +11,13 @@ import {
   FormSelect,
   FormSelectOption,
   Label,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
   Skeleton,
   Spinner,
+  TextArea,
 } from "@patternfly/react-core";
 import {
   BanIcon,
@@ -49,6 +54,22 @@ const FALLBACK_ANCHOR = {
   saveState: "저장 완료",
 };
 
+const FALLBACK_BUYER_ANCHOR = {
+  id: "B-0001",
+  buyer: "손님 정보 미입력",
+  category: "매수",
+  complex: "희망 단지 미입력",
+  area: "평형 미입력",
+  budget: "예산 미입력",
+};
+
+const BUYER_CANDIDATES = [
+  { id: "P-01", grade: "강함", rank: 1, title: "래미안 원베일리 103동 1204호", summary: "희망 단지·평형·예산이 모두 일치", phone: "010-4421-3088", budget: "29억", timing: "2026년 10월 입주", blocker: "방향과 수리 범위 확인 필요", concession: "입주일 2주 조정 가능", evidence: "매물장 최근 상담: 33평, 29억, 10월 입주 협의" },
+  { id: "P-02", grade: "강함", rank: 2, title: "래미안 원베일리 105동 807호", summary: "예산과 입주 시점이 일치", phone: "010-6930-2714", budget: "28.7억", timing: "협의", blocker: "희망 동과 다름", concession: "동 선호 완화 시 방문 가능", evidence: "매물장 최근 상담: 가격 조정 가능, 즉시 방문 가능" },
+  { id: "P-03", grade: "약함", rank: 3, title: "아크로리버파크 102동 1503호", summary: "평형은 맞지만 희망 단지가 다름", phone: "010-8164-5207", budget: "28억", timing: "2026년 11월 입주", blocker: "단지 선호와 입주 시점 차이", concession: "인접 단지와 한 달 차이를 허용하면 검토 가능", evidence: "매물장 최근 상담: 33평, 11월 입주 가능" },
+  { id: "P-04", grade: "기각", rank: 4, title: "반포자이 118동 2101호", summary: "희망 예산을 3억 초과", phone: "010-3275-9401", budget: "33억", timing: "즉시", blocker: "현재 매매가가 최대 예산을 초과", concession: "가격이 30억 이하로 조정되면 재검토", evidence: "매물장 최근 상담: 33억 이하 조정 불가" },
+];
+
 const PROCESS_STEPS = ["기준 세대 확인", "조건 후보 조회", "후보별 근거 판정"];
 
 function gradeLabelProps(grade) {
@@ -63,51 +84,44 @@ function nextActionFor(candidate) {
   return "조건 변화가 생길 때까지 기각 이력 유지";
 }
 
-function buildMessageDraft(candidate, anchor) {
+function buildMessageDraft(candidate, anchor, parentContext) {
+  if (parentContext === "buyer-detail") {
+    return `안녕하세요. ${anchor.buyer || "손님"} 고객의 ${anchor.complex || "희망 단지"} ${anchor.area || ""} ${anchor.budget || ""} 조건과 관련해 ${candidate.title} 확인드립니다. 상담 가능 시간을 알려주세요.`;
+  }
   const recipient = candidate.title.split(" · ")[0];
   return `${recipient}님, ${anchor.complex} ${anchor.building}동 ${anchor.unit}호 ${anchor.area || ""} ${anchor.listingType || "매물"} 조건을 확인드리려고 연락드립니다. 검토 가능하시면 편한 시간을 알려주세요.`;
 }
 
-function CandidateGroups({ candidates, selectedId, onSelect }) {
+function CandidateGroups({ candidates, selectedId, onSelect, hiddenGrades = [], collapsedGrades = [] }) {
   return (
     <div className="cross-match-panel__groups" aria-label="교차 판정 후보 목록">
       {GRADE_ORDER.map((grade) => {
         const items = candidates.filter((candidate) => candidate.grade === grade);
+        if (hiddenGrades.includes(grade)) return null;
+        const isCollapsed = collapsedGrades.includes(grade);
         return (
-          <section className="cross-match-panel__grade" key={grade} aria-labelledby={`candidate-grade-${grade}`}>
-            <div className="cross-match-panel__grade-heading">
-              <h4 id={`candidate-grade-${grade}`}>{grade}</h4>
-              <Label isCompact color="grey" variant="outline">
-                {items.length}건
-              </Label>
-            </div>
-            <div className="cross-match-panel__candidate-list">
-              {items.map((candidate) => {
-                const isSelected = selectedId === candidate.id;
-                return (
-                  <button
-                    className={`cross-match-panel__candidate${isSelected ? " is-selected" : ""}`}
-                    key={candidate.id}
-                    type="button"
-                    aria-pressed={isSelected}
-                    aria-controls="cross-match-candidate-detail"
-                    onClick={() => onSelect(candidate)}
-                  >
-                    <span className="cross-match-panel__candidate-topline">
-                      <Label isCompact {...gradeLabelProps(candidate.grade)}>
-                        {candidate.grade}
-                      </Label>
-                      <span className="cross-match-panel__rank">우선순위 {candidate.rank}</span>
-                    </span>
-                    <strong>{candidate.title}</strong>
-                    <span>{candidate.summary}</span>
-                    <span className="cross-match-panel__candidate-meta">
-                      예산 {candidate.budget} · 시점 {candidate.timing}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          <section className={`cross-match-panel__grade${isCollapsed ? " is-collapsed" : ""}`} key={grade} aria-labelledby={`candidate-grade-${grade}`}>
+            {isCollapsed ? (
+              <details>
+                <summary className="cross-match-panel__grade-heading">
+                  <span><strong id={`candidate-grade-${grade}`}>{grade}</strong><span className="cross-match-panel__grade-note">판정 실행·피드백에서 확인</span></span>
+                  <Label isCompact color="grey" variant="outline">{items.length}건</Label>
+                </summary>
+                <div className="cross-match-panel__candidate-list">
+                  {items.map((candidate) => <CandidateButton key={candidate.id} candidate={candidate} selectedId={selectedId} onSelect={onSelect} />)}
+                </div>
+              </details>
+            ) : (
+              <>
+                <div className="cross-match-panel__grade-heading">
+                  <h4 id={`candidate-grade-${grade}`}>{grade}</h4>
+                  <Label isCompact color="grey" variant="outline">{items.length}건</Label>
+                </div>
+                <div className="cross-match-panel__candidate-list">
+                  {items.map((candidate) => <CandidateButton key={candidate.id} candidate={candidate} selectedId={selectedId} onSelect={onSelect} />)}
+                </div>
+              </>
+            )}
           </section>
         );
       })}
@@ -115,7 +129,28 @@ function CandidateGroups({ candidates, selectedId, onSelect }) {
   );
 }
 
-function SequentialState({ step }) {
+function CandidateButton({ candidate, selectedId, onSelect }) {
+  const isSelected = selectedId === candidate.id;
+  return (
+    <button
+      className={`cross-match-panel__candidate${isSelected ? " is-selected" : ""}`}
+      type="button"
+      aria-pressed={isSelected}
+      aria-controls="cross-match-candidate-detail"
+      onClick={() => onSelect(candidate)}
+    >
+      <span className="cross-match-panel__candidate-topline">
+        <Label isCompact {...gradeLabelProps(candidate.grade)}>{candidate.grade}</Label>
+        <span className="cross-match-panel__rank">우선순위 {candidate.rank}</span>
+      </span>
+      <strong>{candidate.title}</strong>
+      <span>{candidate.summary}</span>
+      <span className="cross-match-panel__candidate-meta">예산 {candidate.budget} · 시점 {candidate.timing}</span>
+    </button>
+  );
+}
+
+function SequentialState({ step, anchor, candidates, parentContext }) {
   return (
     <div className="cross-match-panel__loading" aria-live="polite">
       <ol className="cross-match-panel__steps">
@@ -139,6 +174,13 @@ function SequentialState({ step }) {
         })}
       </ol>
       <div className="cross-match-panel__skeleton-list" aria-label="후보 목록 불러오는 중">
+        <p className="cross-match-panel__sequential-anchor"><strong>앵커 카드</strong> · {parentContext === "buyer-detail" ? `${anchor.buyer} · ${anchor.complex} · ${anchor.area} · ${anchor.budget}` : `${anchor.complex} ${anchor.building}동 ${anchor.unit}호`} · 추정값 기준</p>
+        {step >= 1 && <p className="cross-match-panel__sequential-anchor"><strong>SQL 후보</strong> · 조건에 맞는 {candidates.length}건을 먼저 표시하고 판정을 이어갑니다.</p>}
+        {step >= 1 && candidates.length > 0 && (
+          <ul className="cross-match-panel__sql-preview" aria-label="SQL 후보 미리보기">
+            {candidates.slice(0, 3).map((candidate) => <li key={candidate.id}>{candidate.title} · {candidate.summary}</li>)}
+          </ul>
+        )}
         <Skeleton width="76%" screenreaderText="후보 제목 불러오는 중" />
         <Skeleton width="100%" />
         <Skeleton width="92%" />
@@ -173,15 +215,18 @@ function NoCandidateState({ state, onRetry, onRelax }) {
   );
 }
 
-function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
+function CandidateDetail({ candidate, anchor, parentContext, isReadOnly, onComposeMessage, onOpenEvidence, onLater, onInterest, onSchedule }) {
   const [notice, setNotice] = useState("");
+  const [interestOpen, setInterestOpen] = useState(false);
+  const [interestReason, setInterestReason] = useState("조건 안 맞음");
+  const [interestNote, setInterestNote] = useState("");
 
   useEffect(() => {
     setNotice("");
   }, [candidate, anchor]);
 
   const openMessageComposer = () => {
-    const nextDraft = buildMessageDraft(candidate, anchor);
+    const nextDraft = buildMessageDraft(candidate, anchor, parentContext);
     setNotice("");
     onComposeMessage?.({
       mode: "mvp-copy-only",
@@ -191,6 +236,17 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
       anchorRow: anchor,
       draft: nextDraft,
     });
+  };
+
+  const recordAction = (label, callback, payload = {}) => {
+    callback?.({ candidate, anchorRow: anchor, ...payload });
+    setNotice(`${label} 요청을 F1 연동 대상으로 기록했습니다`);
+  };
+
+  const submitInterest = () => {
+    recordAction("관심없음", onInterest, { reason: interestReason, note: interestNote });
+    setInterestOpen(false);
+    setInterestNote("");
   };
 
   return (
@@ -211,11 +267,11 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
 
       <dl className="cross-match-panel__facts">
         <div>
-          <dt>예산</dt>
+          <dt>{parentContext === "buyer-detail" ? "매물 금액" : "예산"}</dt>
           <dd>{candidate.budget}</dd>
         </div>
         <div>
-          <dt>희망 시점</dt>
+          <dt>{parentContext === "buyer-detail" ? "입주 가능" : "희망 시점"}</dt>
           <dd>{candidate.timing}</dd>
         </div>
         <div>
@@ -230,6 +286,16 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
         <section>
           <h4>판정 근거</h4>
           <p>{candidate.evidence}</p>
+          <Button
+            variant="link"
+            isInline
+            onClick={() => {
+              if (onOpenEvidence) onOpenEvidence({ candidate, anchorRow: anchor, evidence: candidate.evidence });
+              else setNotice("원본 상담 로그 위치를 F1 연동 대상으로 기록했습니다");
+            }}
+          >
+            원본 상담 로그 열기
+          </Button>
         </section>
         <section>
           <h4>걸림돌</h4>
@@ -263,7 +329,7 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
               variant="secondary"
               icon={<BookmarkIcon />}
               isDisabled={isReadOnly}
-              onClick={() => setNotice("나중에 처리 목록에 추가했습니다")}
+              onClick={() => recordAction("나중에", onLater)}
             >
               나중에
             </Button>
@@ -271,7 +337,7 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
               variant="secondary"
               icon={<BanIcon />}
               isDisabled={isReadOnly}
-              onClick={() => setNotice("관심없음 피드백 초안을 기록했습니다")}
+              onClick={() => setInterestOpen(true)}
             >
               관심없음
             </Button>
@@ -279,7 +345,7 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
               variant="secondary"
               icon={<CalendarAltIcon />}
               isDisabled={isReadOnly}
-              onClick={() => setNotice("F1 일정 검토 항목을 준비했습니다")}
+              onClick={() => recordAction("일정 검토", onSchedule)}
             >
               일정 검토
             </Button>
@@ -287,19 +353,48 @@ function CandidateDetail({ candidate, anchor, isReadOnly, onComposeMessage }) {
         </details>
       </div>
 
+      <Modal variant="small" isOpen={interestOpen} onClose={() => setInterestOpen(false)} aria-label="관심없음 사유" data-screen-id="F3-MOD-010" data-requirement-ids="F3-CR-17, F3-TR-03, F3-TR-07">
+        <ModalHeader title="관심없음 사유" description="판정 결과를 개선하기 위한 피드백을 남깁니다." />
+        <ModalBody>
+          <label className="cross-match-panel__field-label" htmlFor="cross-match-interest-reason">사유</label>
+          <FormSelect id="cross-match-interest-reason" value={interestReason} onChange={(_event, value) => setInterestReason(value)}>
+            {[
+              ["조건 안 맞음", "조건 안 맞음"],
+              ["이미 연락함", "이미 연락함"],
+              ["판정이 틀림", "판정이 틀림"],
+              ["기타", "기타"],
+            ].map(([value, label]) => <FormSelectOption key={value} value={value} label={label} />)}
+          </FormSelect>
+          <label className="cross-match-panel__field-label" htmlFor="cross-match-interest-note">메모 (선택)</label>
+          <TextArea id="cross-match-interest-note" value={interestNote} onChange={(_event, value) => setInterestNote(value)} />
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="primary" onClick={submitInterest}>피드백 기록</Button>
+          <Button variant="link" onClick={() => setInterestOpen(false)}>취소</Button>
+        </ModalFooter>
+      </Modal>
+
     </article>
   );
 }
 
-export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage }) {
+export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage, parentContext = "unit-detail", onOpenEvidence, onLater, onInterest, onSchedule }) {
   const [viewState, setViewState] = useState("sequential");
   const panelRef = useRef(null);
   const [processStep, setProcessStep] = useState(0);
   const [selectedId, setSelectedId] = useState(candidateMatches[0]?.id);
-  const anchor = useMemo(() => ({ ...FALLBACK_ANCHOR, ...(anchorRow || {}) }), [anchorRow]);
-  const selectedCandidate =
-    candidateMatches.find((candidate) => candidate.id === selectedId) || candidateMatches[0];
+  const cacheRef = useRef(new Map());
+  const candidates = parentContext === "buyer-detail" ? BUYER_CANDIDATES : candidateMatches;
+  const anchor = useMemo(
+    () => ({ ...(parentContext === "buyer-detail" ? FALLBACK_BUYER_ANCHOR : FALLBACK_ANCHOR), ...(anchorRow || {}) }),
+    [anchorRow, parentContext],
+  );
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedId) || candidates[0];
   const showsCandidates = ["ready", "partial-error", "cached", "readonly"].includes(viewState);
+  const hiddenGrades = parentContext === "unit-detail" ? ["기각"] : [];
+  const collapsedGrades = parentContext === "unit-detail" ? [] : ["기각"];
+  const visibleCandidates = candidates.filter((candidate) => !hiddenGrades.includes(candidate.grade));
+  const cacheKey = `${parentContext}:${anchor.id}`;
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -318,7 +413,10 @@ export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage }
         if (current >= PROCESS_STEPS.length - 1) {
           window.clearInterval(timer);
           window.setTimeout(
-            () => setViewState("ready"),
+            () => {
+              cacheRef.current.set(cacheKey, { candidates, completedAt: new Date().toISOString() });
+              setViewState("ready");
+            },
             PROTOTYPE_ASSUMPTIONS.timing.f3CompletionDelayMs,
           );
           return current;
@@ -327,7 +425,14 @@ export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage }
       });
     }, PROTOTYPE_ASSUMPTIONS.timing.f3ProcessingStepMs);
     return () => window.clearInterval(timer);
-  }, [isOpen, viewState]);
+  }, [isOpen, viewState, cacheKey, candidates]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedId(visibleCandidates[0]?.id || candidates[0]?.id);
+    if (cacheRef.current.has(cacheKey)) setViewState("cached");
+    else setViewState("sequential");
+  }, [isOpen, cacheKey]);
 
   if (!isOpen) return null;
 
@@ -365,8 +470,13 @@ export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage }
           <CandidateDetail
             candidate={selectedCandidate}
             anchor={anchor}
+            parentContext={parentContext}
             isReadOnly={viewState === "readonly"}
             onComposeMessage={onComposeMessage}
+            onOpenEvidence={onOpenEvidence}
+            onLater={onLater}
+            onInterest={onInterest}
+            onSchedule={onSchedule}
           />
         ) : (
           <div className="cross-match-panel__state-card cross-match-panel__state-card--detail">
@@ -388,9 +498,9 @@ export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage }
               F1 비차단 Panel
             </Label>
           </div>
-          <p>
-            {anchor.complex} {anchor.building}동 {anchor.unit}호 · {anchor.area} · {anchor.listingType || "현매물 없음"} {anchor.price || ""}
-          </p>
+          <p>{parentContext === "buyer-detail"
+            ? `${anchor.buyer} · ${anchor.category} · ${anchor.complex} · ${anchor.area} · ${anchor.budget}`
+            : `${anchor.complex} ${anchor.building}동 ${anchor.unit}호 · ${anchor.area} · ${anchor.listingType || "현매물 없음"} ${anchor.price || ""}`}</p>
         </div>
         <div className="cross-match-panel__header-actions">
           <details className="cross-match-panel__prototype-tools">
@@ -425,20 +535,22 @@ export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage }
         <DrawerContent panelContent={detailPanel} colorVariant="primary">
           <DrawerContentBody className="cross-match-panel__candidates" hasPadding>
             {viewState === "sequential" ? (
-              <SequentialState step={processStep} />
+              <SequentialState step={processStep} anchor={anchor} candidates={visibleCandidates} parentContext={parentContext} />
             ) : showsCandidates ? (
               <>
                 <div className="cross-match-panel__list-heading">
                   <div>
                     <p className="cross-match-panel__eyebrow">판정 후보</p>
-                    <h3>강함, 약함, 기각을 함께 검토합니다</h3>
+                    <h3>{parentContext === "unit-detail" ? "강함·약함 후보를 검토합니다" : "강함·약함 후보와 기각 이력을 검토합니다"}</h3>
                   </div>
                   <Label color="grey" variant="outline">
-                    전체 {candidateMatches.length}건
+                    표시 {visibleCandidates.length}건 · 판정 {candidates.length}건
                   </Label>
                 </div>
                 <CandidateGroups
-                  candidates={candidateMatches}
+                  candidates={candidates}
+                  hiddenGrades={hiddenGrades}
+                  collapsedGrades={collapsedGrades}
                   selectedId={selectedCandidate?.id}
                   onSelect={(candidate) => setSelectedId(candidate.id)}
                 />
