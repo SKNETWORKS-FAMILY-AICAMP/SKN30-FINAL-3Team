@@ -1,0 +1,62 @@
+{
+  "baseUrl": "http://127.0.0.1:4173/",
+  "assertions": {
+    "noOverflow1600": true,
+    "noUnder12At1600": true,
+    "noOverflow1366": true,
+    "noUnder12At1366": true,
+    "migrationRemoved": true,
+    "prototypeStatesDisclosed": true,
+    "unsupportedLedgerTabsDisabled": true,
+    "detailSectionOrientation": true,
+    "saveStateBeforeActions": true,
+    "sectionNavMovesFocus": true,
+    "detailNoUnder12At1366": true,
+    "f2DecisionSummary": true,
+    "f2PrimaryAfterTable": true,
+    "f3PrototypeToolsCollapsed": true,
+    "f3RecommendationVisible": true,
+    "f3OnePrimaryAction": true,
+    "f3NoUnder12At1366": true,
+    "composerHierarchy": true,
+    "messageNoUnder12At1366": true,
+    "campaignProgressBeforeRun": true,
+    "campaignProgressAfterRun": true,
+    "finalNoOverflow1366": true,
+    "finalNoUnder12At1366": true
+  },
+  "metrics": {
+    "ledger1600": {
+      "scrollWidth": 1600,
+      "clientWidth": 1600,
+      "under12": []
+    },
+    "ledger1366": {
+      "scrollWidth": 1366,
+      "clientWidth": 1366,
+      "under12": []
+    },
+    "detail1366": {
+      "scrollWidth": 1366,
+      "clientWidth": 1366,
+      "under12": []
+    },
+    "f3Detail1366": {
+      "scrollWidth": 1366,
+      "clientWidth": 1366,
+      "under12": []
+    },
+    "message1366": {
+      "scrollWidth": 1366,
+      "clientWidth": 1366,
+      "under12": []
+    },
+    "final1366": {
+      "scrollWidth": 1366,
+      "clientWidth": 1366,
+      "under12": []
+    }
+  },
+  "consoleErrors": [],
+  "passed": true
+}

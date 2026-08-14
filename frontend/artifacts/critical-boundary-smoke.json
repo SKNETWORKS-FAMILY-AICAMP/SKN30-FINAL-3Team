@@ -1,0 +1,16 @@
+{
+  "assertions": {
+    "unit204CleanOnOpen": true,
+    "unit204ClosesWithoutDecision": true,
+    "unit206CleanOnOpen": true,
+    "unit206ClosesWithoutDecision": true,
+    "audioTriggersClosePolicy": true,
+    "audioRestoredAfterSave": true,
+    "securityGateVisible": true,
+    "securityGateFocused": true,
+    "gridAriaLabel": true
+  },
+  "gridLabel": "매물장 세대 그리드",
+  "consoleErrors": [],
+  "passed": true
+}

@@ -1,0 +1,59 @@
+{
+  "baseUrl": "http://127.0.0.1:4173/",
+  "assertions": {
+    "filteredCountMatches": true,
+    "separateSaveAndAI": true,
+    "gridRowsPresent": true,
+    "bulkSelectionPresent": true,
+    "gridDensity40": true,
+    "singleDetailModal": true,
+    "actionRailVisible": true,
+    "saveEnabled": true,
+    "closeThreeWay": true,
+    "discardDoesNotLeak": true,
+    "incompleteSaveEnabled": true,
+    "incompleteSavedAsDraft": true,
+    "f2Recording": true,
+    "processingWarningFirst": true,
+    "f2ReviewSixColumns": true,
+    "emptyState": true,
+    "errorState": true,
+    "offlineState": true,
+    "noPageOverflow1366": true,
+    "f3FortySixty": true,
+    "f3AllGrades": true,
+    "f1ActionsRemainVisibleWithF3": true,
+    "messageTargetAndPhone": true,
+    "copyOnlyNoSend": true,
+    "phoneCopied": true,
+    "f3FailureIsolated": true
+  },
+  "metrics": {
+    "gridRowHeight": 40,
+    "modal1600": {
+      "x": 72,
+      "y": 20,
+      "width": 1456,
+      "height": 860
+    },
+    "actionRail1600": {
+      "x": 1328,
+      "y": 101,
+      "width": 200,
+      "height": 779
+    },
+    "document1366": {
+      "scrollWidth": 1366,
+      "clientWidth": 1366
+    },
+    "f3Ratio1366": 0.3999942021423084,
+    "messageButtonTexts": [
+      "",
+      "번호 목록 복사",
+      "닫기"
+    ],
+    "copyButtonVisible": true
+  },
+  "consoleErrors": [],
+  "passed": true
+}

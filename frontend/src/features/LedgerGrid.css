@@ -1,0 +1,185 @@
+.ledger-grid {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  color: #151515;
+  background: #fff;
+  font-family: "Noto Sans KR", "Noto Sans", Arial, sans-serif;
+}
+
+.ledger-grid__ag-grid {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+}
+
+.ledger-grid .ag-root-wrapper {
+  border-color: #b8bbbe;
+  border-radius: 0;
+}
+
+.ledger-grid .ag-header,
+.ledger-grid .ag-header-row,
+.ledger-grid .ag-header-cell,
+.ledger-grid .ag-row,
+.ledger-grid .ag-cell {
+  min-height: 40px;
+}
+
+.ledger-grid .ag-header-cell,
+.ledger-grid .ag-cell {
+  padding-inline: 12px;
+}
+
+.ledger-grid .ag-header-cell-label {
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ledger-grid .ag-cell {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.ledger-grid .ag-cell-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-grid .ag-pinned-left-header,
+.ledger-grid .ag-pinned-left-cols-container {
+  border-right: 2px solid #8a8d90;
+}
+
+.ledger-grid .ag-cell-focus:not(.ag-cell-range-selected) {
+  border-color: #0066cc;
+  box-shadow: inset 0 0 0 1px #0066cc;
+}
+
+.ledger-grid .ag-cell-inline-editing {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px #0066cc;
+}
+
+.ledger-grid .ag-row-selected::before {
+  background-color: #e7f1fa;
+}
+
+.ledger-grid--read-only .ag-cell:not(.ledger-grid__detail-cell) {
+  cursor: default;
+}
+
+.ledger-grid__detail-link.pf-v6-c-button.pf-m-link.pf-m-inline {
+  max-width: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-grid__detail-link.pf-v6-c-button.pf-m-link.pf-m-inline:focus-visible {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}
+
+.ledger-grid__status {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  height: 24px;
+  padding-inline: 8px;
+  border: 1px solid #b8bbbe;
+  border-radius: 999px;
+  overflow: hidden;
+  color: #3c3f42;
+  background: #f5f5f5;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-grid__status--save-검토-필요,
+.ledger-grid__status--ai-분석-실패 {
+  border-color: #f0ab00;
+  color: #795600;
+  background: #fff8e1;
+}
+
+.ledger-grid__status--save-저장-완료,
+.ledger-grid__status--ai-분석-완료 {
+  border-color: #6a9c78;
+  color: #1e4f2c;
+  background: #edf7ef;
+}
+
+.ledger-grid__status--save-작성-중,
+.ledger-grid__status--ai-대기 {
+  border-color: #b8bbbe;
+  color: #4f5255;
+  background: #f5f5f5;
+}
+
+.ledger-grid__overlay {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #151515;
+  text-align: center;
+  white-space: normal;
+}
+
+.ledger-grid__overlay--loading {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ledger-grid__overlay--loading strong {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.ledger-grid__overlay--loading span {
+  color: #6a6e73;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.ledger-grid__overlay .pf-v6-c-empty-state {
+  max-width: 520px;
+}
+
+.ledger-grid--offline .ag-cell-inline-editing {
+  background: #fff8e1;
+}
+
+@media (max-width: 900px) {
+  .ledger-grid {
+    min-height: 420px;
+  }
+
+  .ledger-grid__ag-grid {
+    min-height: 420px;
+  }
+}

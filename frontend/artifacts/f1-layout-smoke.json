@@ -1,0 +1,143 @@
+{
+  "baseUrl": "http://127.0.0.1:4173/",
+  "results": {
+    "1366": {
+      "assertions": {
+        "compactTopbar": true,
+        "oneControlStrip": true,
+        "gridStartsImmediately": true,
+        "gridUsesWorkspace": true,
+        "bottomStatusVisible": true,
+        "noPersistentSideNav": true,
+        "noLargePageHeading": true,
+        "topbarContent": true,
+        "controlsStayInternal": true,
+        "offlineSingleBanner": true,
+        "offlineBannerDoesNotOverlap": true,
+        "offlineNoPageOverflow": true
+      },
+      "metrics": {
+        "topbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1366,
+          "height": 48
+        },
+        "controls": {
+          "x": 0,
+          "y": 48,
+          "width": 1366,
+          "height": 56
+        },
+        "grid": {
+          "x": 0,
+          "y": 104,
+          "width": 1366,
+          "height": 636
+        },
+        "status": {
+          "x": 0,
+          "y": 740,
+          "width": 1366,
+          "height": 28
+        },
+        "offlineBanner": {
+          "x": 0,
+          "y": 48,
+          "width": 1366,
+          "height": 40
+        },
+        "offlineControls": {
+          "x": 0,
+          "y": 88,
+          "width": 1366,
+          "height": 56
+        },
+        "offlineGrid": {
+          "x": 0,
+          "y": 144,
+          "width": 1366,
+          "height": 596
+        },
+        "documentScrollWidth": 1366,
+        "documentClientWidth": 1366,
+        "controlScrollWidth": 1713,
+        "controlClientWidth": 1366,
+        "offlineDimensions": {
+          "documentScrollWidth": 1366,
+          "documentClientWidth": 1366
+        }
+      }
+    },
+    "1600": {
+      "assertions": {
+        "compactTopbar": true,
+        "oneControlStrip": true,
+        "gridStartsImmediately": true,
+        "gridUsesWorkspace": true,
+        "bottomStatusVisible": true,
+        "noPersistentSideNav": true,
+        "noLargePageHeading": true,
+        "topbarContent": true,
+        "controlsStayInternal": true,
+        "offlineSingleBanner": true,
+        "offlineBannerDoesNotOverlap": true,
+        "offlineNoPageOverflow": true
+      },
+      "metrics": {
+        "topbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1600,
+          "height": 48
+        },
+        "controls": {
+          "x": 0,
+          "y": 48,
+          "width": 1600,
+          "height": 56
+        },
+        "grid": {
+          "x": 0,
+          "y": 104,
+          "width": 1600,
+          "height": 768
+        },
+        "status": {
+          "x": 0,
+          "y": 872,
+          "width": 1600,
+          "height": 28
+        },
+        "offlineBanner": {
+          "x": 0,
+          "y": 48,
+          "width": 1600,
+          "height": 40
+        },
+        "offlineControls": {
+          "x": 0,
+          "y": 88,
+          "width": 1600,
+          "height": 56
+        },
+        "offlineGrid": {
+          "x": 0,
+          "y": 144,
+          "width": 1600,
+          "height": 728
+        },
+        "documentScrollWidth": 1600,
+        "documentClientWidth": 1600,
+        "controlScrollWidth": 1767,
+        "controlClientWidth": 1600,
+        "offlineDimensions": {
+          "documentScrollWidth": 1600,
+          "documentClientWidth": 1600
+        }
+      }
+    }
+  },
+  "consoleErrors": [],
+  "passed": true
+}

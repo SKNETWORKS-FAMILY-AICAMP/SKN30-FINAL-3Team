@@ -16,3 +16,5 @@ description: "`frontend/`의 React 사용자 인터페이스를 개발하거나 
 - 개인정보가 화면, 브라우저 저장소, 분석 도구 또는 로그에 노출되면 개인정보 정책 확인
 - 내부 폴더 구조, 상태 관리, UI 라이브러리, 테스트, 린트, 빌드·배포 규칙은 보류
 - 작업 전 project-wiki와 존재하는 경우 `.agents/skills/frontend/references/index.md`에서 관련 결정만 확인
+- UI를 만들거나 변경하기 전 `.agents/skills/frontend/references/design/index.md`와 해당 문서가 연결한 현재 작업 관련 세부 가이드를 확인
+- `.agents/skills/frontend/references/design/index.md`의 확정 규칙에서 벗어나면 예외 사유, 접근성 영향과 검증 결과를 PR에 기록

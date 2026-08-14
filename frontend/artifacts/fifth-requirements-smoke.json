@@ -1,0 +1,13 @@
+{
+  "baseUrl": "http://127.0.0.1:4173/",
+  "assertions": {
+    "migrationEntryRemoved": true,
+    "migrationScreenRemoved": true,
+    "personOptionsFollowRoleOrder": true,
+    "manualLogAutoIndex": true,
+    "unspecifiedDoesNotAssumeFirst": true,
+    "f2GeneratedLogUsesSelectedIndex": true
+  },
+  "consoleErrors": [],
+  "passed": true
+}

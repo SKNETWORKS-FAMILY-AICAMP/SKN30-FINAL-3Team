@@ -1,0 +1,23 @@
+{
+  "baseUrl": "http://127.0.0.1:4173/",
+  "assertions": {
+    "startsWithNoSelection": true,
+    "explicitClearSelection": true,
+    "clearPreservesFilter": true,
+    "oneSelectedVoiceEntry": true,
+    "f2ProminentEntry": true,
+    "quickAddComplex": true,
+    "directMessageSource": true,
+    "directRecipientReview": true,
+    "directCopyOnly": true,
+    "campaignSeparatePage": true,
+    "campaignMetrics": true,
+    "campaignCanRun": true,
+    "campaignMessageSource": true
+  },
+  "metrics": {
+    "f2ScrollTop": 729
+  },
+  "consoleErrors": [],
+  "passed": true
+}
