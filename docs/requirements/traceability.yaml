@@ -1,0 +1,6 @@
+version: 1
+updated: "2026-08-14"
+
+# 상세 요구사항은 분할 Markdown 정본에만 둔다.
+# 구현 또는 테스트가 생긴 PR에서 요구사항 ID별 경로를 추가한다.
+requirements: []

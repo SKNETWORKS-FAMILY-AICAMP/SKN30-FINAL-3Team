@@ -1,5 +1,5 @@
 version: 1
-updated: "2026-08-12"
+updated: "2026-08-14"
 
 sources:
   - id: "claude-code-memory"
@@ -41,3 +41,17 @@ sources:
       - ".agents/skills/backend/references/testing-and-quality.md"
       - ".agents/skills/backend/references/decisions/ADR-0001-contextual-architecture-defaults.md"
     scope: "장시간 작업, 승인 후 반영, 배치, 이벤트 연동과 재시도 요구에서 도메인 중립적인 백엔드 품질 특성만 반영"
+
+  - id: "integrated-requirements-f1-f2-f3-2026-08-14"
+    type: "user-provided-document"
+    location: "docs/requirements/sources/integrated-requirements-2026-08-14.md"
+    received: "2026-08-14"
+    sha256: "803bd80fda0c2aef4d53e71704624a20c0cb4dce8a291ce997c0f6a739568841"
+    reflected_in:
+      - "docs/requirements/common/*.md"
+      - "docs/requirements/f1/*.md"
+      - "docs/requirements/f2/*.md"
+      - "docs/requirements/f3/*.md"
+      - "docs/requirements/index.md"
+      - "references/decisions/ADR-0005-requirements-management.md"
+    scope: "통합본의 기능 내용을 검색 의도별 문서로 분할하고 요구사항 관리·검색 경로를 구성함. 기능 요구사항 자체는 변경하지 않음."
