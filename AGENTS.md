@@ -3,7 +3,7 @@
 ## 프로젝트 원칙
 
 - 현재 확정되지 않은 기능 기획을 사실이나 승인된 요구사항으로 가정하지 않는다.
-- 루트 모듈은 `frontend/`, `backend/`, `agent/`, `data/`, `infra/`다.
+- 루트 모듈은 `frontend/`, `backend/`, `ai/`, `data/`, `infra/`다.
 - 모듈 내부 상세 구조는 아직 확정하지 않는다.
 
 ## 프로젝트 위키 사용
@@ -26,7 +26,7 @@
 |---|---|
 | `frontend/` 또는 React UI | `.agents/skills/frontend/SKILL.md` |
 | `backend/` 또는 API·배치·이벤트 서버 | `.agents/skills/backend/SKILL.md` |
-| `agent/` 또는 멀티에이전트·LangGraph | `.agents/skills/agent/SKILL.md` |
+| `ai/` 또는 멀티에이전트·LangGraph | `.agents/skills/ai/SKILL.md` |
 | `data/` 또는 데이터 수집·가공 | `.agents/skills/data/SKILL.md` |
 | `infra/` 또는 AWS·RunPod·IaC | `.agents/skills/infra/SKILL.md` |
 
