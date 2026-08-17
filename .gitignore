@@ -4,6 +4,8 @@
 .env
 .env.*
 !.env.example
+!backend/.env.local
+!backend/.env.prod
 *.pem
 *.key
 *.cert
@@ -74,11 +76,22 @@ dist/
 
 # Testing & Linting
 .pytest_cache/
+.hypothesis/
+.tox/
+.nox/
 .mypy_cache/
+.pyre/
+.pytype/
 .ruff_cache/
 .coverage
 htmlcov/
 .coverage.*
+coverage.xml
+coverage.json
+*.cover
+
+# Local migration tool state/config (may contain database credentials)
+.yoyo-migrate
 
 # Jupyter Notebooks
 .ipynb_checkpoints

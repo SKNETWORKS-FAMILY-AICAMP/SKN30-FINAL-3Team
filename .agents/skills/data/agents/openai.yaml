@@ -1,4 +1,4 @@
 interface:
-  display_name: "데이터"
-  short_description: "데이터 수집·가공·적재·품질 검증의 유지보수 개발 권장안을 제공"
-  default_prompt: "$data를 사용해 데이터 모듈의 개발 권장안을 참고하세요."
+  display_name: "데이터셋과 평가 데이터"
+  short_description: "요구사항을 재현 가능한 데이터셋과 평가 계약으로 변환"
+  default_prompt: "$data를 사용해 관련 요구사항을 데이터셋과 평가 계약으로 구체화하세요."

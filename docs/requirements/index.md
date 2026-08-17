@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-14
+updated: 2026-08-17
 ---
 
 # 요구사항 인덱스
@@ -15,6 +15,7 @@ rg -n --glob '*.md' --glob '!sources/**' '<요구사항-ID>' docs/requirements
 
 | 문서 | 읽는 조건 |
 |---|---|
+| [현재 MVP 범위·평가 중심](common/mvp-scope-and-evaluation.md) | 구현 범위, 우선순위, F1 축소 또는 F2·F3 평가 기준을 판단할 때. 기존 상세 요구사항과 충돌하면 이 문서가 우선 |
 | [개요·책임 경계·원칙](common/overview-and-principles.md) | 시스템 개요, F1·F2·F3 책임, 공통 원칙을 확인할 때 |
 | [연동 접점](common/integrations.md) | F1↔F2 또는 F1↔F3의 화면·데이터 연결을 바꿀 때 |
 | [용어·역할·AI 구조](common/glossary-and-roles.md) | 공통 용어, 권한 역할 또는 AI 배치를 확인할 때 |
@@ -74,4 +75,5 @@ F2의 처리·필드·완료 기준 일부는 아직 독립 요구사항 ID가 �
 | [관리 규칙](README.md) | 정본, 승인 상태, 검색 및 변경 절차 |
 | [추적 정보](traceability.yaml) | 요구사항 ID와 구현·테스트 경로 연결 |
 | [변경 이력](changelog.md) | 변경 ID, 이유와 날짜 기록 |
+| [2026-08-17 MVP 범위 재정의 원문](sources/mvp-scope-redefinition-2026-08-17.md) | 현재 MVP 범위 결정의 사용자 원문과 대조할 때만 읽는 변경 금지 스냅샷 |
 | [2026-08-14 통합 원문](sources/integrated-requirements-2026-08-14.md) | 출처 대조가 필요할 때만 읽는 변경 금지 스냅샷 |
