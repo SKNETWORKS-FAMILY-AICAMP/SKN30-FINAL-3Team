@@ -1,7 +1,26 @@
 version: 1
-updated: "2026-08-14"
+updated: "2026-08-17"
 
 sources:
+  - id: "mvp-scope-redefinition-2026-08-17"
+    type: "user-provided-direction"
+    location: "docs/requirements/sources/mvp-scope-redefinition-2026-08-17.md"
+    received: "2026-08-17"
+    sha256: "d7f1d50a50b63d2010f89b4abebf72d08d701d6a30a54c6358b9b21d988e80bc"
+    reflected_in:
+      - "docs/requirements/index.md"
+      - "docs/requirements/README.md"
+      - "docs/requirements/common/mvp-scope-and-evaluation.md"
+      - "docs/requirements/common/overview-and-principles.md"
+      - "docs/requirements/common/acceptance-and-open-questions.md"
+      - "docs/requirements/common/revision-history.md"
+      - "docs/requirements/f1/overview-and-terms.md"
+      - "docs/requirements/f2/overview-and-flow.md"
+      - "docs/requirements/f3/overview-and-common.md"
+      - "docs/requirements/changelog.md"
+      - "references/project-overview.md"
+    scope: "F1을 최소 데이터 인터페이스로 축소하고 F2 입력 자동화와 F3 멀티 에이전트 판단의 시연·평가를 MVP 우선순위로 확정"
+
   - id: "claude-code-memory"
     type: "official-documentation"
     url: "https://code.claude.com/docs/en/memory"
