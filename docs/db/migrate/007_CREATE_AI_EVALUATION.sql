@@ -111,3 +111,41 @@ CREATE INDEX idx_evaluation_result_subject
         evaluation_subject,
         created_at DESC
     );
+
+
+COMMENT ON TABLE ai_decision_feedback IS '포지션 분석 또는 매칭 판정에 대한 사용자 평가와 구조화된 정정을 기록한다.';
+COMMENT ON COLUMN ai_decision_feedback.id IS 'AI 판단 피드백 레코드 고유 식별자.';
+COMMENT ON COLUMN ai_decision_feedback.brokerage_id IS '데이터를 소유하는 중개사무소 식별자.';
+COMMENT ON COLUMN ai_decision_feedback.position_analysis_id IS '피드백 대상 포지션 분석 식별자.';
+COMMENT ON COLUMN ai_decision_feedback.match_candidate_evaluation_id IS '피드백 대상 후보별 매칭 판정 식별자.';
+COMMENT ON COLUMN ai_decision_feedback.feedback_type IS '평가, 정정 등 피드백 유형.';
+COMMENT ON COLUMN ai_decision_feedback.reason IS '구조화된 피드백 사유 코드.';
+COMMENT ON COLUMN ai_decision_feedback.field_name IS '필드 단위 정정 대상 필드명.';
+COMMENT ON COLUMN ai_decision_feedback.original_value IS '정정 전 AI 판단 값.';
+COMMENT ON COLUMN ai_decision_feedback.corrected_value IS '사용자가 확정한 정정 값.';
+COMMENT ON COLUMN ai_decision_feedback.detail IS '피드백 상세 설명.';
+COMMENT ON COLUMN ai_decision_feedback.correction_interaction_id IS '정정 내용을 추가 전용 상담 로그로 남긴 경우의 상담 식별자.';
+COMMENT ON COLUMN ai_decision_feedback.created_by IS '피드백을 등록한 사용자 식별자.';
+COMMENT ON COLUMN ai_decision_feedback.created_at IS '피드백 생성 시각.';
+
+COMMENT ON TABLE ai_evaluation_result IS '상담 자동화와 중개 판단의 실험 케이스별 평가 점수와 통과 여부를 기록한다.';
+COMMENT ON COLUMN ai_evaluation_result.id IS 'AI 평가 결과 레코드 고유 식별자.';
+COMMENT ON COLUMN ai_evaluation_result.brokerage_id IS '데이터를 소유하는 중개사무소 식별자.';
+COMMENT ON COLUMN ai_evaluation_result.evaluation_domain IS '상담 자동화, 중개 판단 등 평가 도메인.';
+COMMENT ON COLUMN ai_evaluation_result.evaluation_subject IS '평가 대상 기능 또는 단계.';
+COMMENT ON COLUMN ai_evaluation_result.experiment_key IS '평가 실험을 식별하는 키.';
+COMMENT ON COLUMN ai_evaluation_result.case_key IS '실험 안의 평가 케이스 식별 키.';
+COMMENT ON COLUMN ai_evaluation_result.evaluation_variant IS '동일 케이스에서 비교한 모델·프롬프트·워크플로 변형.';
+COMMENT ON COLUMN ai_evaluation_result.transcription_job_id IS '평가 대상 상담 전사 작업 식별자.';
+COMMENT ON COLUMN ai_evaluation_result.agent_run_id IS '평가 대상 에이전트 실행 식별자.';
+COMMENT ON COLUMN ai_evaluation_result.match_evaluation_id IS '평가 대상 매칭 판정 식별자.';
+COMMENT ON COLUMN ai_evaluation_result.evaluator_type IS '사람, 규칙, 모델 등 평가자 유형.';
+COMMENT ON COLUMN ai_evaluation_result.evaluator_key IS '구체 평가자 또는 평가 설정 식별 키.';
+COMMENT ON COLUMN ai_evaluation_result.rubric_version IS '평가에 사용한 루브릭 버전.';
+COMMENT ON COLUMN ai_evaluation_result.evaluation_input_hash IS '동일 평가 입력을 식별하는 SHA-256 해시.';
+COMMENT ON COLUMN ai_evaluation_result.metric_scores IS '평가 지표별 점수.';
+COMMENT ON COLUMN ai_evaluation_result.ground_truth_snapshot IS '평가 시점의 정답 또는 기준값 스냅샷.';
+COMMENT ON COLUMN ai_evaluation_result.passed IS '평가 통과 여부.';
+COMMENT ON COLUMN ai_evaluation_result.evaluation_notes IS '평가 결과에 대한 설명과 메모.';
+COMMENT ON COLUMN ai_evaluation_result.created_by IS '평가 결과를 생성한 사용자 식별자.';
+COMMENT ON COLUMN ai_evaluation_result.created_at IS '평가 결과 생성 시각.';

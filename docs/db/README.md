@@ -15,7 +15,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 
 ## 현재 기준선
 
-현재 기준선은 26개 테이블이다.
+현재 기준선은 26개 테이블과 9개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -27,6 +27,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 006_CREATE_MATCH_EVALUATION.sql | 매칭 판정 | 3 | 판정 헤더, 후보별 판정·근거 |
 | 007_CREATE_AI_EVALUATION.sql | AI 평가 | 2 | 판단 피드백, 실험 평가 결과 |
 | 008_CREATE_AUTHENTICATION.sql | 인증 | 1 | user_session |
+| 009_ALTER_PROPERTY_LEDGER_FIELDS.sql | 매물·수요 원장 확장 | 0 | 세대 스펙, 공동중개, 현 거주지 만기, 분류·진행단계 |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 
@@ -82,6 +83,8 @@ NNN_ACTION_SCOPE.sql
 - 운영 SQL에 실제 이름, 연락처, 상담 원문, 토큰, 비밀번호나 실사용 음성 경로를 넣지 않는다.
 - 세션과 CSRF 원문은 저장하지 않고 해시만 저장한다.
 - Agent JSON과 오류에는 비식별 또는 마스킹된 값만 저장한다.
+- 모든 테이블과 컬럼에는 `COMMENT ON TABLE`과 `COMMENT ON COLUMN`으로 업무 의미를 기록한다.
+- 기존 객체의 설명을 보완할 때는 적용된 migration을 역편집하지 않고 다음 ALTER migration에서 comment를 추가하거나 교체한다.
 
 ## 변경 유형
 

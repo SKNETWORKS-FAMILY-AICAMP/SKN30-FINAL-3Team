@@ -16,7 +16,7 @@ updated: 2026-08-17
 | Database | PostgreSQL 15, SQLModel, Yoyo 순수 SQL migration | 결정 |
 | Queue | AWS SQS | 제안 |
 | Container runtime | AWS ECS Fargate | 제안 |
-| IaC | Terraform | 제안 |
+| IaC | Terraform | 결정; [ADR-0007](../decisions/ADR-0007-terraform-iac.md) |
 | Runtime AWS integration | AWS SDK for Python (`boto3`) | 제안 |
 | Model API | OpenAI·OpenAI-compatible vLLM adapter | 구현됨; 운영 선택 미확정 |
 | GPU runtime | RunPod | 계획됨 |

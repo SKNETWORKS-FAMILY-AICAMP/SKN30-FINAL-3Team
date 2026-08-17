@@ -110,6 +110,10 @@ infra/.terraform/
 *.tfstate.*
 *.tfstate.backup
 
+# Terraform plans and partial backend configuration
+*.tfplan
+backend.hcl
+
 # Terraform variables file (contains sensitive values)
 *.tfvars
 *.tfvars.json

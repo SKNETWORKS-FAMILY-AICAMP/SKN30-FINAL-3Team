@@ -14,7 +14,7 @@ def migration_files() -> list[Path]:
 def test_migration_names_and_sequence() -> None:
     files = migration_files()
 
-    assert [int(path.name[:3]) for path in files] == list(range(1, 9))
+    assert [int(path.name[:3]) for path in files] == list(range(1, 10))
     assert all(NAME_PATTERN.fullmatch(path.name) for path in files)
 
 
@@ -45,7 +45,36 @@ def test_schema_baseline_contains_26_tables() -> None:
     assert len(re.findall(r"(?m)^CREATE TABLE ", text)) == 26
 
 
+def test_all_tables_and_columns_have_comments() -> None:
+    text = "\n".join(path.read_text() for path in migration_files())
+    expected_tables: set[str] = set()
+    expected_columns: set[tuple[str, str]] = set()
+
+    create_table_pattern = re.compile(r"CREATE TABLE\s+(\w+)\s*\((.*?)\n\);", re.DOTALL)
+    for match in create_table_pattern.finditer(text):
+        table, body = match.groups()
+        expected_tables.add(table)
+        for line in body.splitlines():
+            column_match = re.match(r"\s{4}([a-z][a-z0-9_]*)\s+", line)
+            if column_match:
+                expected_columns.add((table, column_match.group(1)))
+
+    alter_table_pattern = re.compile(r"ALTER TABLE\s+(\w+)\s+(.*?);", re.DOTALL)
+    for match in alter_table_pattern.finditer(text):
+        table, body = match.groups()
+        for column in re.findall(r"ADD COLUMN\s+(\w+)", body):
+            expected_columns.add((table, column))
+
+    commented_tables = set(re.findall(r"(?m)^COMMENT ON TABLE\s+(\w+)\s+IS", text))
+    commented_columns = set(
+        re.findall(r"(?m)^COMMENT ON COLUMN\s+(\w+)\.(\w+)\s+IS", text)
+    )
+
+    assert commented_tables == expected_tables
+    assert commented_columns == expected_columns
+
+
 def test_yoyo_can_parse_all_sql_migrations() -> None:
     migrations = read_migrations(str(MIGRATION_DIRECTORY))
 
-    assert len(migrations) == 8
+    assert len(migrations) == 9
