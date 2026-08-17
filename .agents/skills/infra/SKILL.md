@@ -16,6 +16,9 @@ description: "`infra/`의 Terraform 후보 기반 AWS·RunPod 인프라, 네트�
 - 비용 우선 검토: ARM64 최소 태스크, Single-AZ, 짧은 로그 보존, 필요 시에만 Worker 실행
 - NAT Gateway, Multi-AZ, 상시 다중 환경은 비용 영향을 확인하고 승인 후 도입
 - 비밀값을 코드, Terraform 변수 기본값, 상태 출력 또는 로그에 기록하지 않음
+- 로컬·CI·운영 비밀값의 저장, 접근 제어와 프로세스 환경변수 주입은 Infra가 담당
+- 애플리케이션 모듈에는 비밀 저장소 클라이언트를 요구하지 않고 동일한 환경변수 인터페이스를 제공
+- 저장소에서 관리하는 공개 `.env` 파일에는 비밀 변수의 실제 값이나 참조 식별자를 기록하지 않음
 - 최소 권한 IAM과 환경별 자원 경계를 적용
 - 내부 폴더 구조, Terraform state backend, 모듈화, CI/CD, 배포 전략과 관측성 규칙은 보류
 - 작업 전 project-wiki와 존재하는 경우 `.agents/skills/infra/references/index.md`에서 관련 결정만 확인

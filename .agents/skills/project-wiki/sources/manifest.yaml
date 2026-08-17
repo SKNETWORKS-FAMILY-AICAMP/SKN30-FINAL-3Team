@@ -2,6 +2,31 @@ version: 1
 updated: "2026-08-17"
 
 sources:
+  - id: "integrated-ddl-postgresql15-2026-08-17"
+    type: "user-provided-document"
+    location: 'C:\Users\playdata2\Downloads\F1_F2_F3_통합_DDL_명칭개선_PostgreSQL15.sql'
+    received: "2026-08-17"
+    sha256: "a53603a3cc654f2d29237bfa81758edde96a47bb1469126eedb21bea3e89ad6e"
+    reviewed_archive: "docs/db/archive/F1_F2_F3_통합_DDL_명칭개선_PostgreSQL15_REVIEWED.sql"
+    reviewed_sha256: "648739e0e1551bc3377240f99bb344dd675e5216159ff75254af9d7f1a83cde5"
+    reflected_in:
+      - "docs/db/README.md"
+      - "docs/db/migrate/*.sql"
+    scope: "58테이블 통합 DDL의 명칭 오류를 보정해 보존하고, F1 최소 원장과 F2/F3 실행·근거·평가 추적 중심의 25테이블 MVP SQL 기준선으로 재구성"
+
+  - id: "ai-backend-boundary-2026-08-17"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-17)"
+    received: "2026-08-17"
+    reflected_in:
+      - ".agents/skills/ai/SKILL.md"
+      - ".agents/skills/project-wiki/references/architecture/overview.md"
+      - ".agents/skills/project-wiki/references/project-overview.md"
+      - ".agents/skills/project-wiki/references/development/environments.md"
+      - ".agents/skills/project-wiki/references/open-questions.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md"
+    scope: "비즈니스 도메인 내용을 제외한 AI–Backend 의존성 경계, 런타임 주입과 Agent DB 직접 수정 금지 원칙"
+
   - id: "mvp-scope-redefinition-2026-08-17"
     type: "user-provided-direction"
     location: "docs/requirements/sources/mvp-scope-redefinition-2026-08-17.md"
