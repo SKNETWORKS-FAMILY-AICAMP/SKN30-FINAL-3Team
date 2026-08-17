@@ -4,6 +4,8 @@
 .env
 .env.*
 !.env.example
+!ai/.env.local
+!ai/.env.prod
 !backend/.env.local
 !backend/.env.prod
 *.pem

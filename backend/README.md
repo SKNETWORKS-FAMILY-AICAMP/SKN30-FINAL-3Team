@@ -38,6 +38,23 @@ uv sync --frozen
 
 Python은 3.13으로 고정된다. 가상환경과 lock 파일은 backend/ 안에서만 관리한다.
 
+### AI 패키지 의존성
+
+Backend는 `../ai`의 `brokerage-ai`를 editable path dependency로 설치한다. 로컬에서 두 모듈의
+lock과 가상환경은 계속 독립적으로 관리하며, AI 의존성이 바뀌면 각각의 디렉터리에서
+`uv sync --frozen`을 실행한다.
+
+Backend API·domain은 OpenAI SDK, LangGraph, 프롬프트를 직접 사용하지 않는다. AI 기능이 추가되면
+Backend Worker가 `brokerage_ai`의 안정된 facade만 호출하며, HTTP 요청 처리 코드는 AI runtime을
+직접 조립하지 않는다. 이번 기반 작업에는 Worker와 feature facade 구현이 포함되지 않는다.
+
+배포 이미지는 저장소 루트를 build context에 포함해야 `../ai` path를 해석할 수 있다. 배포 설치는
+editable source를 남기지 않도록 Backend 디렉터리에서 다음과 같이 수행한다.
+
+~~~bash
+uv sync --frozen --no-editable
+~~~
+
 ## 환경 설정
 
 src/core/config.py가 python-dotenv로 환경 파일을 읽고 환경변수를 그룹 DTO에 명시적으로 바인딩한다.

@@ -1,25 +1,26 @@
 [project]
-name = "brokerage-backend"
+name = "brokerage-ai"
 version = "0.1.0"
+description = "Framework-neutral AI provider and workflow foundation for the brokerage service"
+readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "brokerage-ai",
-    "fastapi>=0.141.1",
-    "psycopg[binary]>=3.3.4",
-    "pydantic-settings>=2.15.0",
+    "langgraph>=1.2.11",
+    "openai>=3.1.0",
+    "pydantic>=2.13.4",
     "python-dotenv>=1.2.3",
-    "sqlmodel>=0.0.39",
-    "structlog>=26.1.0",
-    "uvicorn[standard]>=0.52.3",
-    "yoyo-migrations>=9.0.0",
 ]
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pre-commit>=4.6.2",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.3",
 ]
@@ -31,22 +32,17 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-extend-ignore = ["B008"]
 
 [tool.pyright]
 pythonVersion = "3.13"
 include = ["src", "tests"]
-extraPaths = ["src"]
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
 addopts = "-ra"
+asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["brokerage_ai"]
 branch = true
-
-[tool.uv.sources]
-brokerage-ai = { path = "../ai", editable = true }

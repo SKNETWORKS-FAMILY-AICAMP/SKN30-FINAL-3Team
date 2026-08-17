@@ -9,7 +9,7 @@ updated: 2026-08-17
 
 - **이 문서가 답하는 질문:** F3 핵심 교차 판정을 어떤 큰 흐름과 모듈 책임으로 구현할 것인가?
 - **관련 요구사항:** [F3 개요·공통](../../requirements/f3/overview-and-common.md) · [포지션 카드](../../requirements/f3/position-card.md) · [대리·중개 판정](../../requirements/f3/delegates-and-brokerage.md) · [후보 추출·도구](../../requirements/f3/candidate-selection-and-tools.md) · [교차 판정](../../requirements/f3/cross-judgment.md) · [MVP 범위와 평가](../../requirements/common/mvp-scope-and-evaluation.md)
-- **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)
+- **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md) · [AI ADR-0002: LangGraph 채택 범위](../../../.agents/skills/ai/references/decisions/ADR-0002-langgraph-adoption.md)
 - **이 문서가 소유하지 않는 상세:** DTO·Pydantic 스키마, API 경로, DB 테이블, 프롬프트 원문, 코드 폴더·클래스 구조
 - **탐색:** [아키텍처 인덱스](../index.md) · [온라인 실행](online-runtime.md) · [오프라인 데이터·평가](offline-data-evaluation.md)
 
@@ -88,7 +88,7 @@ flowchart LR
     WK -->|"프레임워크 중립 호출"| AIF
 
     subgraph AI["AI"]
-        AIF["F3 공개 facade<br/>워크플로 후보: LangGraph"]
+        AIF["F3 공개 facade<br/>워크플로: LangGraph"]
         LA["매물 대리"]
         CA["손님 대리"]
         BJ["중개 판정<br/>도구 없음"]
@@ -144,7 +144,8 @@ pgvector 유사도는 거래 후보를 포함·제외하거나 SQL 후보 점수
 | 영속 작업+Worker, 단계 공개+최종 원자 반영 | 제안 | 비차단 실행·재시작 복구·전체 후보 비교를 함께 보장 |
 | 전문검색+pgvector 하이브리드 로그 검색 | 제안 | 표현 다양성을 보완하되 원본 근거와 시간 문맥을 유지 |
 | AI가 워크플로를 지휘하고 Backend capability를 주입 | 제안 | Agent 구조를 AI에 가두고 DB 접근을 Backend가 통제 |
-| FastAPI·SQLAlchemy 계열·PostgreSQL·pgvector·LangGraph·SSE | 후보 | 팀 승인 전에는 제품 채택으로 간주하지 않음 |
+| F3 AI workflow의 LangGraph 사용 | 결정 | [AI ADR-0002](../../../.agents/skills/ai/references/decisions/ADR-0002-langgraph-adoption.md); F2에는 강제하지 않음 |
+| FastAPI·SQLAlchemy 계열·PostgreSQL·pgvector·SSE | 후보 | 팀 승인 전에는 제품 채택으로 간주하지 않음 |
 | 로컬/외부 모델 제공자와 구체 임베딩 모델 | 미확정 | 지연·비용·개인정보 전송 조건에 영향 |
 
-현재 문서에는 `구현됨` 상태의 항목이 없다. 팀이 제안을 승인해 프로젝트 공통 결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.
+AI Provider/runtime 기반은 구현됐지만 F3 facade와 production graph는 아직 구현되지 않았다. 팀이 다른 제안을 승인해 프로젝트 공통 결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.

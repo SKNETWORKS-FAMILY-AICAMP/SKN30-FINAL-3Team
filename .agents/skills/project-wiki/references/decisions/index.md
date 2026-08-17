@@ -16,4 +16,4 @@ updated: 2026-08-17
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 
-Terraform, LangGraph와 ECS Fargate는 아직 승인된 프로젝트 결정이 아니므로 [open-questions.md](../open-questions.md)에서 관리한다.
+LangGraph의 AI 모듈 내부 채택 범위는 [AI ADR-0002](../../../ai/references/decisions/ADR-0002-langgraph-adoption.md)에서 관리한다. Terraform과 ECS Fargate는 아직 승인된 프로젝트 결정이 아니므로 [open-questions.md](../open-questions.md)에서 관리한다.
