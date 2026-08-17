@@ -1,6 +1,6 @@
 # Infra
 
-Terraform을 AWS 인프라 변경의 정본으로 사용한다. 현재 범위는 계정 baseline, 임시 운영 역할, 원격 state와 AWS 계정 연결까지다. 비용 Budget은 코드에 포함하지만 현재 계정에서는 조직 SCP로 비활성화한다. RDS, VPC, EC2, ECS, ECR, SQS, 업무용 S3와 RunPod는 만들지 않는다.
+Terraform을 AWS 인프라 변경의 정본으로 사용한다. 현재 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없으므로 Billing 자원을 만들지 않는다. 기존 선택적 Budget 입력은 현재 state 호환을 위해 남아 있지만 `create_budget=false`만 허용하며, 2026-09-23까지 누적 300,000원은 자동 집행 없는 운영 참고 상한이다. workload 자원은 plan과 별도 승인 없이 만들지 않는다.
 
 현재 AWS 계정 bootstrap과 S3 원격 state 이관은 완료됐다. 새 PC에서는 bootstrap을 다시 실행하지 않고 아래의 로컬 연결 스크립트를 사용한다.
 
@@ -12,13 +12,15 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 
 ## 구조와 소유 범위
 
-- `bootstrap/`: 계정 password policy, 계정·bucket public access block, 선택적 월 예산, `TerraformOperatorRole`, state bucket
-- `environments/dev/`: AWS account/region data source와 출력만 포함하며 관리 자원은 없음
+- `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, state bucket
+- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성과 private S3·CloudFront Frontend; 현재 코드 구현만 완료되고 미적용
 - `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
 - `scripts/verify-account-link.sh`: state bucket 읽기와 dev init/validate/plan 검증
 
 Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. 실제 두 번째 환경이나 반복 자원이 생기기 전에는 module과 workspace를 추가하지 않는다.
+
+현재 runtime 기본값은 AL2023 x86_64, `t3.medium`, encrypted gp3 40 GiB, ASG 1대와 SSM 전용 접속이다. CloudWatch log group 5개는 14일 보존하고 alarm 5개를 subscription 없는 SNS topic에 연결한다. 애플리케이션 artifact·secret·migration delivery와 RunPod Terraform은 아직 포함하지 않는다. 세부 계약은 [Infra ADR-0004](../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md)를 따른다.
 
 ## 새 PC 빠른 연결
 
@@ -96,9 +98,9 @@ cp infra/environments/dev/example.tfvars infra/environments/dev/dev.tfvars
 
 - `target_account_id`: 전용 계정의 12자리 ID
 - `operator_user_arns`: 공유 사용자가 아닌 승인된 개인 IAM 사용자 ARN
-- `create_budget`: AWS Organizations 정책이 Budget 생성을 허용할 때 `true`; SCP가 `budgets:ModifyBudget`을 차단하면 `false`
-- `budget_notification_email`: 예산 알림 주소; Terraform state에 포함되므로 state 접근을 제한
-- `monthly_budget_amount`: AWS Budgets API의 USD 금액; 300,000원 월 한도는 적용 당일 환율로 USD 환산
+- `create_budget`: 현재 계정에서는 반드시 `false`
+- `budget_notification_email`: 기존 bootstrap 입력 호환용이며 `create_budget=false`에서는 사용하지 않음
+- `monthly_budget_amount`: 기존 bootstrap 입력 호환용이며 운영 비용 한도로 해석하지 않음
 - `expires_at`: 임시 IAM 방식과 개발 환경의 종료 예정일
 
 ## 3. local state로 bootstrap
@@ -109,11 +111,9 @@ cp infra/environments/dev/example.tfvars infra/environments/dev/dev.tfvars
 bootstrap_tmp="$(mktemp -d)"
 bootstrap_vars="$(pwd)/infra/bootstrap/bootstrap.tfvars"
 
-cp infra/bootstrap/versions.tf "$bootstrap_tmp/"
-cp infra/bootstrap/providers.tf "$bootstrap_tmp/"
-cp infra/bootstrap/variables.tf "$bootstrap_tmp/"
-cp infra/bootstrap/main.tf "$bootstrap_tmp/"
-cp infra/bootstrap/outputs.tf "$bootstrap_tmp/"
+for bootstrap_file in versions providers variables locals account-baseline operator-access state-storage budget outputs; do
+  cp "infra/bootstrap/${bootstrap_file}.tf" "$bootstrap_tmp/"
+done
 
 terraform -chdir="$bootstrap_tmp" init
 AWS_PROFILE=skn30-bootstrap terraform -chdir="$bootstrap_tmp" plan \
@@ -125,7 +125,7 @@ AWS_PROFILE=skn30-bootstrap terraform -chdir="$bootstrap_tmp" plan \
 plan에서 다음만 생성되는지 검토하고 승인을 받은 뒤 apply한다.
 
 - account password policy와 account-level S3 public access block
-- `create_budget=true`인 경우 월 비용 budget과 50/80/100% 이메일 알림
+- 현재 계정에서는 Billing 자원을 생성하지 않으며 `create_budget=false` validation이 이를 차단함
 - `TerraformOperatorRole`과 승인 사용자용 assume/login policy 연결
 - Terraform state bucket과 versioning, SSE-S3, ownership, public access, TLS, 90일 noncurrent version 정책
 
@@ -134,7 +134,7 @@ AWS_PROFILE=skn30-bootstrap terraform -chdir="$bootstrap_tmp" apply bootstrap.tf
 cp "$bootstrap_tmp/terraform.tfstate" infra/bootstrap/terraform.tfstate
 ```
 
-Terraform plan에는 알림 이메일이 민감 값으로 가려지는지 확인한다. RDS/VPC/EC2/ECS/ECR/SQS/RunPod 또는 업무용 S3가 보이면 apply하지 않는다.
+bootstrap plan에는 RDS/VPC/EC2/ECS/ECR/SQS/RunPod 또는 업무용 S3가 없어야 한다. 이런 workload 자원이 보이면 apply하지 않는다.
 
 ## 4. 운영 역할과 원격 state로 전환
 
@@ -177,7 +177,7 @@ find infra/bootstrap -maxdepth 1 -name '*.tfstate*' -print
 ```bash
 export AWS_PROFILE=skn30-session
 export TARGET_ACCOUNT_ID="123456789012"
-export EXPIRES_AT=2026-10-31
+export EXPIRES_AT=2026-09-23
 
 infra/scripts/preflight.sh
 terraform -chdir=infra/bootstrap validate
@@ -186,7 +186,7 @@ terraform -chdir=infra/bootstrap plan -var-file=bootstrap.tfvars
 infra/scripts/verify-account-link.sh
 ```
 
-dev root의 최초 plan은 data source 결과를 output state에 기록하는 변경만 보여야 한다. 검토 후 한 번 apply하고 다시 실행하면 `No changes`여야 한다. 이 과정에서 AWS 관리 자원은 생성되지 않는다.
+dev root에는 현재 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG와 관측성이 구현돼 있으므로 plan은 비용 발생 자원을 포함한다. 마지막 검토 plan은 96개 추가, 변경 0개, 삭제 0개였으며 사람의 별도 승인 전에는 apply하지 않는다.
 
 잘못된 계정 ID나 `ap-northeast-2` 외 리전을 넣으면 provider/variable guard가 plan을 중단해야 한다.
 

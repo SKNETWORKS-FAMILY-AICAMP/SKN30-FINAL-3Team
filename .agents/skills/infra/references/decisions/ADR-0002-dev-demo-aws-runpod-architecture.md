@@ -7,6 +7,7 @@ updated: 2026-08-18
 
 - 상태: 승인됨
 - 결정일: 2026-08-18
+- 보완 결정: [프로젝트 ADR-0009](../../../project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md)
 
 ## 맥락
 
@@ -19,16 +20,16 @@ updated: 2026-08-18
 - ASG는 Launch Template 기반 `desired=1`이며 EC2는 public IPv4와 Internet Gateway로 제한된 outbound를 수행한다. 1차에는 NAT Gateway를 두지 않는다.
 - RDS PostgreSQL 15와 pgvector는 private subnet의 Single-AZ 인스턴스로 운영한다.
 - S3 Gateway Endpoint를 사용하고 Frontend origin, 임시 음성, 데이터·모델, Pipeline artifact와 Terraform state bucket을 분리한다.
-- Frontend S3는 public website로 열지 않고 CloudFront Origin Access Control만 허용한다.
+- Frontend S3는 public website로 열지 않고 CloudFront Origin Access Control만 허용한다. CloudFront `/api/*`는 ALB custom origin으로 전달한다.
 - ECR, CodeConnections, CodePipeline V2, CodeBuild와 CodeDeploy를 애플리케이션 전달 자원으로 사용한다. Pipeline source는 `DetectChanges=false`이고 수동 최신 `main` 또는 `COMMIT_ID` override로만 실행한다.
 - CodeDeploy agent, ALB health check, CloudWatch alarm과 자동 rollback을 구성한다. DB migration 실패는 배포 실패로 처리한다.
 - Secrets Manager는 비밀값, Parameter Store는 비민감 설정을 소유하고 EC2 프로세스 환경변수로 주입한다.
-- CloudWatch logs·metrics·alarms, SNS와 Budget으로 상태와 비용을 추적한다.
+- CloudWatch logs·metrics·alarms와 SNS로 상태를 추적한다. AWS Billing 관련 자원은 만들지 않는다.
 - RunPod는 팀 공용 Template에서 개발자별 Pod를 생성·삭제한다. 개발 실험 후에는 stop 대신 결과를 반출하고 삭제하며, 시연 운영 기간에는 선택한 Pod를 실행 상태로 유지한다.
 
 ## 조건부 자원
 
-- Route 53·ACM은 도메인 확정 후 ALB HTTPS를 구성할 때 도입한다.
+- 현재 환경에는 Route 53·ACM·ALB HTTPS를 만들지 않는다. 운영 승격 시 도메인과 종단 간 TLS를 별도 결정한다.
 - SQS·DLQ는 RDS 작업 polling으로 독립 재시도, 지연 격리와 Worker 확장이 어려워진다는 측정 결과가 있을 때 도입한다.
 - ECS Fargate·Cloud Map은 AI 실행부의 독립 확장·배포·장애 격리가 필요할 때 도입한다.
 - RunPod custom image·Network Volume은 기본 vLLM, 일반 모델 다운로드와 Pod volume 방식이 요구를 충족하지 못할 때 도입한다.

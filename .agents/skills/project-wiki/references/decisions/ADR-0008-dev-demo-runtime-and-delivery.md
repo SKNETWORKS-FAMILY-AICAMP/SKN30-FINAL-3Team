@@ -7,6 +7,7 @@ updated: 2026-08-18
 
 - 상태: 승인됨
 - 결정일: 2026-08-18
+- 보완 결정: [ADR-0009](ADR-0009-dev-demo-operating-constraints.md)
 
 ## 맥락
 
@@ -24,7 +25,7 @@ F2·F3 AI 흐름을 두 달 예산 안에서 공동 개발하고 시연하려면
 - Frontend와 Backend+AI Build는 병렬 실행한다. 두 Build 성공 뒤 사람 승인을 받고, Backend CodeDeploy와 health 검증 후 Frontend를 배포한다.
 - DB migration은 CodeDeploy lifecycle에서 명시적으로 실행하고 실패 시 배포를 중단한다. 자동 down migration 없이 전진 호환 migration만 허용한다.
 - Terraform은 애플리케이션 Pipeline에 넣지 않고 기존 수동 `preflight → fmt/validate → plan → 승인 → apply → 검증 → drift plan` 절차를 유지한다.
-- AWS 예산은 2개월 합계 300,000원, RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 별도 관리한다.
+- AWS 비용 참고 상한은 2026-09-23까지 누적 300,000원이며 Billing 자원으로 자동 집행하지 않는다. RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 별도 관리한다.
 
 ## AI 독립 배포 조건
 

@@ -2,6 +2,57 @@ version: 1
 updated: "2026-08-18"
 
 sources:
+  - id: "dev-frontend-origin-routing-2026-08-18"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-18)"
+    received: "2026-08-18"
+    reflected_in:
+      - ".agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md"
+      - ".agents/skills/infra/references/resource-inventory.md"
+      - "docs/architecture/infra/overview.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - "infra/environments/dev/frontend.tf"
+    scope: "CloudFront 기본 domain, private S3 OAC, /api/* ALB 동일 origin 추천 수용과 delivery 분리"
+
+
+  - id: "dev-runtime-observability-2026-08-18"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-18)"
+    received: "2026-08-18"
+    reflected_in:
+      - ".agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md"
+      - ".agents/skills/infra/references/resource-inventory.md"
+      - "docs/architecture/infra/overview.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - "infra/environments/dev/runtime.tf"
+      - "infra/environments/dev/observability.tf"
+    scope: "원래 계획의 EC2·ALB·ASG runtime과 CloudWatch 관측성 진행, 애플리케이션 delivery 분리, RunPod Terraform 보류"
+
+  - id: "dev-storage-database-configuration-2026-08-18"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-18)"
+    received: "2026-08-18"
+    reflected_in:
+      - ".agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md"
+      - ".agents/skills/infra/references/resource-inventory.md"
+      - "docs/architecture/infra/overview.md"
+      - "infra/environments/dev/workload-storage.tf"
+      - "infra/environments/dev/database.tf"
+      - "infra/environments/dev/configuration.tf"
+    scope: "RDS·S3·설정 기본값, 2026-09-23 종료 기준, pgvector 최초 migration, RunPod Terraform 보류"
+
+  - id: "dev-demo-operating-constraints-2026-08-18"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-18)"
+    received: "2026-08-18"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md"
+      - "docs/architecture/infra/overview.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/infra/references/resource-inventory.md"
+      - ".agents/skills/infra/references/open-questions.md"
+    scope: "2026-09-23 AWS 비용·artifact 종료, Billing 서비스 미사용, Identity Center, CloudFront 동일 origin과 개인정보 제한, 최초 migration의 pgvector 활성화, 애플리케이션 배포 선행 작업 분리"
+
   - id: "dev-demo-infra-architecture-2026-08-18"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-18)"

@@ -10,8 +10,8 @@ updated: 2026-08-18
 
 - **이 문서가 답하는 질문:** 선택한 revision을 어떻게 빌드·승인·배포하고 실패와 비용을 어떻게 통제하는가?
 - **관련 개요:** [개발·시연용 인프라 아키텍처](overview.md)
-- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)
-- **적용 범위:** 계획된 절차이며 실제 Pipeline이나 AWS·RunPod 자원은 아직 생성하지 않는다.
+- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md)
+- **적용 범위:** account bootstrap은 이미 적용됐고 dev workload Terraform은 미적용이다. 애플리케이션 delivery Pipeline과 RunPod 자원은 아직 생성하지 않는다.
 
 ## 전달 원칙
 
@@ -57,7 +57,7 @@ Source output은 Pipeline artifact 전용 S3에 저장한다. 이 bucket은 다�
 
 - Terraform state, Frontend origin, 임시 음성, 데이터셋과 모델 artifact를 저장하지 않는다.
 - Pipeline·CodeBuild·CodeDeploy 역할만 최소 권한으로 접근한다.
-- versioning, 저장 암호화, public access block과 짧은 lifecycle을 적용한다.
+- versioning은 사용하지 않고 저장 암호화, public access block과 객체 생성 14일 후 만료 lifecycle을 적용한다.
 - Build log와 artifact에 `.env`, token, 원문 개인정보 또는 전체 접속 URL을 포함하지 않는다.
 
 ## Build 단계
@@ -95,7 +95,7 @@ Manual approval은 두 Build가 모두 성공한 뒤 한 번 수행한다. 승�
 
 ## Backend CodeDeploy
 
-Backend는 ASG `desired=1`의 EC2에 CodeDeploy 인플레이스 방식으로 배포한다. Launch Template bootstrap에서 CodeDeploy agent, SSM agent, container runtime와 CloudWatch agent를 설치하고 활성화한다. EC2 instance profile은 ECR pull, 해당 배포 artifact 읽기, 설정·비밀값 주입과 로그 전송에 필요한 권한만 가진다.
+Backend는 ASG `desired=1`의 EC2에 CodeDeploy 인플레이스 방식으로 배포한다. 현재 Launch Template bootstrap은 SSM agent, Docker와 CloudWatch agent만 준비한다. CodeDeploy agent 설치, Pipeline artifact 읽기, migration 전용 자격과 애플리케이션 설정·비밀값 조립 권한은 delivery 단계에서 별도 추가한다.
 
 [CodeDeploy는 ASG와 연동해 새 인스턴스에 revision을 배포하고 Load Balancer와 조정](https://docs.aws.amazon.com/codedeploy/latest/userguide/integrations-aws-auto-scaling.html)한다. 단일 ASG에는 하나의 CodeDeploy deployment group만 연결한다.
 
@@ -124,10 +124,15 @@ CodeDeploy deployment group은 실패 상태와 CloudWatch alarm에 자동 롤�
 
 Backend health가 확인된 뒤 Frontend deploy action을 실행한다. 배포 전용 CodeBuild action이 build artifact를 Frontend origin S3에 동기화하고 CloudFront invalidation을 생성한다.
 
+현재 `npm run build`는 존재하지 않는 `frontend/scripts/prepare-sites-build.mjs`를 호출하므로 delivery 구현 전에 표준 release build를 복구해야 한다.
+
 - 해시가 포함된 정적 asset은 장기 cache하고 entry document는 짧게 cache한다.
+- entry document는 `no-cache` 또는 짧은 TTL metadata, hash asset은 immutable metadata로 업로드한다.
+- CloudFront managed security headers를 default와 API behavior에 모두 적용하며 CORS는 Backend가 소유한다.
 - S3 객체 ACL로 공개하지 않고 CloudFront OAC bucket policy만 허용한다.
 - sync 실패 시 invalidation을 실행하지 않는다.
 - invalidation 실패는 Pipeline 실패로 표시하고 재실행 여부를 운영자가 판단한다.
+- 환경 종료 시 `force_destroy=false`인 Frontend bucket의 객체를 승인 절차로 비운 뒤 Terraform destroy를 수행한다.
 
 ## 실패 차단과 복구
 
@@ -146,7 +151,7 @@ API·DTO는 이번 작업에서 변경하지 않는다. Frontend와 Backend 배�
 
 ## Terraform 운영
 
-Terraform 배포 Pipeline은 만들지 않는다. AWS·RunPod IaC 변경은 다음 수동 절차를 유지한다.
+Terraform 배포 Pipeline은 만들지 않는다. AWS IaC 변경은 다음 수동 절차를 유지하며 RunPod Terraform 소유 범위는 현재 보류한다.
 
 ```text
 preflight → fmt/validate → plan → 사람 승인 → apply → 검증 → drift plan
@@ -184,25 +189,27 @@ LLM·STT·Embedding은 논리적으로 독립된 route와 관측 차원을 갖�
 
 | 대상 | 로그·메트릭 | 기본 알람·대응 |
 |---|---|---|
-| ALB | target health, response time, 4xx·5xx | unhealthy host, 5xx·지연 증가 시 SNS |
-| EC2 API·Worker | 프로세스 health, CPU·memory·disk, 재시작, job age | process down, disk 부족, 장기 job 시 SNS |
-| RDS | CPU, free storage, connection, latency, backup failure | storage·connection 임계, DB unavailable 시 SNS |
+| ALB | target health, target 5xx | unhealthy host와 target 5xx alarm을 SNS topic에 연결 |
+| EC2 host | CloudWatch Agent memory·disk metric, agent·cloud-init log | API·Worker 프로세스 alarm은 delivery 단계에서 추가 |
+| RDS | CPU, free storage, PostgreSQL·upgrade log | CPU 80%와 free storage 5 GiB alarm을 SNS topic에 연결 |
 | CodePipeline·CodeBuild | 실행 SHA, stage duration, failure | Build·approval·deploy 실패 시 SNS |
 | CodeDeploy | lifecycle hook, deployment status, ALB health | 실패 시 자동 롤백 및 SNS |
 | S3 deletion | 임시 음성 age, 삭제 실패 건수 | 1시간 초과 객체 또는 sweeper 실패 시 SNS |
 | RunPod·OpenAI | route별 latency, error, token·request count, 추정 비용 | endpoint down, 오류율·예산 증가 시 담당자 알림 |
 
-CloudWatch에는 음성, 전사 원문, 전체 프롬프트, 인증 헤더, API key와 개인정보가 포함된 모델 응답을 기록하지 않는다. 내부 작업 ID와 가명 사용자 ID, route, 지연, 상태 코드와 사용량만 남긴다.
+CloudWatch log group은 기본 14일 보존한다. 음성, 전사 원문, 전체 프롬프트, 인증 헤더, API key와 개인정보가 포함된 모델 응답을 기록하지 않고 내부 작업 ID와 가명 사용자 ID, route, 지연, 상태 코드와 사용량만 남긴다.
+
+현재 SNS topic에는 subscription이 없으므로 alarm action은 사람 알림이 아니라 후속 연결점이다. API·Worker process, Pipeline, S3 deletion과 RunPod 알림은 각 delivery·애플리케이션 단계에서 실제 metric 생산자가 준비된 뒤 연결한다.
 
 ## 비용과 종료 정책
 
 | 비용 경계 | 한도 | 운영 규칙 |
 |---|---|---|
-| AWS | 2개월 합계 300,000원 | Budget 단계 알림, 월별 forecast 검토, NAT·Multi-AZ 제외 |
+| AWS | 2026-09-23까지 누적 300,000원 | 자동 집행 없는 참고 상한, 변경별 예상 비용·소유자·종료일 검토 |
 | RunPod | 2개월 합계 USD 300 | Pod별 소유자·종료일, 개발 후 삭제, 시연 Pod만 상시 유지 |
 | OpenAI | 2개월 합계 USD 300 | 모델 route별 사용량·비용 기록, 실험 상한과 key 분리 |
 
-비용 발생 자원에는 최소 `Project`, `Environment`, `Owner`, `ManagedBy`, `ExpiresAt` 태그를 적용한다. S3 등 태그만으로 수명주기를 강제할 수 없는 자원은 lifecycle과 운영 checklist를 함께 둔다. AWS Budget 생성이 조직 SCP로 막히면 조직 관리자에게 예산 또는 동등한 비용 알림을 요청하고, 해결 전에는 유료 workload 생성 승인을 보류한다.
+비용 발생 자원에는 최소 `Project`, `Environment`, `Owner`, `ManagedBy`, `ExpiresAt=2026-09-23` 태그를 적용한다. 이 계정에서는 AWS Budget과 Cost Anomaly Detection을 사용할 수 없으므로 해당 자원을 만들지 않고 자동 알림·차단을 전제하지 않는다. Data/model S3의 승인된 release artifact는 2026-09-23까지 유효하며 환경 종료 확인 후 만료·삭제한다.
 
 ## 운영 체크리스트
 
@@ -212,7 +219,7 @@ CloudWatch에는 음성, 전사 원문, 전체 프롬프트, 인증 헤더, API 
 - 두 Build 성공, image digest와 artifact 분리 확인
 - migration 전진 호환성과 RDS backup 상태 확인
 - Manual approval 완료 및 변경 영향 공지
-- 도메인·ACM 미구성 시 합성 데이터 사용 확인
+- CloudFront 기본 도메인과 `/api/*` 동일 origin을 사용하며 합성·비식별 데이터만 사용하는지 확인
 
 ### 배포 후
 
@@ -227,5 +234,5 @@ CloudWatch에는 음성, 전사 원문, 전체 프롬프트, 인증 헤더, API 
 - RunPod Pod 삭제와 artifact 반출 확인
 - OpenAI·RunPod secret 회전 또는 폐기
 - ASG·RDS·ALB 등 유료 자원의 유지 필요성 검토
-- RDS final snapshot 여부와 업무용 S3 보존·삭제를 승인된 정책에 따라 수행
-- Pipeline artifact lifecycle과 CloudWatch log 보존 만료 확인
+- RDS deletion protection을 별도 승인 apply로 해제한 뒤 final snapshot을 생성하고, snapshot 소유자·보존 근거·폐기 승인일을 기록
+- non-versioned Pipeline artifact의 14일 lifecycle과 CloudWatch log의 14일 보존 만료 확인

@@ -44,13 +44,18 @@ variable "operator_user_arns" {
 }
 
 variable "create_budget" {
-  description = "AWS Organizations 정책이 허용할 때 월 비용 Budget을 관리할지 여부"
+  description = "현재 계정에서 AWS Budget 생성을 비활성화하는 호환 입력"
   type        = bool
-  default     = true
+  default     = false
+
+  validation {
+    condition     = var.create_budget == false
+    error_message = "현재 계정에서는 AWS Billing 관련 서비스를 사용할 수 없으므로 create_budget은 false여야 합니다."
+  }
 }
 
 variable "budget_notification_email" {
-  description = "AWS 월 비용 예산 알림을 받을 이메일"
+  description = "create_budget=false에서 사용하지 않는 기존 bootstrap 호환 입력"
   type        = string
   sensitive   = true
 
@@ -61,7 +66,7 @@ variable "budget_notification_email" {
 }
 
 variable "monthly_budget_amount" {
-  description = "월 AWS 비용 한도(USD). 원화 예산은 적용 시점 환율로 환산한다."
+  description = "create_budget=false에서 사용하지 않는 기존 bootstrap 호환 입력"
   type        = number
 
   validation {
