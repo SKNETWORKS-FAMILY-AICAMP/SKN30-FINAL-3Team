@@ -1,12 +1,10 @@
 ---
-status: 미확정
-updated: 2026-08-12
+status: 결정
+updated: 2026-08-17
 ---
 
 # 백엔드 미해결 질문
 
-| ID | 질문 | 현재 후보·맥락 | 영향 | 결정 주체 |
-|---|---|---|---|---|
-| BQ-001 | 백엔드 웹 프레임워크, Python 버전·패키지 관리자와 품질 도구를 무엇으로 확정할 것인가? | FastAPI 계열과 pytest 등은 후보일 뿐이며 포맷·린트·타입·테스트 명령도 함께 승인 필요 | backend 개발환경과 CI | 백엔드 담당·팀 |
+현재 백엔드 초기 개발환경과 런타임에 남은 미해결 질문은 없다.
 
-DB 계층이나 큐처럼 다른 루트 모듈과 계약에 영향을 주는 질문은 project-wiki의 `open-questions.md`에서 관리한다.
+Python, 패키지 관리자, HTTP 프레임워크, DB 계층, migration, 인증과 품질 도구는 [ADR-0002](decisions/ADR-0002-backend-runtime-database-authentication.md)에서 확정했다. 큐, 배포 런타임과 개인정보 보존 기간처럼 다른 모듈 또는 프로젝트에 영향을 주는 질문은 project-wiki에서 관리한다.

@@ -1,6 +1,6 @@
 ---
 status: 계획됨
-updated: 2026-08-12
+updated: 2026-08-17
 ---
 
 # 런타임 및 기술 후보
@@ -10,10 +10,10 @@ updated: 2026-08-12
 | 영역 | 현재 방향 | 상태 |
 |---|---|---|
 | Frontend | React | 계획됨 |
-| Backend | Python | 계획됨 |
+| Backend | Python 3.13, uv, FastAPI | 결정 |
 | Agent | Python, LangGraph | 제안 |
 | Data | Python | 계획됨 |
-| Database | PostgreSQL, SQLModel, Alembic | 제안 |
+| Database | PostgreSQL 15, SQLModel, Yoyo 순수 SQL migration | 결정 |
 | Queue | AWS SQS | 제안 |
 | Container runtime | AWS ECS Fargate | 제안 |
 | IaC | Terraform | 제안 |
@@ -26,7 +26,7 @@ updated: 2026-08-12
 - SQS는 서비스 간 작업 전달, 재시도와 결합도 완화를 담당한다.
 - LangGraph는 하나의 에이전트 실행 내부의 상태, 체크포인트와 재개를 담당한다.
 - SQLModel 테이블 모델은 API 및 이벤트 공개 계약으로 직접 사용하지 않는다.
-- Alembic을 운영 데이터베이스 스키마 변경 수단으로 사용한다.
+- Backend는 Yoyo로 순수 SQL 전진 migration을 적용하며 애플리케이션 시작 시 자동 적용하지 않는다.
 - AWS SDK는 실행 중 AWS 서비스를 호출하는 데 사용하고 IaC 대체 수단으로 사용하지 않는다.
 
 ## 비용 제약

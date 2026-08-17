@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-14
+updated: 2026-08-17
 ---
 
 # 프로젝트 위키 인덱스
@@ -12,6 +12,7 @@ updated: 2026-08-14
 | [governance.md](governance.md) | 위키를 추가·수정하거나 지식 상태를 판정할 때 |
 | [project-overview.md](project-overview.md) | 프로젝트 목표, 범위, 제약을 확인할 때 |
 | [요구사항 인덱스](../../../../docs/requirements/index.md) | 기능 범위, 사용자 동작, 수용 기준 또는 F1·F2·F3 요구사항 ID를 확인할 때 |
+| [DB SQL 관리](../../../../docs/db/README.md) | DB 기준선, 도메인별 마이그레이션 SQL, 파일 명명·불변성·검증 규칙을 확인할 때 |
 | [architecture/overview.md](architecture/overview.md) | 모듈 경계나 의존 관계를 변경할 때 |
 | [architecture/runtime.md](architecture/runtime.md) | 런타임, 프레임워크, 배포 후보를 검토할 때 |
 | [브랜치 및 PR 정책](../../../../.agents-rule/git.md) | 브랜치, 커밋, PR, 병합 방식을 확인할 때 |
