@@ -30,8 +30,9 @@ description: "`infra/`의 Terraform 기반 AWS·RunPod 인프라, 계정 bootstr
 - Terraform 기반 계정 bootstrap과 S3 원격 state는 결정됐다.
 - AWS 대상 리전은 별도 결정 전까지 `ap-northeast-2`다.
 - IAM 사용자와 MFA는 초기 계정 연결을 위한 임시 방식이며 운영 배포 전에 Identity Center를 재검토한다.
-- RDS, ECS Fargate, SQS, 업무용 S3, RunPod와 구체 배포 구조는 아직 구현 또는 승인된 자원으로 간주하지 않는다.
-- NAT Gateway, Multi-AZ와 상시 다중 환경은 비용 영향을 확인하고 승인 후 도입한다.
+- RDS PostgreSQL 15 Single-AZ, EC2·ALB·ASG, 업무용 S3, RunPod Pod와 CodePipeline 전달 구조는 개발·시연용 선택으로 승인됐지만 아직 구현되지 않았다.
+- ECS Fargate·Cloud Map, SQS·DLQ, Route 53·ACM과 RunPod custom image·Network Volume은 조건이 충족될 때만 도입한다.
+- GitHub Actions OIDC, NAT Gateway, Multi-AZ RDS와 Terraform 배포 Pipeline은 1차 범위에서 제외한다.
 
 ## 검증과 기록
 

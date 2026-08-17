@@ -1,6 +1,6 @@
 ---
 status: 제안
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # 아키텍처 문서 안내
@@ -9,9 +9,9 @@ updated: 2026-08-17
 
 - **이 문서가 답하는 질문:** 기능별 아키텍처 문서를 어디에서 찾고, 어떤 상태로 해석해야 하는가?
 - **관련 요구사항:** [요구사항 인덱스](../requirements/index.md)
-- **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)
+- **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md) · [ADR-0008: 개발·시연 런타임과 전달](../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md)
 - **이 문서가 소유하지 않는 상세:** 기능 요구사항, 승인된 프로젝트 공통 결정의 원문, 모듈 내부 폴더·클래스 구조
-- **탐색:** [F2 개요](f2/overview.md) · [F2 온라인 실행](f2/online-runtime.md) · [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) · [F3 개요](f3/overview.md) · [F3 온라인 실행](f3/online-runtime.md) · [F3 오프라인 데이터·평가](f3/offline-data-evaluation.md)
+- **탐색:** [인프라 개요](infra/overview.md) · [배포·운영](infra/deployment-and-operations.md) · [F2 개요](f2/overview.md) · [F2 온라인 실행](f2/online-runtime.md) · [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) · [F3 개요](f3/overview.md) · [F3 온라인 실행](f3/online-runtime.md) · [F3 오프라인 데이터·평가](f3/offline-data-evaluation.md)
 
 ## 목적과 적용 범위
 
@@ -45,6 +45,8 @@ updated: 2026-08-17
 
 | 문서 | 언제 읽는가? | 다루는 범위 |
 |---|---|---|
+| [인프라 개요](infra/overview.md) | 공유 개발·시연 환경의 AWS·RunPod 배치와 자원 상태를 파악할 때 | VPC, EC2·RDS·S3, RunPod, 데이터 흐름, 조건부 ECS 확장 |
+| [배포·운영 구조](infra/deployment-and-operations.md) | revision 선택부터 Build·승인·배포·롤백과 비용 운영을 확인할 때 | CodePipeline V2, CodeBuild, CodeDeploy, RunPod 운영, 관측·종료 절차 |
 | [F2 개요](f2/overview.md) | F2 전체 흐름과 팀별 책임을 처음 파악할 때 | 범위, 시스템 구성, 온라인·오프라인 관계, 파일럿 가정 |
 | [F2 온라인 실행](f2/online-runtime.md) | 업로드부터 사용자 승인 저장까지 구현 흐름을 논의할 때 | 작업 상태, Backend–AI 경계, 진행 알림, 복구, 저장 일관성 |
 | [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) | 평가셋과 모델 개선·승격 기준을 논의할 때 | 합성 데이터, 분할, 평가 계층, 버전, 피드백 루프 |
@@ -62,4 +64,3 @@ updated: 2026-08-17
 4. 모듈 내부 폴더 구조와 클래스 패턴은 모듈별 skill references가 소유한다.
 5. 미확정 사항은 해당 `open-questions.md`에 두고 이곳에는 링크와 아키텍처 영향만 기록한다.
 6. 팀 승인 후 프로젝트 공통 결정만 ADR로 옮기고, 이 문서는 흐름과 다이어그램을 설명하는 자료로 유지한다.
-

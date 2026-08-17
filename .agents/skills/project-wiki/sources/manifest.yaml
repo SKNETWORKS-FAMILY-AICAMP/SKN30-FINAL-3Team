@@ -1,7 +1,78 @@
 version: 1
-updated: "2026-08-17"
+updated: "2026-08-18"
 
 sources:
+  - id: "dev-demo-infra-architecture-2026-08-18"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-18)"
+    received: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/overview.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md"
+      - ".agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md"
+      - ".agents/skills/infra/references/resource-inventory.md"
+      - ".agents/skills/project-wiki/references/architecture/runtime.md"
+    scope: "EC2 Backend·설치형 brokerage-ai·RunPod 1차 런타임, 수동 CodePipeline V2·CodeBuild·CodeDeploy 전달, 기본·조건부·제외 자원과 운영 제약"
+
+  - id: "aws-codepipeline-source-revision-override"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/codepipeline/latest/userguide/pipelines-trigger-source-overrides.html"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md"
+    scope: "수동 최신 revision 실행과 COMMIT_ID source revision override"
+
+  - id: "aws-codeconnections-github"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/codepipeline/latest/userguide/connections-github.html"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md"
+    scope: "GitHub App 기반 CodeConnections와 DetectChanges=false 수동 release 구성"
+
+  - id: "aws-codedeploy-asg"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/codedeploy/latest/userguide/integrations-aws-auto-scaling.html"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+    scope: "CodeDeploy와 EC2 Auto Scaling·Load Balancer 연동"
+
+  - id: "aws-alb-subnets"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/overview.md"
+    scope: "Application Load Balancer의 다중 AZ subnet 배치"
+
+  - id: "aws-cloudfront-s3-oac"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/overview.md"
+    scope: "CloudFront Origin Access Control을 통한 private S3 origin 제한"
+
+  - id: "runpod-pod-management"
+    type: "official-documentation"
+    url: "https://docs.runpod.io/pods/manage-pods"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+    scope: "개발자별 Pod 생성·삭제와 운영 기간 유지 절차"
+
+  - id: "runpod-template-management"
+    type: "official-documentation"
+    url: "https://docs.runpod.io/pods/templates/manage-templates"
+    accessed: "2026-08-18"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+    scope: "공용 Pod Template의 재사용 설정과 조건부 custom image·storage"
+
   - id: "integrated-ddl-postgresql15-2026-08-17"
     type: "user-provided-document"
     location: 'C:\Users\playdata2\Downloads\F1_F2_F3_통합_DDL_명칭개선_PostgreSQL15.sql'
