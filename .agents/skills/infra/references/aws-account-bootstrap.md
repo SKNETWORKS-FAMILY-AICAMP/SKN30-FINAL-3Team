@@ -23,6 +23,13 @@ updated: 2026-08-17
 
 AWS Organizations의 SCP가 `budgets:ModifyBudget`을 명시적으로 거부하는 계정에서는 `create_budget=false`로 bootstrap한다. 이 경우 계정 baseline과 state 구성을 먼저 완료하고, 비용 알림은 조직 관리자에게 별도로 요청한다. SCP를 우회하거나 Terraform 밖에서 Budget을 만들지 않는다.
 
+## 새 PC 연결
+
+- 승인된 IAM 사용자와 MFA가 있는 새 PC에서는 `infra/scripts/setup-local.sh`로 profile, 로컬 backend/dev 변수, Terraform init과 읽기 전용 연결 검증을 수행한다.
+- 이 절차는 기존 S3 state에 연결할 뿐 bootstrap apply를 반복하지 않는다.
+- 스크립트는 IAM 변경, `bootstrap.tfvars` 생성과 `terraform apply`를 수행하지 않는다.
+- 다른 사용자를 추가할 때는 기존 운영자가 전체 `operator_user_arns`를 보존한 별도 bootstrap plan을 승인받아 적용한다.
+
 ## 복구와 종료
 
 - local state 이관 전에는 복사본을 만들고 이관 성공 후에만 로컬 원본을 제거한다.

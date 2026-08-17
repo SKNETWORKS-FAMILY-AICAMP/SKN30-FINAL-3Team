@@ -2,16 +2,60 @@
 
 Terraform을 AWS 인프라 변경의 정본으로 사용한다. 현재 범위는 계정 baseline, 임시 운영 역할, 원격 state와 AWS 계정 연결까지다. 비용 Budget은 코드에 포함하지만 현재 계정에서는 조직 SCP로 비활성화한다. RDS, VPC, EC2, ECS, ECR, SQS, 업무용 S3와 RunPod는 만들지 않는다.
 
+현재 AWS 계정 bootstrap과 S3 원격 state 이관은 완료됐다. 새 PC에서는 bootstrap을 다시 실행하지 않고 아래의 로컬 연결 스크립트를 사용한다.
+
+Terraform 관리는 다음 세 요소를 함께 사용한다. S3 state에는 Terraform 코드가 저장되지 않으므로 항상 저장소의 최신 승인 코드를 먼저 받아야 한다.
+
+```text
+Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
+```
+
 ## 구조와 소유 범위
 
-- `bootstrap/`: 계정 password policy, 계정·bucket public access block, 월 예산, `TerraformOperatorRole`, state bucket
+- `bootstrap/`: 계정 password policy, 계정·bucket public access block, 선택적 월 예산, `TerraformOperatorRole`, state bucket
 - `environments/dev/`: AWS account/region data source와 출력만 포함하며 관리 자원은 없음
+- `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
 - `scripts/verify-account-link.sh`: state bucket 읽기와 dev init/validate/plan 검증
 
 Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. 실제 두 번째 환경이나 반복 자원이 생기기 전에는 module과 workspace를 추가하지 않는다.
 
-## 0. 사람의 1회 계정 설정
+## 새 PC 빠른 연결
+
+이 절차는 계정 bootstrap을 다시 실행하지 않는다. 사전에 개인 IAM 사용자, console 접근, OTP MFA와 `TerraformOperatorRole` assume 권한이 있어야 한다.
+
+AWS CLI 2.36 이상과 `.terraform-version`의 Terraform을 설치하고 저장소의 최신 승인 코드를 받은 뒤 실행한다.
+
+```bash
+infra/scripts/setup-local.sh \
+  --account-id 398563707017 \
+  --expires-at 2026-09-23
+```
+
+스크립트는 다음 작업만 수행한다.
+
+- `skn30-bootstrap`, `skn30-session` profile 설정과 `aws login`
+- 로그인 계정·사용자·서울 리전 검증
+- 커밋하지 않는 bootstrap/dev `backend.hcl`과 dev `dev.tfvars` 생성
+- 두 Terraform root의 `init -reconfigure`
+- `TerraformOperatorRole` assume, state bucket 보안 설정과 dev 빈 plan 검증
+
+이미 `aws login` 세션이 유효하면 `--skip-login`을 사용할 수 있다. 기존 로컬 파일과 생성할 내용이 다르면 스크립트는 중단하며, 내용을 직접 검토한 경우에만 `--force`로 교체한다.
+
+```bash
+infra/scripts/setup-local.sh \
+  --account-id 398563707017 \
+  --expires-at 2026-09-23 \
+  --skip-login
+```
+
+스크립트는 `bootstrap.tfvars`를 만들거나 IAM 권한을 추가하지 않으며 `terraform apply`를 실행하지 않는다. 다른 팀원을 추가하려면 기존 운영자가 전체 `operator_user_arns`를 보존한 bootstrap plan을 별도로 검토하고 적용해야 한다.
+
+state bucket은 개인 IAM 사용자의 직접 접근을 거부한다. 직접 `aws s3` 명령이 `403`을 반환할 수 있으며, Terraform과 검증 스크립트가 `TerraformOperatorRole`을 assume해 접근하는 것이 정상이다.
+
+## 최초 1회 AWS 계정 설정
+
+현재 계정에서는 완료된 절차다. 새 PC 연결을 위해 다시 수행하지 않는다.
 
 1. root 계정에 MFA, 결제·보안 연락처를 설정하고 root access key가 없음을 확인한다.
 2. 공유 계정 대신 팀원별 IAM 사용자를 만들고 console password와 OTP MFA를 등록한다.
@@ -59,7 +103,7 @@ cp infra/environments/dev/example.tfvars infra/environments/dev/dev.tfvars
 
 ## 3. local state로 bootstrap
 
-S3 bucket은 자기 자신을 backend로 만들 수 없으므로 `backend.tf`를 제외한 임시 사본에서 최초 apply한다. 이 단계만 bootstrap 담당자의 직접 권한을 사용한다.
+최초 계정 구축에서 한 번만 실행한다. S3 bucket은 자기 자신을 backend로 만들 수 없으므로 `backend.tf`를 제외한 임시 사본에서 최초 apply한다. 이 단계만 bootstrap 담당자의 직접 권한을 사용한다.
 
 ```bash
 bootstrap_tmp="$(mktemp -d)"
