@@ -1,5 +1,9 @@
 # SKN30-FINAL-3Team
 
-[노션](https://app.notion.com/p/SKN-30-3-3b1cf7bbd02c814e8b5acc9fdc2ffa6a)
+최소 장부 데이터를 기반으로 AI 입력 자동화와 멀티 에이전트 중개 판단을 시연하고 평가하는 MVP 프로젝트입니다.
 
-[백엔드 개발 가이드](backend/README.md)
+## 모듈
+
+- [Frontend](frontend/README.md)
+- [Backend](backend/README.md)
+- [AI](ai/README.md)
