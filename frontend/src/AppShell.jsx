@@ -17,8 +17,9 @@ import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
 import { CrossMatchPanel } from "./features/CrossMatchPanel.jsx";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
 
-const compactNavItems = ["연락처", "일정", "계약", "보류", "배치 캠페인", "사용자·권한", "설정"];
+const compactNavItems = ["배치 캠페인"];
 
 const viewStates = [
   ["normal", "기본 화면"], ["loading", "불러오는 중"], ["filtered-empty", "결과 없음"],
@@ -61,8 +62,9 @@ function normalizeComposer(payload) {
 }
 
 export function AppShell() {
-  const [rows, setRows] = useState(() => createLedgerRows(PROTOTYPE_ASSUMPTIONS.grid.demoRowCount));
-  const [buyerRows, setBuyerRows] = useState(() => createBuyerRows(12));
+  const { user, isAuthenticated, loginDev, logout, loading: authLoading } = useAuth();
+  const [rows, setRows] = useState(() => createLedgerRows(6));
+  const [buyerRows, setBuyerRows] = useState(() => createBuyerRows(4));
   const [complexOptions, setComplexOptions] = useState(() => initialComplexes.map((name) => ({ name, address: "" })));
   const [activeNav, setActiveNav] = useState("매물장");
   const [searchQuery, setSearchQuery] = useState("");
@@ -289,7 +291,38 @@ export function AppShell() {
         <div className="jump-control f1-topbar__jump"><input value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && jumpQuery.trim()) handleJump(); }} placeholder="동·호 조회 예) 101 203" aria-label="동·호 조회" /><Button variant="secondary" onClick={handleJump} isDisabled={!jumpQuery.trim()}>조회</Button></div>
         <div className="masthead-search"><SearchIcon aria-hidden="true" /><TextInput aria-label="통합 검색" value={searchQuery} onChange={(_event, value) => setSearchQuery(value)} placeholder="통합 검색 (성명·전화번호·로그)" /></div>
         {activeNav === "매물장" && <div className="f1-topbar__counts"><span>필터 {filteredCount.toLocaleString()}건</span><span>전체 {rows.length.toLocaleString()}건</span></div>}
-        <div className="masthead-actions"><Label color={viewState === "offline" ? "orange" : "green"}>{viewState === "offline" ? "오프라인" : "연결됨"}</Label><Button variant="plain" aria-label="알림" icon={<BellIcon />} /><Button variant="plain" aria-label="도움말" icon={<HelpIcon />} /><Button variant="plain" aria-label="사용자 메뉴" icon={<UserIcon />} /><span className="user-name">김이순</span></div>
+        <div className="masthead-actions">
+          <Label color={viewState === "offline" ? "orange" : "green"}>{viewState === "offline" ? "오프라인" : "연결됨"}</Label>
+          <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
+          <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />
+          <Button variant="plain" aria-label="사용자 메뉴" icon={<UserIcon />} />
+          {isAuthenticated && user ? (
+            <>
+              <span className="user-name" title={`ID: ${user.login_id} (${user.role})`}>
+                {user.display_name}
+              </span>
+              <Button variant="secondary" size="sm" onClick={logout} style={{ marginLeft: "8px" }}>
+                로그아웃
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={authLoading}
+              onClick={async () => {
+                try {
+                  const result = await loginDev();
+                  setToast({ variant: "success", title: `개발 세션으로 로그인했습니다 (${result?.user?.display_name || "개발사용자"}).` });
+                } catch (err) {
+                  setToast({ variant: "warning", title: `개발 로그인 안내: 백엔드 서버 연결이 필요합니다 (${err.message}).` });
+                }
+              }}
+            >
+              개발용 로그인
+            </Button>
+          )}
+        </div>
       </header>
       {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
 
