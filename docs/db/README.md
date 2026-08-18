@@ -15,7 +15,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 
 ## 현재 기준선
 
-현재 기준선은 26개 테이블과 9개 전진 migration이다.
+현재 기준선은 26개 테이블과 10개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -28,6 +28,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 007_CREATE_AI_EVALUATION.sql | AI 평가 | 2 | 판단 피드백, 실험 평가 결과 |
 | 008_CREATE_AUTHENTICATION.sql | 인증 | 1 | user_session |
 | 009_ALTER_PROPERTY_LEDGER_FIELDS.sql | 매물·수요 원장 확장 | 0 | 세대 스펙, 공동중개, 현 거주지 만기, 분류·진행단계 |
+| 010_ALTER_PARTY_PRIVACY_CONSENT.sql | 매물·수요 원장 확장 | 0 | 인물 개인정보 활용 동의 |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 

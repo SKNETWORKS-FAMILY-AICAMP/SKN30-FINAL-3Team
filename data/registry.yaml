@@ -1,0 +1,11 @@
+registry_version: 0.1.0
+updated: 2026-08-18
+
+datasets:
+  - dataset_id: f2-llm-analysis
+    path: f2_llm
+    purpose: Qwen F2 분류·필드 추출·요약 학습·평가 입력 관리
+    lifecycle: preparing
+    latest_release: null
+    notes:
+      - 입력·정답 형식과 검수 기준은 실제 데이터 작성 전에 팀이 합의한다.
