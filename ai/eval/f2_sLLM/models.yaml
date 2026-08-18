@@ -1,0 +1,22 @@
+models:
+  - id: Qwen/Qwen3-0.6B
+    label: qwen3-0.6b
+  - id: Qwen/Qwen3-1.7B
+    label: qwen3-1.7b
+  - id: Qwen/Qwen3-4B
+    label: qwen3-4b
+  - id: Qwen/Qwen3-8B
+    label: qwen3-8b
+
+generation:
+  enable_thinking: false
+  max_input_tokens: 8192
+  max_new_tokens: 1024
+  do_sample: false
+
+evaluation:
+  allowed_consultation_types:
+    - 매도의뢰
+    - 매수문의
+    - 공동중개
+    - 단순문의
