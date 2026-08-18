@@ -9,6 +9,8 @@ updated: 2026-08-18
 
 - 2026-08-18: AWS 비용 상한을 2026-09-23까지 누적 300,000원의 참고값으로 정정하고 Billing 자원 미사용, Identity Center 사용 가능, CloudFront `/api/*` 동일 origin, 개인정보 제한, release artifact 종료와 최초 DB migration의 pgvector 활성화를 ADR-0009로 확정함.
 - 2026-08-18: 개발·시연 1차 런타임을 EC2 Backend·설치형 brokerage-ai·RunPod Pod로, 애플리케이션 전달을 자동 감지 없는 수동 CodePipeline V2·CodeBuild·CodeDeploy로 확정하고 AWS·RunPod 아키텍처, ADR, 자원 상태와 미해결 질문을 갱신함.
+- 2026-08-18: F1 MVP 범위에서 후보 추출용 조건 필터를 포함으로, 통합검색을 제외로 구분했다. 2026-08-17 원문 스냅샷은 검색과 필터를 함께 제외했으나 F3 결정적 후보 추출이 조건 조회를 요구해 조정함.
+- 2026-08-18: 인물 개인정보 활용 동의 기록을 migration 010으로 추가하고 F1 매물장·구입장·상담 로그의 HTTP 계약 초안을 API 계약 문서에 `제안`으로 등록했으며 세대·매물 컬럼 범위의 조회·상세·추가·수정 API를 구현함.
 - 2026-08-17: 매물장 세대 스펙과 구입장 공동중개·현 거주지 만기·분류·진행단계를 migration에 추가하고 전체 26개 테이블과 모든 컬럼의 생성·변경 SQL에 DB comment를 부여함.
 - 2026-08-17: Terraform을 AWS 인프라 변경의 IaC 정본으로 승인하고 OQ-001을 종료했으며, Identity Center 전환 시점을 OQ-011로 등록함.
 - 2026-08-17: AI의 Python 3.13·uv 독립 패키지와 Provider/config/runtime 경계를 AI ADR-0001로, F3 LangGraph 채택 범위를 AI ADR-0002로 확정하고 OQ-003을 종료함.
