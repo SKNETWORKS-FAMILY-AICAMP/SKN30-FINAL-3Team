@@ -1,0 +1,32 @@
+dataset_id: replace-me
+dataset_version: 0.1.0
+status: draft
+created_at: YYYY-MM-DD
+
+purpose: []
+
+lineage:
+  source_types: []
+  source_reference: null
+  usage_terms: pending
+  human_verified: false
+
+counts:
+  total: 0
+  train: 0
+  validation: 0
+  test: 0
+
+split:
+  method: unassigned
+  group_key: source_group_id
+  random_seed: null
+
+privacy:
+  classification: internal
+  contains_real_personal_data: false
+  storage_location: pending
+  retention_and_deletion: pending
+
+checksums: {}
+known_limitations: []

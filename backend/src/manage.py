@@ -12,6 +12,11 @@ from domain.authentication.commands import (
 )
 from domain.authentication.models import UserRole
 from domain.engine import create_database_engine
+from domain.property_ledger.commands import (
+    clear_sample_ledger,
+    has_sample_ledger,
+    seed_sample_ledger,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,6 +34,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subcommands.add_parser("purge-expired-sessions")
+
+    seed = subcommands.add_parser("seed-sample-ledger")
+    seed.add_argument("--brokerage-id", type=int, required=True)
+    seed.add_argument("--user-id", type=int, required=True)
+    seed.add_argument(
+        "--reset",
+        action="store_true",
+        help="해당 사무소의 기존 장부 데이터를 지우고 다시 만든다",
+    )
     return parser
 
 
@@ -60,6 +74,20 @@ def main() -> None:
             )
         elif arguments.command == "purge-expired-sessions":
             print(json.dumps({"purged": purge_expired_sessions(session)}))
+        elif arguments.command == "seed-sample-ledger":
+            if has_sample_ledger(session, arguments.brokerage_id):
+                if not arguments.reset:
+                    raise SystemExit(
+                        "이미 장부 데이터가 있습니다. 지우고 다시 만들려면 --reset을 사용하세요."
+                    )
+                clear_sample_ledger(session, arguments.brokerage_id)
+            counts = seed_sample_ledger(
+                session,
+                config,
+                brokerage_id=arguments.brokerage_id,
+                user_id=arguments.user_id,
+            )
+            print(json.dumps(counts, ensure_ascii=False))
 
 
 if __name__ == "__main__":
