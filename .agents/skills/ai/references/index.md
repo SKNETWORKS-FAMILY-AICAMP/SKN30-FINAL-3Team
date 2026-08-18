@@ -5,6 +5,7 @@
 | 문서 | 읽는 조건 |
 |---|---|
 | [decisions/index.md](decisions/index.md) | AI 내부 구조·런타임·워크플로 도구의 승인된 결정을 확인하거나 변경할 때 |
+| [f3-workflow.md](f3-workflow.md) | F3 대리·중개 판정 워크플로의 내부 구조, 프롬프트 버전 규칙 또는 LangGraph 적용 범위를 확인·변경할 때 |
 | [open-questions.md](open-questions.md) | 모델, route, Provider 또는 checkpoint의 미확정 선택에 의존할 때 |
 
 프로젝트 공통 아키텍처, AI–Backend 경계, 개인정보와 개발환경은 project-wiki를 확인한다.

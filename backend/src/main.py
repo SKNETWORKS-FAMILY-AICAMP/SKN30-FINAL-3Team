@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import structlog
+from brokerage_ai import AiError
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,6 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from api.health import database_is_ready
 from api.health import router as health_router
 from api.router import create_api_router
+from core.ai import build_ai_runtime, translate_ai_error
 from core.config import Config, get_config
 from core.errors import ApplicationError, AuthenticationError
 from core.logging import configure_logging
@@ -37,6 +39,8 @@ def create_app(
     app.state.config = resolved_config
     app.state.db_engine = create_database_engine(resolved_config)
     app.state.readiness_probe = readiness_probe or database_is_ready
+    # AI 설정이 없어도 기동한다. F3 경로만 503 이고 F1 은 그대로 동작한다 (수용 기준 15).
+    app.state.ai_runtime = build_ai_runtime(resolved_config)
 
     app.add_middleware(
         CORSMiddleware,
@@ -75,6 +79,20 @@ def create_app(
             content={
                 "code": exc.code,
                 "message": exc.message,
+                "request_id": request.state.request_id,
+            },
+        )
+
+    @app.exception_handler(AiError)
+    async def ai_error_handler(request: Request, exc: AiError) -> JSONResponse:
+        """모델 쪽 실패가 500으로 새지 않게 공개 계약으로 옮긴다."""
+        translated = translate_ai_error(exc)
+        logger.warning("ai_provider_error", error_type=type(exc).__name__)
+        return JSONResponse(
+            status_code=translated.status_code,
+            content={
+                "code": translated.code,
+                "message": translated.message,
                 "request_id": request.state.request_id,
             },
         )

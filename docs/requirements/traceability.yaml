@@ -1,6 +1,46 @@
 version: 1
-updated: "2026-08-14"
+updated: "2026-08-18"
 
 # 상세 요구사항은 분할 Markdown 정본에만 둔다.
 # 구현 또는 테스트가 생긴 PR에서 요구사항 ID별 경로를 추가한다.
-requirements: []
+requirements:
+  - id: F3-PC
+    note: 포지션 카드 규격과 캐시
+    implementation:
+      - ai/src/brokerage_ai/f3/contracts.py
+      - ai/src/brokerage_ai/f3/prompts.py
+      - backend/src/domain/negotiation/service.py
+      - backend/src/api/negotiation.py
+    tests:
+      - ai/tests/unit/f3/test_workflow.py
+      - backend/tests/api/test_negotiation.py
+
+  - id: F3-SQ
+    note: 후보 추출은 코드가 한다. 상한은 대리 카드의 추정값을 쓴다
+    implementation:
+      - backend/src/domain/negotiation/candidates.py
+      - backend/src/domain/negotiation/repository.py
+    tests:
+      - backend/tests/unit/test_negotiation_candidates.py
+
+  - id: F3-BR
+    note: 중개 판정은 앵커 1 + 후보 N 을 한 번의 호출로 받는다
+    implementation:
+      - ai/src/brokerage_ai/f3/workflow.py
+    tests:
+      - ai/tests/unit/f3/test_workflow.py
+      - backend/tests/api/test_negotiation.py
+
+  - id: F3-NF-08
+    note: 같은 입력이면 같은 등급. 등급 산출에 모델 호출이 없다
+    implementation:
+      - backend/src/domain/negotiation/grading.py
+    tests:
+      - backend/tests/unit/test_negotiation_grading.py
+
+  - id: F3-SQ-05
+    note: 날짜 산수는 코드가 한다 — 인도 가능일·인도 마감일
+    implementation:
+      - backend/src/domain/negotiation/ledger_view.py
+    tests:
+      - backend/tests/unit/test_negotiation_ledger_view.py
