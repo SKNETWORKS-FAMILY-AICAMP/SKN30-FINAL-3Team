@@ -1,0 +1,16 @@
+# 원본과 검수 중 데이터는 기본적으로 Git에 포함하지 않는다.
+*/raw/*
+*/working/*
+
+# 빈 디렉터리 골격과 명시적인 예시 파일만 허용한다.
+!*/raw/.gitkeep
+!*/working/.gitkeep
+!*/raw/*.example.*
+!*/working/*.example.*
+
+# 대용량·민감 원본의 흔한 형식은 위치와 관계없이 차단한다.
+*.wav
+*.mp3
+*.m4a
+*.flac
+
