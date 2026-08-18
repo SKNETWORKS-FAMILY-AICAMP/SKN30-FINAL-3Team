@@ -12,7 +12,7 @@ from api.health import database_is_ready
 from api.health import router as health_router
 from api.router import create_api_router
 from core.config import Config, get_config
-from core.errors import AuthenticationError
+from core.errors import ApplicationError, AuthenticationError
 from core.logging import configure_logging
 from core.request_context import RequestContextMiddleware
 from domain.engine import create_database_engine
@@ -61,6 +61,17 @@ def create_app(
         status_code = 403 if exc.code in {"FORBIDDEN", "INVALID_CSRF_TOKEN"} else 401
         return JSONResponse(
             status_code=status_code,
+            content={
+                "code": exc.code,
+                "message": exc.message,
+                "request_id": request.state.request_id,
+            },
+        )
+
+    @app.exception_handler(ApplicationError)
+    async def application_error_handler(request: Request, exc: ApplicationError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
             content={
                 "code": exc.code,
                 "message": exc.message,
