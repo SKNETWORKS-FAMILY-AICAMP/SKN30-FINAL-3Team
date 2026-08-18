@@ -85,6 +85,12 @@ export function AppShell() {
   const [messageCopied, setMessageCopied] = useState(false);
   const [campaignRows, setCampaignRows] = useState([]);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
   const [jumpQuery, setJumpQuery] = useState("");
   const [batchEditOpen, setBatchEditOpen] = useState(false);
   const [batchEditField, setBatchEditField] = useState("assignee");
@@ -221,6 +227,10 @@ export function AppShell() {
   };
 
   const navTo = (item) => {
+    if (item !== "매물장" && item !== "구입장" && item !== "배치 캠페인") {
+      alert(`${item}: 대표 F1 업무 흐름 검증이 끝난 뒤 같은 디자인 언어로 확장하는 화면입니다.`);
+      return;
+    }
     if (item === "배치 캠페인" && selectedRows.length > 0) setCampaignRows(selectedRows);
     if (item !== activeNav) {
       setSelectedRows([]);
@@ -269,7 +279,7 @@ export function AppShell() {
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
     onComposeMessage={openMessageComposer}
     onOpenEvidence={handleEvidenceOpen}
-    onLater={() => { closeDetail(); setActiveNav("보류"); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}
+    onLater={() => { closeDetail(); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}
     onInterest={({ reason }) => setToast({ variant: "info", title: `관심없음 피드백을 기록했습니다 · ${reason}` })}
     onSchedule={({ candidate }) => setScheduleSuggestion({ candidate, anchorRow: detailRow })}
   />;
@@ -283,13 +293,13 @@ export function AppShell() {
           : ""
     }`}>
       <header className="f1-topbar">
-        <div className="f1-product-title"><strong>F1 장부</strong><span>PROTOTYPE</span></div>
+        <div className="f1-product-title"><strong>집크크</strong><span>beta</span></div>
         <h1 className="pf-v6-screen-reader">{isCampaign ? "배치 캠페인" : activeNav}</h1>
         <div className="f1-ledger-switch" role="tablist" aria-label="F1 장부 전환">
           {["매물장", "구입장"].map((item) => <button key={item} type="button" role="tab" aria-selected={activeNav === item} className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}
         </div>
         <div className="jump-control f1-topbar__jump"><input value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && jumpQuery.trim()) handleJump(); }} placeholder="동·호 조회 예) 101 203" aria-label="동·호 조회" /><Button variant="secondary" onClick={handleJump} isDisabled={!jumpQuery.trim()}>조회</Button></div>
-        <div className="masthead-search"><SearchIcon aria-hidden="true" /><TextInput aria-label="통합 검색" value={searchQuery} onChange={(_event, value) => setSearchQuery(value)} placeholder="통합 검색 (성명·전화번호·로그)" /></div>
+        <div className="masthead-search"><SearchIcon aria-hidden="true" /><input type="text" aria-label="통합 검색" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="통합 검색 (성명·전화번호·로그)" /></div>
         {activeNav === "매물장" && <div className="f1-topbar__counts"><span>필터 {filteredCount.toLocaleString()}건</span><span>전체 {rows.length.toLocaleString()}건</span></div>}
         <div className="masthead-actions">
           <Label color={viewState === "offline" ? "orange" : "green"}>{viewState === "offline" ? "오프라인" : "연결됨"}</Label>
@@ -324,7 +334,6 @@ export function AppShell() {
           )}
         </div>
       </header>
-      {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
 
       {isCampaign ? (
         <CampaignWorkspace targets={campaignRows} onBack={() => setActiveNav("매물장")} onOpenComposer={openMessageComposer} />
@@ -345,38 +354,40 @@ export function AppShell() {
         )}
 
         {activeNav === "매물장" ? <div className="f1-control-strip">
-          <div className="ledger-tabs" role="tablist" aria-label="장부 유형">{["아파트", "상가", "주택", "재건축"].map((tab, index) => <button key={tab} id={`ledger-tab-${index}`} role="tab" aria-selected={index === 0} aria-controls="ledger-grid-panel" aria-disabled={index !== 0} disabled={index !== 0} tabIndex={index === 0 ? 0 : -1} title={index !== 0 ? "현재 프로토타입에서 사용할 수 없는 장부 유형입니다" : undefined} className={index === 0 ? "active" : ""} type="button">{tab}</button>)}</div>
-
-          <Toolbar className="ledger-toolbar" aria-label={selectedRows.length ? "선택한 행 작업" : "매물장 작업 도구"}><ToolbarContent>
-            {selectedRows.length ? <ToolbarGroup>
-              <ToolbarItem><strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong></ToolbarItem>
-              <ToolbarItem><Button variant="link" onClick={clearSelection}>전체 선택 해제</Button></ToolbarItem>
-              <ToolbarItem><Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby={selectedRows.length > 1 ? "f2-selected-entry-help" : undefined} isDisabled={selectedRows.length > 1} onClick={openF2Entry}>음성메모 입력</Button></ToolbarItem>
-              {selectedRows.length > 1 && <ToolbarItem><span id="f2-selected-entry-help" className="pf-v6-screen-reader">음성메모 입력은 대상 세대를 한 건만 선택해야 합니다.</span></ToolbarItem>}
-              <ToolbarItem><Button variant="secondary" onClick={() => setBatchEditOpen(true)}>일괄 편집</Button></ToolbarItem>
-              <ToolbarItem><Button variant="secondary" icon={<OutlinedCommentsIcon />} onClick={openDirectMessage}>문자 작업</Button></ToolbarItem>
-              <ToolbarItem><Button variant="secondary" icon={<FilterIcon />} onClick={startCampaign}>F3 캠페인</Button></ToolbarItem>
-            </ToolbarGroup> : <ToolbarGroup>
-              <ToolbarItem><Button ref={addRowButtonRef} icon={<AddCircleOIcon />} onClick={() => handleAddRow()}>행 추가</Button></ToolbarItem>
-              <ToolbarItem><Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="f2-entry-help" onClick={openF2Entry}>음성메모 입력</Button></ToolbarItem>
-              <ToolbarItem><span id="f2-entry-help" className="pf-v6-screen-reader">선택이 없으면 신규 세대를 만들고, 한 건 선택 시 해당 상세 위에 음성메모 팝업을 엽니다.</span></ToolbarItem>
-            </ToolbarGroup>}
-            <ToolbarGroup align={{ default: "alignEnd" }}>
-              {activeNav === "매물장" && <ToolbarItem><Dropdown isOpen={columnMenuOpen} onSelect={() => setColumnMenuOpen(false)} onOpenChange={setColumnMenuOpen} toggle={(ref) => <MenuToggle ref={ref} variant="plain" icon={<ColumnsIcon />} onClick={() => setColumnMenuOpen((open) => !open)} isExpanded={columnMenuOpen}>열 프리셋 · {COLUMN_PRESETS.find((preset) => preset.value === columnPreset)?.label || "기본 (12)"}</MenuToggle>}><DropdownList>{COLUMN_PRESETS.map((preset) => <DropdownItem key={preset.value} onClick={() => { setColumnPreset(preset.value); setColumnMenuOpen(false); }}>{preset.label} · {preset.description}</DropdownItem>)}</DropdownList></Dropdown></ToolbarItem>}
-              <ToolbarItem><Dropdown isOpen={moreOpen} onSelect={() => setMoreOpen(false)} onOpenChange={setMoreOpen} toggle={(ref) => <MenuToggle ref={ref} variant="plain" aria-label="프로토타입 상태 도구" onClick={() => setMoreOpen((open) => !open)} isExpanded={moreOpen}><EllipsisVIcon /></MenuToggle>}><DropdownList>{viewStates.map(([value, label]) => <DropdownItem key={value} onClick={() => setViewState(value)}>{`프로토타입 상태 · ${label}${viewState === value ? " · 현재" : ""}`}</DropdownItem>)}</DropdownList></Dropdown></ToolbarItem>
-            </ToolbarGroup>
-          </ToolbarContent></Toolbar>
-
-          <div className="filter-row">
-            <label className={`filter-control${complexFilter === "전체" ? "" : " active-filter"}`}><FilterIcon aria-hidden="true" /><span>단지</span><select value={complexFilter} onChange={(event) => setComplexFilter(event.target.value)}>{["전체", ...complexOptions.map((option) => option.name)].map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label className="filter-control"><span>저장 상태</span><select value={saveFilter} onChange={(event) => setSaveFilter(event.target.value)}>{["전체", "임시저장", "저장 완료"].map((value) => <option key={value}>{value}</option>)}</select></label>
-            <Button variant="link" onClick={clearFilters} isDisabled={!searchQuery && complexFilter === "전체" && saveFilter === "전체" && viewState !== "filtered-empty"}>모든 필터 해제</Button>
+          <div className="f1-control-strip__top-row">
+            <div className="f1-control-strip__left-group">
+              <div className="ledger-tabs" role="tablist" aria-label="장부 유형">{["아파트", "상가", "주택", "재건축"].map((tab, index) => <button key={tab} id={`ledger-tab-${index}`} role="tab" aria-selected={index === 0} aria-controls="ledger-grid-panel" aria-disabled={index !== 0} disabled={index !== 0} tabIndex={index === 0 ? 0 : -1} title={index !== 0 ? "현재 프로토타입에서 사용할 수 없는 장부 유형입니다" : undefined} className={index === 0 ? "active" : ""} type="button">{tab}</button>)}</div>
+              {selectedRows.length ? <>
+                <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
+                <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
+                <Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby={selectedRows.length > 1 ? "f2-selected-entry-help" : undefined} isDisabled={selectedRows.length > 1} onClick={openF2Entry}>음성메모 입력</Button>
+                {selectedRows.length > 1 && <span id="f2-selected-entry-help" className="pf-v6-screen-reader">음성메모 입력은 대상 세대를 한 건만 선택해야 합니다.</span>}
+                <Button variant="secondary" onClick={() => setBatchEditOpen(true)}>일괄 편집</Button>
+                <Button variant="secondary" icon={<OutlinedCommentsIcon />} onClick={openDirectMessage}>문자 작업</Button>
+                <Button variant="secondary" icon={<FilterIcon />} onClick={startCampaign}>F3 캠페인</Button>
+              </> : <>
+                <Button ref={addRowButtonRef} icon={<AddCircleOIcon />} onClick={() => handleAddRow()}>행 추가</Button>
+                <Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="f2-entry-help" onClick={openF2Entry}>음성메모 입력</Button>
+                <span id="f2-entry-help" className="pf-v6-screen-reader">선택이 없으면 신규 세대를 만들고, 한 건 선택 시 해당 상세 위에 음성메모 팝업을 엽니다.</span>
+              </>}
+            </div>
+            <div className="f1-control-strip__right-group">
+              {activeNav === "매물장" && <Dropdown isOpen={columnMenuOpen} onSelect={() => setColumnMenuOpen(false)} onOpenChange={setColumnMenuOpen} popperProps={{ placement: "bottom-end" }} toggle={(ref) => <MenuToggle ref={ref} variant="plain" icon={<ColumnsIcon />} onClick={() => setColumnMenuOpen((open) => !open)} isExpanded={columnMenuOpen}>열 프리셋 · {COLUMN_PRESETS.find((preset) => preset.value === columnPreset)?.label || "기본 (12)"}</MenuToggle>}><DropdownList>{COLUMN_PRESETS.map((preset) => <DropdownItem key={preset.value} onClick={() => { setColumnPreset(preset.value); setColumnMenuOpen(false); }}>{preset.label} · {preset.description}</DropdownItem>)}</DropdownList></Dropdown>}
+              <Dropdown isOpen={moreOpen} onSelect={() => setMoreOpen(false)} onOpenChange={setMoreOpen} popperProps={{ placement: "bottom-end" }} toggle={(ref) => <MenuToggle ref={ref} variant="plain" aria-label="프로토타입 상태 도구" onClick={() => setMoreOpen((open) => !open)} isExpanded={moreOpen}><EllipsisVIcon /></MenuToggle>}><DropdownList>{viewStates.map(([value, label]) => <DropdownItem key={value} onClick={() => setViewState(value)}>{`프로토타입 상태 · ${label}${viewState === value ? " · 현재" : ""}`}</DropdownItem>)}</DropdownList></Dropdown>
+            </div>
           </div>
 
-          <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
+          <div className="f1-control-strip__bottom-row">
+            <div className="filter-row">
+              <label className={`filter-control${complexFilter === "전체" ? "" : " active-filter"}`}><FilterIcon aria-hidden="true" /><span>단지</span><select value={complexFilter} onChange={(event) => setComplexFilter(event.target.value)}>{["전체", ...complexOptions.map((option) => option.name)].map((value) => <option key={value}>{value}</option>)}</select></label>
+              <label className="filter-control"><span>저장 상태</span><select value={saveFilter} onChange={(event) => setSaveFilter(event.target.value)}>{["전체", "임시저장", "저장 완료"].map((value) => <option key={value}>{value}</option>)}</select></label>
+              <Button variant="link" onClick={clearFilters} isDisabled={!searchQuery && complexFilter === "전체" && saveFilter === "전체" && viewState !== "filtered-empty"}>모든 필터 해제</Button>
+            </div>
+            <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
+          </div>
         </div> : <nav className="f1-quick-nav f1-quick-nav--standalone" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>}
 
-        {activeNav === "매물장" ? <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={viewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => setViewState("normal")} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} /> : activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onAddRow={handleAddBuyerRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <section className="scope-placeholder"><h2>{activeNav}</h2><p>대표 F1 업무 흐름 검증이 끝난 뒤 같은 디자인 언어로 확장하는 화면입니다.</p><Button variant="secondary" onClick={() => setActiveNav("매물장")}>매물장으로 돌아가기</Button></section>}
+        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onAddRow={handleAddBuyerRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={viewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => setViewState("normal")} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
         <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (33)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>
@@ -451,5 +462,6 @@ export function AppShell() {
       <ModalFooter><Button variant="primary" onClick={() => { setScheduleSuggestion(null); setToast({ variant: "success", title: "F3 제안을 승인해 F1 일정으로 저장했습니다." }); }}>일정 저장</Button><Button variant="link" onClick={() => setScheduleSuggestion(null)}>취소</Button></ModalFooter>
     </Modal>
     {viewState === "loading" && <div className="global-progress" aria-label="그리드 데이터 불러오는 중"><Spinner size="md" /></div>}
+    {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
   </div>;
 }

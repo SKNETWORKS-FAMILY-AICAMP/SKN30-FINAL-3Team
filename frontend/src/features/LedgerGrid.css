@@ -17,31 +17,33 @@
 
 .ledger-grid__controls {
   display: flex;
-  min-height: 42px;
+  min-height: 40px;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: 1px solid #d2d2d2;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
   border-bottom: 0;
-  background: #fff;
+  background: #f8fafc;
 }
 
 .ledger-grid__value-filter-select {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #3c3f42;
+  color: #475569;
   font-size: 12px;
   font-weight: 600;
 }
 
 .ledger-grid__value-filter-select select {
   min-height: 32px;
-  padding: 4px 28px 4px 8px;
-  border: 1px solid #b8bbbe;
-  border-radius: 3px;
-  background: #fff;
-  color: #151515;
+  padding: 4px 28px 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .ledger-grid__value-filter {
@@ -50,14 +52,20 @@
 
 .ledger-grid__value-filter summary {
   min-height: 32px;
-  padding: 7px 10px;
-  border: 1px solid #b8bbbe;
-  border-radius: 3px;
-  color: #0066cc;
-  background: #fff;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #0284c7;
+  background: #ffffff;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   list-style: none;
+  transition: all 0.15s ease;
+}
+.ledger-grid__value-filter summary:hover {
+  border-color: #38bdf8;
+  background: #f0f9ff;
 }
 
 .ledger-grid__value-filter summary::-webkit-details-marker { display: none; }
