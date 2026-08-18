@@ -1,0 +1,44 @@
+dataset_id: f2-sell-request-privacy-safe
+version: 0.2.0
+status: draft_privacy_review_pending
+created_at: 2026-08-18
+purpose: F2 상담유형 분류를 위한 매도의뢰 합성 대화 초안
+format: jsonl
+data_file: f2_sell_request_scenarios.privacy_safe.v0.2.jsonl
+privacy_record: f2_sell_request_scenarios.privacy_safe.v0.2.privacy.md
+record_count: 50
+label_distribution:
+  매도의뢰: 50
+source_type: fully_synthetic_from_abstract_blueprint
+source_group_policy: 각 레코드에 독립적인 합성 청사진 그룹 부여
+raw_personal_data_in_artifact: false
+split: unassigned
+privacy_controls:
+  - 직접식별자는 명백한 가상 토큰으로 대체
+  - 위치는 가상 토큰으로 대체
+  - 금액은 범위로 일반화
+  - 날짜는 상대 시점으로 일반화
+  - 면적은 크기 범주로 일반화
+  - 구체 가족관계는 업무 역할로 일반화
+validation:
+  json_parse: passed
+  unique_ids: 50
+  unique_source_groups: 50
+  duplicate_transcripts: 0
+  direct_identifier_pattern_matches: 0
+  real_place_pattern_matches: 0
+  exact_calendar_date_pattern_matches: 0
+  exact_money_pattern_matches: 0
+  unclear_intent_records: 0
+  max_five_gram_jaccard: 0.1361
+sha256: FE39CD2447CFCD436CC3359B6E707A3CA6FDF9627CE887BCA84BFCA6E1E1EFFC
+known_limitations:
+  - 완전한 클린룸 생성 결과로 단정하지 않음
+  - 실제 원본과의 안전한 내부 유사도 비교가 추가로 필요함
+  - 자동 검사는 법적 적정성 검토를 대체하지 않음
+  - 실제 상담 분포의 대표성을 보장하지 않음
+allowed_use: 개인정보 담당자 검토 전 내부 MVP 실험용
+prohibited_use:
+  - 검토 전 외부 공개
+  - 실제 상담 분포를 대표하는 근거로 사용
+  - 개인정보 안전성이 확정된 데이터로 표현
