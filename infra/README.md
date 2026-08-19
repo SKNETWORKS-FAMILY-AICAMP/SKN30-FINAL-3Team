@@ -13,49 +13,129 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 ## 구조와 소유 범위
 
 - `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결, state bucket
-- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성과 private S3·CloudFront Frontend; 현재 코드 구현만 완료되고 미적용
+- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 현재 코드 구현만 완료되고 미적용
+- `justfile`: 반복되는 검증, plan/apply와 DB 운영 명령의 진입점
 - `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
 - `scripts/verify-account-link.sh`: state bucket 읽기와 dev init/validate/plan 검증
+- `scripts/manage_db_access.py`: DB 역할, runtime Secret, IAM migration과 검증 관리
+- `scripts/manage_dev_power.py`: 지정 Infra 운영자의 dev RDS·ASG start/stop/status 관리
 
 Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. 실제 두 번째 환경이나 반복 자원이 생기기 전에는 module과 workspace를 추가하지 않는다.
 
-현재 runtime 기본값은 AL2023 x86_64, `t3.medium`, encrypted gp3 40 GiB, ASG 1대와 SSM 전용 접속이다. CloudWatch log group 5개는 14일 보존하고 alarm 5개를 subscription 없는 SNS topic에 연결한다. 애플리케이션 artifact·secret·migration delivery와 RunPod Terraform은 아직 포함하지 않는다. 세부 계약은 [Infra ADR-0004](../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md)를 따른다.
+## 일상 사용
 
-## 새 PC 빠른 연결
+AWS CLI 2.36 이상, `.terraform-version`의 Terraform, `just`, Python 3.13과 `uv`를 설치한다. DB 명령에는 Session Manager plugin도 필요하다. 모든 `just` 명령은 `infra/`에서 실행한다.
+
+계정 ID는 명령마다 전달하지 않고 Git에서 제외되는 `.env`로 관리한다. 실제 자격 증명, access key와 Secret은 넣지 않는다.
+
+```bash
+cd infra
+cp .env.example .env
+```
+
+`.env`의 `TARGET_ACCOUNT_ID`를 실제 12자리 AWS 계정 ID로 바꾼 뒤 사용 가능한 명령을 확인한다.
+
+```bash
+just
+```
+
+### 새 PC 연결
 
 이 절차는 계정 bootstrap을 다시 실행하지 않는다. 사전에 개인 IAM 사용자, console 접근, OTP MFA와 `TerraformOperatorRole` assume 권한이 있어야 한다.
 
-AWS CLI 2.36 이상과 `.terraform-version`의 Terraform을 설치하고 저장소의 최신 승인 코드를 받은 뒤 실행한다.
-
 ```bash
-infra/scripts/setup-local.sh \
-  --account-id 398563707017 \
-  --expires-at 2026-09-23
+just setup 2026-09-23
 ```
 
-스크립트는 다음 작업만 수행한다.
-
-- `skn30-bootstrap`, `skn30-session` profile 설정과 `aws login`
-- 로그인 계정·사용자·서울 리전 검증
-- 커밋하지 않는 bootstrap/dev `backend.hcl`과 dev `dev.tfvars` 생성
-- 두 Terraform root의 `init -reconfigure`
-- `TerraformOperatorRole` assume, state bucket 보안 설정과 dev 빈 plan 검증
-
-이미 `aws login` 세션이 유효하면 `--skip-login`을 사용할 수 있다. 기존 로컬 파일과 생성할 내용이 다르면 스크립트는 중단하며, 내용을 직접 검토한 경우에만 `--force`로 교체한다.
+유효한 `aws login` 세션을 재사용하려면 다음 명령을 사용한다.
 
 ```bash
-infra/scripts/setup-local.sh \
-  --account-id 398563707017 \
-  --expires-at 2026-09-23 \
-  --skip-login
+just setup-existing 2026-09-23
 ```
 
-스크립트는 `bootstrap.tfvars`를 만들거나 IAM 권한을 추가하지 않으며 `terraform apply`를 실행하지 않는다. 다른 팀원을 추가하려면 기존 운영자가 전체 `operator_user_arns`를 보존한 bootstrap plan을 별도로 검토하고 적용해야 한다.
+이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다.
 
-팀원의 일반 읽기 권한은 Terraform이 관리하는 `team-readonly` IAM 그룹으로 제공한다. IAM 사용자 생성·삭제, 그룹 멤버 추가·제거, console password와 MFA 등록은 Terraform 범위가 아니며 AWS 콘솔에서 개인별로 수행한다. 장기 access key는 만들지 않는다.
+### Terraform 변경
+
+```bash
+just check
+just dev-plan
+just dev-show
+just dev-apply
+just dev-drift
+```
+
+`dev-show`로 저장된 plan의 자원, 교체, 삭제와 비용을 검토하고 승인을 받은 뒤에만 `dev-apply`를 실행한다. bootstrap root 변경에는 같은 순서의 `bootstrap-plan`, `bootstrap-show`, `bootstrap-apply`, `bootstrap-drift`를 사용한다. apply recipe는 실행 전에 추가 확인을 요구한다.
+
+`just fmt`는 Terraform 파일을 수정하므로 포맷이 필요할 때만 실행한다. `just verify-account`는 state와 AWS 계정 연결을 읽기 전용으로 검증한다.
+
+다른 팀원을 추가하려면 기존 운영자가 전체 `operator_user_arns`를 보존한 bootstrap plan을 검토하고 적용해야 한다. IAM 사용자 생성·삭제, 그룹 멤버 추가·제거, console password와 MFA 등록은 Terraform 범위가 아니며 AWS 콘솔에서 개인별로 수행한다. 장기 access key는 만들지 않는다.
+
+### 개발 환경 시작과 정지
+
+Terraform 적용 후 지정 Infra 운영자만 기존 `TerraformOperatorRole`로 공유 개발 환경을 제어한다. 일반 팀원과 `team-db-tunnel` 그룹에는 start/stop 권한을 추가하지 않으며 AWS 계정 root 자격 증명은 계속 거부한다.
+
+```bash
+just dev-status
+just dev-stop
+just dev-start
+```
+
+`dev-stop`은 배포, migration, API 요청과 Worker 작업이 끝났음을 확인한 뒤 실행한다.
+
+1. ASG desired capacity를 0으로 바꾸고 EC2 종료를 기다린다.
+2. RDS를 정지하고 `stopped` 상태를 기다린다.
+
+`dev-start`는 역순으로 복구한다.
+
+1. RDS를 시작하고 `available` 상태를 기다린다.
+2. ASG desired capacity를 1로 바꾼다.
+3. EC2 `InService`와 SSM `Online` 상태를 기다린다.
+4. ALB target 상태를 결과에 포함한다.
+
+ASG 축소는 EC2 정지가 아니라 종료이며 다음 시작에는 Launch Template으로 새 인스턴스를 만든다. 로컬 root volume은 보존되지 않는다. 현재 delivery 구현 전에는 새 인스턴스에 애플리케이션이 자동 배포되지 않으므로 ALB target 상태는 정보로만 출력한다.
+
+RDS 정지는 임시 개발 비용 절감 기능이다. 데이터, endpoint와 설정은 유지되지만 스토리지와 백업, ALB, public IPv4 등 잔여 비용은 계속 발생한다. RDS는 7일 연속 정지 후 자동으로 시작되므로 장기 휴무에는 상태를 다시 확인한다. 자세한 제한은 [AWS RDS 정지 문서](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html)를 따른다.
+
+중단되거나 예상과 다른 상태가 보이면 start/stop을 반복하기 전에 `just dev-status`로 현재 상태를 확인한다. 전원 전환 중에는 Terraform plan/apply와 DB migration을 병행하지 않는다.
+
+## DB 계정 초기화와 migration
+
+이 절차는 dev Terraform apply와 `team-db-tunnel` 멤버 추가가 끝난 뒤 운영자가 실행한다. Python 3.13, `uv`, AWS CLI와 Session Manager plugin이 필요하며 실제 비밀번호와 IAM 토큰은 출력하지 않는다.
+
+로컬 PC에서 private RDS에 접근할 팀원은 `team-db-tunnel` 그룹에 수동으로 추가한다. 이 그룹은 태그가 일치하는 dev app EC2를 경유하는 SSM remote-host 포트 포워딩만 제공하며 interactive shell이나 Run Command를 허용하지 않는다.
+
+Infra 운영자가 고정 DB 역할, runtime Secret 값과 현재 그룹 멤버의 개인 DB 역할을 초기화한다.
+
+```bash
+just db-init
+```
+
+그룹 멤버를 추가하거나 제거한 뒤 DB 권한을 동기화한다. 제거된 사용자는 즉시 `NOLOGIN`으로 바뀌고 활성 DB 세션이 종료된다.
+
+```bash
+just db-sync
+```
+
+각 팀원은 개인 `aws login` 세션으로 SSM 터널과 IAM DB token을 만들고 커밋된 Yoyo migration을 적용한다.
+
+```bash
+just db-migrate
+```
+
+적용 후 운영자는 runtime credential과 필수 DB 역할을 검증한다.
+
+```bash
+just db-verify
+```
+
+master secret은 RDS가 관리한다. runtime Secret 값만 도구가 구조화된 JSON으로 주입하며 migration Secret 컨테이너는 Backend 호환을 위해 비어 있는 deprecated 자원으로 유지한다. runtime 비밀번호 수동 회전은 API·Worker를 중지한 maintenance window에서만 `just db-rotate`로 수행한다.
 
 state bucket은 개인 IAM 사용자의 직접 접근을 거부한다. 직접 `aws s3` 명령이 `403`을 반환할 수 있으며, Terraform과 검증 스크립트가 `TerraformOperatorRole`을 assume해 접근하는 것이 정상이다.
+
+<details>
+<summary>완료된 최초 AWS 계정 bootstrap과 복구 절차</summary>
 
 ## 최초 1회 AWS 계정 설정
 
@@ -178,18 +258,14 @@ find infra/bootstrap -maxdepth 1 -name '*.tfstate*' -print
 ## 5. bootstrap drift와 dev 계정 연결
 
 ```bash
-export AWS_PROFILE=skn30-session
-export TARGET_ACCOUNT_ID="123456789012"
-export EXPIRES_AT=2026-09-23
-
-infra/scripts/preflight.sh
-terraform -chdir=infra/bootstrap validate
-terraform -chdir=infra/bootstrap plan -var-file=bootstrap.tfvars
-
-infra/scripts/verify-account-link.sh
+cd infra
+just bootstrap-plan
+just bootstrap-show
+just verify-account
+cd ..
 ```
 
-dev root에는 현재 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG와 관측성이 구현돼 있으므로 plan은 비용 발생 자원을 포함한다. 마지막 검토 plan은 96개 추가, 변경 0개, 삭제 0개였으며 사람의 별도 승인 전에는 apply하지 않는다.
+dev root에는 현재 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG와 관측성이 구현돼 있으므로 plan은 비용 발생 자원을 포함한다. 마지막 검토 plan은 101개 추가, 변경 0개, 삭제 0개였으며 사람의 별도 승인 전에는 apply하지 않는다.
 
 잘못된 계정 ID나 `ap-northeast-2` 외 리전을 넣으면 provider/variable guard가 plan을 중단해야 한다.
 
@@ -208,7 +284,6 @@ Terraform 밖에서 관리 자원을 변경하지 않는다. 긴급 수동 변�
 
 ```bash
 aws logout --profile skn30-bootstrap
-unset AWS_PROFILE TARGET_ACCOUNT_ID EXPIRES_AT
 ```
 
 - 세션 만료: `aws login --profile skn30-bootstrap` 후 다시 실행한다.
@@ -216,3 +291,5 @@ unset AWS_PROFILE TARGET_ACCOUNT_ID EXPIRES_AT
 - state 복구: S3 object version을 먼저 확인하고 복원 계획을 승인받는다.
 - backend 이관 실패: 임시 사본과 local state를 보존하고 원격 object 상태를 확인한 뒤 `terraform init -migrate-state`를 재시도한다.
 - state bucket은 `prevent_destroy` 대상이다. 프로젝트 종료 시에도 별도 백업·폐기 승인을 거친다.
+
+</details>

@@ -17,12 +17,12 @@ updated: 2026-08-18
 | 컴퓨팅 | EC2, Launch Template, ASG desired 1, ALB | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.medium, gp3 40 GiB, EC2 health; delivery 전 TG unhealthy 예상 |
 | 운영 접속 | SSM Session Manager | 결정 | 구현됨·미적용 | SSH 차단, IMDSv2 강제 |
 | 이미지 | ECR | 결정 | 구현됨·미적용 | immutable tag, untagged image만 7일 후 만료; 배포는 digest 고정 |
-| 데이터베이스 | RDS PostgreSQL 15.18, pgvector, Single-AZ | 결정 | 구현됨·미적용 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일; `vector`는 최초 DB migration 소유 |
+| 데이터베이스 | RDS PostgreSQL 15.18, pgvector, Single-AZ | 결정 | 구현됨·미적용 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일, IAM DB 인증; `vector`는 최초 DB migration 소유 |
 | Frontend | CloudFront, private S3 origin, OAC, ALB custom origin | 결정 | 구현됨·미적용 | 기본 도메인, `/api/*` ALB, managed security headers; 배포 artifact는 미준비 |
 | 업무 파일 | 임시 음성 S3 | 결정 | 구현됨·미적용 | 앱이 성공·취소 즉시, 실패 1시간 이내 삭제; lifecycle 1일 안전망 |
 | 데이터·모델 | 데이터셋·평가·모델 artifact S3 | 결정 | 구현됨·미적용 | `releases/`는 2026-09-24 00:00 UTC 만료, 그 외 자동 만료 없음 |
-| 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 구현됨·미적용 | DB runtime·migration·AI 비밀 container 3개 분리; value는 Terraform 외부 주입, SSM은 비민감 설정만 |
-| 관측성 | CloudWatch logs·metrics·alarms, SNS | 결정 | 구현됨·미적용 | log group 5개 14일, alarm 5개; SNS 구독 없음 |
+| 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 구현됨·미적용 | runtime은 구조화된 DB credential, migration은 IAM 인증과 deprecated 빈 container, master는 RDS 관리; value는 Terraform 외부 주입 |
+| 관측성 | CloudWatch logs·metrics·alarms, SNS | 결정 | 구현됨·미적용 | log group 5개 14일, alarm 6개; IAM DB 인증용 FreeableMemory 경보 포함, SNS 구독 없음 |
 | 전달 | CodeConnections, CodePipeline V2, CodeBuild, CodeDeploy | 결정 | 계획됨 | DetectChanges=false, 수동 최신 main 또는 COMMIT_ID |
 | 전달 저장소 | Pipeline artifact S3 | 결정 | 구현됨·미적용 | non-versioned, 객체 14일 만료; 업무용 S3·Terraform state와 분리 |
 | 모델 실행 | RunPod 공용 Template, 개발자별 Pod | 결정 | 보류 | 운영 구조는 결정됐으나 Terraform 소유 범위는 재개 전 결정 |
@@ -38,6 +38,6 @@ updated: 2026-08-18
 
 - 현재 계정 bootstrap은 워크로드 자원을 만들지 않는다.
 - `infra/environments/dev`에는 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG와 관측성이 구현됐지만 apply하지 않았다.
-- 마지막 원격 plan은 dev root 전체 96개 추가, 변경 0개, 삭제 0개였으며 실제 AWS 자원 생성 승인은 별도다.
+- 마지막 원격 plan은 dev root 전체 101개 추가, 변경 0개, 삭제 0개였으며 실제 AWS 자원 생성 승인은 별도다.
 - RunPod Terraform은 사용자 지시에 따라 보류했고 AWS provider 밖의 자원은 추가하지 않았다.
 - Terraform state bucket은 애플리케이션 파일 저장소가 아니며 다른 용도로 재사용하지 않는다.

@@ -2,11 +2,11 @@ locals {
   application_secret_names = {
     backend_runtime_database = {
       name        = "/${local.name_prefix}/backend/runtime-database-url"
-      description = "Container for the Backend DB_URL value; the value is populated outside Terraform"
+      description = "Container for structured Backend runtime database credentials; the value is populated outside Terraform"
     }
     backend_migration_database = {
       name        = "/${local.name_prefix}/backend/migration-database-url"
-      description = "Container for the Backend DB_MIGRATION_URL value; the value is populated outside Terraform"
+      description = "Deprecated empty compatibility container; migrations use IAM database authentication"
     }
     ai_provider = {
       name        = "/${local.name_prefix}/ai/provider-api-keys"

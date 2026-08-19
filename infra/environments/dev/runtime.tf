@@ -360,7 +360,7 @@ resource "aws_launch_template" "app" {
 
 resource "aws_autoscaling_group" "app" {
   name                = "${local.name_prefix}-app"
-  min_size            = 1
+  min_size            = 0
   desired_capacity    = 1
   max_size            = 1
   vpc_zone_identifier = [for subnet in aws_subnet.public : subnet.id]
@@ -398,6 +398,11 @@ resource "aws_autoscaling_group" "app" {
     aws_iam_role_policy_attachment.app_ssm_core,
     aws_iam_role_policy.app_runtime,
   ]
+
+  lifecycle {
+    # manage_dev_power.py owns the operational 0/1 state after creation.
+    ignore_changes = [desired_capacity]
+  }
 }
 
 output "application_load_balancer" {

@@ -24,10 +24,11 @@ resource "aws_db_instance" "postgres" {
   storage_type          = "gp3"
   storage_encrypted     = true
 
-  db_name                     = local.database_name
-  username                    = local.database_master_username
-  manage_master_user_password = true
-  port                        = 5432
+  db_name                             = local.database_name
+  username                            = local.database_master_username
+  manage_master_user_password         = true
+  iam_database_authentication_enabled = true
+  port                                = 5432
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.database.id]

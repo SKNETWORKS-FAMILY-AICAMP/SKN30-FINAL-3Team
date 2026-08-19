@@ -72,19 +72,48 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_5xx" {
 
 resource "aws_cloudwatch_metric_alarm" "asg_in_service_capacity" {
   alarm_name          = "${local.name_prefix}-asg-in-service-capacity"
-  alarm_description   = "The application ASG has fewer than one in-service instance"
-  comparison_operator = "LessThanThreshold"
+  alarm_description   = "The application ASG has fewer in-service instances than desired"
+  comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
   datapoints_to_alarm = 2
-  metric_name         = "GroupInServiceInstances"
-  namespace           = "AWS/AutoScaling"
-  period              = 60
-  statistic           = "Minimum"
-  threshold           = 1
+  threshold           = 0
   treat_missing_data  = "breaching"
 
-  dimensions = {
-    AutoScalingGroupName = aws_autoscaling_group.app.name
+  metric_query {
+    id          = "capacity_deficit"
+    expression  = "desired - in_service"
+    label       = "ASG desired capacity deficit"
+    return_data = true
+  }
+
+  metric_query {
+    id          = "desired"
+    return_data = false
+
+    metric {
+      metric_name = "GroupDesiredCapacity"
+      namespace   = "AWS/AutoScaling"
+      period      = 60
+      stat        = "Minimum"
+      dimensions = {
+        AutoScalingGroupName = aws_autoscaling_group.app.name
+      }
+    }
+  }
+
+  metric_query {
+    id          = "in_service"
+    return_data = false
+
+    metric {
+      metric_name = "GroupInServiceInstances"
+      namespace   = "AWS/AutoScaling"
+      period      = 60
+      stat        = "Minimum"
+      dimensions = {
+        AutoScalingGroupName = aws_autoscaling_group.app.name
+      }
+    }
   }
 
   alarm_actions = [aws_sns_topic.runtime_alerts.arn]
@@ -123,6 +152,27 @@ resource "aws_cloudwatch_metric_alarm" "rds_free_storage_low" {
   period              = 300
   statistic           = "Average"
   threshold           = 5368709120
+  treat_missing_data  = "missing"
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.postgres.identifier
+  }
+
+  alarm_actions = [aws_sns_topic.runtime_alerts.arn]
+  ok_actions    = [aws_sns_topic.runtime_alerts.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "rds_free_memory_low" {
+  alarm_name          = "${local.name_prefix}-rds-free-memory-low"
+  alarm_description   = "RDS free memory is below 256 MiB after enabling IAM database authentication"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  datapoints_to_alarm = 2
+  metric_name         = "FreeableMemory"
+  namespace           = "AWS/RDS"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 268435456
   treat_missing_data  = "missing"
 
   dimensions = {
