@@ -1,7 +1,72 @@
 version: 1
-updated: "2026-08-18"
+updated: "2026-08-20"
 
 sources:
+  - id: "pr-policy-review-discord-2026-08-19"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-19)"
+    received: "2026-08-19"
+    reflected_in:
+      - ".github/workflows/pr-policy-review.yml"
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".github/pr-review-policy.json"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+      - ".agents-rule/git.md"
+    scope: "별도 서버 없는 PR 알림·권고형 AI 정책 리뷰·Discord 상세 결과, fork·Draft secret 차단, 병합·대화·CloudWatch 연동 제외"
+
+  - id: "github-actions-secure-use-pr-target"
+    type: "official-documentation"
+    url: "https://docs.github.com/en/actions/reference/security/secure-use"
+    accessed: "2026-08-19"
+    reflected_in:
+      - ".github/workflows/pr-policy-review.yml"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+    scope: "pull_request_target에서 untrusted PR head를 checkout·실행하지 않고 base의 trusted code만 실행하는 보안 경계"
+
+  - id: "openai-responses-structured-output-review"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/guides/structured-outputs"
+    accessed: "2026-08-19"
+    reflected_in:
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+    scope: "Responses API strict JSON schema 기반 리뷰 결과 계약"
+
+  - id: "openai-models-pr-review"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/models"
+    accessed: "2026-08-19"
+    reflected_in:
+      - ".github/pr-review-policy.json"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/development/environments.md"
+    scope: "PR 리뷰 기본 모델과 저장소 변수 기반 모델 교체"
+
+  - id: "openai-api-data-controls-pr-review"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/guides/your-data#default-usage-policies-by-endpoint"
+    accessed: "2026-08-19"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+      - ".github/PR_REVIEW_BOT.md"
+    scope: "store=false와 기본 abuse monitoring 보존을 고려한 PR 코드·정책 외부 전송"
+
+  - id: "discord-incoming-webhooks-pr-review"
+    type: "official-documentation"
+    url: "https://docs.discord.com/developers/platform/webhooks"
+    accessed: "2026-08-19"
+    reflected_in:
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+    scope: "단방향 Incoming Webhook 결과 전달, 멘션 차단과 rate limit 처리"
   - id: "dev-frontend-origin-routing-2026-08-18"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-18)"

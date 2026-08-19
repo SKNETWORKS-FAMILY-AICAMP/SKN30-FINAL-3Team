@@ -58,6 +58,9 @@ PR 설명에는 다음을 포함한다.
 - 기본 병합 방식은 squash merge를 사용한다.
 - 병합 후 작업 브랜치를 삭제한다.
 - PR 작성자가 단독으로 예외를 승인하지 않는다.
+- `PR Policy Agent`의 AI 리뷰와 Discord 알림은 권고형이며 사람 승인을 대체하거나 병합을 승인하지 않는다.
+- AI Check는 Required Check로 지정하지 않는다. 비밀 탐지, lint, type check, test, build처럼 안정화된 결정적 검사만 Required Check 후보로 삼는다.
+- Discord 메시지는 알림 기록이며 승인·병합의 정본이 아니다.
 
 ## 긴급 수정
 
