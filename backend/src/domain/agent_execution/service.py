@@ -17,6 +17,13 @@ from domain.agent_execution.models import (
     AnchorType,
 )
 
+# Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
+LEASE_DURATION_SECONDS = 300
+MAX_CLAIM_ATTEMPTS = 3
+LEASE_EXPIRED_FAILURE_CODE = "LEASE_EXPIRED_MAX_ATTEMPTS"
+# 개인정보와 내부 예외를 담지 않는 고정 문구를 쓴다.
+LEASE_EXPIRED_FAILURE_MESSAGE = "실행이 최대 시도 횟수를 초과해 종료되었습니다"
+
 
 @dataclass(frozen=True)
 class ResolvedAnchor:
@@ -117,3 +124,33 @@ def queue_cross_judgment_run(
 
     session.refresh(run)
     return run
+
+
+def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
+    """Worker가 처리할 실행 1건을 선점한다. 대상이 없으면 예외 없이 None을 돌려준다.
+
+    상한 초과 정리와 선점을 한 트랜잭션에 둔다. 두 대상은 attempt_count 기준으로 서로
+    겹치지 않는 행 집합이라 경쟁하지 않고, 하나로 묶으면 도중에 실패했을 때 종료 처리와
+    선점이 함께 취소되어 어중간한 상태가 남지 않는다.
+    """
+    try:
+        repository.fail_runs_over_attempt_limit(
+            session,
+            MAX_CLAIM_ATTEMPTS,
+            LEASE_EXPIRED_FAILURE_CODE,
+            LEASE_EXPIRED_FAILURE_MESSAGE,
+        )
+        locked = repository.lock_claimable_run(session, MAX_CLAIM_ATTEMPTS)
+        claimed = (
+            None
+            if locked is None
+            else repository.mark_run_claimed(
+                session, locked, worker_id, LEASE_DURATION_SECONDS
+            )
+        )
+        session.commit()
+    except SQLAlchemyError:
+        session.rollback()
+        raise
+
+    return claimed

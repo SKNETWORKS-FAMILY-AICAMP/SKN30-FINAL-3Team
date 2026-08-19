@@ -14,6 +14,7 @@ from sqlmodel import Session
 
 from api.schemas.f3_runs import anchor_of
 from core.config import Config
+from domain.agent_execution import service
 from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
     AgentRun,
@@ -386,3 +387,20 @@ def test_anchor_mapping_rejects_a_run_without_exactly_one_target() -> None:
 
         with pytest.raises(AgentRunAnchorError):
             anchor_of(run)
+
+
+@requires_database
+def test_status_response_does_not_expose_lease_fields(config: Config) -> None:
+    """Worker 선점 뒤에도 lease 소유자·만료·시도 횟수는 외부로 나가지 않는다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        queued = queue_listing_run(client, session, brokerage_id)
+        claimed = service.claim_next_run(session, "worker-status-check")
+        assert claimed is not None and claimed.id == queued["run_id"]
+
+        body = client.get(f"/api/v1/f3/runs/{queued['run_id']}").json()
+
+        assert set(body) == PUBLIC_FIELDS
+        assert body["status"] == "RUNNING"
+        assert "lease_owner" not in body
+        assert "lease_expires_at" not in body
+        assert "attempt_count" not in body

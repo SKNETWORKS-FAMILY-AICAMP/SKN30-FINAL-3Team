@@ -183,19 +183,39 @@ updated: 2026-08-19
 `status`는 DB에 저장된 문자열을 그대로 공개하며 표기는 `agent_run.status`의 기본값 `QUEUED`에 맞춰
 **대문자 스네이크로 통일한다.** 클라이언트가 대소문자를 함께 분기하지 않게 하기 위한 규칙이다.
 
-| status | 의미 |
-|---|---|
-| `QUEUED` | 실행 적재 완료, Worker 대기 |
-| `ANCHOR_READY` | 앵커 카드 저장 완료 |
-| `CANDIDATES_READY` | 결정적 SQL 후보 스냅샷 완료 |
-| `JUDGING` | 전체 후보 중개 판정 실행 중 |
-| `COMPLETED` | 검증을 통과한 최종 결과 저장 |
-| `FAILED_RETRYABLE` | 재시도 가능한 일시 오류 |
-| `FAILED_TERMINAL` | 재시도해도 성공하지 않는 영구 오류 |
+`QUEUED`와 `RUNNING`은 Worker가 작업을 잡았는지를 나타내는 실행 제어 상태이고, `ANCHOR_READY`
+이후는 실제 업무 처리 진행 상태다. 클라이언트는 이 둘을 같은 진행률 축에 두지 않는다.
 
-`QUEUED`를 제외한 값은 아직 `제안`이며 이 API가 만들지 않는다. 상태 집합의 의미 정본은
+| status | 구분 | 의미 | 현재 |
+|---|---|---|---|
+| `QUEUED` | 실행 제어 | 실행 적재 완료, Worker 대기 | 구현됨 |
+| `RUNNING` | 실행 제어 | Worker가 lease를 걸고 선점함 | 구현됨 |
+| `ANCHOR_READY` | 업무 처리 | 앵커 카드 저장 완료 | 제안 · 미구현 |
+| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 제안 · 미구현 |
+| `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 제안 · 미구현 |
+| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 제안 · 미구현 |
+| `COMPLETED` | 업무 처리 | 검증을 통과한 최종 결과 저장 | 제안 · 미구현 |
+| `FAILED_RETRYABLE` | 종료 | 재시도 가능한 일시 오류 | 제안 · 미구현 |
+| `FAILED_TERMINAL` | 종료 | 재시도해도 성공하지 않는 영구 오류 | 구현됨 |
+| `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
+| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
+
+Backend가 실제로 기록하는 상태는 세 가지뿐이다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직 만들지 않는다.
+
+상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
 열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
+
+### Worker 선점과 lease
+
+Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
+`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 `RUNNING`이다.
+선점하면 `RUNNING`으로 바꾸고 5분짜리 lease와 시도 횟수를 기록하며, 만료됐는데 시도 횟수가 3회
+이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
+
+`lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
+않는다. Worker 프로세스와 polling loop 자체는 아직 구현하지 않았다.
 
 `anchor_type`과 `anchor_id`는 `target_listing_id`와 `target_requirement_id` 중 **정확히 하나**가 있을
 때만 도출한다. 둘 다 없거나 둘 다 있는 실행은 존재하지 않는 앵커를 정상 응답으로 내보내지 않고

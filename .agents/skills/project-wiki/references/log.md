@@ -13,6 +13,7 @@ updated: 2026-08-20
 
 - 2026-08-18: AWS 비용 상한을 2026-09-23까지 누적 300,000원의 참고값으로 정정하고 Billing 자원 미사용, Identity Center 사용 가능, CloudFront `/api/*` 동일 origin, 개인정보 제한, release artifact 종료와 최초 DB migration의 pgvector 활성화를 ADR-0009로 확정함.
 - 2026-08-18: 개발·시연 1차 런타임을 EC2 Backend·설치형 brokerage-ai·RunPod Pod로, 애플리케이션 전달을 자동 감지 없는 수동 CodePipeline V2·CodeBuild·CodeDeploy로 확정하고 AWS·RunPod 아키텍처, ADR, 자원 상태와 미해결 질문을 갱신함.
+- 2026-08-19: agent_run에 Worker lease 컬럼을 추가하고 FOR UPDATE SKIP LOCKED 기반 원자적 작업 선점과 5분 lease·3회 상한 종료 정책을 구현했으며, 실행 상태값 11종을 대문자 스네이크로 통일하고 실행 제어·업무 처리 구분을 명시함.
 - 2026-08-19: 숫자 run_id 기반 F3 실행 상태 조회 계약과 사무소·루트 실행으로 격리한 tenant-scoped GET endpoint를 구현하고, 공개 status 표기를 대문자 스네이크로 고정했으며 앵커가 정확히 하나가 아닌 실행은 응답으로 변환하지 않게 함.
 - 2026-08-19: F3 실행 요청 API 계약을 제안으로 등록하고 `agent_run`에 `QUEUED` 실행을 적재하는 Backend 수직 슬라이스를 구현함.
 - 2026-08-18: F1 MVP 범위에서 후보 추출용 조건 필터를 포함으로, 통합검색을 제외로 구분했다. 2026-08-17 원문 스냅샷은 검색과 필터를 함께 제외했으나 F3 결정적 후보 추출이 조건 조회를 요구해 조정함.
