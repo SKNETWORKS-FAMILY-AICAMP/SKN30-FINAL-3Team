@@ -2,6 +2,32 @@ version: 1
 updated: "2026-08-20"
 
 sources:
+  - id: "pr-policy-multi-review-2026-08-20"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-20)"
+    received: "2026-08-20"
+    reflected_in:
+      - ".github/workflows/pr-policy-review.yml"
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".github/scripts/tests/pr-review.test.mjs"
+      - ".github/pr-review-policy.json"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+      - ".agents/skills/project-wiki/references/development/environments.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+    scope: "새 ADR 없이 ADR-0010을 수정하고, 전체 10,000줄 PR을 결정적 chunk별 독립 리뷰와 최종 통합으로 처리"
+
+  - id: "openai-responses-multi-agent-pr-review"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/guides/responses-multi-agent"
+    accessed: "2026-08-20"
+    reflected_in:
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+    scope: "병렬 독립 PR 리뷰의 적합성과 네이티브 Multi-agent 베타 상태를 검토하고, CI에는 표준 Responses 호출의 결정적 애플리케이션 orchestration을 선택"
+
   - id: "pr-policy-review-discord-2026-08-19"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-19)"

@@ -9,6 +9,8 @@ import {
   addRedactionFinding,
   applyLimits,
   buildInstructions,
+  buildMergeContext,
+  buildMergeInstructions,
   buildReviewContext,
   discordPayload,
   extractResponseText,
@@ -17,13 +19,18 @@ import {
   findReviewComment,
   incompleteReview,
   isInternalPullRequest,
+  mapWithConcurrency,
+  mergeReviewsFallback,
   normalizeReview,
   planForEvent,
+  planReviewChunks,
+  reconcileMergedReview,
   redactSecrets,
   renderDiscordReviewMessages,
   renderGitHubComment,
   shouldIgnoreFile,
-  stableSafetyIdentifier
+  stableSafetyIdentifier,
+  sumUsage
 } from "./pr-review-lib.mjs";
 
 const rootDir = process.env.GITHUB_WORKSPACE || process.cwd();
@@ -36,6 +43,8 @@ const dryRun = parseBoolean(process.env.PR_REVIEW_DRY_RUN, eventName === "workfl
 const invokeOpenAI = parseBoolean(process.env.PR_REVIEW_INVOKE_OPENAI, eventName !== "workflow_dispatch");
 const model = process.env.OPENAI_REVIEW_MODEL || "gpt-5.6-terra";
 const reasoningEffort = process.env.OPENAI_REVIEW_REASONING_EFFORT || "medium";
+const mergeModel = process.env.OPENAI_REVIEW_MERGE_MODEL || model;
+const mergeReasoningEffort = process.env.OPENAI_REVIEW_MERGE_REASONING_EFFORT || reasoningEffort;
 const openAiKey = process.env.OPENAI_REVIEW_API_KEY || "";
 const discordWebhookUrl = process.env.DISCORD_PR_WEBHOOK_URL || "";
 const runUrl = `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${repository}/actions/runs/${process.env.GITHUB_RUN_ID || ""}`;
@@ -94,68 +103,206 @@ try {
     process.exit(0);
   }
 
-  const staleNotice = action === "synchronize" ? "\n이전 SHA의 리뷰는 만료되었으며 최신 commit을 검토합니다." : "";
-  await notifyDiscord(
-    `🤖 **PR AI 리뷰 시작**\nPR #${pr.number} ${safePrTitle(pr.title, 220)}\nSHA: \`${pr.head.sha.slice(0, 12)}\`${staleNotice}\n${runUrl}`
-  );
+  // 변경: action이 "opened"가 아닐 때만 시작 알림 전송
+  if (action !== "opened") {
+    const staleNotice = action === "synchronize" ? "\n이전 SHA의 리뷰는 만료되었으며 최신 commit을 검토합니다." : "";
+    await notifyDiscord(
+      `🤖 **PR AI 리뷰 시작**\nPR #${pr.number} ${safePrTitle(pr.title, 220)}\nSHA: \`${pr.head.sha.slice(0, 12)}\`${staleNotice}\n${runUrl}`
+    );
+  }
+
 
   const files = await listPullRequestFiles(pr.number);
   const reviewableFiles = files.filter((file) => !shouldIgnoreFile(file.filename, policyFile));
   const limits = effectiveLimits(policyFile.limits ?? {});
   const sizeCheck = applyLimits(reviewableFiles, limits);
+  const chunkPlan = sizeCheck.accepted
+    ? planReviewChunks(reviewableFiles, policyFile, limits)
+    : { accepted: false, chunks: [], reasons: [] };
   let context = {
     modules: [],
     redactionCount: 0,
     redactedFiles: [],
+    missingPolicyPaths: [],
+    missingPatches: [],
     contextChars: 0,
-    reasons: []
+    reasons: [],
+    reviewMode: chunkPlan.chunks.length > 1 ? "multi" : "single",
+    chunkCount: chunkPlan.chunks.length
   };
   let review;
   let usage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
   let effectiveModel = model;
 
-  if (!sizeCheck.accepted) {
+  if (reviewableFiles.length === 0) {
+    review = {
+      status: "clean",
+      summary: "lockfile, binary 또는 생성물 제외 후 AI 검토 대상 파일이 없습니다.",
+      findings: [],
+      missing_evidence: []
+    };
+  } else if (!sizeCheck.accepted) {
     review = incompleteReview(sizeCheck.reasons);
+  } else if (!chunkPlan.accepted) {
+    review = incompleteReview(chunkPlan.reasons);
   } else {
-    context = await buildReviewContext({
-      rootDir,
-      pr,
-      files,
-      policy: policyFile,
-      limits
-    });
-    if (!context.accepted) {
-      review = incompleteReview(context.reasons);
+    const chunkContexts = await Promise.all(
+      chunkPlan.chunks.map((chunk) =>
+        buildReviewContext({
+          rootDir,
+          pr,
+          files: chunk.files,
+          policy: policyFile,
+          limits
+        })
+      )
+    );
+    context = combineChunkContexts(chunkPlan, chunkContexts);
+    const rejectedChunks = chunkContexts.flatMap((chunkContext, index) =>
+      chunkContext.accepted
+        ? []
+        : chunkContext.reasons.map((reason) => `${chunkPlan.chunks[index].id}: ${reason}`)
+    );
+
+    if (rejectedChunks.length > 0) {
+      review = incompleteReview(rejectedChunks);
     } else if (dryRun && !invokeOpenAI) {
       review = incompleteReview([
-        "Dry-run에서 OpenAI 호출이 비활성화되어 컨텍스트 구성까지만 검증했습니다."
+        `Dry-run에서 OpenAI 호출 없이 ${chunkPlan.chunks.length}개 리뷰 chunk 구성까지만 검증했습니다.`
       ]);
-    } else {
+    } else if (chunkPlan.chunks.length === 1) {
       try {
-        const response = await callOpenAI({ pr, context, limits });
+        const response = await callOpenAI({
+          pr,
+          context: chunkContexts[0],
+          limits,
+          instructions: buildInstructions(limits.maxFindings),
+          schemaName: "pr_policy_review"
+        });
         effectiveModel = response.model || model;
         usage = response.usage || usage;
-        if (response.status && response.status !== "completed") {
-          throw new Error(`OpenAI response status was ${response.status}`);
-        }
+        assertCompletedResponse(response);
         review = normalizeReview(JSON.parse(extractResponseText(response)), limits.maxFindings);
       } catch (error) {
         openAiFailure = true;
         review = incompleteReview([safeError(error)]);
       }
+    } else {
+      await notifyDiscord(
+        `🧩 **분할 리뷰 계획**\n${chunkPlan.chunks.length}개 chunk · 최대 동시 실행 ${limits.maxConcurrency}\n${chunkPlan.chunks.map((chunk) => `${chunk.id}: ${chunk.filenames.length} files / ${chunk.changedLines} lines`).join("\n")}`
+      );
+      const chunkRuns = await mapWithConcurrency(
+        chunkPlan.chunks,
+        limits.maxConcurrency,
+        async (chunk, index) => {
+          const chunkContext = chunkContexts[index];
+          let response;
+          try {
+            response = await callOpenAI({
+              pr,
+              context: chunkContext,
+              limits,
+              instructions: `${buildInstructions(limits.chunkMaxFindings)}\n- 이번 요청은 ${chunk.id} chunk만 검토합니다. 다른 chunk의 변경을 추측하지 않습니다.`,
+              schemaName: "pr_policy_chunk_review"
+            });
+            assertCompletedResponse(response);
+            return {
+              ok: true,
+              chunk,
+              context: chunkContext,
+              model: response.model || model,
+              usage: response.usage || {},
+              review: normalizeReview(
+                JSON.parse(extractResponseText(response)),
+                limits.chunkMaxFindings
+              )
+            };
+          } catch (error) {
+            return {
+              ok: false,
+              chunk,
+              context: chunkContext,
+              model: response?.model || model,
+              usage: response?.usage || {},
+              review: incompleteReview([`${chunk.id}: ${safeError(error)}`])
+            };
+          }
+        }
+      );
+      usage = sumUsage(chunkRuns.map((run) => run.usage));
+      effectiveModel = [...new Set(chunkRuns.map((run) => run.model))].join(", ") || model;
+      const leafReviews = chunkRuns.map((run) =>
+        withContextEvidence(run.review, run.context, run.chunk.id)
+      );
+
+      if (chunkRuns.some((run) => !run.ok)) {
+        openAiFailure = true;
+        review = mergeReviewsFallback(leafReviews, limits.maxFindings, {
+          forceIncomplete: true
+        });
+      } else {
+        const mergeInput = chunkRuns.map((run, index) => ({
+          chunk_id: run.chunk.id,
+          group: run.chunk.group,
+          files: run.chunk.filenames,
+          review: leafReviews[index]
+        }));
+        const mergeContext = await buildMergeContext({
+          rootDir,
+          pr,
+          files: reviewableFiles,
+          policy: policyFile,
+          limits,
+          chunkResults: mergeInput
+        });
+        context.mergeContextChars = mergeContext.contextChars;
+        if (!mergeContext.accepted) {
+          review = mergeReviewsFallback(leafReviews, limits.maxFindings, {
+            forceIncomplete: true
+          });
+          review.missing_evidence = [
+            ...review.missing_evidence,
+            ...mergeContext.reasons
+          ].slice(0, 10);
+        } else {
+          try {
+            const response = await callOpenAI({
+              pr,
+              context: mergeContext,
+              limits,
+              instructions: buildMergeInstructions(limits.maxFindings),
+              requestModel: mergeModel,
+              requestReasoningEffort: mergeReasoningEffort,
+              schemaName: "pr_policy_merged_review"
+            });
+            assertCompletedResponse(response);
+            usage = sumUsage([usage, response.usage]);
+            const responseModel = response.model || mergeModel;
+            effectiveModel = responseModel === model ? model : `${model} + ${responseModel}`;
+            review = reconcileMergedReview(
+              normalizeReview(
+                JSON.parse(extractResponseText(response)),
+                limits.maxFindings
+              ),
+              leafReviews,
+              limits.maxFindings
+            );
+          } catch (error) {
+            openAiFailure = true;
+            review = mergeReviewsFallback(leafReviews, limits.maxFindings, {
+              forceIncomplete: true
+            });
+            review.missing_evidence = [
+              ...review.missing_evidence,
+              `통합 리뷰: ${safeError(error)}`
+            ].slice(0, 10);
+          }
+        }
+      }
     }
   }
 
-  const unavailableEvidence = [
-    ...(context.missingPolicyPaths ?? []).map((item) => `정책 파일을 읽지 못함: ${item}`),
-    ...(context.missingPatches ?? []).map((item) => `GitHub patch를 제공받지 못함: ${item}`)
-  ];
-  if (unavailableEvidence.length > 0) {
-    review = {
-      ...review,
-      missing_evidence: [...review.missing_evidence, ...unavailableEvidence].slice(0, 10)
-    };
-  }
+  review = withContextEvidence(review, context);
   review = addRedactionFinding(review, context.redactedFiles ?? []);
   const durationMs = Date.now() - startedAt;
   const comment = renderGitHubComment({
@@ -184,6 +331,8 @@ try {
     usage,
     durationMs,
     modules: context.modules ?? [],
+    reviewMode: context.reviewMode,
+    chunkCount: context.chunkCount,
     runUrl
   })) {
     await notifyDiscord(message);
@@ -196,8 +345,9 @@ try {
 - 상태: **${review.status}**
 - 모델: \`${effectiveModel}\`
 - 영향 모듈: ${(context.modules ?? []).join(", ") || "없음"}
+- 리뷰 방식: ${reviewModeLabel(context)}
 - 파일: ${reviewableFiles.length} reviewable / ${files.length} total, 변경 줄: ${sizeCheck.changedLines}
-- 컨텍스트: ${context.contextChars ?? 0}자
+- 부분 컨텍스트 합: ${context.contextChars ?? 0}자, 통합 컨텍스트: ${context.mergeContextChars ?? 0}자
 - 비밀 의심 redaction: ${context.redactionCount ?? 0}
 - Finding: ${review.findings.length}
 - Discord 실패: ${discordFailures}
@@ -210,7 +360,58 @@ try {
   throw error;
 }
 
-async function callOpenAI({ pr, context, limits }) {
+function combineChunkContexts(chunkPlan, chunkContexts) {
+  const unique = (items) => [...new Set(items)];
+  return {
+    modules: unique(chunkContexts.flatMap((item) => item.modules ?? [])),
+    policyPaths: unique(chunkContexts.flatMap((item) => item.policyPaths ?? [])),
+    missingPolicyPaths: unique(chunkContexts.flatMap((item) => item.missingPolicyPaths ?? [])),
+    missingPatches: unique(chunkContexts.flatMap((item) => item.missingPatches ?? [])),
+    redactionCount: chunkContexts.reduce((total, item) => total + Number(item.redactionCount ?? 0), 0),
+    redactedFiles: unique(chunkContexts.flatMap((item) => item.redactedFiles ?? [])),
+    contextChars: chunkContexts.reduce((total, item) => total + Number(item.contextChars ?? 0), 0),
+    reasons: chunkContexts.flatMap((item) => item.reasons ?? []),
+    reviewMode: chunkPlan.chunks.length > 1 ? "multi" : "single",
+    chunkCount: chunkPlan.chunks.length,
+    chunkIds: chunkPlan.chunks.map((chunk) => chunk.id)
+  };
+}
+
+function withContextEvidence(review, context, prefix = "") {
+  const label = prefix ? `${prefix}: ` : "";
+  const unavailable = [
+    ...(context.missingPolicyPaths ?? []).map((item) => `${label}정책 파일을 읽지 못함: ${item}`),
+    ...(context.missingPatches ?? []).map((item) => `${label}GitHub patch가 없거나 불완전함: ${item}`)
+  ];
+  if (unavailable.length === 0) return review;
+  return {
+    ...review,
+    status: "incomplete",
+    missing_evidence: [...new Set([...(review.missing_evidence ?? []), ...unavailable])].slice(0, 10)
+  };
+}
+
+function assertCompletedResponse(response) {
+  if (response?.status && response.status !== "completed") {
+    throw new Error(`OpenAI response status was ${response.status}`);
+  }
+}
+
+function reviewModeLabel(context) {
+  return context.reviewMode === "multi"
+    ? `분할 ${context.chunkCount ?? 0}개 + 최종 통합`
+    : "단일 리뷰";
+}
+
+async function callOpenAI({
+  pr,
+  context,
+  limits,
+  instructions,
+  requestModel = model,
+  requestReasoningEffort = reasoningEffort,
+  schemaName = "pr_policy_review"
+}) {
   if (!openAiKey) throw new Error("OPENAI_REVIEW_API_KEY is not configured");
   const response = await fetchWithRetry(
     "https://api.openai.com/v1/responses",
@@ -221,15 +422,15 @@ async function callOpenAI({ pr, context, limits }) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model,
-        instructions: buildInstructions(limits.maxFindings),
+        model: requestModel,
+        instructions,
         input: context.text,
-        reasoning: { effort: reasoningEffort },
+        reasoning: { effort: requestReasoningEffort },
         text: {
           verbosity: "medium",
           format: {
             type: "json_schema",
-            name: "pr_policy_review",
+            name: schemaName,
             strict: true,
             schema: REVIEW_SCHEMA
           }
@@ -346,20 +547,45 @@ async function notifyDiscord(content) {
 }
 
 function effectiveLimits(configured) {
+  const maxFindings = Math.min(
+    10,
+    positiveInteger(process.env.AI_REVIEW_MAX_FINDINGS, configured.maxFindings ?? 10)
+  );
   return {
-    maxFiles: positiveInteger(process.env.AI_REVIEW_MAX_FILES, configured.maxFiles ?? 60),
+    maxFiles: positiveInteger(process.env.AI_REVIEW_MAX_FILES, configured.maxFiles ?? 200),
     maxChangedLines: positiveInteger(
       process.env.AI_REVIEW_MAX_CHANGED_LINES,
-      configured.maxChangedLines ?? 2000
+      configured.maxChangedLines ?? 10000
     ),
     maxContextChars: positiveInteger(
       process.env.AI_REVIEW_MAX_CONTEXT_CHARS,
       configured.maxContextChars ?? 200000
     ),
-    maxFindings: Math.min(
-      10,
-      positiveInteger(process.env.AI_REVIEW_MAX_FINDINGS, configured.maxFindings ?? 10)
+    chunkChangedLines: positiveInteger(
+      process.env.AI_REVIEW_CHUNK_CHANGED_LINES,
+      configured.chunkChangedLines ?? 2000
     ),
+    chunkPatchChars: positiveInteger(
+      process.env.AI_REVIEW_CHUNK_PATCH_CHARS,
+      configured.chunkPatchChars ?? 80000
+    ),
+    maxChunks: positiveInteger(process.env.AI_REVIEW_MAX_CHUNKS, configured.maxChunks ?? 10),
+    maxConcurrency: Math.min(
+      6,
+      positiveInteger(process.env.AI_REVIEW_MAX_CONCURRENCY, configured.maxConcurrency ?? 3)
+    ),
+    chunkMaxFindings: Math.min(
+      maxFindings,
+      positiveInteger(
+        process.env.AI_REVIEW_CHUNK_MAX_FINDINGS,
+        configured.chunkMaxFindings ?? 5
+      )
+    ),
+    maxMergeContextChars: positiveInteger(
+      process.env.AI_REVIEW_MAX_MERGE_CONTEXT_CHARS,
+      configured.maxMergeContextChars ?? 300000
+    ),
+    maxFindings,
     maxOutputTokens: positiveInteger(
       process.env.AI_REVIEW_MAX_OUTPUT_TOKENS,
       configured.maxOutputTokens ?? 4000
@@ -398,6 +624,7 @@ function safeError(error) {
   let message = error instanceof Error ? error.message : String(error);
   if (openAiKey) message = message.replaceAll(openAiKey, "[REDACTED]");
   if (discordWebhookUrl) message = message.replaceAll(discordWebhookUrl, "[REDACTED]");
+  message = redactSecrets(message).text;
   return safeText(message, 1000);
 }
 

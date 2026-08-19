@@ -6,6 +6,7 @@ import {
   REVIEW_MARKER,
   addRedactionFinding,
   applyLimits,
+  buildMergeContext,
   buildReviewContext,
   chunkText,
   discordPayload,
@@ -14,11 +15,18 @@ import {
   findCheckRun,
   findReviewComment,
   isInternalPullRequest,
+  isPatchIncomplete,
+  mapWithConcurrency,
+  mergeReviewsFallback,
   normalizeReview,
+  patchChangedLines,
   planForEvent,
+  planReviewChunks,
+  reconcileMergedReview,
   renderDiscordReviewMessages,
   renderGitHubComment,
-  selectPolicyPaths
+  selectPolicyPaths,
+  sumUsage
 } from "../pr-review-lib.mjs";
 
 const rootDir = process.cwd();
@@ -147,6 +155,13 @@ test("structured review output is validated and capped", () => {
     missing_evidence: []
   });
   assert.equal(inconsistent.status, "needs_attention");
+  const incomplete = normalizeReview({
+    status: "clean",
+    summary: "insufficient",
+    findings: [],
+    missing_evidence: ["patch missing"]
+  });
+  assert.equal(incomplete.status, "incomplete");
   const sanitized = normalizeReview({
     status: "clean",
     summary: "sk-proj-abcdefghijklmnopqrstuvwxyz",
@@ -216,7 +231,8 @@ test("GitHub output is sticky and Discord output is bounded", () => {
     modules: ["backend"],
     runUrl: "https://github.com/example/actions/runs/1"
   });
-  assert.ok(messages.length >= 3);
+  assert.ok(messages.length >= 2);
+  assert.ok(messages[0].includes("리뷰 기록"));
   assert.ok(messages.every((message) => message.length <= 1800));
   assert.deepEqual(discordPayload("@everyone test").allowed_mentions, { parse: [] });
 });
@@ -312,4 +328,137 @@ test("non-retryable HTTP responses fail once", async () => {
     /HTTP 400/
   );
   assert.equal(calls, 1);
+});
+
+test("large patches are split deterministically by review chunk limits", () => {
+  const patch = `@@ -0,0 +1,6 @@\n${Array.from({ length: 6 }, (_, index) => `+line ${index + 1}`).join("\n")}`;
+  assert.equal(patchChangedLines(patch), 6);
+  assert.equal(patchChangedLines("@@ -1 +1 @@\n+++counter\n---value"), 2);
+  const result = planReviewChunks(
+    [{ filename: "backend/large.py", status: "modified", additions: 6, deletions: 0, patch }],
+    policy,
+    { chunkChangedLines: 2, chunkPatchChars: 10000, maxChunks: 10 }
+  );
+  assert.equal(result.accepted, true);
+  assert.equal(result.chunks.length, 3);
+  assert.deepEqual(result.chunks.map((chunk) => chunk.changedLines), [2, 2, 2]);
+  assert.ok(result.chunks.every((chunk) => chunk.group === "backend"));
+});
+
+test("chunk plans preserve module boundaries and enforce their own cap", () => {
+  const files = [
+    { filename: "backend/a.py", additions: 1, deletions: 0, patch: "@@ -0,0 +1 @@\n+a" },
+    { filename: "ai/b.py", additions: 1, deletions: 0, patch: "@@ -0,0 +1 @@\n+b" }
+  ];
+  const accepted = planReviewChunks(files, policy, {
+    chunkChangedLines: 10,
+    chunkPatchChars: 10000,
+    maxChunks: 2
+  });
+  assert.deepEqual(accepted.chunks.map((chunk) => chunk.group), ["backend", "ai"]);
+  assert.equal(accepted.accepted, true);
+  const rejected = planReviewChunks(files, policy, {
+    chunkChangedLines: 10,
+    chunkPatchChars: 10000,
+    maxChunks: 1
+  });
+  assert.equal(rejected.accepted, false);
+  assert.match(rejected.reasons[0], /한도 1개/);
+});
+
+test("concurrent chunk execution is bounded and keeps result order", async () => {
+  let active = 0;
+  let maximum = 0;
+  const result = await mapWithConcurrency([3, 2, 1, 0], 2, async (value) => {
+    active += 1;
+    maximum = Math.max(maximum, active);
+    await new Promise((resolve) => setTimeout(resolve, value));
+    active -= 1;
+    return value * 2;
+  });
+  assert.deepEqual(result, [6, 4, 2, 0]);
+  assert.equal(maximum, 2);
+});
+
+test("usage and fallback findings are merged deterministically", () => {
+  assert.deepEqual(
+    sumUsage([
+      { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
+      { input_tokens: 20, output_tokens: 3, total_tokens: 23 }
+    ]),
+    { input_tokens: 30, output_tokens: 5, total_tokens: 35 }
+  );
+  const finding = {
+    severity: "high",
+    category: "architecture",
+    title: "경계 위반",
+    file: "backend/a.py",
+    line: 1,
+    evidence: "직접 의존",
+    rule_source: "AGENTS.md",
+    impact: "결합",
+    recommendation: "포트 사용"
+  };
+  const merged = mergeReviewsFallback(
+    [
+      { status: "needs_attention", summary: "a", findings: [finding], missing_evidence: [] },
+      { status: "clean", summary: "b", findings: [finding], missing_evidence: ["missing"] }
+    ],
+    10,
+    { forceIncomplete: true }
+  );
+  assert.equal(merged.status, "incomplete");
+  assert.equal(merged.findings.length, 1);
+  assert.deepEqual(merged.missing_evidence, ["missing"]);
+});
+
+test("merge context contains inventory and summaries but not raw diff", async () => {
+  const rawPatch = "@@ -0,0 +1 @@\n+DO_NOT_COPY_RAW_PATCH";
+  const context = await buildMergeContext({
+    rootDir,
+    pr,
+    files: [{ filename: "backend/a.py", status: "modified", additions: 1, deletions: 0, patch: rawPatch }],
+    policy,
+    limits: { ...policy.limits, maxMergeContextChars: 900000 },
+    chunkResults: [
+      {
+        chunk_id: "backend-1",
+        group: "backend",
+        files: ["backend/a.py"],
+        review: { status: "clean", summary: "검토 완료", findings: [], missing_evidence: [] }
+      }
+    ]
+  });
+  assert.equal(context.accepted, true);
+  assert.match(context.text, /<changed_file_inventory>/);
+  assert.match(context.text, /<chunk_reviews>/);
+  assert.doesNotMatch(context.text, /DO_NOT_COPY_RAW_PATCH/);
+});
+
+test("truncated GitHub patches are treated as incomplete evidence", () => {
+  assert.equal(
+    isPatchIncomplete({ additions: 2, deletions: 0, patch: "@@ -0,0 +1 @@\n+only one" }),
+    true
+  );
+});
+
+test("final merge preserves high-severity leaf findings", () => {
+  const leafFinding = {
+    severity: "high",
+    category: "security",
+    title: "보존해야 하는 finding",
+    file: "backend/security.py",
+    line: 7,
+    evidence: "권한 확대",
+    rule_source: "AGENTS.md",
+    impact: "과도한 접근",
+    recommendation: "권한 축소"
+  };
+  const reconciled = reconcileMergedReview(
+    { status: "clean", summary: "통합 결과", findings: [], missing_evidence: [] },
+    [{ status: "needs_attention", summary: "부분 결과", findings: [leafFinding], missing_evidence: [] }],
+    10
+  );
+  assert.equal(reconciled.status, "needs_attention");
+  assert.deepEqual(reconciled.findings, [leafFinding]);
 });

@@ -5,6 +5,8 @@ updated: 2026-08-20
 
 # 위키 변경 로그
 
+- 2026-08-20: ADR-0010의 PR 리뷰 한도를 전체 10,000줄로 높이고, 최대 10개 chunk를 동시성 3으로 독립 검토한 뒤 결과를 통합하는 결정적 fan-out/fan-in 방식과 incomplete 보존 규칙을 구현함.
+
 - 2026-08-20: GitHub Actions 기반 권고형 PR AI 리뷰와 Discord 결과 전달을 ADR-0010으로 승인하고 Git 정책, 개인정보 외부 전송, CI secret·변수와 운영 런북을 반영함.
 
 - 2026-08-18: 개발 환경 RDS·S3·설정 기준을 Infra ADR-0003으로, AL2023 t3.medium·gp3 40 GiB·ASG 1대·14일 로그와 5개 alarm 기준을 Infra ADR-0004로, private S3·CloudFront·`/api/*` routing을 Infra ADR-0005로 확정하고 Terraform에 구현했으며 원격 plan 96 add·0 change·0 destroy를 확인함.
