@@ -60,6 +60,14 @@ def resolve_anchor(
     )
 
 
+def require_cross_judgment_run(session: Session, brokerage_id: int, run_id: int) -> AgentRun:
+    """상태 조회용 실행 복구. 남의 사무소와 내부 하위 실행은 존재를 드러내지 않고 404로 답한다."""
+    found = repository.find_root_cross_judgment_run(session, brokerage_id, run_id)
+    if found is None:
+        raise NotFoundError("agent run is not found")
+    return found
+
+
 def redacted_input_snapshot(anchor: ResolvedAnchor) -> dict[str, object]:
     """실행 재현에 필요한 식별자와 버전만 남긴다. 상담 원문과 연락처는 넣지 않는다."""
     return {

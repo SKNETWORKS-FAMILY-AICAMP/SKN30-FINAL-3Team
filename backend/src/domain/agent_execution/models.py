@@ -21,6 +21,10 @@ USER_REQUEST_TRIGGER_TYPE = "USER_REQUEST"
 QUEUED_STATUS = "QUEUED"
 
 
+class AgentRunAnchorError(RuntimeError):
+    """루트 실행에 매물·손님 앵커가 정확히 하나 있어야 한다는 불변식을 어긴 저장 데이터."""
+
+
 class AnchorType(StrEnum):
     """교차 판정의 앵커. 매물 앵커는 반대편 손님을, 손님 앵커는 반대편 매물을 찾는다."""
 
