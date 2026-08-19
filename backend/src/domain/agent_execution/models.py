@@ -18,7 +18,11 @@ from domain.property_ledger.models import (
 CROSS_JUDGMENT_RUN_TYPE = "CROSS_JUDGMENT"
 BROKERAGE_WORKFLOW_AGENT_TYPE = "BROKERAGE_WORKFLOW"
 USER_REQUEST_TRIGGER_TYPE = "USER_REQUEST"
+
+# 이 코드가 실제로 쓰는 상태만 상수로 둔다. 나머지 상태는 아직 구현되지 않았다.
 QUEUED_STATUS = "QUEUED"
+RUNNING_STATUS = "RUNNING"
+FAILED_TERMINAL_STATUS = "FAILED_TERMINAL"
 
 
 class AgentRunAnchorError(RuntimeError):
@@ -41,7 +45,7 @@ class AgentRun(SQLModel, table=True):
     parent_run_id: int | None = Field(default=None, sa_column=Column(BigInteger))
     run_type: str = Field(max_length=30)
     agent_type: str = Field(max_length=30)
-    status: str = Field(default=QUEUED_STATUS, max_length=20)
+    status: str = Field(default=QUEUED_STATUS, max_length=30)
     trigger_type: str = Field(max_length=50)
     model_config_id: int | None = Field(default=None, sa_column=Column(BigInteger))
     model_snapshot: dict[str, object] = Field(
@@ -71,6 +75,9 @@ class AgentRun(SQLModel, table=True):
     failure_message: str | None = Field(default=None, sa_column=Column(Text))
     started_at: datetime | None = Field(default=None, sa_column=timestamp_column())
     completed_at: datetime | None = Field(default=None, sa_column=timestamp_column())
+    lease_owner: str | None = Field(default=None, max_length=64)
+    lease_expires_at: datetime | None = Field(default=None, sa_column=timestamp_column())
+    attempt_count: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
     retention_until: datetime | None = Field(default=None, sa_column=timestamp_column())
     purged_at: datetime | None = Field(default=None, sa_column=timestamp_column())
     created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
