@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-17
+updated: 2026-08-19
 ---
 
 # AWS 계정 bootstrap
@@ -20,6 +20,8 @@ updated: 2026-08-17
 3. 생성된 state bucket 이름을 사용해 bootstrap root를 S3 backend로 초기화하고 local state를 이관한다.
 4. `TerraformOperatorRole` assume이 되는지 확인한 뒤 사용자에게서 임시 관리자 권한을 제거한다.
 5. dev root를 별도 state key로 초기화하고 계정 조회 plan을 실행한다.
+
+bootstrap은 `team-readonly` IAM 그룹과 AWS 관리형 `ReadOnlyAccess` 정책 연결을 관리한다. IAM 사용자와 그룹 멤버십, console password와 MFA 장치는 수동으로 관리하며 Terraform state에 넣지 않는다.
 
 현재 계정에서는 AWS Budget과 Cost Anomaly Detection을 사용할 수 없으므로 `create_budget=false`로 고정한다. 비용 상한은 2026-09-23까지 누적 300,000원의 수동 참고값이며 Terraform 밖에서도 Billing 자원을 만들지 않는다.
 

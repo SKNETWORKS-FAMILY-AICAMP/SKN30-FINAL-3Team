@@ -12,7 +12,7 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 
 ## 구조와 소유 범위
 
-- `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, state bucket
+- `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결, state bucket
 - `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성과 private S3·CloudFront Frontend; 현재 코드 구현만 완료되고 미적용
 - `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
@@ -52,6 +52,8 @@ infra/scripts/setup-local.sh \
 ```
 
 스크립트는 `bootstrap.tfvars`를 만들거나 IAM 권한을 추가하지 않으며 `terraform apply`를 실행하지 않는다. 다른 팀원을 추가하려면 기존 운영자가 전체 `operator_user_arns`를 보존한 bootstrap plan을 별도로 검토하고 적용해야 한다.
+
+팀원의 일반 읽기 권한은 Terraform이 관리하는 `team-readonly` IAM 그룹으로 제공한다. IAM 사용자 생성·삭제, 그룹 멤버 추가·제거, console password와 MFA 등록은 Terraform 범위가 아니며 AWS 콘솔에서 개인별로 수행한다. 장기 access key는 만들지 않는다.
 
 state bucket은 개인 IAM 사용자의 직접 접근을 거부한다. 직접 `aws s3` 명령이 `403`을 반환할 수 있으며, Terraform과 검증 스크립트가 `TerraformOperatorRole`을 assume해 접근하는 것이 정상이다.
 
@@ -111,7 +113,7 @@ cp infra/environments/dev/example.tfvars infra/environments/dev/dev.tfvars
 bootstrap_tmp="$(mktemp -d)"
 bootstrap_vars="$(pwd)/infra/bootstrap/bootstrap.tfvars"
 
-for bootstrap_file in versions providers variables locals account-baseline operator-access state-storage budget outputs; do
+for bootstrap_file in versions providers variables locals account-baseline operator-access team-readonly-access state-storage budget outputs; do
   cp "infra/bootstrap/${bootstrap_file}.tf" "$bootstrap_tmp/"
 done
 
@@ -127,6 +129,7 @@ plan에서 다음만 생성되는지 검토하고 승인을 받은 뒤 apply한�
 - account password policy와 account-level S3 public access block
 - 현재 계정에서는 Billing 자원을 생성하지 않으며 `create_budget=false` validation이 이를 차단함
 - `TerraformOperatorRole`과 승인 사용자용 assume/login policy 연결
+- `team-readonly` IAM 그룹과 AWS 관리형 `ReadOnlyAccess` 정책 연결; 사용자와 그룹 멤버십은 포함하지 않음
 - Terraform state bucket과 versioning, SSE-S3, ownership, public access, TLS, 90일 noncurrent version 정책
 
 ```bash
