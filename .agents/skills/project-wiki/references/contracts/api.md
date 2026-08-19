@@ -116,11 +116,13 @@ updated: 2026-08-19
 ## F3 실행 계약 (제안)
 
 이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 요청을 검증해
-`agent_run`에 `QUEUED`로 적재하는 것까지다. 진행 구독, 결과 조회와 피드백 경로는 아직 없다.
+`agent_run`에 `QUEUED`로 적재하고 그 실행의 현재 상태를 조회하는 것까지다. 결과와 후보 조회, 피드백
+경로는 아직 없다.
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
 | POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
+| GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
 
 요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
 정수다. 선언하지 않은 필드가 있으면 422로 거절한다.
@@ -149,3 +151,52 @@ updated: 2026-08-19
 
 같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)과 Worker 획득은 아직 구현하지
 않았다. 이 경로는 AI 실행을 호출하지 않으므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+
+### 실행 상태 조회
+
+`run_id`는 `agent_run.id` 숫자 PK다. `run_group_id`는 내부 실행 묶음 식별자이므로 외부 조회 키로
+사용하지 않는다. 상태 변경이 없는 GET이므로 CSRF 토큰을 요구하지 않는다.
+
+조회는 `brokerage_id`와 루트 `CROSS_JUDGMENT` 조건(`parent_run_id IS NULL`)으로 격리한다. 다른
+중개사무소의 실행, 내부 하위 실행과 다른 실행 유형은 모두 404로 답해 숫자 ID로 존재 여부를 넘겨짚을
+수 없게 한다. `run_id`가 1 미만이면 422다.
+
+```json
+{
+  "run_id": 51,
+  "status": "QUEUED",
+  "anchor_type": "LISTING",
+  "anchor_id": 123,
+  "input_data_version": 3,
+  "created_at": "2026-08-19T02:13:44.512834+00:00",
+  "started_at": null,
+  "completed_at": null,
+  "failure_code": null,
+  "failure_message": null
+}
+```
+
+응답에는 사무소 식별자, 요청자, 모델 설정·스냅샷, 프롬프트·워크플로 버전, 입출력 스냅샷, 토큰 수,
+`run_group_id`와 `parent_run_id`를 싣지 않는다. `failure_message`는 DB 계약상 개인정보를 담지 않는
+안전한 설명이라는 전제로 그대로 노출한다.
+
+`status`는 DB에 저장된 문자열을 그대로 공개하며 표기는 `agent_run.status`의 기본값 `QUEUED`에 맞춰
+**대문자 스네이크로 통일한다.** 클라이언트가 대소문자를 함께 분기하지 않게 하기 위한 규칙이다.
+
+| status | 의미 |
+|---|---|
+| `QUEUED` | 실행 적재 완료, Worker 대기 |
+| `ANCHOR_READY` | 앵커 카드 저장 완료 |
+| `CANDIDATES_READY` | 결정적 SQL 후보 스냅샷 완료 |
+| `JUDGING` | 전체 후보 중개 판정 실행 중 |
+| `COMPLETED` | 검증을 통과한 최종 결과 저장 |
+| `FAILED_RETRYABLE` | 재시도 가능한 일시 오류 |
+| `FAILED_TERMINAL` | 재시도해도 성공하지 않는 영구 오류 |
+
+`QUEUED`를 제외한 값은 아직 `제안`이며 이 API가 만들지 않는다. 상태 집합의 의미 정본은
+[온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
+열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
+
+`anchor_type`과 `anchor_id`는 `target_listing_id`와 `target_requirement_id` 중 **정확히 하나**가 있을
+때만 도출한다. 둘 다 없거나 둘 다 있는 실행은 존재하지 않는 앵커를 정상 응답으로 내보내지 않고
+`INTERNAL_SERVER_ERROR`로 답한다. DB에 해당 CHECK 제약이 없어 응용 계층에서 막는다.
