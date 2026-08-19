@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from domain.agent_execution.models import AgentRun, AgentRunAnchorError, AnchorType
+from domain.agent_execution.models import AgentRun, AnchorType, anchor_of
 
 
 class F3RunCreateRequest(BaseModel):
@@ -15,23 +15,6 @@ class F3RunCreateRequest(BaseModel):
 
     anchor_type: AnchorType
     anchor_id: int = Field(ge=1)
-
-
-def anchor_of(run: AgentRun) -> tuple[AnchorType, int]:
-    """실행 대상 컬럼에서 공개용 앵커를 되돌린다. 두 응답이 같은 규칙을 쓰게 한다.
-
-    DB에는 둘 중 하나만 채우라는 CHECK 제약이 없다. 어느 쪽도 없거나 양쪽이 다 있는 행을
-    억지로 변환하면 존재하지 않는 앵커를 정상 응답으로 내보내므로 여기서 멈춘다.
-    """
-    listing_id = run.target_listing_id
-    requirement_id = run.target_requirement_id
-    if listing_id is not None and requirement_id is None:
-        return AnchorType.LISTING, listing_id
-    if requirement_id is not None and listing_id is None:
-        return AnchorType.REQUIREMENT, requirement_id
-    raise AgentRunAnchorError(
-        "agent run must target exactly one of a listing or a requirement"
-    )
 
 
 class F3RunResponse(BaseModel):

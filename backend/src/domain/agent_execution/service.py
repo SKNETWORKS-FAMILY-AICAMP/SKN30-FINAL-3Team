@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,6 +9,7 @@ from sqlmodel import Session
 
 from core.errors import NotFoundError
 from domain.agent_execution import repository
+from domain.agent_execution.cache_key import position_card_cache_key
 from domain.agent_execution.models import (
     BROKERAGE_WORKFLOW_AGENT_TYPE,
     CROSS_JUDGMENT_RUN_TYPE,
@@ -15,6 +17,9 @@ from domain.agent_execution.models import (
     USER_REQUEST_TRIGGER_TYPE,
     AgentRun,
     AnchorType,
+    InputVersionChangedError,
+    LeaseNotHeldError,
+    anchor_of,
 )
 
 # Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
@@ -154,3 +159,143 @@ def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
         raise
 
     return claimed
+
+
+@dataclass(frozen=True)
+class PositionCardRequest:
+    """카드가 없을 때 AI 생성에 넘길 최소 입력. 상담 원문·성명·연락처는 담지 않는다.
+
+    interaction_count·last_interaction_at·max_interaction_id 는 이후 카드 저장 단계에서
+    입력이 그대로인지 다시 확인할 fencing 값이다. 재검증 자체는 아직 구현하지 않았다.
+    """
+
+    cache_key: str
+    negotiation_side: str
+    anchor_type: AnchorType
+    anchor_id: int
+    data_version: int
+    interaction_count: int
+    last_interaction_at: datetime | None
+    max_interaction_id: int | None
+    agent_type: str
+    model_config_id: int | None
+    prompt_version: str | None
+    workflow_version: str | None
+
+
+@dataclass(frozen=True)
+class AnchorCardLookup:
+    """앵커 포지션 카드 조회 결과. 재사용 카드가 있으면 hit, 없으면 생성 요청이 붙는다."""
+
+    cache_hit: bool
+    cache_key: str
+    negotiation_side: str
+    anchor_type: AnchorType
+    anchor_id: int
+    data_version: int
+    position_analysis_id: int | None = None
+    generation_request: PositionCardRequest | None = None
+
+
+def anchor_interaction_summary(
+    session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int
+) -> repository.InteractionSummary:
+    """앵커에 달린 상담 로그 집합의 신원. 매물은 세대 로그를 함께 본다."""
+    if anchor_type is AnchorType.LISTING:
+        listing = repository.find_listing_anchor(session, run.brokerage_id, anchor_id)
+        if listing is None:
+            raise NotFoundError("property listing is not found")
+        return repository.summarize_interactions(
+            session, run.brokerage_id, unit_id=listing.unit_id, listing_id=listing.id
+        )
+
+    requirement = repository.find_requirement_anchor(session, run.brokerage_id, anchor_id)
+    if requirement is None:
+        raise NotFoundError("property requirement is not found")
+    return repository.summarize_interactions(
+        session, run.brokerage_id, requirement_id=requirement.id
+    )
+
+
+def current_anchor_version(
+    session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int
+) -> int:
+    if anchor_type is AnchorType.LISTING:
+        listing = repository.find_listing_anchor(session, run.brokerage_id, anchor_id)
+        if listing is None:
+            raise NotFoundError("property listing is not found")
+        return listing.row_version
+    requirement = repository.find_requirement_anchor(session, run.brokerage_id, anchor_id)
+    if requirement is None:
+        raise NotFoundError("property requirement is not found")
+    return requirement.row_version
+
+
+def prepare_anchor_position_card(
+    session: Session, run_id: int, worker_id: str, attempt_count: int
+) -> AnchorCardLookup:
+    """선점한 실행의 앵커 카드를 찾거나 생성 요청을 만든다. 아무것도 저장하지 않는다.
+
+    유효한 카드를 확보하기 전이므로 ANCHOR_READY 전환은 이 단계에서 하지 않는다.
+    """
+    run = repository.find_leased_run(session, run_id, worker_id, attempt_count)
+    if run is None:
+        raise LeaseNotHeldError("the worker does not hold a valid lease on this run")
+
+    anchor_type, anchor_id = anchor_of(run)
+    if current_anchor_version(session, run, anchor_type, anchor_id) != run.input_data_version:
+        raise InputVersionChangedError("the anchor changed after the run was queued")
+
+    interactions = anchor_interaction_summary(session, run, anchor_type, anchor_id)
+    # 앵커 카드는 앵커 자신을 대리하므로 측면이 앵커 종류를 따른다.
+    # negotiation_side 값 어휘는 아직 정본에서 확정되지 않은 내부 임시값이다 (OQ-012).
+    negotiation_side = anchor_type.value
+    cache_key = position_card_cache_key(
+        brokerage_id=run.brokerage_id,
+        negotiation_side=negotiation_side,
+        anchor_type=anchor_type.value,
+        anchor_id=anchor_id,
+        data_version=run.input_data_version,
+        interaction_count=interactions.interaction_count,
+        last_interaction_at=interactions.last_interaction_at,
+        max_interaction_id=interactions.max_interaction_id,
+        agent_type=run.agent_type,
+        model_config_id=run.model_config_id,
+        prompt_version=run.prompt_version,
+        workflow_version=run.workflow_version,
+    )
+
+    cached = repository.find_active_position_card(
+        session,
+        run.brokerage_id,
+        cache_key=cache_key,
+        negotiation_side=negotiation_side,
+        listing_id=anchor_id if anchor_type is AnchorType.LISTING else None,
+        requirement_id=anchor_id if anchor_type is AnchorType.REQUIREMENT else None,
+        data_version=run.input_data_version,
+        interactions=interactions,
+    )
+    common = {
+        "cache_key": cache_key,
+        "negotiation_side": negotiation_side,
+        "anchor_type": anchor_type,
+        "anchor_id": anchor_id,
+        "data_version": run.input_data_version,
+    }
+    if cached is not None:
+        return AnchorCardLookup(cache_hit=True, position_analysis_id=cached.id, **common)
+
+    return AnchorCardLookup(
+        cache_hit=False,
+        generation_request=PositionCardRequest(
+            interaction_count=interactions.interaction_count,
+            last_interaction_at=interactions.last_interaction_at,
+            max_interaction_id=interactions.max_interaction_id,
+            agent_type=run.agent_type,
+            model_config_id=run.model_config_id,
+            prompt_version=run.prompt_version,
+            workflow_version=run.workflow_version,
+            **common,
+        ),
+        **common,
+    )
