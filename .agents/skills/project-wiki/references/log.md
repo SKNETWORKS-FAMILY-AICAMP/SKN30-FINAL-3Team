@@ -5,6 +5,7 @@ updated: 2026-08-19
 
 # 위키 변경 로그
 
+- 2026-08-19: 앵커 포지션 카드 캐시 조회와 AI 생성 요청 준비를 구현하고, `ANCHOR_READY`가 원장 조회 완료가 아니라 유효한 포지션 카드 확보를 뜻한다는 점을 명시함. cache key(`position-card:v2`)는 대상·입력 버전·상담 로그 건수·마지막 상담 시각·최대 로그 ID·모델 구성 버전의 canonical JSON SHA-256이며, 과거 시각 로그 추가와 로그 무효화도 cache miss가 된다. `negotiation_side` 값 어휘 미확정을 OQ-012로 등록함.
 - 2026-08-19: agent_run에 Worker lease 컬럼을 추가하고 FOR UPDATE SKIP LOCKED 기반 원자적 작업 선점과 5분 lease·3회 상한 종료 정책을 구현했으며, 실행 상태값 11종을 대문자 스네이크로 통일하고 실행 제어·업무 처리 구분을 명시함.
 - 2026-08-19: 숫자 run_id 기반 F3 실행 상태 조회 계약과 사무소·루트 실행으로 격리한 tenant-scoped GET endpoint를 구현하고, 공개 status 표기를 대문자 스네이크로 고정했으며 앵커가 정확히 하나가 아닌 실행은 응답으로 변환하지 않게 함.
 - 2026-08-19: F3 실행 요청 API 계약을 제안으로 등록하고 `agent_run`에 `QUEUED` 실행을 적재하는 Backend 수직 슬라이스를 구현함.

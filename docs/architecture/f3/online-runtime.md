@@ -166,6 +166,14 @@ sequenceDiagram
 
 현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 세 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
+`ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
+
+현재 구현된 범위는 lease 소유권 확인, 앵커·입력 버전 확인, cache key 계산, 캐시 조회와 생성 요청 준비까지다. AI 카드 생성과 `ANCHOR_READY` 전환은 아직 구현하지 않았다.
+
+포지션 카드 cache key의 현재 schema version은 `position-card:v2`이며 마지막 상담 시각만으로는 부족하다. F1의 상담 로그 추가는 매물·구입장의 `row_version`을 올리지 않으므로, 기존 최신 로그보다 **과거 시각의 로그를 추가**하거나 **로그를 무효화**하면 `MAX(interaction_at)`과 데이터 버전이 그대로여서 낡은 카드가 재사용된다. 따라서 key에는 상담 로그 **건수**와 **최대 로그 ID**를 source revision으로 함께 넣어 집합이 바뀌면 반드시 cache miss가 되게 한다.
+
+재사용 판정은 cache key만 믿지 않고 저장된 카드의 `source_interaction_count`와 `last_interaction_at`을 현재 값과 다시 대조한다. 조회 시점과 카드 저장 시점 사이에 로그가 또 바뀔 수 있으므로, 카드 저장과 `ANCHOR_READY` 전환 단계에서 생성 요청에 실린 source identity를 한 번 더 확인해야 한다. 그 재검증은 아직 구현하지 않았다.
+
 5초 안에 `COMPLETED`가 되지 않으면 빈 패널을 유지하지 않고 확보된 마지막 안전 단계를 표시한다. SSE 후보 연결이 끊기면 작업은 취소되지 않으며 상태 조회로 스냅샷을 복구한 뒤 마지막 이벤트 이후를 다시 구독한다.
 
 ## 결정적 후보 검색
