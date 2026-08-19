@@ -1,0 +1,113 @@
+set dotenv-load
+
+account_id := env_var("TARGET_ACCOUNT_ID")
+aws_profile := env_var_or_default("AWS_PROFILE", "skn30-session")
+
+# 사용 가능한 Infra 명령을 표시한다.
+default:
+    @just --list
+
+# 새 PC의 AWS profile, Terraform backend와 dev 변수를 구성한다.
+setup expires_at:
+    scripts/setup-local.sh --account-id "{{ account_id }}" --expires-at "{{ expires_at }}"
+
+# 유효한 aws login 세션을 재사용해 새 PC 구성을 완료한다.
+setup-existing expires_at:
+    scripts/setup-local.sh --account-id "{{ account_id }}" --expires-at "{{ expires_at }}" --skip-login
+
+# Terraform과 DB 관리 도구를 변경 없이 검사한다.
+check:
+    just --fmt --check
+    terraform fmt -check -recursive .
+    terraform -chdir=bootstrap validate
+    terraform -chdir=environments/dev validate
+    uvx ruff check scripts/manage_db_access.py scripts/manage_dev_power.py tests
+    uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
+
+# 모든 Terraform 파일을 포맷한다.
+fmt:
+    terraform fmt -recursive .
+
+# bootstrap 변경 plan을 저장한다.
+bootstrap-plan:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    terraform -chdir=bootstrap validate
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=bootstrap plan -input=false -var-file=bootstrap.tfvars -out=bootstrap.tfplan
+
+# 저장된 bootstrap plan을 사람이 검토할 수 있게 표시한다.
+bootstrap-show:
+    terraform -chdir=bootstrap show bootstrap.tfplan
+
+# 승인된 bootstrap plan만 적용한다.
+[confirm("검토하고 승인한 bootstrap.tfplan을 적용합니까?")]
+bootstrap-apply:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=bootstrap apply bootstrap.tfplan
+
+# bootstrap 적용 후 drift가 없는지 검사한다.
+bootstrap-drift:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=bootstrap plan -input=false -detailed-exitcode -var-file=bootstrap.tfvars
+
+# dev 변경 plan을 저장한다.
+dev-plan:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    terraform -chdir=environments/dev validate
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -out=dev.tfplan
+
+# 저장된 dev plan을 사람이 검토할 수 있게 표시한다.
+dev-show:
+    terraform -chdir=environments/dev show dev.tfplan
+
+# 승인된 dev plan만 적용한다.
+[confirm("검토하고 승인한 dev.tfplan을 적용합니까?")]
+dev-apply:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev.tfplan
+
+# dev 적용 후 drift가 없는지 검사한다.
+dev-drift:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -detailed-exitcode -var-file=dev.tfvars
+
+# RDS, ASG와 SSM 연결 상태를 변경 없이 확인한다.
+dev-status:
+    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
+
+# RDS를 먼저 시작하고 ASG를 1로 복구한 뒤 SSM Online까지 기다린다.
+[confirm("공유 개발 RDS와 EC2를 시작합니까?")]
+dev-start:
+    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
+
+# 활성 작업 확인 후 ASG를 0으로 내리고 RDS를 정지한다.
+[confirm("배포, migration, API 요청과 Worker 작업이 모두 끝났습니까?")]
+dev-stop:
+    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
+
+# Terraform state와 AWS 계정 연결을 읽기 전용으로 검증한다.
+verify-account:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/verify-account-link.sh
+
+# 고정 DB 역할, runtime Secret과 현재 팀원 DB 역할을 초기화한다.
+[confirm("개발 DB 역할과 runtime Secret을 초기화합니까?")]
+db-init:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" bootstrap --apply
+
+# team-db-tunnel IAM 그룹 멤버와 DB 역할을 동기화한다.
+[confirm("team-db-tunnel 멤버 변경을 개발 DB 역할에 반영합니까?")]
+db-sync:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" sync-team --apply
+
+# 개인 IAM 인증으로 커밋된 Yoyo migration을 적용한다.
+[confirm("커밋된 Yoyo migration을 개발 DB에 적용합니까?")]
+db-migrate:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" migrate --apply
+
+# runtime credential과 필수 DB 역할을 읽기 전용으로 검증한다.
+db-verify:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" verify
+
+# maintenance window에서 runtime DB 비밀번호를 회전한다.
+[confirm("API와 Worker가 중지된 maintenance window입니까?")]
+db-rotate:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" rotate-runtime --apply --maintenance-window-confirmed

@@ -1,28 +1,43 @@
 ---
-status: 계획됨
-updated: 2026-08-17
+status: 결정
+updated: 2026-08-18
 ---
 
 # 인프라 자원 인벤토리
 
-아래 상태는 아키텍처 문서를 인프라 관점에서 분류한 것이며 `제안`과 `미확정` 자원을 승인된 선택으로 바꾸지 않는다.
+선택 정본은 [Infra ADR-0002](decisions/ADR-0002-dev-demo-aws-runpod-architecture.md), [Infra ADR-0003](decisions/ADR-0003-dev-storage-database-and-configuration.md), [Infra ADR-0004](decisions/ADR-0004-dev-runtime-and-observability-baseline.md)와 [Infra ADR-0005](decisions/ADR-0005-dev-frontend-origin-and-api-routing.md)다. Terraform 코드 구현과 실제 생성 여부를 구분하며, 현재 workload는 모두 미적용 상태다.
 
-| 영역 | 후보 자원 | 상태 | 도입 조건 |
-|---|---|---|---|
-| 계정 기반 | IAM, Budget, S3 Terraform state | 구현됨(Budget 제외) | IAM·state는 적용됨; Budget은 조직 SCP 해제 또는 조직 관리자 제공 필요 |
-| 데이터베이스 | RDS PostgreSQL 15, pgvector | 계획됨 | 공유 개발 DB 범위, 접근 경로, 백업·폐기 승인 |
-| 네트워크 | VPC, subnet, security group, ingress | 미확정 | RDS 또는 컨테이너 첫 배포 설계 승인 |
-| 파일 | F2 임시 음성용 암호화 저장소 | 제안 | 성공 즉시 삭제, 실패 최대 1시간 정책과 Backend 계약 확정 |
-| 데이터·모델 | 데이터셋, 평가 보고서, 현재·직전 모델 artifact 저장소 | 제안 | Data·AI 저장 포맷, 접근 주체와 버전 정책 확정 |
-| 컨테이너 | ECR, ECS Fargate API·Worker·인덱싱 Worker | 제안 | OQ-004와 인터넷 egress·ingress·용량 결정 |
-| 큐 | SQS, DLQ | 제안 | OQ-009와 멱등성·재시도·보존 정책 결정 |
-| 모델 실행 | RunPod/vLLM 또는 외부 모델 API | 계획됨 | 비용 범위, 개인정보 전송과 운영 모델 제공자 결정 |
-| 관측성 | CloudWatch logs·metrics·alarms | 계획됨 | 배포 자원과 로그 보존·마스킹 정책 확정 |
-| 공개 진입 | ALB, DNS, 인증서, Frontend hosting | 미확정 | 공개 배포 아키텍처와 도메인 확정 |
+| 영역 | 자원 | 선택 상태 | 구현 상태 | 도입 조건·제약 |
+|---|---|---|---|---|
+| 계정 기반 | IAM, Terraform state S3 | 결정 | 구현됨 | state는 업무·Pipeline artifact와 혼용 금지 |
+| 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 2026-09-23까지 누적 300,000원은 운영 참고 상한 |
+| 네트워크 | VPC, IGW, route table, public subnet 2개 AZ | 결정 | 구현됨·미적용 | NAT·IPv6 없음 |
+| 네트워크 | EC2 app public subnet, RDS private subnet 2개, security group | 결정 | 구현됨·미적용 | ALB HTTP는 CloudFront origin-facing prefix에서만, EC2 inbound는 ALB SG만, RDS inbound는 App SG만 |
+| 네트워크 | S3 Gateway Endpoint | 결정 | 구현됨·미적용 | public/app route table의 업무용 S3 접근 경로 |
+| 컴퓨팅 | EC2, Launch Template, ASG desired 1, ALB | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.medium, gp3 40 GiB, EC2 health; delivery 전 TG unhealthy 예상 |
+| 운영 접속 | SSM Session Manager | 결정 | 구현됨·미적용 | SSH 차단, IMDSv2 강제 |
+| 이미지 | ECR | 결정 | 구현됨·미적용 | immutable tag, untagged image만 7일 후 만료; 배포는 digest 고정 |
+| 데이터베이스 | RDS PostgreSQL 15.18, pgvector, Single-AZ | 결정 | 구현됨·미적용 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일, IAM DB 인증; `vector`는 최초 DB migration 소유 |
+| Frontend | CloudFront, private S3 origin, OAC, ALB custom origin | 결정 | 구현됨·미적용 | 기본 도메인, `/api/*` ALB, managed security headers; 배포 artifact는 미준비 |
+| 업무 파일 | 임시 음성 S3 | 결정 | 구현됨·미적용 | 앱이 성공·취소 즉시, 실패 1시간 이내 삭제; lifecycle 1일 안전망 |
+| 데이터·모델 | 데이터셋·평가·모델 artifact S3 | 결정 | 구현됨·미적용 | `releases/`는 2026-09-24 00:00 UTC 만료, 그 외 자동 만료 없음 |
+| 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 구현됨·미적용 | runtime은 구조화된 DB credential, migration은 IAM 인증과 deprecated 빈 container, master는 RDS 관리; value는 Terraform 외부 주입 |
+| 관측성 | CloudWatch logs·metrics·alarms, SNS | 결정 | 구현됨·미적용 | log group 5개 14일, alarm 6개; IAM DB 인증용 FreeableMemory 경보 포함, SNS 구독 없음 |
+| 전달 | CodeConnections, CodePipeline V2, CodeBuild, CodeDeploy | 결정 | 계획됨 | DetectChanges=false, 수동 최신 main 또는 COMMIT_ID |
+| 전달 저장소 | Pipeline artifact S3 | 결정 | 구현됨·미적용 | non-versioned, 객체 14일 만료; 업무용 S3·Terraform state와 분리 |
+| 모델 실행 | RunPod 공용 Template, 개발자별 Pod | 결정 | 보류 | 운영 구조는 결정됐으나 Terraform 소유 범위는 재개 전 결정 |
+| 공개 TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 환경에는 도메인이 없고 실제 개인정보 사용 금지; 운영 승격 시 별도 결정 |
+| 큐 | SQS, DLQ | 조건부 | 미확정 | RDS polling이 독립 재시도·확장을 충족하지 못할 때 |
+| AI 분리 | ECS Fargate, Cloud Map | 조건부 | 미확정 | 경합·지연·독립 배포·장애 격리 필요 측정 후 |
+| 모델 배포 | RunPod custom image, Network Volume | 조건부 | 미확정 | 기본 vLLM·다운로드 방식이 부족할 때 |
+| 제외 | GitHub Actions OIDC, NAT Gateway, Multi-AZ RDS | 제외 | 제외 | 1차 개발·시연 범위 |
+| 제외 | WAF, ElastiCache, AWS Backup, EKS, Step Functions | 제외 | 제외 | 별도 요구·승인 전 |
+| 제외 | Terraform 배포 Pipeline | 제외 | 제외 | 수동 Terraform 절차 유지 |
 
 ## 현재 구현 경계
 
-- 이번 계정 bootstrap은 워크로드 자원을 만들지 않는다.
-- `infra/environments/dev`는 계정·리전 조회만 수행한다.
-- RDS, VPC, EC2, ECS, ECR, SQS, RunPod와 업무용 S3는 후속 결정 전까지 Terraform state에 추가하지 않는다.
+- 현재 계정 bootstrap은 워크로드 자원을 만들지 않는다.
+- `infra/environments/dev`에는 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG와 관측성이 구현됐지만 apply하지 않았다.
+- 마지막 원격 plan은 dev root 전체 101개 추가, 변경 0개, 삭제 0개였으며 실제 AWS 자원 생성 승인은 별도다.
+- RunPod Terraform은 사용자 지시에 따라 보류했고 AWS provider 밖의 자원은 추가하지 않았다.
 - Terraform state bucket은 애플리케이션 파일 저장소가 아니며 다른 용도로 재사용하지 않는다.
