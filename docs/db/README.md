@@ -4,6 +4,8 @@
 
 백엔드 DB 계층은 PostgreSQL 15, SQLModel과 순수 SQL migration으로 결정되었다. 적용 도구와 애플리케이션 실행법은 백엔드 ADR 및 backend/README.md에서 관리하며, 이 문서는 SQL 파일 자체의 규칙만 정의한다.
 
+공유 환경에 적용하는 최초 migration은 `CREATE EXTENSION vector`로 pgvector를 활성화한다. Terraform은 SQL을 실행하거나 extension schema를 소유하지 않는다. 현재 migration 기준선에는 아직 이 결정이 반영되지 않았으므로 첫 공유 DB 적용 전 별도 배포 작업에서 migration을 갱신하고 PostgreSQL 15에서 검증해야 한다.
+
 ## 디렉터리
 
 | 경로 | 용도 | 실행 여부 |

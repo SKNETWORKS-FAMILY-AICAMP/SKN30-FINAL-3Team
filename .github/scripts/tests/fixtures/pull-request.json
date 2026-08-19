@@ -1,0 +1,21 @@
+{
+  "action": "synchronize",
+  "pull_request": {
+    "number": 42,
+    "title": "feat: add policy-aware review",
+    "body": "## 변경 목적과 범위\n정책 기반 리뷰를 추가합니다.",
+    "draft": false,
+    "merged": false,
+    "html_url": "https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/pull/42",
+    "user": { "login": "team-member" },
+    "head": {
+      "sha": "1234567890abcdef1234567890abcdef12345678",
+      "repo": {
+        "full_name": "SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team"
+      }
+    },
+    "base": {
+      "sha": "abcdef1234567890abcdef1234567890abcdef12"
+    }
+  }
+}

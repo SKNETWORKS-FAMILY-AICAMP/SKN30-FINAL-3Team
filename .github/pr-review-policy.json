@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "limits": {
+    "maxFiles": 60,
+    "maxChangedLines": 2000,
+    "maxContextChars": 200000,
+    "maxFindings": 10,
+    "maxOutputTokens": 4000
+  },
+  "ignored": {
+    "basenames": [
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "bun.lock",
+      "bun.lockb",
+      "uv.lock",
+      "poetry.lock",
+      "Pipfile.lock",
+      "Cargo.lock",
+      ".terraform.lock.hcl"
+    ],
+    "prefixes": [
+      ".terraform/",
+      "coverage/",
+      "frontend/build/",
+      "frontend/dist/"
+    ],
+    "suffixes": [
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".webp",
+      ".ico",
+      ".pdf",
+      ".zip",
+      ".gz",
+      ".woff",
+      ".woff2",
+      ".ttf"
+    ]
+  },
+  "always": {
+    "files": [
+      "AGENTS.md",
+      ".agents-rule/git.md",
+      ".agents/skills/project-wiki/SKILL.md",
+      ".agents/skills/project-wiki/references/index.md",
+      ".agents/skills/project-wiki/references/architecture/overview.md",
+      ".agents/skills/project-wiki/references/architecture/runtime.md",
+      ".agents/skills/project-wiki/references/contracts/api.md",
+      ".agents/skills/project-wiki/references/contracts/events.md",
+      ".agents/skills/project-wiki/references/privacy/policy.md",
+      ".agents/skills/project-wiki/references/decisions/index.md",
+      ".agents/skills/project-wiki/references/open-questions.md"
+    ]
+  },
+  "projectWide": {
+    "prefixes": [
+      ".github/",
+      ".agents-rule/",
+      ".agents/skills/project-wiki/",
+      "AGENTS.md",
+      "CLAUDE.md"
+    ],
+    "directories": [
+      ".agents/skills/project-wiki/references/decisions"
+    ],
+    "files": [
+      ".agents/skills/project-wiki/references/development/environments.md"
+    ]
+  },
+  "modules": {
+    "frontend": {
+      "prefixes": ["frontend/", "docs/screen/"],
+      "files": [
+        ".agents/skills/frontend/SKILL.md",
+        ".agents/skills/frontend/references/index.md"
+      ],
+      "directories": [
+        ".agents/skills/frontend/references/decisions",
+        ".agents/skills/frontend/references/design"
+      ]
+    },
+    "backend": {
+      "prefixes": ["backend/", "docs/db/"],
+      "files": [
+        ".agents/skills/backend/SKILL.md",
+        ".agents/skills/backend/references/index.md",
+        ".agents/skills/backend/references/architecture.md",
+        ".agents/skills/backend/references/testing-and-quality.md",
+        ".agents/skills/backend/references/open-questions.md"
+      ],
+      "directories": [
+        ".agents/skills/backend/references/decisions"
+      ]
+    },
+    "ai": {
+      "prefixes": ["ai/", "docs/architecture/f2/", "docs/architecture/f3/"],
+      "files": [
+        ".agents/skills/ai/SKILL.md",
+        ".agents/skills/ai/references/index.md",
+        ".agents/skills/ai/references/open-questions.md"
+      ],
+      "directories": [
+        ".agents/skills/ai/references/decisions"
+      ]
+    },
+    "data": {
+      "prefixes": ["data/"],
+      "files": [
+        ".agents/skills/data/SKILL.md",
+        ".agents/skills/data/references/index.md",
+        ".agents/skills/data/references/dataset-design.md",
+        ".agents/skills/data/references/evaluation-design.md",
+        ".agents/skills/data/references/open-questions.md"
+      ],
+      "directories": [
+        ".agents/skills/data/references/decisions"
+      ]
+    },
+    "infra": {
+      "prefixes": ["infra/", "docs/architecture/infra/"],
+      "files": [
+        ".agents/skills/infra/SKILL.md",
+        ".agents/skills/infra/references/index.md",
+        ".agents/skills/infra/references/resource-inventory.md",
+        ".agents/skills/infra/references/terraform-standards.md",
+        ".agents/skills/infra/references/open-questions.md"
+      ],
+      "directories": [
+        ".agents/skills/infra/references/decisions"
+      ]
+    }
+  }
+}
