@@ -113,6 +113,18 @@ resource "aws_cloudfront_distribution" "frontend" {
     origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 
+  ordered_cache_behavior {
+    path_pattern               = "/health/*"
+    target_origin_id           = local.frontend_api_origin_id
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD", "OPTIONS"]
+    compress                   = true
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
+    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
+    origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"

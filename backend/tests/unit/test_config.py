@@ -36,6 +36,15 @@ def test_required_value_is_rejected() -> None:
         bind_config(values)
 
 
+def test_application_runtime_does_not_require_migration_url() -> None:
+    values = config_values()
+    values.pop("DB_MIGRATION_URL")
+
+    config = bind_config(values)
+
+    assert config.db.migration_url is None
+
+
 def test_environment_and_database_target_must_match() -> None:
     values = config_values(APP_ENV="prod", DB_TARGET="development")
 

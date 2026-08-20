@@ -10,10 +10,10 @@ import re
 import time
 import unicodedata
 import wave
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Sequence
-
+from typing import Protocol
 
 DEFAULT_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -91,9 +91,7 @@ def levenshtein_distance(reference: Sequence[str], hypothesis: Sequence[str]) ->
         for hypothesis_index, hypothesis_unit in enumerate(hypothesis, start=1):
             insertion = current[hypothesis_index - 1] + 1
             deletion = previous[hypothesis_index] + 1
-            substitution = previous[hypothesis_index - 1] + (
-                reference_unit != hypothesis_unit
-            )
+            substitution = previous[hypothesis_index - 1] + (reference_unit != hypothesis_unit)
             current.append(min(insertion, deletion, substitution))
         previous = current
     return previous[-1]
@@ -226,9 +224,7 @@ def evaluate_model(
         "success_count": success_count,
         "error_count": error_count,
         "cer_successful": (
-            total_character_edits / total_reference_characters
-            if total_reference_characters
-            else ""
+            total_character_edits / total_reference_characters if total_reference_characters else ""
         ),
         "wer_successful": (
             total_word_edits / total_reference_words if total_reference_words else ""

@@ -440,9 +440,9 @@ def test_longest_documented_status_round_trips_through_the_model() -> None:
         assert run_id is not None
 
         session.expire_all()
-        reloaded = session.execute(
-            select(AgentRun).where(col(AgentRun.id) == run_id)
-        ).scalars().one()
+        reloaded = (
+            session.execute(select(AgentRun).where(col(AgentRun.id) == run_id)).scalars().one()
+        )
 
         assert reloaded.status == "CANDIDATE_CARDS_READY"
         assert stored_run(session, run_id)["status"] == "CANDIDATE_CARDS_READY"

@@ -218,8 +218,7 @@ def find_active_position_card(
         col(NegotiationPositionAnalysis.listing_id).is_not_distinct_from(listing_id),
         col(NegotiationPositionAnalysis.requirement_id).is_not_distinct_from(requirement_id),
         col(NegotiationPositionAnalysis.data_version) == data_version,
-        col(NegotiationPositionAnalysis.source_interaction_count)
-        == interactions.interaction_count,
+        col(NegotiationPositionAnalysis.source_interaction_count) == interactions.interaction_count,
         col(NegotiationPositionAnalysis.last_interaction_at).is_not_distinct_from(
             interactions.last_interaction_at
         ),

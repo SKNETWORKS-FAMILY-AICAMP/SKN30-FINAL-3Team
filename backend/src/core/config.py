@@ -44,7 +44,7 @@ class DbPoolConfig(BaseModel):
 class DbConfig(BaseModel):
     target: DatabaseTarget
     url: SecretStr
-    migration_url: SecretStr
+    migration_url: SecretStr | None = None
     pool: DbPoolConfig
 
 
@@ -173,7 +173,11 @@ def bind_config(source: Mapping[str, str]) -> Config:
         db=DbConfig(
             target=DatabaseTarget(_required(source, "DB_TARGET")),
             url=SecretStr(_required(source, "DB_URL")),
-            migration_url=SecretStr(_required(source, "DB_MIGRATION_URL")),
+            migration_url=(
+                SecretStr(migration_url)
+                if (migration_url := _optional(source, "DB_MIGRATION_URL"))
+                else None
+            ),
             pool=DbPoolConfig(
                 size=_integer(source, "DB_POOL_SIZE", 5),
                 max_overflow=_integer(source, "DB_POOL_MAX_OVERFLOW", 5),

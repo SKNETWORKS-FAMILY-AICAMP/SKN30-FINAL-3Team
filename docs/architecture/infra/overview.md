@@ -1,6 +1,6 @@
 ---
 status: 결정
-implementation: 부분 구현·미적용
+implementation: workload 적용·delivery 코드 구현
 updated: 2026-08-20
 ---
 
@@ -12,7 +12,7 @@ updated: 2026-08-20
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
 - **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성과 private S3·CloudFront Frontend는 Terraform 코드로 구현됐지만 아직 apply하지 않았다. RunPod Terraform은 보류 상태이며 애플리케이션 API·DTO 변경은 범위 밖이다.
+- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront와 DB migration은 적용됐다. 세 delivery Pipeline은 코드 구현 후 plan·apply 승인 전이고 RunPod Terraform은 보류 상태다.
 
 ## 결정 요약
 
@@ -28,27 +28,27 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 
 | 영역 | 자원 | 선택 상태 | 구현 상태 | 비고 |
 |---|---|---|---|---|
-| 네트워크 | VPC, Internet Gateway, route table | 결정 | 구현됨·미적용 | NAT 없이 개발·시연용 public egress 사용 |
-| 네트워크 | ALB용 서로 다른 AZ의 public subnet 2개 | 결정 | 구현됨·미적용 | ALB 활성화를 위한 기본 배치 |
-| 네트워크 | EC2 app public subnet | 결정 | 구현됨·미적용 | public IPv4는 Launch Template 단계에서 연결 |
-| 네트워크 | RDS private subnet 2개와 DB subnet group | 결정 | 구현됨·미적용 | 서로 다른 AZ를 포함하되 DB 인스턴스는 Single-AZ |
-| 네트워크 | ALB·App·DB security group | 결정 | 구현됨·미적용 | ALB HTTP는 CloudFront origin-facing prefix만, App은 ALB SG만, DB는 App SG만 허용 |
-| 네트워크 | S3 Gateway Endpoint | 결정 | 구현됨·미적용 | app route table의 S3 트래픽에 사용 |
-| 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.small, gp3 40 GiB, 현재 EC2 health |
-| 컴퓨팅 | ALB, target group, health check | 결정 | 구현됨·미적용 | `/health/ready`; delivery 전 unhealthy 예상, 직접 EC2 ingress 없음 |
-| 운영 접속 | SSM Session Manager | 결정 | 구현됨·미적용 | SSH·22번 차단, IMDSv2 강제 |
-| 이미지 | ECR | 결정 | 구현됨·미적용 | immutable tag, untagged image만 7일 후 만료 |
-| 데이터베이스 | RDS PostgreSQL 15.18 Single-AZ, pgvector | 결정 | 구현됨·미적용 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일; vector는 최초 migration에서 활성화 |
-| 파일 | Frontend private S3 origin | 결정 | 구현됨·미적용 | OAC distribution SourceArn만 object read, public website 금지 |
-| 파일 | 임시 음성 S3 | 결정 | 구현됨·미적용 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
-| 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 구현됨·미적용 | `releases/`는 2026-09-24 00:00 UTC 만료 |
-| CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 구현됨·미적용 | 기본 도메인, `/api/*` cache disabled, managed security headers |
-| 보안 | Secrets Manager, Parameter Store | 결정 | 구현됨·미적용 | runtime DB·migration DB·AI secret container 분리, value는 외부 주입 |
-| 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 구현됨·미적용 | log group 5개 14일, alarm 5개; SNS 구독 없음 |
+| 네트워크 | VPC, Internet Gateway, route table | 결정 | 적용됨 | NAT 없이 개발·시연용 public egress 사용 |
+| 네트워크 | ALB용 서로 다른 AZ의 public subnet 2개 | 결정 | 적용됨 | ALB 활성화를 위한 기본 배치 |
+| 네트워크 | EC2 app public subnet | 결정 | 적용됨 | public IPv4는 Launch Template 단계에서 연결 |
+| 네트워크 | RDS private subnet 2개와 DB subnet group | 결정 | 적용됨 | 서로 다른 AZ를 포함하되 DB 인스턴스는 Single-AZ |
+| 네트워크 | ALB·App·DB security group | 결정 | 적용됨 | ALB HTTP는 CloudFront origin-facing prefix만, App은 ALB SG만, DB는 App SG만 허용 |
+| 네트워크 | S3 Gateway Endpoint | 결정 | 적용됨 | app route table의 S3 트래픽에 사용 |
+| 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | 적용됨 | AL2023 x86_64, t3.small, gp3 40 GiB, 현재 EC2 health |
+| 컴퓨팅 | ALB, target group, health check | 결정 | 적용됨 | `/health/ready`; delivery 전 unhealthy 예상, 직접 EC2 ingress 없음 |
+| 운영 접속 | SSM Session Manager | 결정 | 적용됨 | SSH·22번 차단, IMDSv2 강제 |
+| 이미지 | ECR | 결정 | 적용됨 | immutable tag, untagged image만 7일 후 만료 |
+| 데이터베이스 | RDS PostgreSQL 15.18 Single-AZ, pgvector | 결정 | 적용됨 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일; vector는 최초 migration에서 활성화 |
+| 파일 | Frontend private S3 origin | 결정 | 적용됨 | OAC distribution SourceArn만 object read, public website 금지 |
+| 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
+| 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
+| CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨 | 기본 도메인, `/api/*` cache disabled, managed security headers |
+| 보안 | Secrets Manager, Parameter Store | 결정 | 적용됨 | runtime DB·migration DB·AI secret container 분리, value는 외부 주입 |
+| 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 5개; SNS 구독 없음 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
-| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 계획됨 | GitHub App 연결, 자동 변경 감지 비활성화 |
-| 전달 | CodeBuild, CodeDeploy | 결정 | 계획됨 | 병렬 Build, 수동 승인, EC2 인플레이스 배포 |
-| 전달 | Pipeline artifact 전용 S3 | 결정 | 구현됨·미적용 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
+| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 코드 구현됨·미적용 | 통합 main 자동, Backend·Frontend 수동, QUEUED |
+| 전달 | CodeBuild, CodeDeploy | 결정 | 코드 구현됨·미적용 | 병렬 Build, 승인 단계 없음, migration·rollback·health |
+| 전달 | Pipeline artifact 전용 S3 | 결정 | 적용됨 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
 | DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
 | 비동기 작업 | SQS, DLQ | 조건부 | 미확정 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |
 | AI 분리 | ECS Fargate, Cloud Map | 조건부 | 미확정 | 경합·지연·독립 배포·장애 격리 필요성이 측정될 때 |
@@ -76,7 +76,7 @@ flowchart LR
         dataS3["Purpose-specific S3\nAudio · Data · Model"]
         obs["CloudWatch · SNS"]
         secret["Secrets Manager\nParameter Store"]
-        pipeline["CodeConnections → CodePipeline V2\nCodeBuild → Approval → CodeDeploy"]
+        pipeline["3× CodePipeline V2 QUEUED\nCodeBuild → CodeDeploy"]
         artifact["Pipeline artifact S3"]
         ecr["ECR"]
     end
@@ -86,7 +86,7 @@ flowchart LR
         openai["OpenAI API"]
     end
 
-    github -->|"수동 release·revision 선택"| pipeline
+    github -->|"main 자동 또는 수동 SHA"| pipeline
     pipeline --> artifact
     pipeline --> ecr
     pipeline --> webS3

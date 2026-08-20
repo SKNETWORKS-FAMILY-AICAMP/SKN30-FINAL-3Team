@@ -335,9 +335,7 @@ def test_unauthenticated_request_is_rejected(config: Config) -> None:
     app = create_app(config=config, readiness_probe=lambda request: True)
 
     with TestClient(app) as client:
-        response = client.post(
-            "/api/v1/f3/runs", json={"anchor_type": "LISTING", "anchor_id": 1}
-        )
+        response = client.post("/api/v1/f3/runs", json={"anchor_type": "LISTING", "anchor_id": 1})
 
     assert response.status_code == 401
     assert response.json()["code"] == "UNAUTHENTICATED"
@@ -345,9 +343,7 @@ def test_unauthenticated_request_is_rejected(config: Config) -> None:
 
 def test_missing_csrf_token_is_rejected(config: Config) -> None:
     with authenticated_client(config) as client:
-        response = client.post(
-            "/api/v1/f3/runs", json={"anchor_type": "LISTING", "anchor_id": 1}
-        )
+        response = client.post("/api/v1/f3/runs", json={"anchor_type": "LISTING", "anchor_id": 1})
 
     assert response.status_code == 403
     assert response.json()["code"] == "INVALID_CSRF_TOKEN"

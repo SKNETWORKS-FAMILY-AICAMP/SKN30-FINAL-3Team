@@ -66,9 +66,7 @@ def test_all_tables_and_columns_have_comments() -> None:
             expected_columns.add((table, column))
 
     commented_tables = set(re.findall(r"(?m)^COMMENT ON TABLE\s+(\w+)\s+IS", text))
-    commented_columns = set(
-        re.findall(r"(?m)^COMMENT ON COLUMN\s+(\w+)\.(\w+)\s+IS", text)
-    )
+    commented_columns = set(re.findall(r"(?m)^COMMENT ON COLUMN\s+(\w+)\.(\w+)\s+IS", text))
 
     assert commented_tables == expected_tables
     assert commented_columns == expected_columns

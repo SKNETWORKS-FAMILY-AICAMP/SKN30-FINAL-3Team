@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=common.sh
+source /opt/brokerage/revision/scripts/common.sh
+
+test -n "${BACKEND_IMAGE:-}"
+if [[ "${BACKEND_IMAGE}" != *@sha256:* ]]; then
+  echo "BACKEND_IMAGE must be pinned to an ECR digest" >&2
+  exit 1
+fi
+
+aws ecr get-login-password --region "${AWS_REGION}" |
+  docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
+
+curl -fsSLo "${CONFIG_DIR}/global-bundle.pem"   https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+chmod 0644 "${CONFIG_DIR}/global-bundle.pem"
+
+python3 "${REVISION_DIR}/scripts/render_env.py"   --runtime-output "${RUNTIME_ENV_FILE}"   --migration-output "${MIGRATION_ENV_FILE}"
+
+compose config --quiet
+compose pull api worker migrate
+compose --profile migration run --rm --no-deps migrate
+python3 "${REVISION_DIR}/scripts/record_deployment.py" \
+  --manifest "${REVISION_DIR}/release-manifest.json" \
+  --output "${APP_ROOT}/deploy-record.json"

@@ -22,7 +22,7 @@ import statistics
 import time
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -158,13 +158,13 @@ def load_dataset(
                 raise ValueError(f"{path}:{line_number}: missing {sorted(missing)}")
             if task == "classification":
                 if not isinstance(sample["scenario_id"], str) or not sample["scenario_id"].strip():
-                    raise ValueError(f"{path}:{line_number}: scenario_id must be a non-empty string")
+                    raise ValueError(
+                        f"{path}:{line_number}: scenario_id must be a non-empty string"
+                    )
                 if not isinstance(sample["transcript"], str) or not sample["transcript"].strip():
                     raise ValueError(f"{path}:{line_number}: transcript must be a non-empty string")
                 if sample["label"] not in allowed_types:
-                    raise ValueError(
-                        f"{path}:{line_number}: label must be one of {allowed_types}"
-                    )
+                    raise ValueError(f"{path}:{line_number}: label must be one of {allowed_types}")
             elif not isinstance(sample["expected"], dict):
                 raise ValueError(f"{path}:{line_number}: expected must be an object")
             samples.append(sample)
@@ -226,10 +226,7 @@ def build_user_prompt(sample: dict[str, Any], task: str) -> str:
 
     if task == "classification":
         return f"STT 상담 텍스트:\n{sample['transcript']}"
-    return (
-        f"현재 장부 종류: {sample['ledger_type']}\n"
-        f"STT 상담 텍스트:\n{sample['transcript']}"
-    )
+    return f"현재 장부 종류: {sample['ledger_type']}\nSTT 상담 텍스트:\n{sample['transcript']}"
 
 
 def extract_json(text: str) -> dict[str, Any]:
@@ -322,9 +319,7 @@ def percentile(values: list[float], fraction: float) -> float | None:
     return ordered[index]
 
 
-def calculate_metrics(
-    rows: list[dict[str, Any]], allowed_types: list[str]
-) -> dict[str, Any]:
+def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> dict[str, Any]:
     """한 모델의 모든 사례를 모아 최종 비교 지표를 계산한다.
 
     분류는 네 상담 유형의 클래스별 F1과 Macro F1을 계산한다. 필드 추출은 모든 사례의
@@ -424,8 +419,7 @@ def calculate_classification_metrics(
     false_negative: Counter[str] = Counter()
     confusion_labels = [*allowed_types, "__invalid__"]
     confusion_matrix = {
-        expected: {predicted: 0 for predicted in confusion_labels}
-        for expected in allowed_types
+        expected: {predicted: 0 for predicted in confusion_labels} for expected in allowed_types
     }
     parsed_count = 0
     valid_label_count = 0
@@ -439,9 +433,7 @@ def calculate_classification_metrics(
             predicted_value = prediction.get("consultation_type")
         else:
             predicted_value = None
-        predicted_class = (
-            predicted_value if predicted_value in allowed_types else "__invalid__"
-        )
+        predicted_class = predicted_value if predicted_value in allowed_types else "__invalid__"
         if predicted_class != "__invalid__":
             valid_label_count += 1
         if predicted_class == expected_class:
@@ -458,19 +450,13 @@ def calculate_classification_metrics(
 
     metrics_by_class: dict[str, dict[str, float | int]] = {}
     for label in allowed_types:
-        precision = safe_divide(
-            true_positive[label], true_positive[label] + false_positive[label]
-        )
-        recall = safe_divide(
-            true_positive[label], true_positive[label] + false_negative[label]
-        )
+        precision = safe_divide(true_positive[label], true_positive[label] + false_positive[label])
+        recall = safe_divide(true_positive[label], true_positive[label] + false_negative[label])
         metrics_by_class[label] = {
             "precision": precision,
             "recall": recall,
             "f1": safe_divide(2 * precision * recall, precision + recall),
-            "support": sum(
-                row["expected"]["consultation_type"] == label for row in rows
-            ),
+            "support": sum(row["expected"]["consultation_type"] == label for row in rows),
         }
 
     latencies = [row["latency_seconds"] for row in rows if row["error"] is None]
@@ -522,9 +508,7 @@ def run_model(
     # 2. 실제 Qwen 가중치를 다운로드/캐시에서 읽어 메모리에 올린다.
     # AutoModelForCausalLM은 config.json의 model_type을 확인해 내부적으로 적절한
     # Qwen CausalLM 클래스를 선택한다. 따라서 코드에 Qwen3ForCausalLM 이름이 없어도 된다.
-    model = AutoModelForCausalLM.from_pretrained(
-        spec.model_id, **model_load_kwargs(quantization)
-    )
+    model = AutoModelForCausalLM.from_pretrained(spec.model_id, **model_load_kwargs(quantization))
 
     # Dropout 같은 학습 전용 동작을 끄고 평가 모드로 전환한다.
     model.eval()
@@ -542,9 +526,7 @@ def run_model(
                 {
                     "role": "system",
                     "content": (
-                        CLASSIFICATION_SYSTEM_PROMPT
-                        if task == "classification"
-                        else SYSTEM_PROMPT
+                        CLASSIFICATION_SYSTEM_PROMPT if task == "classification" else SYSTEM_PROMPT
                     ),
                 },
                 {"role": "user", "content": build_user_prompt(sample, task)},
@@ -660,7 +642,7 @@ def main() -> None:
     # --models를 지정했다면 그중 요청된 모델만 남는다.
     specs = select_models(config, args.models)
     generation = config["generation"]
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_dir = args.output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
 
