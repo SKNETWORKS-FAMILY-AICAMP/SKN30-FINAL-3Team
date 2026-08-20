@@ -5,6 +5,7 @@ updated: 2026-08-20
 
 # 위키 변경 로그
 
+- 2026-08-20: F3 포지션 카드의 Backend–AI 계약을 `contracts/f3-ai.md`로 확정했다. `negotiation_side`를 `LISTING`·`REQUIREMENT`로 고정해 OQ-012를 종료하고, 계약 버전 `position-card:v1`을 cache key 버전 `position-card:v2`와 별개 축으로 분리했으며, intent·urgency·contactability·evidence·price_kind 어휘와 화면 한국어 매핑, LISTING/REQUIREMENT 입력 격리, 근거 필수 규칙, 마스킹된 상담 로그만 전달하는 개인정보 경계를 정의했다. F3-SE-03의 원문 보관 요구보다 승인된 개인정보 정책의 전체 프롬프트·응답 로그 금지를 우선한다. 프롬프트, 모델 호출, LangGraph workflow, 카드 저장과 `ANCHOR_READY` 전환은 아직 구현하지 않았고 운영 Provider·모델은 미확정이다.
 - 2026-08-20: F3 매물 앵커가 F1 세대 소프트 삭제를 따르도록 매물 단건 조회 범위에 부모 세대 삭제 여부를 포함하고, `agent_run.requested_by`의 보존·삭제를 개인정보 정책 정본에서 `agent_run` 감사 이력과 같은 생명주기로 확정해 OQ-007 범위를 미확정 항목만으로 좁힘. 배포용 Worker 프로세스는 있으나 polling loop·handler는 없다는 구현 상태와 활성 실행 재사용·`SUPERSEDED`·SSE 미구현을 F3 아키텍처와 API 계약에 같은 사실로 반영함.
 - 2026-08-20: 세션 발급 시 CSRF 원문을 별도 HttpOnly Cookie에 보관하고 `/auth/me`는 Cookie와 DB 해시를 검증해 같은 값을 반환만 하도록 인증 계약을 변경하여, GET의 CSRF 해시 변경과 다중 탭 토큰 무효화를 제거함.
 - 2026-08-20: Identity Center 전환을 폐기하고 2026-09-23까지 기존 개인 IAM 사용자·MFA·`aws login`·`TerraformOperatorRole`을 유지하며, 승인된 `student` 사용자에게 세 dev Pipeline 최소 운영 policy를 직접 연결하기로 ADR-0012에서 확정함. INFRA-OQ-001과 delivery 적용 차단 조건을 제거함.

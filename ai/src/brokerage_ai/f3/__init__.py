@@ -1,0 +1,71 @@
+"""F3 포지션 카드의 Backend–AI 공개 계약.
+
+현재 범위는 어휘, DTO, Protocol 과 요청·결과 교차 검증까지다. 프롬프트, 모델 호출,
+LangGraph workflow 와 카드 저장은 아직 없다.
+"""
+
+from brokerage_ai.f3.contracts import (
+    ALLOWED_PRICE_KINDS,
+    POSITION_CARD_CONTRACT_VERSION,
+    AnchorContext,
+    ConsultationLogInput,
+    ContactabilityAssessment,
+    ContactabilityStatus,
+    ContractVersion,
+    DateSignals,
+    Evidence,
+    EvidenceKind,
+    IntentAssessment,
+    ListingAnchorContext,
+    NegotiationIntent,
+    NegotiationSide,
+    PositionCardAnalysis,
+    PositionCardGenerationRequest,
+    PositionCardGenerationResult,
+    PositionCardTarget,
+    PositionCondition,
+    PriceAssessment,
+    PriceKind,
+    RequirementAnchorContext,
+    SourceIdentity,
+    TimingAssessment,
+    Urgency,
+    UrgencyAssessment,
+)
+from brokerage_ai.f3.ports import PositionCardGenerator
+from brokerage_ai.f3.validation import (
+    PositionCardContractError,
+    validate_generation_result,
+)
+
+__all__ = [
+    "ALLOWED_PRICE_KINDS",
+    "POSITION_CARD_CONTRACT_VERSION",
+    "AnchorContext",
+    "ConsultationLogInput",
+    "ContactabilityAssessment",
+    "ContactabilityStatus",
+    "ContractVersion",
+    "DateSignals",
+    "Evidence",
+    "EvidenceKind",
+    "IntentAssessment",
+    "ListingAnchorContext",
+    "NegotiationIntent",
+    "NegotiationSide",
+    "PositionCardAnalysis",
+    "PositionCardContractError",
+    "PositionCardGenerationRequest",
+    "PositionCardGenerationResult",
+    "PositionCardGenerator",
+    "PositionCardTarget",
+    "PositionCondition",
+    "PriceAssessment",
+    "PriceKind",
+    "RequirementAnchorContext",
+    "SourceIdentity",
+    "TimingAssessment",
+    "Urgency",
+    "UrgencyAssessment",
+    "validate_generation_result",
+]
