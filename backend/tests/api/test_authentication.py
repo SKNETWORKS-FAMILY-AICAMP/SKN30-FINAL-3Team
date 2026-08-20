@@ -123,8 +123,7 @@ def test_logout_clears_session_and_csrf_cookies(
     assert revoked_tokens == ["session-token"]
     set_cookie_headers = response.headers.get_list("set-cookie")
     assert any(
-        header.startswith(f"{config.auth.session.cookie_name}=")
-        for header in set_cookie_headers
+        header.startswith(f"{config.auth.session.cookie_name}=") for header in set_cookie_headers
     )
     assert any(
         header.startswith(f"{config.auth.session.csrf_cookie_name}=")
