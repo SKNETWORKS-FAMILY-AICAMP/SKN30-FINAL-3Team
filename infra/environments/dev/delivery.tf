@@ -683,9 +683,9 @@ resource "aws_codepipeline" "integrated" {
       output_artifacts = ["SourceArtifact"]
 
       configuration = {
-        BranchName           = "main"
+        BranchName           = "dev"
         ConnectionArn        = aws_codeconnections_connection.github.arn
-        DetectChanges        = tostring(var.integrated_pipeline_detect_changes)
+        DetectChanges        = false
         FullRepositoryId     = var.github_full_repository_id
         OutputArtifactFormat = "CODE_ZIP"
       }
@@ -847,7 +847,7 @@ resource "aws_codepipeline" "backend" {
       output_artifacts = ["SourceArtifact"]
 
       configuration = {
-        BranchName           = "main"
+        BranchName           = "dev"
         ConnectionArn        = aws_codeconnections_connection.github.arn
         DetectChanges        = "false"
         FullRepositoryId     = var.github_full_repository_id
@@ -960,7 +960,7 @@ resource "aws_codepipeline" "frontend" {
       output_artifacts = ["SourceArtifact"]
 
       configuration = {
-        BranchName           = "main"
+        BranchName           = "dev"
         ConnectionArn        = aws_codeconnections_connection.github.arn
         DetectChanges        = "false"
         FullRepositoryId     = var.github_full_repository_id
