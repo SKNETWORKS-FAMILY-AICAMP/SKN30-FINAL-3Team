@@ -38,6 +38,11 @@ variable "expires_at" {
     condition     = can(regex("^20[0-9]{2}-(0[1-9]|1[0-2])-([0-2][0-9]|3[0-1])$", var.expires_at))
     error_message = "expires_at은 YYYY-MM-DD 형식이어야 합니다."
   }
+
+  validation {
+    condition     = var.expires_at == "2026-09-23"
+    error_message = "dev 환경의 ExpiresAt은 승인된 종료일인 2026-09-23이어야 합니다."
+  }
 }
 
 variable "owner" {

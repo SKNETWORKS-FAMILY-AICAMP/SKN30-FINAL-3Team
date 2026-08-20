@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # API 계약 규칙
@@ -123,3 +123,138 @@ updated: 2026-08-18
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
+
+## F3 실행 계약 (제안)
+
+이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 요청을 검증해
+`agent_run`에 `QUEUED`로 적재하고 그 실행의 현재 상태를 조회하는 것까지다. 결과와 후보 조회, 피드백
+경로는 아직 없다.
+
+| Method | Path | 인증 | 동작 |
+|---|---|---|---|
+| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
+| GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
+
+요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
+정수다. 선언하지 않은 필드가 있으면 422로 거절한다.
+
+```json
+{ "anchor_type": "LISTING", "anchor_id": 123 }
+```
+
+`brokerage_id`와 요청자는 세션에서만 도출한다. 실행 상태, 실행 종류와 에이전트 종류는 서버가 정하며
+클라이언트가 지정할 수 없다. 응답은 `202 Accepted`이고 사무소 식별자, 요청자와 입력 스냅샷을 싣지 않는다.
+
+```json
+{
+  "run_id": 1,
+  "run_group_id": "018f7c9e-0f2f-7c1e-9a3b-2f7c9e0f2f7c",
+  "status": "QUEUED",
+  "anchor_type": "LISTING",
+  "anchor_id": 123,
+  "input_data_version": 1,
+  "created_at": "2026-08-19T02:13:44.512834+00:00"
+}
+```
+
+`input_data_version`은 앵커가 된 매물 또는 구입장의 `row_version`이다. 같은 화면을 다시 열었을 때
+같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
+
+같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)은 아직 구현하지 않았다.
+Worker 작업 선점 유스케이스 `claim_next_run`은 구현했지만 그것을 돌리는 Worker 프로세스와 polling
+loop는 아직 없다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만
+하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+
+### 요청자 기록과 개인정보
+
+- 수집 필드: 세션에서 도출한 내부 `app_user.id` 한 개. 성명, 연락처와 로그인 ID는 쓰지 않는다.
+- 목적: 실행 요청자 식별과 감사 추적.
+- 저장 위치: PostgreSQL `agent_run.requested_by`.
+- API 응답 노출: 없음. 실행 요청과 상태 조회 응답 모두 요청자를 싣지 않는다.
+- AI 또는 외부 서비스 전송: 현재 구현에서는 없음.
+- 애플리케이션 로그와 Queue 적재: 현재 구현에서는 없음.
+- 접근 범위: Backend 조회는 세션의 `brokerage_id`로 격리한다.
+- 보존과 삭제: 아직 미확정이며 [OQ-007](../open-questions.md)에서 결정한다. DB 백업에도 포함될 수
+  있으므로 최종 보존·파기 정책과 함께 정한다.
+
+### 실행 상태 조회
+
+`run_id`는 `agent_run.id` 숫자 PK다. `run_group_id`는 내부 실행 묶음 식별자이므로 외부 조회 키로
+사용하지 않는다. 상태 변경이 없는 GET이므로 CSRF 토큰을 요구하지 않는다.
+
+조회는 `brokerage_id`와 루트 `CROSS_JUDGMENT` 조건(`parent_run_id IS NULL`)으로 격리한다. 다른
+중개사무소의 실행, 내부 하위 실행과 다른 실행 유형은 모두 404로 답해 숫자 ID로 존재 여부를 넘겨짚을
+수 없게 한다. `run_id`가 1 미만이면 422다.
+
+```json
+{
+  "run_id": 51,
+  "status": "QUEUED",
+  "anchor_type": "LISTING",
+  "anchor_id": 123,
+  "input_data_version": 3,
+  "created_at": "2026-08-19T02:13:44.512834+00:00",
+  "started_at": null,
+  "completed_at": null,
+  "failure_code": null,
+  "failure_message": null
+}
+```
+
+응답에는 사무소 식별자, 요청자, 모델 설정·스냅샷, 프롬프트·워크플로 버전, 입출력 스냅샷, 토큰 수,
+`run_group_id`와 `parent_run_id`를 싣지 않는다.
+
+`agent_run.failure_message`는 외부 AI 오류 원문, 내부 예외와 개인정보가 들어올 수 있는 내부 운영
+정보이므로 DB 원문을 그대로 공개하지 않는다. 공개 응답의 `failure_code`와 `failure_message`는
+allowlist 기반으로만 만든다.
+
+| 저장된 failure_code | 공개 failure_code | 공개 failure_message |
+|---|---|---|
+| 없음 | `null` | `null` |
+| `LEASE_EXPIRED_MAX_ATTEMPTS` | `LEASE_EXPIRED_MAX_ATTEMPTS` | 실행이 최대 시도 횟수를 초과해 종료되었습니다 |
+| 그 밖의 모든 값 | `EXECUTION_FAILED` | 실행에 실패했습니다. 잠시 후 다시 시도해 주세요 |
+
+allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개인정보, 외부 서비스 오류 원문과
+내부 예외 문구는 어떤 경우에도 응답에 싣지 않는다. 공개 코드를 늘리려면 이 표를 먼저 갱신한다.
+
+`status`는 DB에 저장된 문자열을 그대로 공개하며 표기는 `agent_run.status`의 기본값 `QUEUED`에 맞춰
+**대문자 스네이크로 통일한다.** 클라이언트가 대소문자를 함께 분기하지 않게 하기 위한 규칙이다.
+
+`QUEUED`와 `RUNNING`은 Worker가 작업을 잡았는지를 나타내는 실행 제어 상태이고, `ANCHOR_READY`
+이후는 실제 업무 처리 진행 상태다. 클라이언트는 이 둘을 같은 진행률 축에 두지 않는다.
+
+| status | 구분 | 의미 | 현재 |
+|---|---|---|---|
+| `QUEUED` | 실행 제어 | 실행 적재 완료, Worker 대기 | 구현됨 |
+| `RUNNING` | 실행 제어 | Worker가 lease를 걸고 선점함 | 구현됨 |
+| `ANCHOR_READY` | 업무 처리 | 앵커 카드 저장 완료 | 제안 · 미구현 |
+| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 제안 · 미구현 |
+| `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 제안 · 미구현 |
+| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 제안 · 미구현 |
+| `COMPLETED` | 업무 처리 | 검증을 통과한 최종 결과 저장 | 제안 · 미구현 |
+| `FAILED_RETRYABLE` | 종료 | 재시도 가능한 일시 오류 | 제안 · 미구현 |
+| `FAILED_TERMINAL` | 종료 | 재시도해도 성공하지 않는 영구 오류 | 구현됨 |
+| `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
+| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
+
+Backend가 실제로 기록하는 상태는 세 가지뿐이다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직 만들지 않는다.
+
+상태 집합의 의미 정본은
+[온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
+열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
+
+### Worker 선점과 lease
+
+Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
+`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 `RUNNING`이다.
+선점하면 `RUNNING`으로 바꾸고 5분짜리 lease와 시도 횟수를 기록하며, 만료됐는데 시도 횟수가 3회
+이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
+
+`lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
+않는다. `claim_next_run` 유스케이스는 구현했고 이를 호출하는 Worker 프로세스와 polling loop는 아직
+구현하지 않았다.
+
+`anchor_type`과 `anchor_id`는 `target_listing_id`와 `target_requirement_id` 중 **정확히 하나**가 있을
+때만 도출한다. 둘 다 없거나 둘 다 있는 실행은 존재하지 않는 앵커를 정상 응답으로 내보내지 않고
+`INTERNAL_SERVER_ERROR`로 답한다. DB에 해당 CHECK 제약이 없어 응용 계층에서 막는다.

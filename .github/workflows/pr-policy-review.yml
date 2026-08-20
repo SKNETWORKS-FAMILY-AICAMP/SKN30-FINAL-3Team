@@ -1,0 +1,79 @@
+name: PR Policy Review
+
+on:
+  pull_request_target:
+    branches:
+      - main
+      - dev
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - synchronize
+      - closed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Existing pull request number to inspect
+        required: true
+        type: number
+      dry_run:
+        description: Disable Discord and GitHub writes
+        required: true
+        default: true
+        type: boolean
+      invoke_openai:
+        description: Invoke OpenAI during a manual dry-run
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: pr-policy-review-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review PR policy and notify Discord
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out trusted base revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Review and notify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_REVIEW_API_KEY: ${{ secrets.OPENAI_REVIEW_API_KEY }}
+          DISCORD_PR_WEBHOOK_URL: ${{ secrets.DISCORD_PR_WEBHOOK_URL }}
+          OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL }}
+          OPENAI_REVIEW_REASONING_EFFORT: ${{ vars.OPENAI_REVIEW_REASONING_EFFORT }}
+          OPENAI_REVIEW_MERGE_MODEL: ${{ vars.OPENAI_REVIEW_MERGE_MODEL }}
+          OPENAI_REVIEW_MERGE_REASONING_EFFORT: ${{ vars.OPENAI_REVIEW_MERGE_REASONING_EFFORT }}
+          AI_REVIEW_MAX_FILES: ${{ vars.AI_REVIEW_MAX_FILES }}
+          AI_REVIEW_MAX_CHANGED_LINES: ${{ vars.AI_REVIEW_MAX_CHANGED_LINES }}
+          AI_REVIEW_MAX_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_CONTEXT_CHARS }}
+          AI_REVIEW_CHUNK_CHANGED_LINES: ${{ vars.AI_REVIEW_CHUNK_CHANGED_LINES }}
+          AI_REVIEW_CHUNK_PATCH_CHARS: ${{ vars.AI_REVIEW_CHUNK_PATCH_CHARS }}
+          AI_REVIEW_MAX_CHUNKS: ${{ vars.AI_REVIEW_MAX_CHUNKS }}
+          AI_REVIEW_MAX_CONCURRENCY: ${{ vars.AI_REVIEW_MAX_CONCURRENCY }}
+          AI_REVIEW_CHUNK_MAX_FINDINGS: ${{ vars.AI_REVIEW_CHUNK_MAX_FINDINGS }}
+          AI_REVIEW_MAX_MERGE_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_MERGE_CONTEXT_CHARS }}
+          AI_REVIEW_MAX_FINDINGS: ${{ vars.AI_REVIEW_MAX_FINDINGS }}
+          AI_REVIEW_MAX_OUTPUT_TOKENS: ${{ vars.AI_REVIEW_MAX_OUTPUT_TOKENS }}
+          PR_REVIEW_PR_NUMBER: ${{ inputs.pr_number }}
+          PR_REVIEW_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          PR_REVIEW_INVOKE_OPENAI: ${{ github.event_name != 'workflow_dispatch' || inputs.invoke_openai }}
+        run: node .github/scripts/pr-policy-review.mjs

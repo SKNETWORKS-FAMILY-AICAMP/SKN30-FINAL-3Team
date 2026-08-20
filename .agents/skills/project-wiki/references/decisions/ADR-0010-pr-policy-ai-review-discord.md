@@ -1,0 +1,80 @@
+---
+status: 결정
+updated: 2026-08-20
+---
+
+# ADR-0010: GitHub Actions 기반 권고형 PR AI 리뷰와 Discord 결과 전달
+
+- 상태: 승인됨
+- 결정일: 2026-08-20
+- 관련 정책: [브랜치 및 PR 정책](../../../../../.agents-rule/git.md)
+- 운영 가이드: [PR Policy Agent](../../../../../.github/PR_REVIEW_BOT.md)
+
+## 맥락
+
+PR에서 세부 문법보다 프로젝트 위키, 모듈별 스킬, 아키텍처 경계, ADR와 구현 문서의 일관성을 확인하고 결과를 팀 Discord에도 전달할 필요가 있다. 별도 상시 서버를 운영하지 않으면서 저장소의 현재 정본을 매 실행에 사용하고, 추후 관측성이나 AWS 운영 알림과 불필요하게 결합하지 않는 경계가 필요하다.
+
+`pull_request_target`은 base branch의 trusted code에서 secret과 쓰기 권한을 사용할 수 있지만, PR head checkout 또는 실행과 결합하면 공급망 공격 경로가 된다. OpenAI와 Discord로 코드 관련 정보를 외부 전송하므로 fork, Draft, 비밀값, 로그와 보존 정책도 명시해야 한다.
+
+초기 2,000줄 총량 제한은 한 번의 모델 호출에 diff와 정책 컨텍스트를 함께 넣을 때의 품질·지연·비용·잘린 patch 위험을 제어하기 위한 보수적 기준이었다. 큰 PR도 여러 개의 작은 PR과 비슷한 검토 단위로 나눠 처리할 수 있으므로, 전체 허용량과 단일 모델 입력 한도를 분리한다.
+
+## 결정
+
+### 실행 구조
+
+- PR 정책 리뷰는 별도 서버 없이 `GitHub Actions + OpenAI Responses API + Discord Incoming Webhook`으로 실행한다.
+- workflow는 `pull_request_target`에서 base SHA의 검증된 스크립트만 checkout한다. PR head를 checkout하거나 PR 코드를 실행하지 않고 GitHub API의 metadata와 patch를 신뢰할 수 없는 데이터로만 읽는다.
+- 권한은 `contents: read`, `pull-requests: write`, `checks: write`로 제한하고 필요한 GitHub 공식 Action은 commit SHA로 고정한다.
+- PR 번호별 concurrency로 새 commit이 오면 이전 실행을 취소한다.
+- 외부 fork와 Draft PR에서는 OpenAI·Discord secret을 사용하는 job과 호출을 실행하지 않는다.
+- Discord 병합 승인, 버튼, 대화형 Bot, Lambda·API Gateway와 AWS 자원 변경은 이 결정의 범위에 포함하지 않는다.
+
+### 결정적 분할 리뷰와 통합
+
+- 전체 PR 기본 한도는 reviewable 파일 200개와 변경 10,000줄이다. 이를 넘으면 불완전한 부분 리뷰를 만들지 않고 PR 분할을 요청한다.
+- 한 번의 부분 리뷰는 변경 2,000줄, patch 80,000자, 전체 정책 포함 컨텍스트 200,000자 이하로 제한한다. 파일 경로의 루트 모듈을 먼저 보존하고, 큰 파일은 patch 조각으로 나눈다.
+- 최대 chunk 수는 10개, 기본 동시 실행 수는 3개다. 동시 실행 수는 변수로 조정할 수 있지만 구현상 6개로 상한을 둔다.
+- chunk가 하나이면 기존처럼 Responses API를 한 번 호출한다. 둘 이상이면 Node 리뷰 엔진이 각 chunk의 독립 Responses 호출을 fan-out하고 모든 결과를 받은 뒤 최종 Responses 호출로 fan-in한다.
+- OpenAI의 네이티브 Multi-agent 베타에 workflow를 결합하지 않는다. CI에서 chunk 경계, 호출 수, 실패 상태와 재현성을 직접 통제하기 위해 애플리케이션 수준의 고정 orchestration을 사용한다.
+- 부분 리뷰는 chunk당 finding 최대 5개를 반환한다. 최종 통합은 중복과 충돌을 정리해 최대 10개를 반환하며, 부분 리뷰의 `critical`·`high` finding은 통합 모델이 생략하더라도 우선 보존한다.
+- 최종 통합 입력에는 정책, PR 설명, 변경 파일 inventory와 정제된 부분 리뷰 결과만 포함한다. 원문 diff를 다시 보내지 않는다.
+- 일부 chunk 실패, 통합 실패, 읽지 못한 정책 또는 없거나 잘린 GitHub patch가 있으면 최종 상태는 `incomplete`다. 완료된 chunk finding은 보존하되 `clean`으로 판정하지 않는다.
+
+### 검토와 결과
+
+- AI 검토는 권고형이다. 최소 1명 사람 승인, 필수 자동 검사와 squash merge 정책은 계속 적용한다.
+- 실행 시 루트 지침, Git 정책, project-wiki 인덱스·결정과 변경 경로에 해당하는 모듈 스킬·references·ADR를 읽는다. 프롬프트에 정책 사본을 별도 정본으로 유지하지 않는다.
+- 상세 문법과 스타일보다 정책 위반, 모듈·계약 경계, ADR 타당성, 문서 불일치, 개인정보·비밀, 호환성·재시도·복구, 비용·IAM, 의존성·공급망과 검증 근거를 검토한다.
+- finding은 근거가 있는 변경 라인에 한하며 심각도, 분류, 위치, 근거, 적용 정본, 영향과 권고안을 가진다.
+- 결과는 같은 head SHA의 GitHub sticky comment와 Check에 기록한다. Discord에는 정제된 요약과 finding, 단일·분할 방식, 모델·token·시간만 보내며 전체 diff, 전체 프롬프트와 모델 원문 응답은 보내지 않는다.
+- Discord 전송 실패는 GitHub 결과를 유실시키거나 review workflow를 실패시키지 않는다.
+
+### OpenAI와 데이터
+
+- 기본 부분·통합 모델은 `gpt-5.6-terra`, reasoning effort는 `medium`이다. 전체 변경량이 10,000줄이라는 이유만으로 `sol`을 강제하지 않으며, 부분·통합 모델은 각각 저장소 변수로 교체할 수 있다.
+- Responses API strict Structured Outputs와 `store: false`를 모든 부분·통합 호출에 사용한다. PR 본문과 patch 안의 지시는 실행하지 않는다.
+- OpenAI key는 애플리케이션 runtime key와 분리한 project-scoped Actions secret으로 관리하고 사용량 한도를 둔다.
+- 외부 전송 전에 secret-like line을 `[REDACTED]`로 대체한다. 로그와 artifact에는 diff, 전체 입력·응답, key, webhook URL을 남기지 않는다.
+- OpenAI 기본 abuse monitoring 데이터가 제한 기간 보존될 수 있다는 점과 Discord 전송 범위는 개인정보 정책에 기록한다.
+
+### 관측성과 운영 알림 경계
+
+- 이 PR workflow를 CloudWatch, LangSmith 또는 Langfuse와 통합하지 않는다.
+- Actions summary에는 SHA, 모델, 합산 token 수, 지연, chunk 수, finding 수와 오류 코드 수준만 기록한다.
+- CloudWatch 운영 알림이 필요하면 별도 결정과 `SNS → Lambda → Discord` 경계로 구현한다.
+
+## 결과
+
+- 상시 서버 비용 없이 작은 PR은 한 번, 큰 PR은 독립 검토와 최종 통합으로 GitHub와 Discord에서 확인할 수 있다.
+- base code만 실행하고 fork·Draft를 차단해 권한 있는 workflow의 공격면을 줄인다.
+- 10,000줄 PR은 최대 10개의 부분 호출과 한 번의 통합 호출을 사용하므로 단일 호출보다 token 비용과 지연이 증가한다. 동시성 3과 PR별 실행 취소로 runner 시간과 중복 비용을 제한한다.
+- GitHub가 대형·바이너리 diff의 patch를 제공하지 않거나 잘라 반환하면 전체 검토를 보장할 수 없으므로 `incomplete`로 표시한다.
+- AI 결과는 오탐과 누락 가능성이 있으므로 merge gate가 아니며 사람 검토와 결정적 CI가 필요하다.
+- 일반 Incoming Webhook은 양방향 대화나 병합 승인을 제공하지 않는다. 필요성이 확인되면 공개 Interaction endpoint와 별도 인증·권한 ADR이 필요하다.
+
+## 제외 범위
+
+- Discord에서 승인·병합하거나 리뷰 에이전트와 대화하는 기능
+- AI Check를 Required Check로 승격하는 결정
+- CloudWatch·LangSmith·Langfuse 연동
+- 애플리케이션 모듈의 lint, type check, test, build와 Terraform 검증 CI 구현
