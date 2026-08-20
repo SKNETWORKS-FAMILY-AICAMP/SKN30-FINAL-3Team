@@ -10,7 +10,7 @@
     "test:workflow": "node scripts/workflow-smoke.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "test:ledger": "node --test tests/ledger-mappers.test.ts tests/ledger-fixtures.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
     "test:release": "node --test tests/release-build.test.mjs"
   },
   "dependencies": {
