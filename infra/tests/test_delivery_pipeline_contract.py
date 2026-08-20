@@ -5,7 +5,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DELIVERY_ROOT = REPOSITORY_ROOT / "infra/delivery"
 
@@ -60,6 +59,18 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertEqual(terraform.count('name = "Build"'), 3)
         self.assertIn("aws_codebuild_project.backend_verify.name", terraform)
         self.assertIn("aws_codebuild_project.frontend_verify.name", terraform)
+
+    def test_app_instance_uses_valid_rds_db_user_arn(self) -> None:
+        terraform = read("infra/environments/dev/runtime.tf")
+
+        self.assertIn(
+            ":dbuser:${aws_db_instance.postgres.resource_id}/app_migrator",
+            terraform,
+        )
+        self.assertNotIn(
+            ":dbuser/${aws_db_instance.postgres.resource_id}/app_migrator",
+            terraform,
+        )
 
     def test_delivery_images_do_not_depend_on_docker_hub(self) -> None:
         backend_dockerfile = read("backend/Dockerfile")

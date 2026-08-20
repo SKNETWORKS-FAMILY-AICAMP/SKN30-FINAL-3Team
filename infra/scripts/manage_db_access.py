@@ -518,6 +518,51 @@ def parse_runtime_secret(secret_string: str) -> dict[str, object]:
     return value
 
 
+def validate_runtime_secret_target(
+    target: DatabaseTarget, secret: dict[str, object]
+) -> None:
+    expected = {
+        "engine": "postgres",
+        "host": target.endpoint,
+        "port": target.port,
+        "dbname": target.database,
+        "username": DB_RUNTIME_USER,
+    }
+    actual = {name: secret.get(name) for name in expected}
+    if actual != expected:
+        raise ToolError("runtime secret database target metadata does not match RDS")
+
+
+def verify_fixed_role_contract(cursor: psycopg.Cursor[Any]) -> None:
+    required = {
+        DB_OWNER_ROLE,
+        DB_RW_ROLE,
+        DB_RUNTIME_USER,
+        DB_MIGRATOR_USER,
+    }
+    cursor.execute(
+        "SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname = ANY(%s)",
+        (list(required),),
+    )
+    roles = {str(name): bool(can_login) for name, can_login in cursor.fetchall()}
+    if set(roles) != required:
+        raise ToolError("required database roles are missing")
+    if roles[DB_OWNER_ROLE] or roles[DB_RW_ROLE]:
+        raise ToolError("database capability roles must not allow login")
+    if not roles[DB_RUNTIME_USER] or not roles[DB_MIGRATOR_USER]:
+        raise ToolError("database application users must allow login")
+
+    for member, granted in (
+        (DB_RUNTIME_USER, DB_RW_ROLE),
+        (DB_MIGRATOR_USER, "rds_iam"),
+        (DB_MIGRATOR_USER, DB_OWNER_ROLE),
+    ):
+        cursor.execute("SELECT pg_has_role(%s, %s, 'member')", (member, granted))
+        membership = cursor.fetchone()
+        if membership is None or not membership[0]:
+            raise ToolError(f"{member} is missing required database role {granted}")
+
+
 def get_runtime_secret(
     session: boto3.Session,
     settings: Settings,
@@ -877,6 +922,7 @@ def verify(settings: Settings) -> None:
     runtime_secret, _ = get_runtime_secret(operator, settings)
     if runtime_secret is None or not runtime_secret.get("password"):
         raise ToolError("runtime secret is not initialized")
+    validate_runtime_secret_target(target, runtime_secret)
 
     ca_bundle = ensure_ca_bundle()
     with PortForward(operator, instance_id, target, settings.local_port):
@@ -892,19 +938,7 @@ def verify(settings: Settings) -> None:
             ) as connection,
             connection.cursor() as cursor,
         ):
-            required = {
-                DB_OWNER_ROLE,
-                DB_RW_ROLE,
-                DB_RUNTIME_USER,
-                DB_MIGRATOR_USER,
-            }
-            cursor.execute(
-                "SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)",
-                (list(required),),
-            )
-            present = {row[0] for row in cursor.fetchall()}
-            if present != required:
-                raise ToolError("required database roles are missing")
+            verify_fixed_role_contract(cursor)
     emit("verification-complete", database=target.identifier)
 
 

@@ -61,6 +61,51 @@ class ManageDbAccessTest(unittest.TestCase):
         with self.assertRaises(MODULE.ToolError):
             MODULE.parse_runtime_secret('{"username":"dbadmin","password":"secret"}')
 
+    def test_runtime_secret_target_must_match_rds(self) -> None:
+        payload = MODULE.runtime_secret_payload(self.target(), "generated-password")
+        MODULE.validate_runtime_secret_target(self.target(), payload)
+
+        payload["host"] = "stale.example.rds.amazonaws.com"
+        with self.assertRaisesRegex(
+            MODULE.ToolError, "database target metadata does not match RDS"
+        ):
+            MODULE.validate_runtime_secret_target(self.target(), payload)
+
+    def test_fixed_role_contract_requires_iam_migrator_membership(self) -> None:
+        class DummyCursor:
+            def __init__(self, memberships: dict[tuple[str, str], bool]) -> None:
+                self.memberships = memberships
+                self.result: list[tuple[object, ...]] = []
+
+            def execute(self, query: object, params: object = None) -> None:
+                if "FROM pg_roles" in str(query):
+                    self.result = [
+                        ("app_owner", False),
+                        ("app_rw", False),
+                        ("app_runtime", True),
+                        ("app_migrator", True),
+                    ]
+                    return
+                member, granted = params
+                self.result = [(self.memberships[(member, granted)],)]
+
+            def fetchall(self) -> list[tuple[object, ...]]:
+                return self.result
+
+            def fetchone(self) -> tuple[object, ...] | None:
+                return self.result[0] if self.result else None
+
+        memberships = {
+            ("app_runtime", "app_rw"): True,
+            ("app_migrator", "rds_iam"): True,
+            ("app_migrator", "app_owner"): True,
+        }
+        MODULE.verify_fixed_role_contract(DummyCursor(memberships))
+
+        memberships[("app_migrator", "rds_iam")] = False
+        with self.assertRaisesRegex(MODULE.ToolError, "rds_iam"):
+            MODULE.verify_fixed_role_contract(DummyCursor(memberships))
+
     def test_caller_username_requires_direct_iam_user(self) -> None:
         self.assertEqual(
             MODULE.caller_username("arn:aws:iam::123456789012:user/team/alice"),

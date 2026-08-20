@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 COMMON_SCRIPT = REPOSITORY_ROOT / "infra/deploy/scripts/common.sh"
 IMAGE_DIGEST = "sha256:" + ("a" * 64)
