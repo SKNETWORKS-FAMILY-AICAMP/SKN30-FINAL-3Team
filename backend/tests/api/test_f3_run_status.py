@@ -323,9 +323,7 @@ def test_another_brokerage_run_is_not_found(config: Config) -> None:
 def test_child_run_is_not_found(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, user_id):
         queued = queue_listing_run(client, session, brokerage_id)
-        child_id = insert_agent_run(
-            session, brokerage_id, user_id, parent_run_id=queued["run_id"]
-        )
+        child_id = insert_agent_run(session, brokerage_id, user_id, parent_run_id=queued["run_id"])
 
         response = client.get(f"/api/v1/f3/runs/{child_id}")
 

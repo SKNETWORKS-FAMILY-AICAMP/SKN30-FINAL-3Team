@@ -9,5 +9,6 @@ updated: 2026-08-17
 |---|---|---|
 | [ADR-0001](ADR-0001-contextual-architecture-defaults.md) | 승인됨 | 복잡도에 비례한 선택적 DDD·포트/어댑터·이벤트·테스트 기본안 사용 |
 | [ADR-0002](ADR-0002-backend-runtime-database-authentication.md) | 승인됨 | Python 3.13·uv·FastAPI·SQLModel·Yoyo·서버 세션 기반 사용 |
+| [ADR-0003](ADR-0003-dev-deployment-contract.md) | 승인됨 | 같은 digest API·Worker, 명시적 migration과 비활성 Worker 배포 계약 |
 
 큐와 배포처럼 아직 확정하지 않은 프로젝트 범위는 project-wiki의 관련 질문을 확인한다.

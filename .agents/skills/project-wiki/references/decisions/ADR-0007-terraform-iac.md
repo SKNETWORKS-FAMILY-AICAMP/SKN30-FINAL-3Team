@@ -1,9 +1,12 @@
 ---
-status: 결정
-updated: 2026-08-17
+status: 부분 대체됨
+updated: 2026-08-20
 ---
 
 # ADR-0007: Terraform을 AWS IaC 정본으로 사용
+
+- 상태: 부분 대체됨
+- 접근 모델 대체: [ADR-0012](ADR-0012-retain-iam-access.md)
 
 ## 맥락
 
@@ -16,7 +19,7 @@ AWS 계정 연결과 이후 인프라 변경을 팀원이 같은 절차로 재�
 - state는 버전 관리·암호화·공개 차단·잠금이 적용된 전용 S3 bucket에 저장한다.
 - 계정 부트스트랩과 환경별 워크로드는 서로 다른 Terraform root와 state key로 분리한다.
 - 개인 IAM 사용자와 MFA, AWS CLI `aws login`은 초기 프로젝트 기간의 임시 접근 방식으로 사용한다.
-- Identity Center 전환 시점은 운영 배포 전에 다시 결정한다.
+- Identity Center 전환 시점을 다시 결정한다는 조항은 ADR-0012로 폐기됐다. 개발 환경 종료일까지 기존 IAM 접근을 유지한다.
 
 세부 루트 구조와 state 운영 기준은 [Infra ADR-0001](../../../infra/references/decisions/ADR-0001-terraform-layout-and-state.md)을 따른다.
 

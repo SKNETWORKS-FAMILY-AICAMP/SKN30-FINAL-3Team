@@ -23,7 +23,7 @@ updated: 2026-08-18
 | Runtime AWS integration | AWS SDK for Python (`boto3`) | 제안 |
 | Model API | OpenAI·OpenAI-compatible vLLM adapter | 구현됨; 운영 선택 미확정 |
 | GPU runtime | RunPod Pod, 공용 Template | 운영 방향 결정; Terraform 소유 범위 보류 |
-| Application CI/CD | CodeConnections → CodePipeline V2 → CodeBuild → CodeDeploy | 결정; 구현 계획됨 |
+| Application CI/CD | 통합 자동·Backend 수동·Frontend 수동 CodePipeline V2 | 결정; 코드 구현됨·미적용 |
 
 ## 역할 분리 후보
 
@@ -33,7 +33,7 @@ updated: 2026-08-18
 - Backend는 Yoyo로 순수 SQL 전진 migration을 적용하며 애플리케이션 시작 시 자동 적용하지 않는다.
 - AWS SDK는 실행 중 AWS 서비스를 호출하는 데 사용하고 IaC 대체 수단으로 사용하지 않는다.
 - AI 실행부는 CPU·메모리 경합, API 지연, 독립 배포 또는 장애 격리 필요성이 측정될 때만 ECS로 분리한다. 분리 후에도 AI의 DB 직접 접근은 금지한다.
-- Pipeline은 `DetectChanges=false`로 자동 push 실행을 끄고 최신 `main` 또는 지정 `COMMIT_ID`를 수동 배포한다. Terraform 배포는 Pipeline 범위에서 제외한다.
+- 통합 Pipeline은 검증 gate 후 `main` 변경을 자동 감지하고, Backend·Frontend 독립 Pipeline은 최신 `main` 또는 지정 `COMMIT_ID`를 수동 배포한다. 세 Pipeline은 `QUEUED`이며 Terraform 배포는 범위에서 제외한다.
 
 ## 비용 제약
 

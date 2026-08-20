@@ -37,4 +37,4 @@ bootstrap은 `team-readonly` IAM 그룹과 AWS 관리형 `ReadOnlyAccess` 정책
 - local state 이관 전에는 복사본을 만들고 이관 성공 후에만 로컬 원본을 제거한다.
 - state lock은 실제 실행이 종료됐음을 확인한 경우에만 `force-unlock`한다.
 - state bucket은 일반 destroy 대상이 아니다. 프로젝트 종료 시 state와 복구 필요성을 검토한 별도 절차로 폐기한다.
-- IAM+MFA는 임시 방식이다. 첫 유료 workload apply 전에 Identity Center permission set, 사용자·그룹 할당, 역할 trust 전환과 기존 IAM 권한 폐기 절차를 확정한다.
+- 개인 IAM 사용자, OTP MFA, `aws login`과 `TerraformOperatorRole`을 2026-09-23 환경 종료까지 유지한다. Identity Center 전환은 하지 않으며 종료 시 사용자·역할·policy attachment 회수를 확인한다.

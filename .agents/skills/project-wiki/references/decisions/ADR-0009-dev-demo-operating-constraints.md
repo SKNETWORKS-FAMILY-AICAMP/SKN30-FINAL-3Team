@@ -1,11 +1,12 @@
 ---
-status: 결정
-updated: 2026-08-18
+status: 부분 대체됨
+updated: 2026-08-20
 ---
 
 # ADR-0009: 개발·시연 환경의 기간·접근·데이터 보완 결정
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
+- 계정 접근 결정 대체: [ADR-0012](ADR-0012-retain-iam-access.md)
 - 결정일: 2026-08-18
 - 보완 대상: [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md), [Infra ADR-0002](../../../infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)
 
@@ -26,9 +27,9 @@ updated: 2026-08-18
 
 ### 계정 접근
 
-- Identity Center는 사용할 수 있다.
-- 첫 유료 workload apply 전에 permission set, 사용자·그룹 할당, `TerraformOperatorRole` trust 전환과 기존 IAM 사용자 권한 폐기 절차를 확정한다.
-- 이 세부 전환이 검토되기 전에는 기존 임시 IAM+MFA 접근을 운영 workload의 확정 접근 모델로 간주하지 않는다.
+- 이 절의 Identity Center 전환 결정은 ADR-0012로 폐기됐다.
+- 개발 환경 종료일까지 기존 개인 IAM 사용자, OTP MFA, `aws login`과 `TerraformOperatorRole`을 유지한다.
+- Pipeline 수동 운영 권한은 승인된 기존 IAM 사용자에게 별도 최소 권한 정책으로 연결한다.
 
 ### 브라우저 진입과 개인정보
 
@@ -54,7 +55,7 @@ updated: 2026-08-18
 
 ## 제외 범위
 
-- Identity Center permission set과 trust policy의 구체 구현
+- 기존 IAM 사용자·역할과 Pipeline 정책 연결의 환경 종료 시 회수 실행
 - AWS 비용을 대신 추적할 외부 도구 또는 수동 장부 선택
 - Pipeline artifact와 CloudWatch log의 정확한 보존기간
 - 애플리케이션 배포 선행 작업 구현

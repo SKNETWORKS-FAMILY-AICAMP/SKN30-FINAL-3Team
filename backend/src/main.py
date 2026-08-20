@@ -6,13 +6,13 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from api.health import database_is_ready
 from api.health import router as health_router
 from api.router import create_api_router
 from core.config import Config, get_config
 from core.errors import ApplicationError, AuthenticationError
+from core.health_host import HealthAwareTrustedHostMiddleware
 from core.logging import configure_logging
 from core.request_context import RequestContextMiddleware
 from domain.engine import create_database_engine
@@ -46,7 +46,7 @@ def create_app(
         allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID"],
     )
     app.add_middleware(
-        TrustedHostMiddleware,
+        HealthAwareTrustedHostMiddleware,
         allowed_hosts=resolved_config.http.allowed_hosts,
     )
     app.add_middleware(RequestContextMiddleware)

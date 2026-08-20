@@ -148,9 +148,7 @@ def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
         claimed = (
             None
             if locked is None
-            else repository.mark_run_claimed(
-                session, locked, worker_id, LEASE_DURATION_SECONDS
-            )
+            else repository.mark_run_claimed(session, locked, worker_id, LEASE_DURATION_SECONDS)
         )
         session.commit()
     except SQLAlchemyError:

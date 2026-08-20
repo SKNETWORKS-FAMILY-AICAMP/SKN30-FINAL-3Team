@@ -411,19 +411,33 @@ def test_lookup_modifies_neither_the_run_nor_the_cards(monkeypatch) -> None:
         session.commit()
 
         before_run = agent_run_row(session, run_id)
-        before_cards = session.execute(
-            text("SELECT * FROM negotiation_position_analysis WHERE brokerage_id = :b ORDER BY id"),
-            {"b": fixture.brokerage_id},
-        ).mappings().all()
+        before_cards = (
+            session.execute(
+                text(
+                    "SELECT * FROM negotiation_position_analysis "
+                    "WHERE brokerage_id = :b ORDER BY id"
+                ),
+                {"b": fixture.brokerage_id},
+            )
+            .mappings()
+            .all()
+        )
 
         assert prepare(session, run_id).cache_hit is True
         assert prepare(session, run_id).cache_hit is True
 
         assert agent_run_row(session, run_id) == before_run
-        after_cards = session.execute(
-            text("SELECT * FROM negotiation_position_analysis WHERE brokerage_id = :b ORDER BY id"),
-            {"b": fixture.brokerage_id},
-        ).mappings().all()
+        after_cards = (
+            session.execute(
+                text(
+                    "SELECT * FROM negotiation_position_analysis "
+                    "WHERE brokerage_id = :b ORDER BY id"
+                ),
+                {"b": fixture.brokerage_id},
+            )
+            .mappings()
+            .all()
+        )
         assert after_cards == before_cards
 
 

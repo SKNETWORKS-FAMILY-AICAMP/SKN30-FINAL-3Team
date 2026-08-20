@@ -172,7 +172,7 @@ state bucket은 개인 IAM 사용자의 직접 접근을 거부한다. 직접 `a
 1. root 계정에 MFA, 결제·보안 연락처를 설정하고 root access key가 없음을 확인한다.
 2. 공유 계정 대신 팀원별 IAM 사용자를 만들고 console password와 OTP MFA를 등록한다.
 3. 최초 Infra 담당자에게만 bootstrap용 관리자 권한과 AWS 관리형 `SignInLocalDevelopmentAccess`를 임시 부여한다.
-4. 운영 자원 배포 전 Identity Center 전환 여부를 재검토한다.
+4. 프로젝트 종료까지 기존 개인 IAM+MFA와 `TerraformOperatorRole`을 유지하고 Identity Center로 전환하지 않는다.
 
 MFA 장치를 Terraform으로 생성하면 seed가 state에 남을 수 있으므로 수동으로 등록한다. Terraform은 account password policy와 `aws login`에서 발급된 Sign-In session만 허용하는 역할 trust policy를 관리한다.
 
@@ -211,7 +211,7 @@ cp infra/environments/dev/example.tfvars infra/environments/dev/dev.tfvars
 - `create_budget`: 현재 계정에서는 반드시 `false`
 - `budget_notification_email`: 기존 bootstrap 입력 호환용이며 `create_budget=false`에서는 사용하지 않음
 - `monthly_budget_amount`: 기존 bootstrap 입력 호환용이며 운영 비용 한도로 해석하지 않음
-- `expires_at`: 임시 IAM 방식과 개발 환경의 종료 예정일
+- `expires_at`: 기존 IAM 권한과 개발 환경의 종료 예정일
 
 ## 3. local state로 bootstrap
 

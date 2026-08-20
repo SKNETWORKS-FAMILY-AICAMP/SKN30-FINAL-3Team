@@ -1,0 +1,24 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+  build:
+    commands:
+      - test "${#CODEBUILD_RESOLVED_SOURCE_VERSION}" -eq 40
+      - cd frontend
+      - npm ci
+      - npm run build
+      - npm run test:release
+      - cd ..
+      - mkdir -p _frontend_release/site
+      - cp -R frontend/dist/client/. _frontend_release/site/
+      - python infra/delivery/scripts/write_frontend_manifest.py --site _frontend_release/site --output _frontend_release/release-manifest.json --pipeline "${PIPELINE_KIND}" --revision "${CODEBUILD_RESOLVED_SOURCE_VERSION}" --execution "${PIPELINE_EXECUTION_ID}"
+      - cp infra/delivery/buildspec-frontend-deploy.yml _frontend_release/buildspec.yml
+      - cp infra/delivery/scripts/deploy_frontend.sh _frontend_release/deploy_frontend.sh
+artifacts:
+  base-directory: _frontend_release
+  files:
+    - '**/*'

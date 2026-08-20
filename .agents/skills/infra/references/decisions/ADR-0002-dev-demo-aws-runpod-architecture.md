@@ -5,7 +5,8 @@ updated: 2026-08-18
 
 # ADR-0002: 개발·시연용 AWS·RunPod 인프라 구성
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
+- 전달 세부 대체: [Infra ADR-0011](ADR-0011-dev-delivery-implementation.md)
 - 결정일: 2026-08-18
 - 보완 결정: [프로젝트 ADR-0009](../../../project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md)
 

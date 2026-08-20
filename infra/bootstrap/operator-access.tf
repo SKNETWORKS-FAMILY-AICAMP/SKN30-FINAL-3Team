@@ -25,7 +25,7 @@ data "aws_iam_policy_document" "operator_trust" {
 
 resource "aws_iam_role" "terraform_operator" {
   name                 = "TerraformOperatorRole"
-  description          = "Temporary Terraform deployment role; replace with Identity Center before production"
+  description          = "Terraform deployment role for approved IAM users through the dev environment lifetime"
   assume_role_policy   = data.aws_iam_policy_document.operator_trust.json
   max_session_duration = 3600
 }
