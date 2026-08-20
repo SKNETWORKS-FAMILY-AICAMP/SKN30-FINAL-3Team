@@ -9,6 +9,7 @@
 | 데이터셋 | 목적 | 현재 상태 |
 |---|---|---|
 | `f2_llm` | Qwen 분류·필드 추출·요약 학습 및 평가 | 준비 중 |
+| `f2_sell_request` | F2 상담유형 분류를 위한 매도의뢰 합성 대화 | 작업 중, 발행된 릴리스 없음 |
 
 ## 공통 구조
 
@@ -17,7 +18,10 @@ data/
 ├── README.md
 ├── registry.yaml
 ├── manifest.template.yaml
-└── f2_llm/
+├── f2_llm/
+│   ├── working/
+│   └── releases/
+└── f2_sell_request/
     ├── working/
     └── releases/
 ```

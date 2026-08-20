@@ -1,5 +1,5 @@
 registry_version: 0.1.0
-updated: 2026-08-18
+updated: 2026-08-20
 
 datasets:
   - dataset_id: f2-llm-analysis
@@ -9,3 +9,15 @@ datasets:
     latest_release: null
     notes:
       - 입력·정답 형식과 검수 기준은 실제 데이터 작성 전에 팀이 합의한다.
+
+  - dataset_id: f2-sell-request-privacy-safe
+    path: f2_sell_request
+    purpose: F2 상담유형 분류를 위한 매도의뢰 합성 대화
+    lifecycle: working
+    latest_release: null
+    notes:
+      - 발행된 릴리스가 없다. 산출물은 전부 working/의 초안이다.
+      - 0.2.0은 개인정보 담당자 검토 대기 상태다(manifest status draft_privacy_review_pending).
+      - 0.2.0의 출처, 개인정보 통제, 검사 결과와 한계는 같은 폴더의 manifest가 소유한다.
+      - 0.1.0은 manifest와 개인정보 기록이 없는 초기 초안이며 0.2.0으로 대체됐다. 사용하지 않는다.
+      - 검토를 통과하면 releases/0.2.0/으로 발행하고 latest_release를 갱신한다.
