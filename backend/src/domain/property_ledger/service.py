@@ -57,12 +57,18 @@ def delete_property_complex(
 
     세대가 남아 있으면 거절한다. 세대는 단지를 필수로 참조하므로 단지를 먼저 감추면
     그 세대들이 이름 없는 상태가 된다. 지우려면 세대를 먼저 정리해야 한다.
+
+    세대 수를 세기 전에 단지 행을 배타로 잠근다. 세대 등록은 같은 행의 공유 잠금을 거치므로,
+    "세대가 없음"을 확인한 시점과 커밋 사이에 새 세대가 끼어들 수 없다.
     """
-    if repository.find_property_complex(session, brokerage_id, complex_id) is None:
+    if repository.lock_property_complex(session, brokerage_id, complex_id, exclusive=True) is None:
         raise NotFoundError("property complex is not found")
 
     remaining = repository.count_units_in_complex(session, brokerage_id, complex_id)
     if remaining > 0:
+        # 거절하고 나가는 길이므로 잠금을 바로 놓는다. 안 그러면 세대 등록이 세션이
+        # 닫힐 때까지 기다린다.
+        session.rollback()
         # 화면이 사유를 그대로 안내할 수 있도록 코드를 준다.
         raise ValidationError(
             f"this complex still has {remaining} unit(s)", code="COMPLEX_HAS_UNITS"
@@ -83,8 +89,14 @@ def delete_property_complex(
 
 
 def create_property_unit(session: Session, brokerage_id: int, payload: dict[str, Any]) -> int:
+    """세대를 만든다.
+
+    단지 행을 공유 잠금으로 확인한다. 단지 삭제는 같은 행의 배타 잠금을 거치므로, 확인 시점과
+    커밋 사이에 단지가 사라질 수 없다. 삭제가 먼저 커밋됐다면 잠근 뒤 읽을 때 이미 감춰져 있어
+    여기서 거절된다. 공유 잠금이므로 다른 세대 등록과는 서로 기다리지 않는다.
+    """
     complex_id = int(payload["complex_id"])
-    if repository.find_property_complex(session, brokerage_id, complex_id) is None:
+    if repository.lock_property_complex(session, brokerage_id, complex_id, exclusive=False) is None:
         raise ValidationError("complex_id does not belong to this brokerage")
 
     unit = PropertyUnit(brokerage_id=brokerage_id, **payload)

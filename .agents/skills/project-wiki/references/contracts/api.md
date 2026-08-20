@@ -76,6 +76,8 @@ updated: 2026-08-18
 
 세대와 매물 건은 `row_version`을 각각 보유하므로 한 요청으로 두 테이블을 함께 수정하지 않는다. 세대 삭제도 마찬가지로 매물 건을 수정하지 않는다. 매물 조회는 세대를 join하므로 세대가 감춰지면 그 세대의 매물 건도 응답에 나타나지 않는다.
 
+단지 삭제와 세대 추가는 같은 단지 행을 두고 직렬화된다. 두 요청이 동시에 들어오면 나중에 처리되는 쪽이 반드시 거절된다. 삭제가 먼저 반영되면 세대 추가가 `VALIDATION_FAILED`로, 세대 추가가 먼저 반영되면 삭제가 `COMPLEX_HAS_UNITS`로 거절된다. 따라서 삭제된 단지에 살아 있는 세대가 남는 상태는 생기지 않는다.
+
 현재 구현된 필터는 세대와 최신 매물 건의 컬럼으로 한정한다. `complex_id`, `building_number`, `unit_number`, `floor_number`, `orientation`, `tenancy_status`, `lifecycle_status`, `unit_type`, `assigned_user_id`, `is_expanded`와 매물 건의 `listing_status`, `handover_condition`, `is_sale_available`, `is_jeonse_available`, `is_monthly_rent_available`를 지원한다. 임대인·임차인 등 인물 컬럼과 상담 로그 컬럼의 필터는 아직 제공하지 않는다.
 
 빈 행 추가는 클라이언트 화면 상태로 처리한다. 저장하지 않고 닫은 빈 행은 서버에 전달하지 않으며, 저장 시점에 필수값을 갖춘 POST 한 번으로 확정한다.
