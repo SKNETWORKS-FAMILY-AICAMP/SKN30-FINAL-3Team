@@ -24,6 +24,10 @@ QUEUED_STATUS = "QUEUED"
 RUNNING_STATUS = "RUNNING"
 FAILED_TERMINAL_STATUS = "FAILED_TERMINAL"
 
+# Backend가 직접 기록하는 실패 어휘. 개인정보와 내부 예외를 담지 않는 고정 문구를 쓴다.
+LEASE_EXPIRED_FAILURE_CODE = "LEASE_EXPIRED_MAX_ATTEMPTS"
+LEASE_EXPIRED_FAILURE_MESSAGE = "실행이 최대 시도 횟수를 초과해 종료되었습니다"
+
 
 class AgentRunAnchorError(RuntimeError):
     """루트 실행에 매물·손님 앵커가 정확히 하나 있어야 한다는 불변식을 어긴 저장 데이터."""

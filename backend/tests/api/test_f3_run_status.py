@@ -12,11 +12,17 @@ from ledger_fixtures import create_complex, create_unit, ledger_client, requires
 from sqlalchemy import text
 from sqlmodel import Session
 
-from api.schemas.f3_runs import anchor_of
+from api.schemas.f3_runs import (
+    GENERIC_FAILURE_CODE,
+    GENERIC_FAILURE_MESSAGE,
+    anchor_of,
+)
 from core.config import Config
 from domain.agent_execution import service
 from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
+    LEASE_EXPIRED_FAILURE_CODE,
+    LEASE_EXPIRED_FAILURE_MESSAGE,
     AgentRun,
     AgentRunAnchorError,
 )
@@ -179,8 +185,16 @@ def test_requirement_run_status_reports_the_requirement_anchor(config: Config) -
         assert body["input_data_version"] == queued["input_data_version"]
 
 
+def set_failure(session: Session, run_id: int, code: str | None, message: str | None) -> None:
+    """Worker나 AI가 나중에 채울 실패 컬럼을 테스트 트랜잭션 안에서만 직접 세팅한다."""
+    session.execute(
+        text("UPDATE agent_run SET failure_code = :c, failure_message = :m WHERE id = :i"),
+        {"c": code, "m": message, "i": run_id},
+    )
+
+
 @requires_database
-def test_status_reflects_stored_lifecycle_and_failure_columns(config: Config) -> None:
+def test_status_reflects_stored_lifecycle_columns(config: Config) -> None:
     """Worker가 채울 컬럼을 직접 세팅해 매핑을 확인한다. 상태 전이는 이 API가 하지 않는다."""
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         queued = queue_listing_run(client, session, brokerage_id)
@@ -189,8 +203,7 @@ def test_status_reflects_stored_lifecycle_and_failure_columns(config: Config) ->
         session.execute(
             text(
                 "UPDATE agent_run SET status = 'FAILED_RETRYABLE', started_at = :s,"
-                " completed_at = :c, failure_code = 'MODEL_TIMEOUT',"
-                " failure_message = '모델 응답이 지연되어 실행을 중단했습니다' WHERE id = :i"
+                " completed_at = :c WHERE id = :i"
             ),
             {"s": started_at, "c": completed_at, "i": queued["run_id"]},
         )
@@ -200,8 +213,80 @@ def test_status_reflects_stored_lifecycle_and_failure_columns(config: Config) ->
         assert body["status"] == "FAILED_RETRYABLE"
         assert datetime.fromisoformat(body["started_at"]) == started_at
         assert datetime.fromisoformat(body["completed_at"]) == completed_at
-        assert body["failure_code"] == "MODEL_TIMEOUT"
-        assert body["failure_message"] == "모델 응답이 지연되어 실행을 중단했습니다"
+
+
+@requires_database
+def test_allowlisted_failure_code_is_returned_with_its_fixed_message(config: Config) -> None:
+    """lease 상한 초과는 공개 가능한 코드다. 문구는 DB 원문이 아니라 고정 문구를 쓴다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        queued = queue_listing_run(client, session, brokerage_id)
+        set_failure(session, queued["run_id"], LEASE_EXPIRED_FAILURE_CODE, "내부 운영 원문")
+
+        body = client.get(f"/api/v1/f3/runs/{queued['run_id']}").json()
+
+        assert body["failure_code"] == LEASE_EXPIRED_FAILURE_CODE
+        assert body["failure_message"] == LEASE_EXPIRED_FAILURE_MESSAGE
+        assert "내부 운영 원문" not in body["failure_message"]
+
+
+@requires_database
+def test_unknown_failure_code_is_generalized(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        queued = queue_listing_run(client, session, brokerage_id)
+        set_failure(session, queued["run_id"], "MODEL_TIMEOUT", "upstream 429 from provider")
+
+        body = client.get(f"/api/v1/f3/runs/{queued['run_id']}").json()
+
+        assert body["failure_code"] == GENERIC_FAILURE_CODE
+        assert body["failure_message"] == GENERIC_FAILURE_MESSAGE
+
+
+@requires_database
+@pytest.mark.parametrize(
+    ("failure_code", "stored_message"),
+    [
+        (LEASE_EXPIRED_FAILURE_CODE, "의뢰인 010-1234-5678 확인 필요"),
+        ("MODEL_TIMEOUT", "kim.buyer@example.com 상담 로그 처리 중 실패"),
+        ("UPSTREAM_ERROR", "openai.BadRequestError: invalid_request_error - context length"),
+        (
+            "INTERNAL_ERROR",
+            'Traceback (most recent call last):\n  File "/srv/app/worker.py", line 42,'
+            " in run\n    raise RuntimeError('db password rotated')",
+        ),
+    ],
+    ids=["전화번호", "이메일", "외부_오류_원문", "stack_trace"],
+)
+def test_stored_failure_message_is_never_exposed(
+    config: Config, failure_code: str, stored_message: str
+) -> None:
+    """DB failure_message에 무엇이 저장돼도 응답 본문 어디에도 원문이 나오지 않는다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        queued = queue_listing_run(client, session, brokerage_id)
+        set_failure(session, queued["run_id"], failure_code, stored_message)
+
+        response = client.get(f"/api/v1/f3/runs/{queued['run_id']}")
+
+        assert stored_message not in response.text
+        assert response.json()["failure_message"] in {
+            LEASE_EXPIRED_FAILURE_MESSAGE,
+            GENERIC_FAILURE_MESSAGE,
+        }
+
+
+@requires_database
+def test_successful_run_has_no_failure_fields(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        queued = queue_listing_run(client, session, brokerage_id)
+        session.execute(
+            text("UPDATE agent_run SET status = 'COMPLETED' WHERE id = :i"),
+            {"i": queued["run_id"]},
+        )
+
+        body = client.get(f"/api/v1/f3/runs/{queued['run_id']}").json()
+
+        assert body["status"] == "COMPLETED"
+        assert body["failure_code"] is None
+        assert body["failure_message"] is None
 
 
 @requires_database

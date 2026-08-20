@@ -13,6 +13,8 @@ from domain.agent_execution.cache_key import position_card_cache_key
 from domain.agent_execution.models import (
     BROKERAGE_WORKFLOW_AGENT_TYPE,
     CROSS_JUDGMENT_RUN_TYPE,
+    LEASE_EXPIRED_FAILURE_CODE,
+    LEASE_EXPIRED_FAILURE_MESSAGE,
     QUEUED_STATUS,
     USER_REQUEST_TRIGGER_TYPE,
     AgentRun,
@@ -25,9 +27,6 @@ from domain.agent_execution.models import (
 # Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
 LEASE_DURATION_SECONDS = 300
 MAX_CLAIM_ATTEMPTS = 3
-LEASE_EXPIRED_FAILURE_CODE = "LEASE_EXPIRED_MAX_ATTEMPTS"
-# 개인정보와 내부 예외를 담지 않는 고정 문구를 쓴다.
-LEASE_EXPIRED_FAILURE_MESSAGE = "실행이 최대 시도 횟수를 초과해 종료되었습니다"
 
 
 @dataclass(frozen=True)

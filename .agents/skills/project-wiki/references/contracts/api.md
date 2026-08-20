@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-19
+updated: 2026-08-20
 ---
 
 # API 계약 규칙
@@ -149,8 +149,22 @@ updated: 2026-08-19
 `input_data_version`은 앵커가 된 매물 또는 구입장의 `row_version`이다. 같은 화면을 다시 열었을 때
 같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
 
-같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)과 Worker 획득은 아직 구현하지
-않았다. 이 경로는 AI 실행을 호출하지 않으므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)은 아직 구현하지 않았다.
+Worker 작업 선점 유스케이스 `claim_next_run`은 구현했지만 그것을 돌리는 Worker 프로세스와 polling
+loop는 아직 없다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만
+하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+
+### 요청자 기록과 개인정보
+
+- 수집 필드: 세션에서 도출한 내부 `app_user.id` 한 개. 성명, 연락처와 로그인 ID는 쓰지 않는다.
+- 목적: 실행 요청자 식별과 감사 추적.
+- 저장 위치: PostgreSQL `agent_run.requested_by`.
+- API 응답 노출: 없음. 실행 요청과 상태 조회 응답 모두 요청자를 싣지 않는다.
+- AI 또는 외부 서비스 전송: 현재 구현에서는 없음.
+- 애플리케이션 로그와 Queue 적재: 현재 구현에서는 없음.
+- 접근 범위: Backend 조회는 세션의 `brokerage_id`로 격리한다.
+- 보존과 삭제: 아직 미확정이며 [OQ-007](../open-questions.md)에서 결정한다. DB 백업에도 포함될 수
+  있으므로 최종 보존·파기 정책과 함께 정한다.
 
 ### 실행 상태 조회
 
@@ -177,8 +191,20 @@ updated: 2026-08-19
 ```
 
 응답에는 사무소 식별자, 요청자, 모델 설정·스냅샷, 프롬프트·워크플로 버전, 입출력 스냅샷, 토큰 수,
-`run_group_id`와 `parent_run_id`를 싣지 않는다. `failure_message`는 DB 계약상 개인정보를 담지 않는
-안전한 설명이라는 전제로 그대로 노출한다.
+`run_group_id`와 `parent_run_id`를 싣지 않는다.
+
+`agent_run.failure_message`는 외부 AI 오류 원문, 내부 예외와 개인정보가 들어올 수 있는 내부 운영
+정보이므로 DB 원문을 그대로 공개하지 않는다. 공개 응답의 `failure_code`와 `failure_message`는
+allowlist 기반으로만 만든다.
+
+| 저장된 failure_code | 공개 failure_code | 공개 failure_message |
+|---|---|---|
+| 없음 | `null` | `null` |
+| `LEASE_EXPIRED_MAX_ATTEMPTS` | `LEASE_EXPIRED_MAX_ATTEMPTS` | 실행이 최대 시도 횟수를 초과해 종료되었습니다 |
+| 그 밖의 모든 값 | `EXECUTION_FAILED` | 실행에 실패했습니다. 잠시 후 다시 시도해 주세요 |
+
+allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개인정보, 외부 서비스 오류 원문과
+내부 예외 문구는 어떤 경우에도 응답에 싣지 않는다. 공개 코드를 늘리려면 이 표를 먼저 갱신한다.
 
 `status`는 DB에 저장된 문자열을 그대로 공개하며 표기는 `agent_run.status`의 기본값 `QUEUED`에 맞춰
 **대문자 스네이크로 통일한다.** 클라이언트가 대소문자를 함께 분기하지 않게 하기 위한 규칙이다.
@@ -215,7 +241,8 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
 
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
-않는다. Worker 프로세스와 polling loop 자체는 아직 구현하지 않았다.
+않는다. `claim_next_run` 유스케이스는 구현했고 이를 호출하는 Worker 프로세스와 polling loop는 아직
+구현하지 않았다.
 
 `anchor_type`과 `anchor_id`는 `target_listing_id`와 `target_requirement_id` 중 **정확히 하나**가 있을
 때만 도출한다. 둘 다 없거나 둘 다 있는 실행은 존재하지 않는 앵커를 정상 응답으로 내보내지 않고
