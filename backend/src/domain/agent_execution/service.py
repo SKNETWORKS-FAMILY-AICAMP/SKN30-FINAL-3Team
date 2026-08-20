@@ -245,7 +245,8 @@ def prepare_anchor_position_card(
 
     interactions = anchor_interaction_summary(session, run, anchor_type, anchor_id)
     # 앵커 카드는 앵커 자신을 대리하므로 측면이 앵커 종류를 따른다.
-    # negotiation_side 값 어휘는 아직 정본에서 확정되지 않은 내부 임시값이다 (OQ-012).
+    # negotiation_side 어휘는 LISTING·REQUIREMENT 로 확정됐고 AnchorType 과 값이 같다.
+    # 정본은 project-wiki 의 contracts/f3-ai.md 이고 AI 쪽 정의는 NegotiationSide 다.
     negotiation_side = anchor_type.value
     cache_key = position_card_cache_key(
         brokerage_id=run.brokerage_id,
