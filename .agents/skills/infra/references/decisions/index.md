@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-19
+updated: 2026-08-20
 ---
 
 # Infra 결정 인덱스
@@ -16,3 +16,4 @@ updated: 2026-08-19
 | [ADR-0007](ADR-0007-dev-db-tunnel-access.md) | 승인됨 | `team-db-tunnel` 그룹과 태그 제한 SSM remote-host 포트 포워딩 권한 관리 |
 | [ADR-0008](ADR-0008-dev-database-access-management.md) | 승인됨 | runtime Secret, IAM DB migration과 개인 개발자 DB 역할 운영 기준 |
 | [ADR-0009](ADR-0009-dev-power-lifecycle.md) | 승인됨 | 지정 Infra 운영자의 ASG 0↔1·RDS start/stop 운영과 Terraform 소유권 경계 |
+| [ADR-0010](ADR-0010-dev-ec2-instance-class.md) | 승인됨 | 개발 환경 EC2 instance class를 `t3.small`로 축소 |

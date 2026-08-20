@@ -30,8 +30,10 @@ Discord는 Incoming Webhook 단방향 알림만 사용한다. 병합 승인 버�
 - 변경 경로를 프로젝트 공통과 `frontend`, `backend`, `ai`, `data`, `infra`로 묶은 뒤 chunk당 변경 2,000줄·patch 80,000자 이하로 결정적으로 분할한다. 큰 파일은 같은 파일의 patch 조각으로 나뉠 수 있다.
 - chunk별 정책 포함 컨텍스트는 200,000자 이하, chunk 수는 최대 10개다.
 - chunk가 하나면 Responses API를 한 번 호출한다. 둘 이상이면 기본 동시성 3으로 부분 리뷰를 실행하고, 정책·변경 파일 inventory·정제된 부분 결과를 최대 300,000자 통합 컨텍스트로 한 번 더 검토한다. 통합 호출에는 원문 diff를 다시 포함하지 않는다.
-- 부분 리뷰는 최대 5개, 최종 결과는 최대 10개의 finding을 낸다. 부분 리뷰의 `critical`·`high` finding은 최종 통합 결과에 우선 보존한다.
-- 읽지 못한 정책, 없거나 잘린 patch, 부분 호출 실패 또는 통합 실패가 있으면 완료된 finding은 남기되 최종 상태를 `incomplete`로 표시한다.
+- 부분 리뷰는 최대 3개, 최종 결과는 최대 5개의 finding을 낸다. 부분 리뷰의 `critical`·`high` finding은 최종 통합 결과에 우선 보존한다.
+- 같은 근본 원인은 파일·라인이 달라도 `root_cause`로 하나로 합친다. `low`는 게시하지 않고 `medium`은 개선 권고로 표시한다.
+- `제안`·`미확정`·`계획됨` 문서는 현재 구현이나 승인된 의무로 간주하지 않는다.
+- 읽지 못한 정책, 없거나 잘린 patch, 부분 호출 실패 또는 통합 실패처럼 실행기가 확인한 누락만 최종 상태를 `incomplete`로 표시한다. 다른 chunk에 파일이 없다는 모델 판단은 누락으로 취급하지 않는다.
 
 이 방식은 OpenAI 네이티브 Multi-agent 베타가 아니라 GitHub Actions의 한 Node 프로세스가 여러 표준 Responses 호출을 고정된 fan-out/fan-in 그래프로 조율한다. 10,000줄이라는 이유만으로 더 큰 모델을 요구하지 않으며, 모델 변경은 실제 평가 결과로 결정한다.
 
@@ -57,16 +59,16 @@ Actions secret:
 | `AI_REVIEW_CHUNK_PATCH_CHARS` | `80000` | chunk별 patch 문자 상한 |
 | `AI_REVIEW_MAX_CHUNKS` | `10` | 부분 리뷰 호출 수 상한 |
 | `AI_REVIEW_MAX_CONCURRENCY` | `3` | 동시 부분 호출 수; 구현 상한 6 |
-| `AI_REVIEW_CHUNK_MAX_FINDINGS` | `5` | 부분 리뷰 finding 상한 |
+| `AI_REVIEW_CHUNK_MAX_FINDINGS` | `3` | 부분 리뷰 finding 상한; 구현 상한 3 |
 | `AI_REVIEW_MAX_MERGE_CONTEXT_CHARS` | `300000` | 최종 통합 컨텍스트 한도 |
-| `AI_REVIEW_MAX_FINDINGS` | `10` | 최종 finding 상한 10 |
+| `AI_REVIEW_MAX_FINDINGS` | `5` | 최종 finding 상한; 구현 상한 5 |
 | `AI_REVIEW_MAX_OUTPUT_TOKENS` | `4000` | 각 Responses 호출 출력 상한 |
 
 OpenAI 키에는 사용량 한도를 설정한다. 동시성과 chunk 수를 올리면 API rate limit, 비용과 Discord 메시지 양이 함께 증가한다.
 
 ## 결과와 실패 처리
 
-리뷰 결과는 같은 head SHA를 표시하는 PR sticky comment와 `PR Policy Agent` Check에 기록된다. Discord에는 PR·Check·Actions 링크가 있는 요약, 최대 10개의 정제된 finding, 단일·분할 방식과 모델·시간·합산 token 사용량을 순서대로 보낸다. `allowed_mentions.parse=[]`로 멘션을 막고 메시지는 1,800자 이하로 분할한다.
+리뷰 결과는 같은 head SHA를 표시하는 PR sticky comment와 `PR Policy Agent` Check에 기록된다. Discord에는 PR·Check·Actions 링크가 있는 요약, 최대 5개의 정제된 finding, 단일·분할 방식과 모델·시간·합산 token 사용량을 순서대로 보낸다. `allowed_mentions.parse=[]`로 멘션을 막고 메시지는 1,800자 이하로 분할한다.
 
 AI finding은 세부 문법보다 저장소 정책, 모듈 경계, 계약, ADR, 문서, 개인정보·비밀, 마이그레이션·복구, 비용·IAM, 의존성과 검증 근거를 본다.
 

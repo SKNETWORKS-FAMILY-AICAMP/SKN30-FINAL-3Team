@@ -1,13 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # ADR-0004: 개발 환경 runtime·관측성 구현 기준
 
 - 상태: 부분 대체됨
 - 결정일: 2026-08-18
-- 대체 관계: ASG 최소·희망 용량과 용량 알람 결정은 [ADR-0009](ADR-0009-dev-power-lifecycle.md)가 대체한다.
+- 대체 관계: ASG 최소·희망 용량과 용량 알람 결정은 [ADR-0009](ADR-0009-dev-power-lifecycle.md)가, EC2 instance class 결정은 [ADR-0010](ADR-0010-dev-ec2-instance-class.md)이 대체한다.
 
 ## 맥락
 

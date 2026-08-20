@@ -8,9 +8,9 @@
     "chunkPatchChars": 80000,
     "maxChunks": 10,
     "maxConcurrency": 3,
-    "chunkMaxFindings": 5,
+    "chunkMaxFindings": 3,
     "maxMergeContextChars": 300000,
-    "maxFindings": 10,
+    "maxFindings": 5,
     "maxOutputTokens": 4000
   },
   "ignored": {
