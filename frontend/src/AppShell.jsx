@@ -660,7 +660,7 @@ export function AppShell() {
       <ModalFooter><Button variant={messageCopied ? "secondary" : "primary"} isDisabled={!composerRecipients.length} onClick={async () => { try { if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable"); await navigator.clipboard.writeText(composerRecipients.map((recipient) => recipient.phone).join("\n")); setMessageCopied(true); setToast({ variant: "success", title: "번호 목록을 복사했습니다. 발송은 외부 도구에서 진행합니다." }); } catch { setMessageCopied(false); setToast({ variant: "warning", title: "번호를 복사하지 못했습니다. 번호 목록을 선택해 직접 복사해 주세요." }); } }}>{messageCopied ? "번호 목록 복사됨" : "번호 목록 복사"}</Button><Button variant="link" onClick={closeMessageComposer}>닫기</Button></ModalFooter>
     </Modal>
     <Modal variant="small" isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
-      <ModalHeader titleIconVariant="warning" title="삭제할까요?" description="삭제한 행은 목록에서 사라집니다. 상담 로그와 매물 이력은 서버에 남습니다." />
+      <ModalHeader titleIconVariant="warning" title="삭제할까요?" description="삭제한 행은 장부 목록과 검색에서 즉시 사라집니다. 데이터는 서버에 남고 상담 로그·매물 이력도 보존되지만, 화면에서 되돌리는 기능은 없습니다. 되살리려면 관리자에게 요청해야 합니다." />
       <ModalBody>
         <p role="status">대상 {(deleteTarget?.rows.length ?? 0).toLocaleString()}건</p>
         <ul className="delete-target-list">

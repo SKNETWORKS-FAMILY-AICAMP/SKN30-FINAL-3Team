@@ -96,27 +96,40 @@ def seeded_unit(session: Session) -> tuple[int, int]:
 
 
 @requires_database
-def test_deleted_unit_disappears_from_the_listing_and_hides_its_listings() -> None:
+def test_deleted_unit_disappears_from_the_listing_but_leaves_its_listings_untouched() -> None:
+    """세대 삭제는 딸린 매물 건을 수정하지 않는다.
+
+    매물 건은 자신의 row_version을 갖고 있어, 한 요청에서 함께 고치면 그 낙관적 잠금을
+    우회한다. 매물이 화면에서 사라지는 것은 조회가 세대를 join하기 때문이지
+    매물 행을 건드려서가 아니다.
+    """
     engine = create_engine(os.environ["TEST_DB_URL"])
 
     with Session(engine) as session:
         unit_id, listing_id = seeded_unit(session)
         filters = PropertyUnitFilters()
         before = repository.count_property_units(session, BROKERAGE_ID, filters)
+        listing_before = session.exec(
+            select(PropertyListing).where(PropertyListing.id == listing_id)
+        ).one()
+        listing_version_before = listing_before.row_version
 
         service.delete_property_unit(session, BROKERAGE_ID, unit_id, expected_row_version=1)
 
         assert repository.count_property_units(session, BROKERAGE_ID, filters) == before - 1
         assert repository.find_property_unit(session, BROKERAGE_ID, unit_id) is None
 
+        session.expire_all()
         stored_unit = session.exec(select(PropertyUnit).where(PropertyUnit.id == unit_id)).one()
         stored_listing = session.exec(
             select(PropertyListing).where(PropertyListing.id == listing_id)
         ).one()
-        # 행 자체는 남아 있어야 이력을 잃지 않는다.
+        # 세대 행 자체는 남아 있어야 이력을 잃지 않는다.
         assert stored_unit.is_deleted is True
         assert stored_unit.deleted_at is not None
-        assert stored_listing.is_deleted is True
+        # 매물 건은 손대지 않는다. 버전이 오르면 다른 사람의 동시 수정을 덮은 것이다.
+        assert stored_listing.is_deleted is False
+        assert stored_listing.row_version == listing_version_before
 
 
 @requires_database

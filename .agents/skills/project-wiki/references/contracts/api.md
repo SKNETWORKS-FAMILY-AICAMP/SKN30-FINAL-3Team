@@ -70,11 +70,11 @@ updated: 2026-08-18
 | GET | /api/v1/property-units/{unit_id} | 세션 | 세대 상세. 단지, 인물 관계, 매물 이력 포함 |
 | POST | /api/v1/property-units | 세션·CSRF | 세대 추가 |
 | PATCH | /api/v1/property-units/{unit_id} | 세션·CSRF | 세대 부분 수정 |
-| DELETE | /api/v1/property-units/{unit_id} | 세션·CSRF | 세대 삭제. `row_version` 질의 변수 필수, 딸린 매물 건도 함께 감춘다 |
+| DELETE | /api/v1/property-units/{unit_id} | 세션·CSRF | 세대 삭제. `row_version` 질의 변수 필수 |
 | POST | /api/v1/property-units/{unit_id}/listings | 세션·CSRF | 해당 세대의 매물 건 등록 |
 | PATCH | /api/v1/property-listings/{listing_id} | 세션·CSRF | 매물 건 조건 수정 |
 
-세대와 매물 건은 `row_version`을 각각 보유하므로 한 요청으로 두 테이블을 함께 수정하지 않는다.
+세대와 매물 건은 `row_version`을 각각 보유하므로 한 요청으로 두 테이블을 함께 수정하지 않는다. 세대 삭제도 마찬가지로 매물 건을 수정하지 않는다. 매물 조회는 세대를 join하므로 세대가 감춰지면 그 세대의 매물 건도 응답에 나타나지 않는다.
 
 현재 구현된 필터는 세대와 최신 매물 건의 컬럼으로 한정한다. `complex_id`, `building_number`, `unit_number`, `floor_number`, `orientation`, `tenancy_status`, `lifecycle_status`, `unit_type`, `assigned_user_id`, `is_expanded`와 매물 건의 `listing_status`, `handover_condition`, `is_sale_available`, `is_jeonse_available`, `is_monthly_rent_available`를 지원한다. 임대인·임차인 등 인물 컬럼과 상담 로그 컬럼의 필터는 아직 제공하지 않는다.
 

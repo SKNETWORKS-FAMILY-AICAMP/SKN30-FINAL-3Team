@@ -5,21 +5,27 @@ backend를 실제 PostgreSQL에 붙여 보기 위한 컨테이너 구성이다. 
 
 ## 실행
 
+자격증명은 저장소에 두지 않는다. 예시 파일을 복사해 값을 채운 뒤 실행한다.
+
 ```bash
+cp infra/local/.env.example infra/local/.env   # POSTGRES_USER/PASSWORD/DB 채우기
 docker compose -f infra/local/compose.yaml up -d
 ```
 
-`brokerage-local-postgres` 컨테이너가 5432 포트로 뜨고, 데이터는 `local_postgres-data`
-볼륨에 남는다. 컨테이너를 지워도 데이터는 유지된다. 완전히 비우려면
-`docker compose -f infra/local/compose.yaml down -v`.
+`brokerage-local-postgres` 컨테이너가 `127.0.0.1:5432`에만 공개된다. 같은 네트워크의
+다른 장치에서는 접속할 수 없다. 데이터는 `local_postgres-data` 볼륨에 남아 컨테이너를
+지워도 유지된다. 완전히 비우려면 `docker compose -f infra/local/compose.yaml down -v`.
 
 ## migration 적용
 
+접속 URL도 추적 파일에 적지 않는다. `.env`에 채운 값으로 셸에서 조립한다.
+
 ```bash
 cd backend
+set -a && . ../infra/local/.env && set +a
 export PYTHONUTF8=1
-export DB_URL="postgresql+psycopg://brokerage:localdev@127.0.0.1:5432/brokerage"
-export DB_MIGRATION_URL="postgresql+psycopg://brokerage:localdev@127.0.0.1:5432/brokerage"
+export DB_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
+export DB_MIGRATION_URL="$DB_URL"
 uv run yoyo apply --batch
 ```
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlmodel import Session, col
+from sqlmodel import Session
 
 from core.errors import (
     NotFoundError,
@@ -118,6 +118,10 @@ def delete_property_unit(
 
     행을 실제로 지우지 않는다. 상담 로그와 매물 이력이 세대를 참조하고 있어 물리 삭제는
     이력을 함께 잃는다. 목록 조회는 이미 `is_deleted = false`만 본다.
+
+    딸린 매물 건은 건드리지 않는다. 매물 건은 자신의 `row_version`을 따로 갖고 있어,
+    한 요청에서 함께 수정하면 그 낙관적 잠금 경계를 우회한다. 매물 조회는 세대를 join하므로
+    세대가 감춰지면 매물도 목록에 나타나지 않는다.
     """
     require_property_unit(session, brokerage_id, unit_id)
     deleted_at = datetime.now(UTC)
@@ -132,11 +136,6 @@ def delete_property_unit(
     if not updated:
         session.rollback()
         raise RowVersionConflictError()
-
-    # 세대가 사라지면 그 세대의 매물 건도 목록에 남을 이유가 없다.
-    repository.soft_delete_children(
-        session, PropertyListing, brokerage_id, col(PropertyListing.unit_id), unit_id
-    )
     session.commit()
 
 

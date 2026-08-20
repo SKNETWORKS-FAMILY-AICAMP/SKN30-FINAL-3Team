@@ -80,6 +80,7 @@ function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
             {option.name}
           </button>
           {pendingId === option.id ? <span className="complex-picker__confirm">
+            <span className="complex-picker__confirm-note">{`'${option.name}'을(를) 단지 목록에서 지웁니다. 세대가 등록돼 있으면 거절되며, 화면에서 되돌리는 기능은 없습니다.`}</span>
             <button type="button" onClick={() => removeComplex(option)} disabled={busyId === option.id}>삭제</button>
             <button type="button" onClick={() => setPendingId(null)} disabled={busyId === option.id}>취소</button>
           </span> : <button

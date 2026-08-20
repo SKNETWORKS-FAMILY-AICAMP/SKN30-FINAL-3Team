@@ -83,6 +83,7 @@ export function useBuyerLedger(
 
       try {
         let requirementId: number;
+        let savedVersion: number;
 
         if (row.serverId == null) {
           const create = toRequirementCreatePayload(row);
@@ -97,12 +98,25 @@ export function useBuyerLedger(
           }
           const detail = await ledgerTransport.createRequirement(create);
           requirementId = detail.requirement.id;
+          savedVersion = detail.requirement.row_version;
         } else {
           const update = toRequirementUpdatePayload(row);
           if (update == null) throw new Error("row_version이 없어 저장할 수 없습니다.");
           const detail = await ledgerTransport.updateRequirement(row.serverId, update);
           requirementId = detail.requirement.id;
+          savedVersion = detail.requirement.row_version;
         }
+
+        /*
+         * 구입장 저장이 끝난 시점에 서버 id와 새 row_version을 곧바로 반영한다.
+         * 뒤따르는 상담 로그 생성이 실패해도 이 행은 이미 서버에 있다. 반영하지 않으면
+         * 재시도가 같은 손님을 다시 POST하거나 낡은 row_version으로 409를 받는다.
+         */
+        patchRow(row.id, (current) => ({
+          ...current,
+          serverId: requirementId,
+          rowVersion: savedVersion,
+        }));
 
         const newLog = newInteractionContent(row.content, "");
         if (newLog != null) {

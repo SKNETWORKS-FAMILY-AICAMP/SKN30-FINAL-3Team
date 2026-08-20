@@ -12,6 +12,7 @@ import type { ListQuery } from "../api/transport.ts";
 import type { PropertyUnitDetailDto } from "../model/dto.ts";
 import {
   applyLatestInteraction,
+  applyServerIdentity,
   applyUnitDetail,
   createPropertyDraftRow,
   hasListingValues,
@@ -106,15 +107,32 @@ export function usePropertyLedger(
           detail = await ledgerTransport.updatePropertyUnit(row.serverId, update);
         }
 
+        /*
+         * 세대 저장이 끝난 시점에 곧바로 서버 id와 새 row_version을 행에 반영한다.
+         * 뒤따르는 매물·상담 로그 요청이 실패해도 이 행은 이미 서버에 있다.
+         * 반영하지 않으면 재시도가 세대를 다시 POST해 중복을 만들거나,
+         * 낡은 row_version으로 PATCH를 보내 409가 된다.
+         */
+        patchRow(row.id, (current) => applyServerIdentity(current, detail.unit));
+
         // 매물 건은 별도 레코드다. 값이 있을 때만 만들거나 고친다.
         const unitId = detail.unit.id;
         if (hasListingValues(row)) {
           if (row.listingId == null) {
-            await ledgerTransport.createPropertyListing(unitId, toListingCreatePayload(row));
+            const listing = await ledgerTransport.createPropertyListing(
+              unitId,
+              toListingCreatePayload(row),
+            );
+            // 매물 건도 만들어지는 즉시 기록한다. 재시도가 같은 매물을 또 만들지 않게 한다.
+            patchRow(row.id, (current) => applyServerIdentity(current, detail.unit, listing));
           } else {
             const listingUpdate = toListingUpdatePayload(row);
             if (listingUpdate != null) {
-              await ledgerTransport.updatePropertyListing(row.listingId, listingUpdate);
+              const listing = await ledgerTransport.updatePropertyListing(
+                row.listingId,
+                listingUpdate,
+              );
+              patchRow(row.id, (current) => applyServerIdentity(current, detail.unit, listing));
             }
           }
         }

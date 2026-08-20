@@ -201,6 +201,27 @@ export function applyUnitDetail(row: PropertyRow, detail: PropertyUnitDetailDto)
   };
 }
 
+/**
+ * 서버가 확정한 식별자와 버전을 행에 반영한다.
+ *
+ * 저장은 세대·매물·상담 로그로 나뉜 여러 요청이다. 중간에 실패해도 이미 만들어진 것은
+ * 서버에 남으므로, 각 단계가 끝나는 즉시 이 값을 기록해야 재시도가 같은 레코드를
+ * 다시 만들지 않고 이어서 고칠 수 있다.
+ */
+export function applyServerIdentity(
+  row: PropertyRow,
+  unit: { id: number; row_version: number },
+  listing?: { id: number; row_version: number } | null,
+): PropertyRow {
+  return {
+    ...row,
+    serverId: unit.id,
+    rowVersion: unit.row_version,
+    listingId: listing?.id ?? row.listingId,
+    listingRowVersion: listing?.row_version ?? row.listingRowVersion,
+  };
+}
+
 /** 상담 로그 최신 1건을 행에 반영한다(F1-GR-05). */
 export function applyLatestInteraction(row: PropertyRow, content: string): PropertyRow {
   return { ...row, log: content };

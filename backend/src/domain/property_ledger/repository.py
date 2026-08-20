@@ -596,24 +596,6 @@ def touch_last_contact(
         )
 
 
-def soft_delete_children(
-    session: Session, model: Any, brokerage_id: int, column: Any, parent_id: int
-) -> int:
-    """부모가 지워질 때 딸린 레코드도 함께 감춘다. 낙관적 잠금은 부모에서 이미 확인했다."""
-    deleted_at = datetime.now(UTC)
-    statement = (
-        update(model)
-        .where(
-            model.brokerage_id == brokerage_id,
-            column == parent_id,
-            model.is_deleted.is_(False),
-        )
-        .values(is_deleted=True, deleted_at=deleted_at, updated_at=deleted_at)
-    )
-    result = cast(CursorResult[Any], session.execute(statement))
-    return result.rowcount
-
-
 def bump_row_version(
     session: Session,
     model: Any,

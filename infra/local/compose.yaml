@@ -1,13 +1,14 @@
 # 로컬 개발용 PostgreSQL.
 #
 # 운영 인프라는 Terraform이 관리한다. 이 파일은 개발자 노트북에서 backend를
-# 실제 DB에 붙여 보기 위한 것이며, 여기 적힌 자격증명은 로컬 전용이다.
+# 실제 DB에 붙여 보기 위한 것이다.
+#
+# 자격증명은 이 파일에 적지 않는다. 같은 디렉터리의 `.env`(git 미추적)에서 읽는다.
+# `.env.example`을 복사해 값을 채운 뒤 실행한다.
 #
 # 사용법
+#   cp infra/local/.env.example infra/local/.env   # 값 채우기
 #   docker compose -f infra/local/compose.yaml up -d
-#   export DB_URL="postgresql+psycopg://brokerage:localdev@127.0.0.1:5432/brokerage"
-#   export DB_MIGRATION_URL="postgresql://brokerage:localdev@127.0.0.1:5432/brokerage"
-#   (backend/) uv run yoyo apply --batch
 
 services:
   postgres:
@@ -15,17 +16,19 @@ services:
     image: postgres:15-alpine
     container_name: brokerage-local-postgres
     environment:
-      POSTGRES_USER: brokerage
-      POSTGRES_PASSWORD: localdev
-      POSTGRES_DB: brokerage
+      POSTGRES_USER: ${POSTGRES_USER:?infra/local/.env에 POSTGRES_USER를 설정한다}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?infra/local/.env에 POSTGRES_PASSWORD를 설정한다}
+      POSTGRES_DB: ${POSTGRES_DB:?infra/local/.env에 POSTGRES_DB를 설정한다}
       # 한글 데이터가 들어가므로 UTF-8로 초기화한다.
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5432:5432"
+      # loopback에만 공개한다. 호스트 IP를 생략하면 같은 네트워크의 다른 장치에서도
+      # 평문 PostgreSQL 연결을 시도할 수 있다.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U brokerage -d brokerage"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20

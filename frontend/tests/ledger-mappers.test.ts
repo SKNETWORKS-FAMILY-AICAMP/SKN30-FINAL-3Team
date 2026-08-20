@@ -14,6 +14,7 @@ import { addYears, formatTimestampAsDate, parseDate } from "../src/features/ledg
 import { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "../src/features/ledger/model/phone.ts";
 import { LIFECYCLE_STATUS, toCode, toLabel } from "../src/features/ledger/model/codes.ts";
 import {
+  applyServerIdentity,
   applyUnitDetail,
   createPropertyDraftRow,
   hasListingValues,
@@ -287,4 +288,24 @@ test("지우는 중에는 형식을 다시 붙이지 않는다", () => {
   // 하이픈이 곧바로 되붙으면 백스페이스가 먹지 않는 것처럼 보인다.
   assert.equal(nextPhoneInput("010-1234-5678", "010-1234-567"), "010-1234-567");
   assert.equal(nextPhoneInput("010-1234", "010-12345"), "010-1234-5");
+});
+
+
+test("서버 식별자 반영은 재시도가 같은 레코드를 다시 만들지 않게 한다", () => {
+  /*
+   * 저장은 세대·매물·상담 로그로 나뉜 여러 요청이다. 세대만 성공하고 뒤가 실패했을 때
+   * serverId가 비어 있으면 재시도가 세대를 다시 POST해 중복이 생긴다.
+   */
+  const draft = createPropertyDraftRow("DRAFT-1");
+  assert.equal(draft.serverId, null);
+
+  const afterUnit = applyServerIdentity(draft, { id: 42, row_version: 3 });
+  assert.equal(afterUnit.serverId, 42);
+  assert.equal(afterUnit.rowVersion, 3);
+  // 매물은 아직 만들지 않았으므로 건드리지 않는다.
+  assert.equal(afterUnit.listingId, null);
+
+  const afterListing = applyServerIdentity(afterUnit, { id: 42, row_version: 3 }, { id: 7, row_version: 1 });
+  assert.equal(afterListing.listingId, 7);
+  assert.equal(afterListing.listingRowVersion, 1);
 });
