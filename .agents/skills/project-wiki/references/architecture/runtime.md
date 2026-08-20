@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # 런타임 및 기술 후보
@@ -23,7 +23,7 @@ updated: 2026-08-18
 | Runtime AWS integration | AWS SDK for Python (`boto3`) | 제안 |
 | Model API | OpenAI·OpenAI-compatible vLLM adapter | 구현됨; 운영 선택 미확정 |
 | GPU runtime | RunPod Pod, 공용 Template | 운영 방향 결정; Terraform 소유 범위 보류 |
-| Application CI/CD | 통합 자동·Backend 수동·Frontend 수동 CodePipeline V2 | 결정; 코드 구현됨·미적용 |
+| Application CI/CD | 통합 자동·Backend 수동·Frontend 수동 CodePipeline V2 | 결정; 기존 구조 적용됨·Verify/Build 분리 미적용 |
 
 ## 역할 분리 후보
 
@@ -37,4 +37,4 @@ updated: 2026-08-18
 
 ## 비용 제약
 
-AWS는 2026-09-23까지 누적 300,000원을 참고 상한으로 사용하고, RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 분리한다. AWS Budget·Cost Anomaly Detection 자원은 만들지 않는다. 1차는 RDS `db.t4g.small`·gp3 20→50 GiB, EC2 `t3.medium`·gp3 40 GiB와 ASG desired 1을 사용하고 NAT Gateway, Multi-AZ와 상시 다중 환경은 제외한다. RDS backup은 7일, CloudWatch log는 14일 보존하며 실제 부하와 누적 비용에 따라 적용 전 크기를 재검토한다.
+AWS는 2026-09-23까지 누적 300,000원을 참고 상한으로 사용하고, RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 분리한다. AWS Budget·Cost Anomaly Detection 자원은 만들지 않는다. 1차는 RDS `db.t4g.small`·gp3 20→50 GiB, EC2 `t3.small`·gp3 40 GiB와 ASG desired 1을 사용하고 NAT Gateway, Multi-AZ와 상시 다중 환경은 제외한다. RDS backup은 7일, CloudWatch log는 14일 보존하며 실제 부하와 누적 비용에 따라 적용 전 크기를 재검토한다.

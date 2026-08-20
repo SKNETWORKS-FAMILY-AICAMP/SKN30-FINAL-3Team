@@ -16,13 +16,15 @@ updated: 2026-08-20
 
 - 기존 `AVAILABLE` 상태 `SKN30_FINAL` GitHub Connection을 Terraform resource와 import block으로 관리한다.
 - 기존 Pipeline artifact S3를 Pipeline 이름별 prefix와 `frontend-releases/` backup prefix로 분리한다.
-- Backend, Frontend, Frontend deploy와 상호 상태 검사용 CodeBuild project를 역할별로 공유한다.
+- Backend Verify, Backend image Build, Frontend Verify, Frontend release Build, Frontend deploy와 상호 상태 검사용 CodeBuild project를 역할별로 공유한다. Verify project는 output artifact를 만들지 않고 Build project는 테스트 DB를 시작하지 않는다.
 - Pipeline service role은 세 개로 분리하고 CodeBuild와 CodeDeploy 역할은 기능별 최소 권한으로 공유한다.
 - ECR tag는 전체 commit SHA이며 immutable repository에서 기존 SHA digest가 있으면 재사용한다. CodeDeploy artifact는 항상 repository URL과 digest를 함께 고정한다.
+- Backend Verify의 PostgreSQL 15+pgvector image는 Docker Hub를 사용하지 않는다. ECR Public의 PostgreSQL base와 commit으로 고정한 pgvector source로 만들고 전용 private ECR에 immutable tag로 캐시한다. 이 repository 권한은 Backend Verify role에만 둔다.
 - Pipeline 종류, revision, 실행 ID, image digest와 migration 검증 결과를 release manifest와 실행 이력에 남긴다.
 
 ### Backend 배포
 
+- Verify는 AI·Backend lock 설치, format/lint/type/test, 빈 DB migration과 두 번째 no-op migration, lifecycle 계약 검사를 수행한다. image Build는 Verify 성공 후 별도 project에서 실행한다.
 - root context multi-stage image는 Backend와 `brokerage-ai`를 각 lockfile로 non-editable 설치하고 비루트 UID 10001로 실행한다.
 - CodeDeploy lifecycle은 graceful stop, revision 설치, digest 검증과 pull, runtime 설정 조립, IAM DB 인증 전진 migration, Compose 시작, local health 순서다.
 - migration은 PostgreSQL advisory lock을 잡고 Yoyo를 실행한다. 실패하면 API·Worker를 시작하지 않으며 rollback에서 down migration을 실행하지 않는다.
@@ -32,6 +34,7 @@ updated: 2026-08-20
 
 ### Frontend 배포
 
+- Verify는 clean install, typecheck와 원장 테스트까지만 수행한다. 별도 Build가 다시 clean install한 뒤 Vite release와 release 계약 검사를 수행하고 artifact를 만든다.
 - Frontend는 runtime Dockerfile 없이 Vite `dist/client` artifact를 만든다.
 - 현재 Backend의 CloudFront `/health/ready`를 먼저 확인한다.
 - release manifest에 entry document, asset 목록, 크기와 SHA-256을 기록한다.

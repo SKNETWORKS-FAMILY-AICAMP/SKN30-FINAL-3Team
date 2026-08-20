@@ -58,7 +58,8 @@ npm run test:release # dist/client release 구조 검사
 - 프로토타입 가정값: `src/config/prototypeAssumptions.js`
 - 스타일: `src/styles.css`, `src/shell.css`, `src/features/*.css`
 - 빌드 설정: `vite.config.mjs`
-- CodeBuild와 같은 전체 검증은 저장소 루트에서 `infra/delivery/scripts/verify_frontend.sh`로 실행합니다.
+- CodeBuild 검증 단계와 같은 정적·원장 검사는 저장소 루트에서 `infra/delivery/scripts/verify_frontend.sh`로 실행합니다.
+- release 산출물 생성 계약은 `infra/delivery/scripts/build_frontend_release.sh`로 별도 검증합니다.
 - release artifact는 Vite가 생성한 `dist/client`이며 OpenAI Sites worker·server bundle은 만들지 않습니다.
 
 프로토타입 가정값은 제품 정책이나 운영 제한으로 간주하지 않습니다. 운영 기능을 추가할 때는 API 계약, 개인정보 처리 기준, 인증·권한과 실제 저장 방식을 별도로 확인해야 합니다.

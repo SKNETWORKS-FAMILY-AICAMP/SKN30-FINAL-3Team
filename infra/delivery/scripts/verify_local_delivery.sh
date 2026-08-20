@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 container_name="brokerage-delivery-local-${$}"
 database_port="${LOCAL_TEST_DB_PORT:-55432}"
 validation_dir="$(mktemp -d /tmp/brokerage-delivery-verify.XXXXXX)"
+ci_database_image="brokerage-pgvector-ci:pg15.18-pgvector0.8.6"
 
 cleanup() {
   docker stop "${container_name}" >/dev/null 2>&1 || true
@@ -18,12 +19,18 @@ node --version | grep -Eq '^v22\.'
 docker version >/dev/null
 docker compose version >/dev/null
 
+cd "${repo_root}"
+docker build \
+  --file infra/delivery/docker/pgvector-ci.Dockerfile \
+  --tag "${ci_database_image}" \
+  .
+
 docker run --detach --rm \
   --name "${container_name}" \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=brokerage \
   -p "${database_port}:5432" \
-  pgvector/pgvector:pg15 >/dev/null
+  "${ci_database_image}" >/dev/null
 
 for attempt in $(seq 1 30); do
   if docker exec "${container_name}" pg_isready -U postgres >/dev/null; then
@@ -46,6 +53,7 @@ export AUTH_DEVELOPMENT_ENABLED=false
 
 "${repo_root}/infra/delivery/scripts/verify_backend_ai.sh"
 "${repo_root}/infra/delivery/scripts/verify_frontend.sh"
+"${repo_root}/infra/delivery/scripts/build_frontend_release.sh"
 
 cd "${repo_root}"
 docker build --file backend/Dockerfile --tag brokerage-backend:local .

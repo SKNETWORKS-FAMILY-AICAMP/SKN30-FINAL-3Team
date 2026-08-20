@@ -1,6 +1,6 @@
 ---
 status: 결정
-implementation: workload 적용·delivery 코드 구현
+implementation: workload·기존 delivery 적용·Verify/Build 분리 미적용
 updated: 2026-08-20
 ---
 
@@ -12,7 +12,7 @@ updated: 2026-08-20
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
 - **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront와 DB migration은 적용됐다. 세 delivery Pipeline은 코드 구현 후 plan·apply 승인 전이고 RunPod Terraform은 보류 상태다.
+- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. Verify/Build 분리는 plan 검증 후 apply 승인 전이고 RunPod Terraform은 보류 상태다.
 
 ## 결정 요약
 
@@ -46,8 +46,8 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 보안 | Secrets Manager, Parameter Store | 결정 | 적용됨 | runtime DB·migration DB·AI secret container 분리, value는 외부 주입 |
 | 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 5개; SNS 구독 없음 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
-| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 코드 구현됨·미적용 | 통합 main 자동, Backend·Frontend 수동, QUEUED |
-| 전달 | CodeBuild, CodeDeploy | 결정 | 코드 구현됨·미적용 | 병렬 Build, 승인 단계 없음, migration·rollback·health |
+| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 구조 적용됨·분리 변경 미적용 | 통합 main 자동 전환 예정, Backend·Frontend 수동, QUEUED |
+| 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |
 | 전달 | Pipeline artifact 전용 S3 | 결정 | 적용됨 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
 | DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
 | 비동기 작업 | SQS, DLQ | 조건부 | 미확정 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |

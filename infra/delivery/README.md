@@ -20,15 +20,17 @@ Compose plugin이 설치된 Linux 환경에서 저장소 루트 기준으로 실
 infra/delivery/scripts/verify_local_delivery.sh
 ```
 
-이 명령은 disposable PostgreSQL 15+pgvector를 시작하고 다음을 순서대로 검증한 뒤
-컨테이너와 임시 파일을 정리한다.
+이 명령은 ECR Public PostgreSQL base와 고정 pgvector commit으로 로컬 검증 image를 만들고
+disposable DB를 시작한 뒤 다음을 순서대로 검증한다. Docker Hub image는 사용하지 않는다.
+컨테이너와 임시 파일은 종료 시 정리한다.
 
 1. AI와 Backend의 frozen lock 설치, format, lint, type, 전체 테스트
 2. 빈 DB migration과 두 번째 no-op migration
 3. CodeDeploy lifecycle shell 구문과 image metadata 전달 계약 테스트
-4. Frontend clean install, typecheck, 원장 테스트, release build
-5. Backend root-context image build와 UID 10001 실행
-6. Compose config
+4. Frontend Verify: clean install, typecheck, 원장 테스트
+5. Frontend Build: 별도 clean install, release build와 release 계약 테스트
+6. Backend root-context image build와 UID 10001 실행
+7. Compose config
 
 Backend DB 테스트는 `TEST_DB_URL`이 없으면 실행 자체를 거부한다. 부분 검증이 필요할 때도
 CodeBuild가 호출하는 아래 진입점을 그대로 사용한다.
@@ -36,18 +38,35 @@ CodeBuild가 호출하는 아래 진입점을 그대로 사용한다.
 ```bash
 infra/delivery/scripts/verify_backend_ai.sh
 infra/delivery/scripts/verify_frontend.sh
+infra/delivery/scripts/build_frontend_release.sh
 ```
+
+Pipeline에서는 각 진입점을 격리된 CodeBuild project에서 실행한다.
+
+| Stage | Buildspec | DB 사용 | Output artifact |
+|---|---|---|---|
+| Backend Verify | `buildspec-backend-verify.yml` | disposable PostgreSQL+pgvector | 없음 |
+| Backend Build | `buildspec-backend-build.yml` | 없음 | CodeDeploy revision과 image digest |
+| Frontend Verify | `buildspec-frontend-verify.yml` | 없음 | 없음 |
+| Frontend Build | `buildspec-frontend-build.yml` | 없음 | `dist/client` release |
+
+Backend Verify는 검증 DB image를 전용 immutable ECR에 캐시한다. 최초 실행만 image를 만들고,
+이후에는 tag의 digest를 조회해 재사용한다. 검증 실패 단계에는 artifact 설정이 없으므로
+`_backend_release` 누락이 원래 테스트 오류를 덮지 않는다.
 
 PR에는 실행한 진입점과 결과를 기록하고, Pipeline 최초 적용 전에는 로컬 전체 검증과
 Backend·Frontend 독립 Pipeline을 모두 통과시킨다.
 
 ### 지속 검증 운영
 
-- Backend·AI 변경은 `verify_backend_ai.sh`, Frontend 변경은 `verify_frontend.sh`를 PR마다 실행한다.
+- Backend·AI 변경은 `verify_backend_ai.sh`, Frontend 변경은 `verify_frontend.sh`와
+  `build_frontend_release.sh`를 PR마다 실행한다.
 - lockfile, migration, Dockerfile, Compose 또는 buildspec 변경은 영향 모듈만 확인하지 않고
   `verify_local_delivery.sh` 전체를 실행한다.
-- CodeBuild는 로컬과 같은 두 component script를 호출한다. 검증 명령을 바꿀 때 buildspec에
+- CodeBuild는 로컬과 같은 component script를 호출한다. 검증 명령을 바꿀 때 buildspec에
   명령을 복제하지 않고 component script 한 곳만 수정한다.
+- `infra.tests.test_delivery_pipeline_contract`가 Verify/Build 명령·artifact·DB 경계와 세
+  Pipeline의 `main` source를 검사한다. buildspec이나 stage를 바꾸면 이 계약 테스트도 함께 갱신한다.
 - `main` 통합 Pipeline은 merge 이후 배포 gate다. merge 이전 강제 gate가 필요하면 같은
   component script를 호출하는 PR CI를 별도로 연결한 뒤 성공 check를 branch protection의
   required check로 지정한다.
@@ -56,9 +75,9 @@ Backend·Frontend 독립 Pipeline을 모두 통과시킨다.
 - Frontend release manifest의 bundle bytes를 실행별로 비교한다. 현재 Vite large-chunk 경고는
   관찰 항목이며, 팀이 성능 예산을 승인하면 그 값을 release test의 실패 기준으로 고정한다.
 
-## 최초 Terraform 적용
+## Verify/Build 분리 Terraform 적용
 
-최초 적용은 통합 자동 감지와 ELB health 전환을 보류한다.
+분리 변경 적용 중에는 통합 자동 감지와 ELB health 전환을 계속 보류한다.
 
 ```hcl
 integrated_pipeline_detect_changes = false
@@ -150,8 +169,8 @@ Lifecycle script의 AWS CLI 오류는 원래 AWS service error와 operation 이�
 
 ## 검증 순서
 
-1. Backend 독립 Pipeline으로 첫 정상 CodeDeploy revision을 만든다.
-2. Frontend 독립 Pipeline으로 첫 정적 release를 배포한다.
+1. Backend 독립 Pipeline에서 Verify 실패가 Build·CodeDeploy를 시작하지 않는지 확인한 뒤 첫 정상 CodeDeploy revision을 만든다.
+2. Frontend 독립 Pipeline에서 Verify와 Build가 분리됐는지 확인한 뒤 첫 정적 release를 배포한다.
 3. 통합 Pipeline을 수동 실행해 migration no-op과 Backend 후 Frontend 순서를 확인한다.
 4. 실패 주입 revision으로 Backend 자동 rollback, Frontend index 복원과 Discord 알림을 확인한다.
 5. ALB target, CloudFront 화면, 같은 origin API, migration version, API·Worker log를 확인한다.

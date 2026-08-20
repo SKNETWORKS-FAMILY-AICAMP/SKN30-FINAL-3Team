@@ -7,7 +7,9 @@ locals {
 
   codebuild_projects = {
     admission       = "${local.name_prefix}-admission"
+    backend_verify  = "${local.name_prefix}-backend-verify"
     backend         = "${local.name_prefix}-backend-build"
+    frontend_verify = "${local.name_prefix}-frontend-verify"
     frontend        = "${local.name_prefix}-frontend-build"
     frontend_deploy = "${local.name_prefix}-frontend-deploy"
   }
@@ -64,41 +66,24 @@ resource "aws_iam_role" "codebuild_backend" {
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
 }
 
+resource "aws_iam_role" "codebuild_backend_verify" {
+  name               = "${local.name_prefix}-codebuild-backend-verify"
+  assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
+}
+
 resource "aws_iam_role" "codebuild_frontend" {
   name               = "${local.name_prefix}-codebuild-frontend"
+  assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
+}
+
+resource "aws_iam_role" "codebuild_frontend_verify" {
+  name               = "${local.name_prefix}-codebuild-frontend-verify"
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
 }
 
 resource "aws_iam_role" "codebuild_frontend_deploy" {
   name               = "${local.name_prefix}-codebuild-frontend-deploy"
   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
-}
-
-data "aws_iam_policy_document" "codebuild_common" {
-  statement {
-    sid    = "ArtifactBucket"
-    effect = "Allow"
-    actions = [
-      "s3:GetObject",
-      "s3:GetObjectVersion",
-      "s3:PutObject",
-      "s3:GetBucketVersioning",
-    ]
-    resources = [
-      aws_s3_bucket.workload["pipeline_artifact"].arn,
-      "${aws_s3_bucket.workload["pipeline_artifact"].arn}/*",
-    ]
-  }
-
-  statement {
-    sid    = "BuildLogs"
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-    resources = ["${aws_cloudwatch_log_group.delivery["admission"].arn}:*"]
-  }
 }
 
 resource "aws_iam_role_policy" "codebuild_admission" {
@@ -172,6 +157,49 @@ resource "aws_iam_role_policy" "codebuild_backend" {
   })
 }
 
+resource "aws_iam_role_policy" "codebuild_backend_verify" {
+  name = "${local.name_prefix}-codebuild-backend-verify"
+  role = aws_iam_role.codebuild_backend_verify.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ArtifactRead"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:GetObjectVersion"]
+        Resource = ["${aws_s3_bucket.workload["pipeline_artifact"].arn}/*"]
+      },
+      {
+        Sid      = "EcrAuthorization"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Sid    = "CiPgvectorRepository"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchGetImage",
+          "ecr:CompleteLayerUpload",
+          "ecr:DescribeImages",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart",
+        ]
+        Resource = aws_ecr_repository.ci_pgvector.arn
+      },
+      {
+        Sid      = "BuildLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = ["${aws_cloudwatch_log_group.delivery["backend_verify"].arn}:*"]
+      },
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "codebuild_frontend" {
   name = "${local.name_prefix}-codebuild-frontend"
   role = aws_iam_role.codebuild_frontend.id
@@ -189,6 +217,28 @@ resource "aws_iam_role_policy" "codebuild_frontend" {
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = ["${aws_cloudwatch_log_group.delivery["frontend"].arn}:*"]
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "codebuild_frontend_verify" {
+  name = "${local.name_prefix}-codebuild-frontend-verify"
+  role = aws_iam_role.codebuild_frontend_verify.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ArtifactRead"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:GetObjectVersion"]
+        Resource = ["${aws_s3_bucket.workload["pipeline_artifact"].arn}/*"]
+      },
+      {
+        Sid      = "BuildLogs"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = ["${aws_cloudwatch_log_group.delivery["frontend_verify"].arn}:*"]
       },
     ]
   })
@@ -302,13 +352,57 @@ resource "aws_codebuild_project" "backend" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "infra/delivery/buildspec-backend.yml"
+    buildspec = "infra/delivery/buildspec-backend-build.yml"
   }
 
   logs_config {
     cloudwatch_logs {
       group_name  = aws_cloudwatch_log_group.delivery["backend"].name
       stream_name = "backend"
+    }
+  }
+}
+
+resource "aws_codebuild_project" "backend_verify" {
+  name          = local.codebuild_projects.backend_verify
+  service_role  = aws_iam_role.codebuild_backend_verify.arn
+  build_timeout = 60
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type    = "BUILD_GENERAL1_MEDIUM"
+    image           = "aws/codebuild/standard:7.0"
+    type            = "LINUX_CONTAINER"
+    privileged_mode = true
+
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
+
+    environment_variable {
+      name  = "CI_PGVECTOR_REPOSITORY_NAME"
+      value = aws_ecr_repository.ci_pgvector.name
+    }
+
+    environment_variable {
+      name  = "CI_PGVECTOR_REPOSITORY_URI"
+      value = aws_ecr_repository.ci_pgvector.repository_url
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "infra/delivery/buildspec-backend-verify.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      group_name  = aws_cloudwatch_log_group.delivery["backend_verify"].name
+      stream_name = "backend-verify"
     }
   }
 }
@@ -330,13 +424,41 @@ resource "aws_codebuild_project" "frontend" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "infra/delivery/buildspec-frontend.yml"
+    buildspec = "infra/delivery/buildspec-frontend-build.yml"
   }
 
   logs_config {
     cloudwatch_logs {
       group_name  = aws_cloudwatch_log_group.delivery["frontend"].name
       stream_name = "frontend"
+    }
+  }
+}
+
+resource "aws_codebuild_project" "frontend_verify" {
+  name          = local.codebuild_projects.frontend_verify
+  service_role  = aws_iam_role.codebuild_frontend_verify.arn
+  build_timeout = 30
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type = "BUILD_GENERAL1_SMALL"
+    image        = "aws/codebuild/standard:7.0"
+    type         = "LINUX_CONTAINER"
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "infra/delivery/buildspec-frontend-verify.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      group_name  = aws_cloudwatch_log_group.delivery["frontend_verify"].name
+      stream_name = "frontend-verify"
     }
   }
 }
@@ -491,13 +613,36 @@ resource "aws_iam_role_policy" "codepipeline" {
         Sid    = "RunBuilds"
         Effect = "Allow"
         Action = ["codebuild:StartBuild", "codebuild:BatchGetBuilds"]
-        Resource = [
+        Resource = each.key == "integrated" ? [
           aws_codebuild_project.admission.arn,
+          aws_codebuild_project.backend_verify.arn,
           aws_codebuild_project.backend.arn,
+          aws_codebuild_project.frontend_verify.arn,
+          aws_codebuild_project.frontend.arn,
+          aws_codebuild_project.frontend_deploy.arn,
+          ] : each.key == "backend" ? [
+          aws_codebuild_project.admission.arn,
+          aws_codebuild_project.backend_verify.arn,
+          aws_codebuild_project.backend.arn,
+          ] : [
+          aws_codebuild_project.admission.arn,
+          aws_codebuild_project.frontend_verify.arn,
           aws_codebuild_project.frontend.arn,
           aws_codebuild_project.frontend_deploy.arn,
         ]
       },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "codepipeline_backend_deploy" {
+  for_each = { for key, name in local.delivery_pipeline_names : key => name if key != "frontend" }
+
+  name = "${each.value}-backend-deploy"
+  role = aws_iam_role.codepipeline[each.key].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
       {
         Sid    = "DeployBackend"
         Effect = "Allow"
@@ -538,7 +683,7 @@ resource "aws_codepipeline" "integrated" {
       output_artifacts = ["SourceArtifact"]
 
       configuration = {
-        BranchName           = "dev"
+        BranchName           = "main"
         ConnectionArn        = aws_codeconnections_connection.github.arn
         DetectChanges        = tostring(var.integrated_pipeline_detect_changes)
         FullRepositoryId     = var.github_full_repository_id
@@ -566,6 +711,36 @@ resource "aws_codepipeline" "integrated" {
           { name = "PIPELINE_KIND", value = "integrated", type = "PLAINTEXT" },
           { name = "PIPELINE_EXECUTION_ID", value = "#{codepipeline.PipelineExecutionId}", type = "PLAINTEXT" },
         ])
+      }
+    }
+  }
+
+  stage {
+    name = "Verify"
+
+    action {
+      name            = "Backend"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      version         = "1"
+      input_artifacts = ["SourceArtifact"]
+
+      configuration = {
+        ProjectName = aws_codebuild_project.backend_verify.name
+      }
+    }
+
+    action {
+      name            = "Frontend"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      version         = "1"
+      input_artifacts = ["SourceArtifact"]
+
+      configuration = {
+        ProjectName = aws_codebuild_project.frontend_verify.name
       }
     }
   }
@@ -672,7 +847,7 @@ resource "aws_codepipeline" "backend" {
       output_artifacts = ["SourceArtifact"]
 
       configuration = {
-        BranchName           = "dev"
+        BranchName           = "main"
         ConnectionArn        = aws_codeconnections_connection.github.arn
         DetectChanges        = "false"
         FullRepositoryId     = var.github_full_repository_id
@@ -700,6 +875,23 @@ resource "aws_codepipeline" "backend" {
           { name = "PIPELINE_KIND", value = "backend", type = "PLAINTEXT" },
           { name = "PIPELINE_EXECUTION_ID", value = "#{codepipeline.PipelineExecutionId}", type = "PLAINTEXT" },
         ])
+      }
+    }
+  }
+
+  stage {
+    name = "Verify"
+
+    action {
+      name            = "Backend"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      version         = "1"
+      input_artifacts = ["SourceArtifact"]
+
+      configuration = {
+        ProjectName = aws_codebuild_project.backend_verify.name
       }
     }
   }
@@ -768,7 +960,7 @@ resource "aws_codepipeline" "frontend" {
       output_artifacts = ["SourceArtifact"]
 
       configuration = {
-        BranchName           = "dev"
+        BranchName           = "main"
         ConnectionArn        = aws_codeconnections_connection.github.arn
         DetectChanges        = "false"
         FullRepositoryId     = var.github_full_repository_id
@@ -797,6 +989,23 @@ resource "aws_codepipeline" "frontend" {
           { name = "PIPELINE_EXECUTION_ID", value = "#{codepipeline.PipelineExecutionId}", type = "PLAINTEXT" },
           { name = "BACKEND_ORIGIN", value = "https://${aws_cloudfront_distribution.frontend.domain_name}", type = "PLAINTEXT" },
         ])
+      }
+    }
+  }
+
+  stage {
+    name = "Verify"
+
+    action {
+      name            = "Frontend"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      version         = "1"
+      input_artifacts = ["SourceArtifact"]
+
+      configuration = {
+        ProjectName = aws_codebuild_project.frontend_verify.name
       }
     }
   }

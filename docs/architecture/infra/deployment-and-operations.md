@@ -1,6 +1,6 @@
 ---
 status: 결정
-implementation: 코드 구현됨·delivery 미적용
+implementation: 기존 delivery 적용됨·Verify/Build 분리 미적용
 updated: 2026-08-20
 ---
 
@@ -10,15 +10,15 @@ updated: 2026-08-20
 
 - **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
-- **현재 상태:** dev workload와 DB migration은 적용됐다. 세 Pipeline과 delivery 부속 자원은 Terraform 코드로 구현했으며 기존 IAM 운영자 attachment를 포함한 plan 승인 전이므로 아직 적용하지 않았다.
+- **현재 상태:** dev workload, DB migration과 기존 세 Pipeline은 적용됐다. Verify/Build 분리와 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다.
 
 ## Pipeline 구성
 
-| Pipeline | 시작 | Build | Deploy |
-|---|---|---|---|
-| `dev-integrated` | 최종 전환 후 `main` 자동 감지 | Backend+AI와 Frontend 병렬 | migration → Backend/Worker → health → Frontend |
-| `dev-backend` | 운영자 수동, 최신 `main` 또는 전체 SHA | Backend+AI | migration → Backend/Worker → health |
-| `dev-frontend` | 운영자 수동, 최신 `main` 또는 전체 SHA | Frontend | 현재 Backend readiness → S3 → CloudFront |
+| Pipeline | 시작 | Verify | Build | Deploy |
+|---|---|---|---|---|
+| `dev-integrated` | 최종 전환 후 `main` 자동 감지 | Backend+AI와 Frontend 병렬 | Backend image와 Frontend release 병렬 | migration → Backend/Worker → health → Frontend |
+| `dev-backend` | 운영자 수동, 최신 `main` 또는 전체 SHA | Backend+AI, disposable DB | Backend image | migration → Backend/Worker → health |
+| `dev-frontend` | 운영자 수동, 최신 `main` 또는 전체 SHA | typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
 
 세 Pipeline은 CodePipeline V2 `QUEUED`다. 독립 Pipeline 실행 권한이 운영자 승인 역할을 하므로 내부 Manual approval은 두지 않는다. 통합 Pipeline도 별도 승인 없이 끝까지 진행한다. 애플리케이션 Pipeline은 Terraform을 실행하지 않는다.
 
@@ -32,8 +32,10 @@ flowchart LR
     backend --> admission
     frontend --> admission
 
-    admission --> bebuild["Backend+AI verify + image"]
-    admission --> febuild["Frontend verify + artifact"]
+    admission --> beverify["Backend+AI verify + test DB"]
+    admission --> feverify["Frontend verify"]
+    beverify --> bebuild["Backend image build"]
+    feverify --> febuild["Frontend release build"]
     bebuild --> migrate["IAM DB migration"]
     migrate --> deploy["CodeDeploy API + Worker"]
     deploy --> health["Local + ALB health"]
@@ -52,12 +54,17 @@ flowchart LR
 
 ## Backend build와 image
 
+Verify project는 다음 검사를 수행하고 output artifact를 만들지 않는다.
+
 1. Python 3.13과 각 `uv.lock`으로 Backend·AI 환경을 동기화한다.
 2. format, lint, type, architecture, unit/API/integration 검사를 수행하며 `TEST_DB_URL` 누락으로 DB 검사가 skip되는 것을 허용하지 않는다.
 3. disposable PostgreSQL 15+pgvector에 전체 Yoyo migration을 두 번 실행해 적용과 no-op을 검증한다.
-4. 저장소 root context에서 multi-stage image를 만든다.
-5. commit SHA tag가 ECR에 있으면 기존 digest를 사용하고, 없으면 immutable tag로 push한다.
-6. AppSpec, Compose, lifecycle script, digest와 release manifest를 Pipeline artifact로 출력한다.
+
+검증 DB image는 ECR Public PostgreSQL base와 고정 pgvector commit으로 만들며 전용 private ECR에 캐시한다. Docker Hub anonymous pull에 의존하지 않는다. Verify 성공 뒤 image Build project가 다음을 수행한다.
+
+1. 저장소 root context에서 multi-stage image를 만든다.
+2. commit SHA tag가 ECR에 있으면 기존 digest를 사용하고, 없으면 immutable tag로 push한다.
+3. AppSpec, Compose, lifecycle script, digest와 release manifest를 Pipeline artifact로 출력한다.
 
 이미지는 `brokerage-ai`를 non-editable dependency로 설치하고 UID 10001로 실행한다. 비밀값이나 환경 파일을 image layer에 넣지 않는다. API, Worker와 migration은 같은 digest를 사용한다.
 
@@ -81,7 +88,7 @@ Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM clea
 
 ## Frontend build와 배포
 
-Frontend는 runtime Dockerfile을 사용하지 않는다. `npm ci → typecheck → 원장 테스트 → Vite build → release test` 결과인 `frontend/dist/client`만 artifact로 전달한다.
+Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
 
 - asset path, bytes, SHA-256, entry document, revision과 execution ID를 release manifest에 기록한다.
 - 독립 Pipeline은 Build 전에 CloudFront를 통한 Backend live/readiness를 확인한다.
@@ -95,7 +102,7 @@ Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. �
 ## IAM과 비밀값
 
 - Pipeline service role은 세 개로 나눈다.
-- admission, Backend build, Frontend build와 Frontend deploy CodeBuild role은 기능별로 분리한다.
+- admission, Backend Verify/image Build, Frontend Verify/release Build와 Frontend deploy CodeBuild role은 기능별로 분리한다.
 - CodeDeploy는 AWS 관리 service role을 사용한다.
 - EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write와 migration DB connect만 둔다.
 - 운영자 policy는 `pipeline_operator_user_names`에 지정한 기존 IAM 사용자에게 직접 연결하고 `team-readonly`에는 쓰기 권한을 추가하지 않는다.
