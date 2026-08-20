@@ -144,7 +144,8 @@ just db-sync
 just db-migrate
 ```
 
-적용 후 운영자는 runtime credential과 필수 DB 역할을 검증한다.
+적용 후 운영자는 runtime credential·RDS endpoint metadata와 고정 DB 역할의 로그인 속성 및
+필수 role membership을 검증한다.
 
 ```bash
 just db-verify

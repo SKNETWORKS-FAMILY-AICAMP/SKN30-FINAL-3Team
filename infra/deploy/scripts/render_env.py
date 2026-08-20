@@ -14,12 +14,18 @@ MIGRATION_USER = "app_migrator"
 
 
 def aws(*args: str) -> str:
-    result = subprocess.run(
-        ["aws", *args],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["aws", *args],
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as error:
+        operation = " ".join(args[:2])
+        raise SystemExit(
+            f"AWS CLI operation failed: {operation} (exit status {error.returncode})"
+        ) from None
     return result.stdout.strip()
 
 
@@ -64,7 +70,9 @@ def main() -> None:
     database = str(secret["dbname"])
     username = str(secret["username"])
     password = str(secret["password"])
-    ca_path = "/opt/brokerage/config/global-bundle.pem"
+    ca_path = os.environ.get("RDS_CA_CONTAINER_FILE", "").strip()
+    if not ca_path.startswith("/"):
+        raise SystemExit("RDS_CA_CONTAINER_FILE must be an absolute container path")
 
     parameter_payload = json.loads(
         aws(

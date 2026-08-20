@@ -33,25 +33,38 @@ requires_database = pytest.mark.skipif(
     reason="TEST_DB_URL is required for PostgreSQL integration tests",
 )
 
-BROKERAGE_ID = 1
+BROKERAGE_ID = 0
 SEED_COMPLEX_NAME = "삭제 검증 단지"
 SEED_PARTY_NAME = "삭제 검증 손님"
 
 
 @pytest.fixture(autouse=True)
-def clean_up_seeded_complexes() -> Any:
-    """테스트가 만든 단지를 남기지 않는다.
+def isolated_brokerage() -> Any:
+    """빈 migration DB에서도 동작하도록 테스트별 중개사와 원장 데이터를 격리한다.
 
     남기면 화면의 단지 선택지에 검증용 이름이 계속 쌓인다. 실제로 그렇게 쌓인 적이 있다.
     """
-    yield
     if not os.getenv("TEST_DB_URL"):
+        yield
         return
+
+    global BROKERAGE_ID
     engine = create_engine(os.environ["TEST_DB_URL"])
+    with Session(engine) as session:
+        BROKERAGE_ID = session.execute(
+            text("INSERT INTO brokerage (name) VALUES ('삭제 통합 검증 사무소') RETURNING id")
+        ).scalar_one()
+        session.commit()
+
+    yield
+
     with Session(engine) as session:
         # 참조하는 쪽부터 지운다. 소프트 삭제된 행도 외래키는 그대로 걸려 있다.
         complex_ids = session.exec(
-            select(PropertyComplex.id).where(col(PropertyComplex.name) == SEED_COMPLEX_NAME)
+            select(PropertyComplex.id).where(
+                PropertyComplex.brokerage_id == BROKERAGE_ID,
+                col(PropertyComplex.name) == SEED_COMPLEX_NAME,
+            )
         ).all()
         if complex_ids:
             unit_ids = session.exec(
@@ -67,12 +80,20 @@ def clean_up_seeded_complexes() -> Any:
                 session.execute(delete(PropertyUnit).where(col(PropertyUnit.id).in_(unit_ids)))
             session.execute(delete(PropertyComplex).where(col(PropertyComplex.id).in_(complex_ids)))
 
-        party_ids = session.exec(select(Party.id).where(col(Party.name) == SEED_PARTY_NAME)).all()
+        party_ids = session.exec(
+            select(Party.id).where(
+                Party.brokerage_id == BROKERAGE_ID,
+                col(Party.name) == SEED_PARTY_NAME,
+            )
+        ).all()
         if party_ids:
             session.execute(
                 delete(PropertyRequirement).where(col(PropertyRequirement.party_id).in_(party_ids))
             )
             session.execute(delete(Party).where(col(Party.id).in_(party_ids)))
+        session.execute(
+            text("DELETE FROM brokerage WHERE id = :brokerage_id"), {"brokerage_id": BROKERAGE_ID}
+        )
         session.commit()
 
 

@@ -1,0 +1,48 @@
+version: 0.2
+env:
+  shell: bash
+  variables:
+    DB_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
+    DB_MIGRATION_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
+    TEST_DB_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
+    APP_PROFILE: "test"
+    APP_ENV: "test"
+    DB_TARGET: "test"
+    HTTP_CORS_ALLOWED_ORIGINS: "[]"
+    HTTP_ALLOWED_HOSTS: '["localhost","127.0.0.1"]'
+    AUTH_DEVELOPMENT_ENABLED: "false"
+    CI_PGVECTOR_TAG: "pg15.18-pgvector0.8.6"
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - python -m pip install --disable-pip-version-check uv==0.11.2
+  pre_build:
+    commands:
+      - test "${#CODEBUILD_RESOLVED_SOURCE_VERSION}" -eq 40
+      - aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${CI_PGVECTOR_REPOSITORY_URI%%/*}"
+  build:
+    commands:
+      - export TEST_DB_CONTAINER="brokerage-ci-${CODEBUILD_BUILD_NUMBER}"
+      - |
+        CI_PGVECTOR_DIGEST="$(aws ecr describe-images --repository-name "${CI_PGVECTOR_REPOSITORY_NAME}" --image-ids imageTag="${CI_PGVECTOR_TAG}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+        if [[ "${CI_PGVECTOR_DIGEST}" != sha256:* ]]; then
+          docker build \
+            --file infra/delivery/docker/pgvector-ci.Dockerfile \
+            --tag "${CI_PGVECTOR_REPOSITORY_URI}:${CI_PGVECTOR_TAG}" \
+            .
+          if ! docker push "${CI_PGVECTOR_REPOSITORY_URI}:${CI_PGVECTOR_TAG}"; then
+            CI_PGVECTOR_DIGEST="$(aws ecr describe-images --repository-name "${CI_PGVECTOR_REPOSITORY_NAME}" --image-ids imageTag="${CI_PGVECTOR_TAG}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+            [[ "${CI_PGVECTOR_DIGEST}" == sha256:* ]]
+          fi
+        fi
+        CI_PGVECTOR_DIGEST="$(aws ecr describe-images --repository-name "${CI_PGVECTOR_REPOSITORY_NAME}" --image-ids imageTag="${CI_PGVECTOR_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+        [[ "${CI_PGVECTOR_DIGEST}" == sha256:* ]]
+        export TEST_DB_IMAGE="${CI_PGVECTOR_REPOSITORY_URI}@${CI_PGVECTOR_DIGEST}"
+      - docker run --detach --rm --name "${TEST_DB_CONTAINER}" -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=brokerage -p 5432:5432 "${TEST_DB_IMAGE}"
+      - for attempt in $(seq 1 30); do docker exec "${TEST_DB_CONTAINER}" pg_isready -U postgres && break; sleep 2; done
+      - docker exec "${TEST_DB_CONTAINER}" pg_isready -U postgres
+      - infra/delivery/scripts/verify_backend_ai.sh
+    finally:
+      - docker stop "brokerage-ci-${CODEBUILD_BUILD_NUMBER}" >/dev/null 2>&1 || true

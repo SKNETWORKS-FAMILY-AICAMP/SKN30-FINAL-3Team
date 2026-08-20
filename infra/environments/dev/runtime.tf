@@ -121,7 +121,10 @@ data "aws_iam_policy_document" "app_runtime" {
     ]
     resources = concat(
       [for parameter in aws_ssm_parameter.application : parameter.arn],
-      ["arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name_prefix}/*"],
+      [
+        "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name_prefix}",
+        "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name_prefix}/*",
+      ],
     )
   }
 
@@ -130,7 +133,7 @@ data "aws_iam_policy_document" "app_runtime" {
     effect  = "Allow"
     actions = ["rds-db:connect"]
     resources = [
-      "arn:aws:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser/${aws_db_instance.postgres.resource_id}/app_migrator",
+      "arn:aws:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.postgres.resource_id}/app_migrator",
     ]
   }
 

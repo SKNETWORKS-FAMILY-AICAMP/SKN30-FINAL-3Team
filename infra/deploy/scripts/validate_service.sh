@@ -3,6 +3,7 @@ set -euo pipefail
 
 # shellcheck source=common.sh
 source /opt/brokerage/revision/scripts/common.sh
+require_backend_image
 
 for attempt in $(seq 1 24); do
   api_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' brokerage-dev-api-1 2>/dev/null || true)"

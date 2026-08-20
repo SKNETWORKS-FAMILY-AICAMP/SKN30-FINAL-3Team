@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # ADR-0005: 개발 환경 Frontend origin과 API routing 기준
@@ -25,7 +25,7 @@ updated: 2026-08-18
 
 ## Delivery 선행 계약
 
-- 현재 `npm run build`가 참조하는 `frontend/scripts/prepare-sites-build.mjs`가 없어 새 release artifact를 재현할 수 있으므로 배포 전 build를 복구한다.
+- `npm ci → typecheck → 원장 테스트 → Vite build → release test`를 같은 검증 진입점으로 실행하고 `frontend/dist/client` artifact를 재현한다.
 - `index.html`은 `no-cache` 또는 짧은 TTL metadata로, hash asset은 장기 immutable metadata로 업로드하고 distribution invalidation을 수행한다.
 - CloudFront는 viewer Host를 ALB DNS Host로 바꾸므로 Backend allowed-host에 ALB DNS를 허용한다. ALB target health의 private-IP Host 처리는 별도 Backend 계약으로 해결한다.
 - bucket은 `force_destroy=false`이므로 환경 종료 시 승인된 artifact 반출 후 객체를 비우고 Terraform destroy를 수행한다.

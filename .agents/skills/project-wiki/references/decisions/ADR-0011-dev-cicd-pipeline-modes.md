@@ -18,7 +18,7 @@ updated: 2026-08-20
 - CodePipeline V2 `QUEUED` Pipeline을 `dev-integrated`, `dev-backend`, `dev-frontend` 세 개 둔다.
 - 통합 Pipeline만 `main` 변경을 자동 감지한다. Backend와 Frontend 독립 Pipeline은 `DetectChanges=false`인 운영자 수동 실행이며 최신 `main` 또는 전체 `COMMIT_ID` override를 받는다.
 - Pipeline 내부 Manual approval은 두지 않는다. 독립 Pipeline 시작 권한 자체를 운영자 승인으로 본다.
-- 통합 Build는 같은 Source artifact에서 Backend+AI와 Frontend를 병렬 검증한다. 배포는 DB 전진 migration, Backend와 Worker, health, Frontend index-last 순서다.
+- 통합 Pipeline은 같은 Source artifact에서 Backend+AI와 Frontend의 `Verify`를 병렬 실행한 뒤, Backend image와 Frontend release의 `Build`를 병렬 실행한다. 검증 단계는 배포 artifact를 만들지 않으며 Build 단계는 테스트 DB를 사용하지 않는다. 배포는 DB 전진 migration, Backend와 Worker, health, Frontend index-last 순서다.
 - Backend 독립 Pipeline은 migration과 Backend만 변경한다. Frontend 독립 Pipeline은 현재 Backend readiness를 확인한 뒤 S3와 CloudFront만 변경한다.
 - 모든 Pipeline은 첫 단계에서 다른 두 Pipeline의 최근 실행 상태를 조회하고 `InProgress` 또는 `Stopping`이면 실패한다. 조회와 실제 배포 사이의 짧은 race는 수용하며, 독립 실행 전 운영자가 통합 Pipeline 상태를 확인한다.
 - Backend 실패는 마지막 정상 CodeDeploy revision으로 자동 롤백하고 DB down migration은 실행하지 않는다.
@@ -30,6 +30,7 @@ updated: 2026-08-20
 
 - Breaking API 변경은 호환되는 단계적 변경 또는 통합 Pipeline으로만 배포한다.
 - Worker는 `WORKER_ENABLED=false`에서 DB readiness와 graceful shutdown만 제공하고 작업을 claim하지 않는다. 전체 F3 handler 전에는 `true` 시작을 거부한다.
+- Backend Verify는 disposable PostgreSQL의 `TEST_DB_URL`을 필수로 주입해 DB 통합 검사를 skip 없이 실행한다. Frontend Verify는 typecheck와 원장 테스트를 수행하고, 별도 Frontend Build가 Vite release와 release 계약 테스트를 수행한다.
 - 통합 자동 감지는 독립 Pipeline, rollback, Frontend 복원과 알림 실패 주입 검증 후에만 켠다.
 - Pipeline 수동 운영 권한은 [ADR-0012](ADR-0012-retain-iam-access.md)에 따라 승인된 기존 IAM 사용자에게 최소 권한 policy로 연결한다.
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.
