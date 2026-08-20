@@ -126,9 +126,15 @@ test("file and changed-line limits reject oversized PRs", () => {
   assert.equal(result.reasons.length, 2);
 });
 
+test("review publication limits favor a short actionable result", () => {
+  assert.equal(policy.limits.chunkMaxFindings, 3);
+  assert.equal(policy.limits.maxFindings, 5);
+});
+
 test("structured review output is validated and capped", () => {
   const finding = {
     severity: "high",
+    root_cause: "architecture-boundary",
     category: "architecture",
     title: "경계 위반",
     file: "backend/src/main.py",
@@ -145,9 +151,9 @@ test("structured review output is validated and capped", () => {
       findings: Array.from({ length: 12 }, () => finding),
       missing_evidence: []
     },
-    10
+    5
   );
-  assert.equal(review.findings.length, 10);
+  assert.equal(review.findings.length, 5);
   const inconsistent = normalizeReview({
     status: "clean",
     summary: "clean",
@@ -155,13 +161,22 @@ test("structured review output is validated and capped", () => {
     missing_evidence: []
   });
   assert.equal(inconsistent.status, "needs_attention");
-  const incomplete = normalizeReview({
-    status: "clean",
+  const modelReportedGap = normalizeReview({
+    status: "incomplete",
     summary: "insufficient",
     findings: [],
     missing_evidence: ["patch missing"]
   });
-  assert.equal(incomplete.status, "incomplete");
+  assert.equal(modelReportedGap.status, "clean");
+  assert.deepEqual(modelReportedGap.missing_evidence, []);
+  const lowOnly = normalizeReview({
+    status: "needs_attention",
+    summary: "style",
+    findings: [{ ...finding, severity: "low" }],
+    missing_evidence: []
+  });
+  assert.equal(lowOnly.status, "clean");
+  assert.deepEqual(lowOnly.findings, []);
   const sanitized = normalizeReview({
     status: "clean",
     summary: "sk-proj-abcdefghijklmnopqrstuvwxyz",
@@ -201,6 +216,7 @@ test("GitHub output is sticky and Discord output is bounded", () => {
     findings: [
       {
         severity: "high",
+        root_cause: "architecture-boundary",
         category: "architecture",
         title: "경계 위반",
         file: "backend/src/main.py",
@@ -222,6 +238,16 @@ test("GitHub output is sticky and Discord output is bounded", () => {
     context: { modules: ["backend"] }
   });
   assert.ok(comment.startsWith(REVIEW_MARKER));
+  assert.match(comment, /HIGH · 병합 전 확인/);
+  const mediumComment = renderGitHubComment({
+    pr,
+    review: { ...review, findings: [{ ...review.findings[0], severity: "medium" }] },
+    model: "gpt-5.6-terra",
+    usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+    durationMs: 1200,
+    context: { modules: ["backend"] }
+  });
+  assert.match(mediumComment, /MEDIUM · 개선 권고/);
   const messages = renderDiscordReviewMessages({
     pr,
     review,
@@ -390,6 +416,7 @@ test("usage and fallback findings are merged deterministically", () => {
   );
   const finding = {
     severity: "high",
+    root_cause: "module-boundary-violation",
     category: "architecture",
     title: "경계 위반",
     file: "backend/a.py",
@@ -402,7 +429,7 @@ test("usage and fallback findings are merged deterministically", () => {
   const merged = mergeReviewsFallback(
     [
       { status: "needs_attention", summary: "a", findings: [finding], missing_evidence: [] },
-      { status: "clean", summary: "b", findings: [finding], missing_evidence: ["missing"] }
+      { status: "clean", summary: "b", findings: [{ ...finding, file: "ai/b.py", line: 2, rule_source: "architecture.md" }], missing_evidence: ["missing"] }
     ],
     10,
     { forceIncomplete: true }

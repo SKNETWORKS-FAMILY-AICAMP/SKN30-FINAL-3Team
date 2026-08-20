@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # 인프라 자원 인벤토리
@@ -14,7 +14,7 @@ updated: 2026-08-18
 | 네트워크 | VPC, IGW, route table, public subnet 2개 AZ | 결정 | 구현됨·미적용 | NAT·IPv6 없음 |
 | 네트워크 | EC2 app public subnet, RDS private subnet 2개, security group | 결정 | 구현됨·미적용 | ALB HTTP는 CloudFront origin-facing prefix에서만, EC2 inbound는 ALB SG만, RDS inbound는 App SG만 |
 | 네트워크 | S3 Gateway Endpoint | 결정 | 구현됨·미적용 | public/app route table의 업무용 S3 접근 경로 |
-| 컴퓨팅 | EC2, Launch Template, ASG desired 1, ALB | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.medium, gp3 40 GiB, EC2 health; delivery 전 TG unhealthy 예상 |
+| 컴퓨팅 | EC2, Launch Template, ASG desired 1, ALB | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.small, gp3 40 GiB, EC2 health; delivery 전 TG unhealthy 예상 |
 | 운영 접속 | SSM Session Manager | 결정 | 구현됨·미적용 | SSH 차단, IMDSv2 강제 |
 | 이미지 | ECR | 결정 | 구현됨·미적용 | immutable tag, untagged image만 7일 후 만료; 배포는 digest 고정 |
 | 데이터베이스 | RDS PostgreSQL 15.18, pgvector, Single-AZ | 결정 | 구현됨·미적용 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일, IAM DB 인증; `vector`는 최초 DB migration 소유 |

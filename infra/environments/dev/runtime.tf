@@ -225,7 +225,7 @@ resource "aws_lb_listener" "http" {
 resource "aws_launch_template" "app" {
   name_prefix            = "${local.name_prefix}-app-"
   image_id               = data.aws_ssm_parameter.al2023_x86_64_ami.insecure_value
-  instance_type          = "t3.medium"
+  instance_type          = "t3.small"
   update_default_version = true
 
   iam_instance_profile {

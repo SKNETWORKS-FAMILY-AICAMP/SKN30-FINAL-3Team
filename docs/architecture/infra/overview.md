@@ -1,7 +1,7 @@
 ---
 status: 결정
 implementation: 부분 구현·미적용
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -34,7 +34,7 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 네트워크 | RDS private subnet 2개와 DB subnet group | 결정 | 구현됨·미적용 | 서로 다른 AZ를 포함하되 DB 인스턴스는 Single-AZ |
 | 네트워크 | ALB·App·DB security group | 결정 | 구현됨·미적용 | ALB HTTP는 CloudFront origin-facing prefix만, App은 ALB SG만, DB는 App SG만 허용 |
 | 네트워크 | S3 Gateway Endpoint | 결정 | 구현됨·미적용 | app route table의 S3 트래픽에 사용 |
-| 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.medium, gp3 40 GiB, 현재 EC2 health |
+| 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | 구현됨·미적용 | AL2023 x86_64, t3.small, gp3 40 GiB, 현재 EC2 health |
 | 컴퓨팅 | ALB, target group, health check | 결정 | 구현됨·미적용 | `/health/ready`; delivery 전 unhealthy 예상, 직접 EC2 ingress 없음 |
 | 운영 접속 | SSM Session Manager | 결정 | 구현됨·미적용 | SSH·22번 차단, IMDSv2 강제 |
 | 이미지 | ECR | 결정 | 구현됨·미적용 | immutable tag, untagged image만 7일 후 만료 |
@@ -215,7 +215,7 @@ flowchart LR
 ## 미확정 사항
 
 - 도메인, Route 53 hosted zone과 ACM 인증서
-- `t3.medium`·gp3 40 GiB 기본값을 조정할 부하 임계값
+- `t3.small`·gp3 40 GiB 기본값을 다시 조정할 부하 임계값
 - LLM·STT·Embedding의 실제 모델, GPU, Pod 통합 또는 분리 배치와 RunPod Terraform 소유 범위
 - RDS polling에서 SQS·DLQ로 전환할 측정 임계값
 - 향후 ECS AI 내부 호출의 인증·암호화·재시도 방식
