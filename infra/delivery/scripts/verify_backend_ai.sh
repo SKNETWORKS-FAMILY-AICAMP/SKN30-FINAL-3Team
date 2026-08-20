@@ -22,3 +22,5 @@ uv run pyright
 uv run yoyo apply --batch
 uv run yoyo apply --batch
 uv run pytest -q
+
+"${repo_root}/infra/delivery/scripts/verify_deploy_scripts.sh"

@@ -3,12 +3,7 @@ set -euo pipefail
 
 # shellcheck source=common.sh
 source /opt/brokerage/revision/scripts/common.sh
-
-test -n "${BACKEND_IMAGE:-}"
-if [[ "${BACKEND_IMAGE}" != *@sha256:* ]]; then
-  echo "BACKEND_IMAGE must be pinned to an ECR digest" >&2
-  exit 1
-fi
+require_backend_image
 
 docker_config_dir="$(mktemp -d /tmp/brokerage-docker-config.XXXXXX)"
 cleanup() {

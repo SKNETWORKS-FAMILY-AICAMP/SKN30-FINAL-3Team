@@ -25,9 +25,10 @@ infra/delivery/scripts/verify_local_delivery.sh
 
 1. AI와 Backend의 frozen lock 설치, format, lint, type, 전체 테스트
 2. 빈 DB migration과 두 번째 no-op migration
-3. Frontend clean install, typecheck, 원장 테스트, release build
-4. Backend root-context image build와 UID 10001 실행
-5. Compose config
+3. CodeDeploy lifecycle shell 구문과 image metadata 전달 계약 테스트
+4. Frontend clean install, typecheck, 원장 테스트, release build
+5. Backend root-context image build와 UID 10001 실행
+6. Compose config
 
 Backend DB 테스트는 `TEST_DB_URL`이 없으면 실행 자체를 거부한다. 부분 검증이 필요할 때도
 CodeBuild가 호출하는 아래 진입점을 그대로 사용한다.
