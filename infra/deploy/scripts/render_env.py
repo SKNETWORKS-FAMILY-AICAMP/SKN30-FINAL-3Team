@@ -14,12 +14,18 @@ MIGRATION_USER = "app_migrator"
 
 
 def aws(*args: str) -> str:
-    result = subprocess.run(
-        ["aws", *args],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["aws", *args],
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+    except subprocess.CalledProcessError as error:
+        operation = " ".join(args[:2])
+        raise SystemExit(
+            f"AWS CLI operation failed: {operation} (exit status {error.returncode})"
+        ) from None
     return result.stdout.strip()
 
 

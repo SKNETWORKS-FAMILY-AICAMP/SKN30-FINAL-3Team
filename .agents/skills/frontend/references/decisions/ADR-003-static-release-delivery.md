@@ -12,6 +12,7 @@ updated: 2026-08-20
 ## 결정
 
 - Frontend는 runtime Docker image를 만들지 않고 Vite `frontend/dist/client` artifact를 배포한다.
+- release build 전 clean install, TypeScript strict 검사와 현재 원장 변환 테스트를 필수로 통과한다.
 - release test는 entry document와 hash가 포함된 JavaScript·CSS asset을 검증한다.
 - manifest는 asset path, bytes, SHA-256, revision과 Pipeline execution ID를 기록한다.
 - CloudFront Backend readiness를 확인한 뒤 asset-first/index-last 순서로 private S3에 배포한다.

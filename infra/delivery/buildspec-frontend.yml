@@ -8,11 +8,7 @@ phases:
   build:
     commands:
       - test "${#CODEBUILD_RESOLVED_SOURCE_VERSION}" -eq 40
-      - cd frontend
-      - npm ci
-      - npm run build
-      - npm run test:release
-      - cd ..
+      - infra/delivery/scripts/verify_frontend.sh
       - mkdir -p _frontend_release/site
       - cp -R frontend/dist/client/. _frontend_release/site/
       - python infra/delivery/scripts/write_frontend_manifest.py --site _frontend_release/site --output _frontend_release/release-manifest.json --pipeline "${PIPELINE_KIND}" --revision "${CODEBUILD_RESOLVED_SOURCE_VERSION}" --execution "${PIPELINE_EXECUTION_ID}"

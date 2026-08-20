@@ -10,6 +10,13 @@ if [[ "${BACKEND_IMAGE}" != *@sha256:* ]]; then
   exit 1
 fi
 
+docker_config_dir="$(mktemp -d /tmp/brokerage-docker-config.XXXXXX)"
+cleanup() {
+  rm -rf -- "${docker_config_dir}"
+}
+trap cleanup EXIT
+export DOCKER_CONFIG="${docker_config_dir}"
+
 aws ecr get-login-password --region "${AWS_REGION}" |
   docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
 

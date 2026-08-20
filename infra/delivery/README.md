@@ -11,6 +11,50 @@
 - Discord secret container에 `{"webhook_url":"..."}` 값을 저장소와 Terraform 밖에서 주입한다.
 - Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다.
 
+## 로컬 CodeBuild 동등 검증
+
+전체 검증은 CodeBuild와 같은 Node.js 22, Python 3.13, `uv 0.11.2`, Docker와
+Compose plugin이 설치된 Linux 환경에서 저장소 루트 기준으로 실행한다.
+
+```bash
+infra/delivery/scripts/verify_local_delivery.sh
+```
+
+이 명령은 disposable PostgreSQL 15+pgvector를 시작하고 다음을 순서대로 검증한 뒤
+컨테이너와 임시 파일을 정리한다.
+
+1. AI와 Backend의 frozen lock 설치, format, lint, type, 전체 테스트
+2. 빈 DB migration과 두 번째 no-op migration
+3. Frontend clean install, typecheck, 원장 테스트, release build
+4. Backend root-context image build와 UID 10001 실행
+5. Compose config
+
+Backend DB 테스트는 `TEST_DB_URL`이 없으면 실행 자체를 거부한다. 부분 검증이 필요할 때도
+CodeBuild가 호출하는 아래 진입점을 그대로 사용한다.
+
+```bash
+infra/delivery/scripts/verify_backend_ai.sh
+infra/delivery/scripts/verify_frontend.sh
+```
+
+PR에는 실행한 진입점과 결과를 기록하고, Pipeline 최초 적용 전에는 로컬 전체 검증과
+Backend·Frontend 독립 Pipeline을 모두 통과시킨다.
+
+### 지속 검증 운영
+
+- Backend·AI 변경은 `verify_backend_ai.sh`, Frontend 변경은 `verify_frontend.sh`를 PR마다 실행한다.
+- lockfile, migration, Dockerfile, Compose 또는 buildspec 변경은 영향 모듈만 확인하지 않고
+  `verify_local_delivery.sh` 전체를 실행한다.
+- CodeBuild는 로컬과 같은 두 component script를 호출한다. 검증 명령을 바꿀 때 buildspec에
+  명령을 복제하지 않고 component script 한 곳만 수정한다.
+- `main` 통합 Pipeline은 merge 이후 배포 gate다. merge 이전 강제 gate가 필요하면 같은
+  component script를 호출하는 PR CI를 별도로 연결한 뒤 성공 check를 branch protection의
+  required check로 지정한다.
+- Node, Python, `uv`, base image 또는 lockfile을 올리는 PR은 clean install과 `--no-cache`
+  image build를 추가로 수행한다.
+- Frontend release manifest의 bundle bytes를 실행별로 비교한다. 현재 Vite large-chunk 경고는
+  관찰 항목이며, 팀이 성능 예산을 승인하면 그 값을 release test의 실패 기준으로 고정한다.
+
 ## 최초 Terraform 적용
 
 최초 적용은 통합 자동 감지와 ELB health 전환을 보류한다.
@@ -59,6 +103,49 @@ aws codepipeline start-pipeline-execution \
 ```
 
 Frontend도 Pipeline 이름만 바꿔 같은 방식으로 실행한다. 실행 전 다른 두 Pipeline이 `InProgress` 또는 `Stopping`이 아닌지 운영자가 확인한다.
+
+## Backend deploy 검증
+
+배포 재실행 전에는 EC2 instance role이 Parameter Store의 개별 값뿐 아니라 조회 경로
+자체에도 접근 가능한지 확인한다. `GetParametersByPath`는 아래 base path ARN을 평가하므로
+결과가 `allowed`여야 한다.
+
+```bash
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::<ACCOUNT_ID>:role/skn30-final-3team-dev-app-instance \
+  --action-names ssm:GetParametersByPath \
+  --resource-arns arn:aws:ssm:ap-northeast-2:<ACCOUNT_ID>:parameter/skn30-final-3team-dev \
+  --context-entries ContextKeyName=ssm:Recursive,ContextKeyValues=true,ContextKeyType=boolean \
+  --region ap-northeast-2
+```
+
+Pipeline과 CodeDeploy에서는 다음 순서로 확인한다.
+
+1. CodePipeline의 Source revision이 요청한 40자리 SHA인지 확인한다.
+2. Backend Build artifact의 image가 `repository@sha256:...` 형식인지 확인한다.
+3. CodeDeploy `AfterInstall`에서 설정 조립과 migration이 성공했는지 확인한다.
+4. `ApplicationStart`, `ValidateService`가 성공하고 deployment 상태가 `Succeeded`인지 확인한다.
+5. Target Group의 유일한 target이 `healthy`인지 확인한다.
+6. CloudFront `https://<distribution-domain>/health/ready`가 200을 반환하는지 확인한다.
+7. API·Worker CloudWatch log에 revision 전환 이후 지속적인 error가 없는지 확인한다.
+8. `/opt/brokerage/deploy-record.json`의 revision, image digest와 Pipeline execution ID가
+   실행 이력과 같은지 확인한다. 파일에는 비밀값이 없어야 한다.
+
+실패한 deployment의 상세 상태는 값을 노출하지 않는 다음 조회로 확인한다.
+
+```bash
+aws deploy get-deployment \
+  --deployment-id <DEPLOYMENT_ID> \
+  --query 'deploymentInfo.{status:status,error:errorInformation,revision:revision}' \
+  --region ap-northeast-2
+
+aws deploy list-deployment-instances \
+  --deployment-id <DEPLOYMENT_ID> \
+  --region ap-northeast-2
+```
+
+Lifecycle script의 AWS CLI 오류는 원래 AWS service error와 operation 이름을 stderr에
+남겨야 한다. Secret 값, Parameter 값, DB URL과 IAM DB token은 출력하지 않는다.
 
 ## 검증 순서
 

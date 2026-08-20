@@ -30,6 +30,7 @@ updated: 2026-08-20
 
 - Breaking API 변경은 호환되는 단계적 변경 또는 통합 Pipeline으로만 배포한다.
 - Worker는 `WORKER_ENABLED=false`에서 DB readiness와 graceful shutdown만 제공하고 작업을 claim하지 않는다. 전체 F3 handler 전에는 `true` 시작을 거부한다.
+- Backend Build는 disposable PostgreSQL의 `TEST_DB_URL`을 필수로 주입해 DB 통합 검사를 skip 없이 실행하고, Frontend Build는 typecheck와 현재 release 계약 테스트를 수행한다.
 - 통합 자동 감지는 독립 Pipeline, rollback, Frontend 복원과 알림 실패 주입 검증 후에만 켠다.
 - Pipeline 수동 운영 권한은 [ADR-0012](ADR-0012-retain-iam-access.md)에 따라 승인된 기존 IAM 사용자에게 최소 권한 policy로 연결한다.
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.

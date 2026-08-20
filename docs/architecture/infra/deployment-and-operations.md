@@ -53,7 +53,7 @@ flowchart LR
 ## Backend build와 image
 
 1. Python 3.13과 각 `uv.lock`으로 Backend·AI 환경을 동기화한다.
-2. format, lint, type, architecture, unit/API/integration 검사를 수행한다.
+2. format, lint, type, architecture, unit/API/integration 검사를 수행하며 `TEST_DB_URL` 누락으로 DB 검사가 skip되는 것을 허용하지 않는다.
 3. disposable PostgreSQL 15+pgvector에 전체 Yoyo migration을 두 번 실행해 적용과 no-op을 검증한다.
 4. 저장소 root context에서 multi-stage image를 만든다.
 5. commit SHA tag가 ECR에 있으면 기존 digest를 사용하고, 없으면 immutable tag로 push한다.
@@ -81,7 +81,7 @@ Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM clea
 
 ## Frontend build와 배포
 
-Frontend는 runtime Dockerfile을 사용하지 않는다. `npm ci → vite build → release test` 결과인 `frontend/dist/client`만 artifact로 전달한다.
+Frontend는 runtime Dockerfile을 사용하지 않는다. `npm ci → typecheck → 원장 테스트 → Vite build → release test` 결과인 `frontend/dist/client`만 artifact로 전달한다.
 
 - asset path, bytes, SHA-256, entry document, revision과 execution ID를 release manifest에 기록한다.
 - 독립 Pipeline은 Build 전에 CloudFront를 통한 Backend live/readiness를 확인한다.

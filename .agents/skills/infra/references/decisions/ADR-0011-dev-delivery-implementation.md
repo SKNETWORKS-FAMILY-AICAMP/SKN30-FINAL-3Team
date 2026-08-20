@@ -42,7 +42,7 @@ updated: 2026-08-20
 
 - 첫 CodeBuild action이 다른 두 Pipeline의 최근 상태를 조회한다. `InProgress` 또는 `Stopping`이면 현재 실행을 실패시킨다.
 - 상태 확인과 다음 action 사이 race는 남으며 DynamoDB lock은 도입하지 않는다.
-- EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read와 `app_migrator`의 `rds-db:connect`만 추가한다.
+- EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read와 `app_migrator`의 `rds-db:connect`만 추가한다. `GetParametersByPath`에는 prefix 하위 ARN뿐 아니라 API가 평가하는 prefix 자체 ARN도 허용한다.
 - Discord webhook은 전용 secret container만 Terraform으로 만들고 값을 저장소·state에 넣지 않는다.
 - EventBridge Pipeline/CodeDeploy 상태 이벤트를 기존 SNS에 게시하고 Lambda가 revision, 실패 action과 Console 링크를 조립한다.
 

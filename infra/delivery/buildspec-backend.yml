@@ -4,6 +4,7 @@ env:
   variables:
     DB_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
     DB_MIGRATION_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
+    TEST_DB_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
     APP_PROFILE: "test"
     APP_ENV: "test"
     DB_TARGET: "test"
@@ -18,16 +19,15 @@ phases:
       - python -m pip install --disable-pip-version-check uv==0.11.2
   pre_build:
     commands:
+      - test "${#CODEBUILD_RESOLVED_SOURCE_VERSION}" -eq 40
+  build:
+    commands:
       - export REVISION_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION}"
-      - test "${#REVISION_SHA}" -eq 40
       - export TEST_DB_CONTAINER="brokerage-ci-${CODEBUILD_BUILD_NUMBER}"
       - docker run --detach --rm --name "${TEST_DB_CONTAINER}" -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=brokerage -p 5432:5432 pgvector/pgvector:pg15
       - for attempt in $(seq 1 30); do docker exec "${TEST_DB_CONTAINER}" pg_isready -U postgres && break; sleep 2; done
-  build:
-    commands:
-      - cd ai && uv sync --frozen && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run pytest && cd ..
-      - cd backend && uv sync --frozen && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run yoyo apply --batch && uv run yoyo apply --batch && uv run pytest && cd ..
-      - export REVISION_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+      - docker exec "${TEST_DB_CONTAINER}" pg_isready -U postgres
+      - infra/delivery/scripts/verify_backend_ai.sh
       - aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REPOSITORY_URI%%/*}"
       - |
         EXISTING_DIGEST="$(aws ecr describe-images --repository-name "${ECR_REPOSITORY_NAME}" --image-ids imageTag="${REVISION_SHA}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
@@ -52,8 +52,7 @@ phases:
           --execution "${PIPELINE_EXECUTION_ID}" \
           --image-digest "${IMAGE_DIGEST}" \
           --migration validated
-  post_build:
-    commands:
+    finally:
       - docker stop "brokerage-ci-${CODEBUILD_BUILD_NUMBER}" >/dev/null 2>&1 || true
 artifacts:
   base-directory: _backend_release

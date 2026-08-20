@@ -4,8 +4,8 @@
 
 로컬에서 `frontend/`를 설치하고 실행하려면 다음 환경이 필요합니다.
 
-- Node.js `v24.19.0` (프로젝트 기준 고정 버전)
-- npm `11.17.0` 권장
+- Node.js `22.x` (CodeBuild와 같은 major version)
+- Node.js 22에 포함된 npm
 - 의존성 설치를 위한 인터넷 연결 및 npm 레지스트리 접근 권한
 - 개발 서버에 접속할 최신 웹 브라우저
 - 저장소를 내려받고 `frontend/` 디렉터리를 읽고 실행할 수 있는 권한
@@ -43,9 +43,10 @@ npm run dev
 ```bash
 npm run dev       # 개발 서버
 npm run preview   # 빌드 결과 미리보기
+npm run typecheck # TypeScript strict 검사
+npm run test:ledger # 원장 변환 테스트
 npm run build     # 프로덕션 빌드
-npm run test:sites # Sites worker 테스트
-npm run test:workflow # 워크플로 스모크 테스트
+npm run test:release # dist/client release 구조 검사
 ```
 
 ## 참고
@@ -57,7 +58,7 @@ npm run test:workflow # 워크플로 스모크 테스트
 - 프로토타입 가정값: `src/config/prototypeAssumptions.js`
 - 스타일: `src/styles.css`, `src/shell.css`, `src/features/*.css`
 - 빌드 설정: `vite.config.mjs`
-- `npm run build`는 Vite 빌드 후 `scripts/prepare-sites-build.mjs`를 실행하도록 정의되어 있습니다. 현재 해당 후처리 스크립트가 저장소에 없으므로 Vite 번들 생성은 완료되지만 전체 명령은 후처리 단계에서 실패합니다.
-- `npm run test:workflow`도 `scripts/workflow-smoke.mjs`가 필요하므로 실행 전 파일 존재 여부를 확인하세요.
+- CodeBuild와 같은 전체 검증은 저장소 루트에서 `infra/delivery/scripts/verify_frontend.sh`로 실행합니다.
+- release artifact는 Vite가 생성한 `dist/client`이며 OpenAI Sites worker·server bundle은 만들지 않습니다.
 
 프로토타입 가정값은 제품 정책이나 운영 제한으로 간주하지 않습니다. 운영 기능을 추가할 때는 API 계약, 개인정보 처리 기준, 인증·권한과 실제 저장 방식을 별도로 확인해야 합니다.
