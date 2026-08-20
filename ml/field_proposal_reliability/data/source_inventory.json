@@ -1,0 +1,52 @@
+{
+  "generated_at_utc": "2026-08-20T06:57:22+00:00",
+  "dataset_type": "fully_synthetic_project_fixtures",
+  "contains_real_personal_data": false,
+  "raw_row_count": 1250,
+  "deduplicated_row_count": 1200,
+  "duplicate_row_count": 50,
+  "deduplication_keys": [
+    "scenario_id",
+    "source_group_id",
+    "sha256(transcript)"
+  ],
+  "deduplication_note": "The three files contain 1,250 rows. The 50-row sell-request file is fully duplicated in the 200-row small fixture, leaving 1,200 unique rows.",
+  "sources": [
+    {
+      "source_dataset": "f2_sllm_naturalistic",
+      "path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/data/f2_llm/working/f2_sllm_.jsonl",
+      "sha256": "7f031b3c72b5650b40a365f557cba817111f54e99729ea2f751cd404c48350b8",
+      "raw_rows": 1000,
+      "retained_rows_after_cross_file_deduplication": 1000,
+      "raw_label_distribution": {
+        "공동중개": 250,
+        "단순문의": 250,
+        "매도의뢰": 250,
+        "매수문의": 250
+      }
+    },
+    {
+      "source_dataset": "f2_sllm_blueprint",
+      "path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/data/f2_llm/working/f2_sllm_data_small.jsonl",
+      "sha256": "4b6c660b076bd8201eda36921a50cf228cad1b390415a57ffd545eb9ad2ba319",
+      "raw_rows": 200,
+      "retained_rows_after_cross_file_deduplication": 200,
+      "raw_label_distribution": {
+        "공동중개": 50,
+        "단순문의": 50,
+        "매도의뢰": 50,
+        "매수문의": 50
+      }
+    },
+    {
+      "source_dataset": "f2_sell_request_blueprint",
+      "path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/data/f2_sell_request/working/f2_sell_request_scenarios.privacy_safe.v0.2.jsonl",
+      "sha256": "fe39cd2447cfcd436cc3359b6e707a3ca6fdf9627ce887bca84bfca6e1e1effc",
+      "raw_rows": 50,
+      "retained_rows_after_cross_file_deduplication": 0,
+      "raw_label_distribution": {
+        "매도의뢰": 50
+      }
+    }
+  ]
+}

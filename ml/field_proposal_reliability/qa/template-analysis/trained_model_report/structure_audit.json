@@ -1,0 +1,4746 @@
+{
+  "audit_version": "1.0",
+  "source": {
+    "path": "/mnt/c/Users/playdata2/Downloads/[데이터 전처리] 학습한 ML_DL 모델_27기_1팀.docx",
+    "byte_size": 774875,
+    "sha256": "6c7b57cf9a391c3f428917c1ed306b67b7fceb7aecf7180796f05943526321ae"
+  },
+  "render_status": {
+    "status": "not_rendered",
+    "reason": "Bundled Windows Python cannot execute under WSL; Linux Python lacks pdf2image/Pillow; soffice/libreoffice and pdftoppm are unavailable.",
+    "page_count_status": "inferred from explicit page breaks; not visually verified"
+  },
+  "package": [
+    {
+      "path": "word/header1.xml",
+      "uncompressed_bytes": 2929,
+      "compressed_bytes": 811,
+      "sha256": "42f2ba13ca9cd550816d6af671ff216642c884525d9b15becee90303c2a88a36",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/header2.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 504,
+      "sha256": "15aa49618aabfcb350a9035444b02d25b9e42925d851fd2d34cc7af5aabf7e57",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/header3.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 505,
+      "sha256": "442e19540e59a9585c46e0c4f5518f708a9ca4032a35934d9eafc534304127ab",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer1.xml",
+      "uncompressed_bytes": 2929,
+      "compressed_bytes": 811,
+      "sha256": "15b83ffb187fa5fad275b5fe18cad7ec28758609cf0112ea3e681feaa1eee266",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer2.xml",
+      "uncompressed_bytes": 2215,
+      "compressed_bytes": 582,
+      "sha256": "151dacdb4fa8615678bd574520a94d6507c4a243313c33e4eef3e0814a18f04b",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer3.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 505,
+      "sha256": "fd98b8e46d87be7034b4ef6eca07055a7808f16731d9486c15acf5c5878f7a77",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/numbering.xml",
+      "uncompressed_bytes": 19492,
+      "compressed_bytes": 1037,
+      "sha256": "5f1c05891c45a7b39de892e21054099ac62a13cc2370ae38fc98a6af4af8129b",
+      "policy": "preserve_design_authority; extend only for new semantic roles"
+    },
+    {
+      "path": "word/settings.xml",
+      "uncompressed_bytes": 2152,
+      "compressed_bytes": 591,
+      "sha256": "26f2853fde05b88d4b0a9da0bb016d56a896901f60c9272dddf33c3f3fa61e4a",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/fontTable.xml",
+      "uncompressed_bytes": 2040,
+      "compressed_bytes": 540,
+      "sha256": "ad0d94740ae768ff8a3d583140985777982484c9bdb08ddd1fe81f964f179402",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/_rels/fontTable.xml.rels",
+      "uncompressed_bytes": 449,
+      "compressed_bytes": 205,
+      "sha256": "6f500acf3de0bcc672d01923dda818ab2675a5892bdf740eed3db4fc8194d6ef",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/styles.xml",
+      "uncompressed_bytes": 8813,
+      "compressed_bytes": 1192,
+      "sha256": "9d4968e5b8973535e3468bf002a8fe5cb63c86e4fc16c1e06a3f052e4502d097",
+      "policy": "preserve_design_authority; extend only for new semantic roles"
+    },
+    {
+      "path": "customXML/itemProps1.xml",
+      "uncompressed_bytes": 404,
+      "compressed_bytes": 214,
+      "sha256": "fc2e321bb5ca54d5f2b99b99f91d681d004417098918a318be88fe525218c9a3",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "customXML/item1.xml",
+      "uncompressed_bytes": 485,
+      "compressed_bytes": 305,
+      "sha256": "fcf8069043d4f088707c498154ec58974cf80602261b446273c9df190b64b2e7",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "customXML/_rels/item1.xml.rels",
+      "uncompressed_bytes": 295,
+      "compressed_bytes": 186,
+      "sha256": "26ac718f80df621ee703e3c0f143a63034967c5fe65fbfdcefbf96419235355e",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/document.xml",
+      "uncompressed_bytes": 185533,
+      "compressed_bytes": 7264,
+      "sha256": "202998b5c20dd260ee2780926ea0586e98c6008ffb873d5581ae3714400c3927",
+      "policy": "editable_content_slots"
+    },
+    {
+      "path": "word/_rels/document.xml.rels",
+      "uncompressed_bytes": 1991,
+      "compressed_bytes": 343,
+      "sha256": "4159bcb2ad1edac6bdd91391215998af18553992f005eb5aa112612ddf387fd8",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "_rels/.rels",
+      "uncompressed_bytes": 298,
+      "compressed_bytes": 177,
+      "sha256": "1cc87395d4a229f21c23af406724de12dd9454071925f983e4b648a7b2be8cc5",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/fonts/NotoSansSymbols-regular.ttf",
+      "uncompressed_bytes": 183620,
+      "compressed_bytes": 91020,
+      "sha256": "3c9c40311ae6012f7d3c4a4ff98952b2c7bbc0d4c89a93ba22986ff1f1884af5",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/fonts/NotoSansSymbols-bold.ttf",
+      "uncompressed_bytes": 183344,
+      "compressed_bytes": 95578,
+      "sha256": "afc2a6b7050df884f5deb2618ebbdecb9fa2f163d3ca66ca75f8b069febc6741",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/media/image2.png",
+      "uncompressed_bytes": 596380,
+      "compressed_bytes": 567346,
+      "sha256": "870dde32a180bc9498566da821287becb142cc047bf2f9bd4278b5eb39a3869a",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/theme/theme1.xml",
+      "uncompressed_bytes": 7643,
+      "compressed_bytes": 1580,
+      "sha256": "b2295d3198893d2c03f5e584c749a15751b798aefdcd9bee2889f13903d68cb2",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/media/image1.png",
+      "uncompressed_bytes": 70,
+      "compressed_bytes": 63,
+      "sha256": "18d840af2c50eff9a5241d4b50833a596e6b71af0cee87cf2b3435345f2f7aba",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "[Content_Types].xml",
+      "uncompressed_bytes": 2258,
+      "compressed_bytes": 424,
+      "sha256": "e5c6c7c4755336f94212898c125ae999fa1050b62556a2665efb857fb3c1ac46",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    }
+  ],
+  "relationships": [
+    {
+      "Id": "rId11",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header1.xml"
+    },
+    {
+      "Id": "rId10",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header3.xml"
+    },
+    {
+      "Id": "rId13",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer3.xml"
+    },
+    {
+      "Id": "rId12",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer2.xml"
+    },
+    {
+      "Id": "rId1",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+      "Target": "theme/theme1.xml"
+    },
+    {
+      "Id": "rId2",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+      "Target": "settings.xml"
+    },
+    {
+      "Id": "rId3",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+      "Target": "fontTable.xml"
+    },
+    {
+      "Id": "rId4",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
+      "Target": "numbering.xml"
+    },
+    {
+      "Id": "rId9",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header2.xml"
+    },
+    {
+      "Id": "rId14",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer1.xml"
+    },
+    {
+      "Id": "rId5",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "Target": "styles.xml"
+    },
+    {
+      "Id": "rId6",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+      "Target": "../customXML/item1.xml"
+    },
+    {
+      "Id": "rId7",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image2.png"
+    },
+    {
+      "Id": "rId8",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image1.png"
+    }
+  ],
+  "page_system": {
+    "sections": [
+      {
+        "index": 1,
+        "type": "continuous/default",
+        "page_size_twips": {
+          "h": "16834",
+          "w": "11909",
+          "orient": "portrait"
+        },
+        "margins_twips": {
+          "bottom": "1559",
+          "top": "1275",
+          "left": "992",
+          "right": "992",
+          "header": "720",
+          "footer": "720"
+        },
+        "columns": {},
+        "page_numbering": {
+          "start": "0"
+        },
+        "different_first_page": true,
+        "references": [
+          {
+            "kind": "header",
+            "type": "default",
+            "relationship_id": "rId9"
+          },
+          {
+            "kind": "header",
+            "type": "first",
+            "relationship_id": "rId10"
+          },
+          {
+            "kind": "header",
+            "type": "even",
+            "relationship_id": "rId11"
+          },
+          {
+            "kind": "footer",
+            "type": "default",
+            "relationship_id": "rId12"
+          },
+          {
+            "kind": "footer",
+            "type": "first",
+            "relationship_id": "rId13"
+          },
+          {
+            "kind": "footer",
+            "type": "even",
+            "relationship_id": "rId14"
+          }
+        ]
+      }
+    ],
+    "even_and_odd_headers_enabled": false,
+    "body_explicit_page_break_count": 1,
+    "page_count_inferred_from_explicit_breaks": 2
+  },
+  "styles": {
+    "document_defaults": {
+      "run": {
+        "fonts": {
+          "ascii": "Arial",
+          "cs": "Arial",
+          "eastAsia": "Arial",
+          "hAnsi": "Arial"
+        },
+        "size_half_points": "22",
+        "bold": "1",
+        "language": "ko"
+      },
+      "paragraph": {
+        "spacing": {
+          "line": "276",
+          "lineRule": "auto"
+        }
+      }
+    },
+    "styles": [
+      {
+        "style_id": "TableNormal",
+        "type": "table",
+        "default": "1",
+        "name": "TableNormal",
+        "based_on": null,
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "100.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Normal",
+        "type": "paragraph",
+        "default": "1",
+        "name": "normal",
+        "based_on": null,
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading1",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 1",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "120",
+            "before": "400",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "40",
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading2",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 2",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "120",
+            "before": "360",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "32",
+          "bold": "0",
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading3",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 3",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "320",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "28",
+          "bold": "0",
+          "italic": null,
+          "color": "434343"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading4",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 4",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "280",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "24",
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading5",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 5",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading6",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 6",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": "1",
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Title",
+        "type": "paragraph",
+        "default": null,
+        "name": "Title",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "60",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "52",
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Subtitle",
+        "type": "paragraph",
+        "default": null,
+        "name": "Subtitle",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "320",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "30",
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table1",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table2",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table3",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "0.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table4",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table5",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      }
+    ]
+  },
+  "numbering": {
+    "abstract_definitions": {
+      "1": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "2": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "3": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "4": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "decimal",
+          "text": "%1.",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "decimal",
+          "text": "%2.",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "decimal",
+          "text": "%3.",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "decimal",
+          "text": "%4.",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "decimal",
+          "text": "%5.",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "decimal",
+          "text": "%6.",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "decimal",
+          "text": "%7.",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "decimal",
+          "text": "%8.",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "decimal",
+          "text": "%9.",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {}
+        }
+      ],
+      "5": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "6": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ]
+    },
+    "instances": [
+      {
+        "num_id": "1",
+        "abstract_num_id": "1"
+      },
+      {
+        "num_id": "2",
+        "abstract_num_id": "2"
+      },
+      {
+        "num_id": "3",
+        "abstract_num_id": "3"
+      },
+      {
+        "num_id": "4",
+        "abstract_num_id": "4"
+      },
+      {
+        "num_id": "5",
+        "abstract_num_id": "5"
+      },
+      {
+        "num_id": "6",
+        "abstract_num_id": "6"
+      }
+    ]
+  },
+  "body": {
+    "body_child_count": 68,
+    "nonempty_body_paragraphs": 48,
+    "tables": [
+      {
+        "locator": "word/document.xml/body/tbl[1]",
+        "page_by_explicit_breaks": 1,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": "Table1",
+        "table_width": {
+          "w": "9925.0",
+          "type": "dxa"
+        },
+        "table_indent": {},
+        "alignment": "left",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {},
+        "cell_margins": {},
+        "fill_histogram": {},
+        "border_histogram": {
+          "top:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"18\", \"val\": \"single\"}": 1,
+          "left:{\"color\": \"000000\", \"space\": \"0\", \"sz\": \"0\", \"val\": \"nil\"}": 1,
+          "bottom:{\"color\": \"000000\", \"space\": \"0\", \"sz\": \"0\", \"val\": \"nil\"}": 1,
+          "right:{\"color\": \"33bcb1\", \"space\": \"0\", \"sz\": \"18\", \"val\": \"single\"}": 1
+        },
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [
+          0
+        ],
+        "merged_cells": [],
+        "first_row_labels": [
+          "SK 네트웍스 Family AI 27기 : 1팀 학습한 ML / DL 모델"
+        ],
+        "character_count": 41
+      },
+      {
+        "locator": "word/document.xml/body/tbl[4]",
+        "page_by_explicit_breaks": 1,
+        "rows": 4,
+        "max_columns": 2,
+        "style_id": "Table2",
+        "table_width": {
+          "w": "9000.0",
+          "type": "dxa"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "2250",
+          "6750"
+        ],
+        "cell_width_signatures": {},
+        "cell_margins": {},
+        "fill_histogram": {},
+        "border_histogram": {
+          "top:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"18\", \"val\": \"single\"}": 2,
+          "left:{\"color\": \"000000\", \"space\": \"0\", \"sz\": \"0\", \"val\": \"nil\"}": 4,
+          "bottom:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"4\", \"val\": \"single\"}": 6,
+          "right:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"4\", \"val\": \"single\"}": 4,
+          "left:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"4\", \"val\": \"single\"}": 4,
+          "right:{\"color\": \"000000\", \"space\": \"0\", \"sz\": \"0\", \"val\": \"nil\"}": 4,
+          "top:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"4\", \"val\": \"single\"}": 6,
+          "bottom:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"18\", \"val\": \"single\"}": 2
+        },
+        "vertical_alignment_histogram": {
+          "center": 4
+        },
+        "repeat_header_rows": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "cant_split_rows": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "merged_cells": [],
+        "first_row_labels": [
+          "산출물 단계",
+          "데이터 전처리"
+        ],
+        "character_count": 106
+      },
+      {
+        "locator": "word/document.xml/body/tbl[7]",
+        "page_by_explicit_breaks": 2,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": "Table3",
+        "table_width": {
+          "w": "9930.0",
+          "type": "dxa"
+        },
+        "table_indent": {},
+        "alignment": "left",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "9930"
+        ],
+        "cell_width_signatures": {},
+        "cell_margins": {},
+        "fill_histogram": {},
+        "border_histogram": {
+          "top:{\"color\": \"0b57d0\", \"space\": \"0\", \"sz\": \"18\", \"val\": \"single\"}": 1,
+          "left:{\"color\": \"000000\", \"space\": \"0\", \"sz\": \"0\", \"val\": \"nil\"}": 1,
+          "bottom:{\"color\": \"000000\", \"space\": \"0\", \"sz\": \"0\", \"val\": \"nil\"}": 1,
+          "right:{\"color\": \"33bcb1\", \"space\": \"0\", \"sz\": \"18\", \"val\": \"single\"}": 1
+        },
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [
+          0
+        ],
+        "merged_cells": [],
+        "first_row_labels": [
+          "학습한 ML / DL 모델 (Trained ML / DL Model)"
+        ],
+        "character_count": 38
+      },
+      {
+        "locator": "word/document.xml/body/tbl[17]",
+        "page_by_explicit_breaks": 2,
+        "rows": 5,
+        "max_columns": 3,
+        "style_id": "Table4",
+        "table_width": {
+          "w": "9000.0",
+          "type": "dxa"
+        },
+        "table_indent": {},
+        "alignment": "left",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "724",
+          "3051",
+          "5225"
+        ],
+        "cell_width_signatures": {},
+        "cell_margins": {},
+        "fill_histogram": {
+          "cfe2f3": 3
+        },
+        "border_histogram": {
+          "top:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 15,
+          "left:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 15,
+          "bottom:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 15,
+          "right:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 15
+        },
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "cant_split_rows": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "merged_cells": [],
+        "first_row_labels": [
+          "구분",
+          "항목",
+          "설명"
+        ],
+        "character_count": 156
+      },
+      {
+        "locator": "word/document.xml/body/tbl[51]",
+        "page_by_explicit_breaks": 2,
+        "rows": 7,
+        "max_columns": 4,
+        "style_id": "Table5",
+        "table_width": {
+          "w": "9000.0",
+          "type": "dxa"
+        },
+        "table_indent": {},
+        "alignment": "left",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "3156",
+          "2297",
+          "2122",
+          "1425"
+        ],
+        "cell_width_signatures": {},
+        "cell_margins": {},
+        "fill_histogram": {
+          "cfe2f3": 4
+        },
+        "border_histogram": {
+          "top:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 28,
+          "left:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 28,
+          "bottom:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 28,
+          "right:{\"color\": \"cccccc\", \"space\": \"0\", \"sz\": \"8\", \"val\": \"single\"}": 28
+        },
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "cant_split_rows": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "merged_cells": [],
+        "first_row_labels": [
+          "평가 지표",
+          "측정 대상",
+          "목표",
+          "비고"
+        ],
+        "character_count": 179
+      }
+    ],
+    "table_count": 5,
+    "paragraphs": [
+      {
+        "locator": "word/document.xml/body/p[8]",
+        "page_by_explicit_breaks": 2,
+        "text": "1. 모델 개요",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "1. 모델 개요",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[9]",
+        "page_by_explicit_breaks": 2,
+        "text": "모델명 : LightFM Hybrid Recommendation",
+        "properties": {
+          "style_id": null,
+          "num_id": "1",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "모델명 : LightFM Hybrid Recommendation",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[10]",
+        "page_by_explicit_breaks": 2,
+        "text": "목적 : Cold Start 환경에서 전 레시피 추천 점수 생성",
+        "properties": {
+          "style_id": null,
+          "num_id": "1",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "목적 : Cold Start 환경에서 전 레시피 추천 점수 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[11]",
+        "page_by_explicit_breaks": 2,
+        "text": "입력 : User-Recipe Interaction, Recipe Metadata",
+        "properties": {
+          "style_id": null,
+          "num_id": "1",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "입력 : User-Recipe Interaction, Recipe Metadata",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[12]",
+        "page_by_explicit_breaks": 2,
+        "text": "출력 : Recipe Recommendation Score(ŷ)",
+        "properties": {
+          "style_id": null,
+          "num_id": "1",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "출력 : Recipe Recommendation Score(",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          },
+          {
+            "text": "ŷ",
+            "format": {
+              "fonts": {
+                "ascii": "Calibri",
+                "cs": "Calibri",
+                "eastAsia": "Calibri",
+                "hAnsi": "Calibri"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          },
+          {
+            "text": ")",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[13]",
+        "page_by_explicit_breaks": 2,
+        "text": "적용 대상 : 레시피 추천 서비스",
+        "properties": {
+          "style_id": null,
+          "num_id": "1",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "적용 대상 : 레시피 추천 서비스",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "0",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[14]",
+        "page_by_explicit_breaks": 2,
+        "text": "2. 모델 구조",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2. 모델 구조",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[15]",
+        "page_by_explicit_breaks": 2,
+        "text": "데이터 전처리 → Interaction(Target) 생성 → Item Feature 생성 → Train/Test Split → LightFM(WARP Loss) 학습 → 추천 점수 예측 → 추천 성능 / 추천 점수 생성 평가 → 전 카탈로그 CSV Export",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "0",
+            "right": "0",
+            "firstLine": "0"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "데이터 전처리 → Interaction(Target) 생성 → Item Feature 생성 → Train/Test Split → LightFM(WARP Loss) 학습 → 추천 점수 예측 → 추천 성능 / 추천 점수 생성 평가 → 전 카탈로그 CSV Export",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[16]",
+        "page_by_explicit_breaks": 2,
+        "text": "3. 입력 / 출력 정의",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3. 입력 / 출력 정의",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[18]",
+        "page_by_explicit_breaks": 2,
+        "text": "4. Interaction(Target) 정의",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4. Interaction(Target) 정의",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[19]",
+        "page_by_explicit_breaks": 2,
+        "text": "초기 Target : Star + Sentiment",
+        "properties": {
+          "style_id": null,
+          "num_id": "2",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "초기 Target : Star + Sentiment",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[20]",
+        "page_by_explicit_breaks": 2,
+        "text": "최종 Target : Product Interaction (Star × Sentiment)",
+        "properties": {
+          "style_id": null,
+          "num_id": "2",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "최종 Target : Product Interaction (Star × Sentiment)",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[21]",
+        "page_by_explicit_breaks": 2,
+        "text": "선정 이유 : 별점과 감성점수의 상호작용 반영, Ceiling 효과 일부 완화, 추천모델 성능 향상",
+        "properties": {
+          "style_id": null,
+          "num_id": "2",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "선정 이유 : 별점과 감성점수의 상호작용 반영, Ceiling 효과 일부 완화, 추천모델 성능 향상",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[22]",
+        "page_by_explicit_breaks": 2,
+        "text": "5. Item Feature",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "5. Item Feature",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[23]",
+        "page_by_explicit_breaks": 2,
+        "text": "Category",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Category",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[24]",
+        "page_by_explicit_breaks": 2,
+        "text": "Ingredient",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Ingredient",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[25]",
+        "page_by_explicit_breaks": 2,
+        "text": "Cooking Method",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Cooking Method",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[26]",
+        "page_by_explicit_breaks": 2,
+        "text": "Difficulty",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Difficulty",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[27]",
+        "page_by_explicit_breaks": 2,
+        "text": "Cooking Time",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Cooking Time",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[28]",
+        "page_by_explicit_breaks": 2,
+        "text": "View Count",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "View Count",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[29]",
+        "page_by_explicit_breaks": 2,
+        "text": "Scrap Count",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Scrap Count",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[30]",
+        "page_by_explicit_breaks": 2,
+        "text": "Recipe Metadata",
+        "properties": {
+          "style_id": null,
+          "num_id": "3",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Recipe Metadata",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[33]",
+        "page_by_explicit_breaks": 2,
+        "text": "6. 사용 프레임워크",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "6. 사용 프레임워크",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[34]",
+        "page_by_explicit_breaks": 2,
+        "text": "Python, LightFM, pandas, NumPy, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Docker, Docker Compose",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "0",
+            "right": "0",
+            "firstLine": "0"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Python, LightFM, pandas, NumPy, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Docker, Docker Compose",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[37]",
+        "page_by_explicit_breaks": 2,
+        "text": "7. 학습 및 평가 과정",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "7. 학습 및 평가 과정",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[38]",
+        "page_by_explicit_breaks": 2,
+        "text": "데이터 수집 및 전처리",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "데이터 수집 및 전처리",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[39]",
+        "page_by_explicit_breaks": 2,
+        "text": "Interaction 생성",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Interaction 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[40]",
+        "page_by_explicit_breaks": 2,
+        "text": "Item Feature 생성",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Item Feature 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[41]",
+        "page_by_explicit_breaks": 2,
+        "text": "Train/Test Split",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Train/Test Split",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[42]",
+        "page_by_explicit_breaks": 2,
+        "text": "LightFM 학습",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "LightFM 학습",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[43]",
+        "page_by_explicit_breaks": 2,
+        "text": "추천 점수 생성",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "추천 점수 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[44]",
+        "page_by_explicit_breaks": 2,
+        "text": "추천 성능 평가(Precision/Recall)",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "추천 성능 평가(Precision/Recall)",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[45]",
+        "page_by_explicit_breaks": 2,
+        "text": "추천 점수 생성 평가(Evaluation)",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "추천 점수 생성 평가(Evaluation)",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[46]",
+        "page_by_explicit_breaks": 2,
+        "text": "Feature/Target Ablation",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Feature/Target Ablation",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[47]",
+        "page_by_explicit_breaks": 2,
+        "text": "Catalog Export",
+        "properties": {
+          "style_id": null,
+          "num_id": "4",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Catalog Export",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[50]",
+        "page_by_explicit_breaks": 2,
+        "text": "8. 모델 평가",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "8. 모델 평가",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[53]",
+        "page_by_explicit_breaks": 2,
+        "text": "9. 최종 적용 전략",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "9. 최종 적용 전략",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[54]",
+        "page_by_explicit_breaks": 2,
+        "text": "Product Interaction을 기본 Target으로 채택",
+        "properties": {
+          "style_id": null,
+          "num_id": "5",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Product Interaction을 기본 Target으로 채택",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[55]",
+        "page_by_explicit_breaks": 2,
+        "text": "Warm 데이터로 학습 후 전 카탈로그 점수 생성",
+        "properties": {
+          "style_id": null,
+          "num_id": "5",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Warm 데이터로 학습 후 전 카탈로그 점수 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[56]",
+        "page_by_explicit_breaks": 2,
+        "text": "Cold Recipe는 예측 점수로 서비스 제공",
+        "properties": {
+          "style_id": null,
+          "num_id": "5",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Cold Recipe는 예측 점수로 서비스 제공",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[57]",
+        "page_by_explicit_breaks": 2,
+        "text": "실제 사용자 데이터 축적 시 관측 Interaction으로 교체",
+        "properties": {
+          "style_id": null,
+          "num_id": "5",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "실제 사용자 데이터 축적 시 관측 Interaction으로 교체",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[58]",
+        "page_by_explicit_breaks": 2,
+        "text": "예측값은 재학습 정답으로 사용하지 않음",
+        "properties": {
+          "style_id": null,
+          "num_id": "5",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "예측값은 재학습 정답으로 사용하지 않음",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[60]",
+        "page_by_explicit_breaks": 2,
+        "text": "10. 한계 및 향후 개선",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "10. 한계 및 향후 개선",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[61]",
+        "page_by_explicit_breaks": 2,
+        "text": "Warm Recipe 수 부족",
+        "properties": {
+          "style_id": null,
+          "num_id": "6",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Warm Recipe 수 부족",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[62]",
+        "page_by_explicit_breaks": 2,
+        "text": "Cold Item 직접 검증 어려움",
+        "properties": {
+          "style_id": null,
+          "num_id": "6",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Cold Item 직접 검증 어려움",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[63]",
+        "page_by_explicit_breaks": 2,
+        "text": "Ceiling Effect 존재",
+        "properties": {
+          "style_id": null,
+          "num_id": "6",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Ceiling Effect 존재",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[64]",
+        "page_by_explicit_breaks": 2,
+        "text": "실제 사용자 로그 기반 개인화 추천 고도화",
+        "properties": {
+          "style_id": null,
+          "num_id": "6",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "실제 사용자 로그 기반 개인화 추천 고도화",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[65]",
+        "page_by_explicit_breaks": 2,
+        "text": "Learning-to-Rank 및 Graph 기반 추천 검토",
+        "properties": {
+          "style_id": null,
+          "num_id": "6",
+          "ilvl": "0",
+          "alignment": "left",
+          "spacing": {
+            "after": "0",
+            "before": "0",
+            "line": "276",
+            "lineRule": "auto"
+          },
+          "indent": {
+            "left": "720",
+            "right": "0",
+            "hanging": "360"
+          },
+          "tabs": [],
+          "keep_next": true,
+          "keep_lines": true,
+          "page_break_before": true,
+          "borders": {
+            "space": "0",
+            "sz": "0",
+            "val": "nil"
+          }
+        },
+        "run_formats": [
+          {
+            "text": "Learning-to-Rank 및 Graph 기반 추천 검토",
+            "format": {
+              "fonts": {
+                "ascii": "Malgun Gothic",
+                "cs": "Malgun Gothic",
+                "eastAsia": "Malgun Gothic",
+                "hAnsi": "Malgun Gothic"
+              },
+              "size_half_points": "22",
+              "bold": "1",
+              "italic": "0",
+              "underline": "none",
+              "color": "000000"
+            }
+          }
+        ]
+      }
+    ],
+    "outline": [
+      {
+        "kind": "table",
+        "page": 1,
+        "locator": "word/document.xml/body/tbl[1]",
+        "label": "SK 네트웍스 Family AI 27기 : 1팀 학습한 ML / DL 모델"
+      },
+      {
+        "kind": "table",
+        "page": 1,
+        "locator": "word/document.xml/body/tbl[4]",
+        "label": "산출물 단계 | 데이터 전처리"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[7]",
+        "label": "학습한 ML / DL 모델 (Trained ML / DL Model)"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[8]",
+        "label": "1. 모델 개요"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[9]",
+        "label": "모델명 : LightFM Hybrid Recommendation"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[10]",
+        "label": "목적 : Cold Start 환경에서 전 레시피 추천 점수 생성"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[11]",
+        "label": "입력 : User-Recipe Interaction, Recipe Metadata"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[12]",
+        "label": "출력 : Recipe Recommendation Score(ŷ)"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[13]",
+        "label": "적용 대상 : 레시피 추천 서비스"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[14]",
+        "label": "2. 모델 구조"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[16]",
+        "label": "3. 입력 / 출력 정의"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[17]",
+        "label": "구분 | 항목 | 설명"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[18]",
+        "label": "4. Interaction(Target) 정의"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[19]",
+        "label": "초기 Target : Star + Sentiment"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[20]",
+        "label": "최종 Target : Product Interaction (Star × Sentiment)"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[21]",
+        "label": "선정 이유 : 별점과 감성점수의 상호작용 반영, Ceiling 효과 일부 완화, 추천모델 성능 향상"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[22]",
+        "label": "5. Item Feature"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[23]",
+        "label": "Category"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[24]",
+        "label": "Ingredient"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[25]",
+        "label": "Cooking Method"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[26]",
+        "label": "Difficulty"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[27]",
+        "label": "Cooking Time"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[28]",
+        "label": "View Count"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[29]",
+        "label": "Scrap Count"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[30]",
+        "label": "Recipe Metadata"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[33]",
+        "label": "6. 사용 프레임워크"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[37]",
+        "label": "7. 학습 및 평가 과정"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[38]",
+        "label": "데이터 수집 및 전처리"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[39]",
+        "label": "Interaction 생성"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[40]",
+        "label": "Item Feature 생성"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[41]",
+        "label": "Train/Test Split"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[42]",
+        "label": "LightFM 학습"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[43]",
+        "label": "추천 점수 생성"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[44]",
+        "label": "추천 성능 평가(Precision/Recall)"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[45]",
+        "label": "추천 점수 생성 평가(Evaluation)"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[46]",
+        "label": "Feature/Target Ablation"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[47]",
+        "label": "Catalog Export"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[50]",
+        "label": "8. 모델 평가"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[51]",
+        "label": "평가 지표 | 측정 대상 | 목표 | 비고"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[53]",
+        "label": "9. 최종 적용 전략"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[54]",
+        "label": "Product Interaction을 기본 Target으로 채택"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[55]",
+        "label": "Warm 데이터로 학습 후 전 카탈로그 점수 생성"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[56]",
+        "label": "Cold Recipe는 예측 점수로 서비스 제공"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[57]",
+        "label": "실제 사용자 데이터 축적 시 관측 Interaction으로 교체"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[58]",
+        "label": "예측값은 재학습 정답으로 사용하지 않음"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[60]",
+        "label": "10. 한계 및 향후 개선"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[61]",
+        "label": "Warm Recipe 수 부족"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[62]",
+        "label": "Cold Item 직접 검증 어려움"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[63]",
+        "label": "Ceiling Effect 존재"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[64]",
+        "label": "실제 사용자 로그 기반 개인화 추천 고도화"
+      },
+      {
+        "kind": "numbered_level_0",
+        "page": 2,
+        "locator": "word/document.xml/body/p[65]",
+        "label": "Learning-to-Rank 및 Graph 기반 추천 검토"
+      }
+    ],
+    "explicit_page_break_count": 1,
+    "page_break_locations": [
+      {
+        "body_index": 6,
+        "count": 1,
+        "page_before": 1
+      }
+    ],
+    "page_count_inferred_from_explicit_breaks": 2
+  },
+  "content_controls": [],
+  "headers_and_footers": [
+    {
+      "part": "word/footer1.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/footer2.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 1,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/footer3.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header1.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header2.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header3.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    }
+  ],
+  "drawings": [
+    {
+      "index": 1,
+      "mode": "anchor",
+      "anchor_attributes": {
+        "allowOverlap": "1",
+        "behindDoc": "1",
+        "distB": "0",
+        "distT": "0",
+        "distL": "0",
+        "distR": "0",
+        "hidden": "0",
+        "layoutInCell": "1",
+        "locked": "0",
+        "relativeHeight": "0",
+        "simplePos": "0"
+      },
+      "horizontal_position": {
+        "relative_from": "page",
+        "offset_emu": "-363371"
+      },
+      "vertical_position": {
+        "relative_from": "page",
+        "offset_emu": "-57850"
+      },
+      "extent_emu": {
+        "cx": "8453438",
+        "cy": "7249802"
+      },
+      "extent_inches": {
+        "width": 9.2448,
+        "height": 7.9285
+      },
+      "doc_properties": {
+        "id": "1",
+        "name": ""
+      },
+      "relationship_ids": [
+        "rId7"
+      ],
+      "targets": [
+        "media/image2.png"
+      ],
+      "images": [
+        {
+          "part": "word/media/image2.png",
+          "sha256": "870dde32a180bc9498566da821287becb142cc047bf2f9bd4278b5eb39a3869a",
+          "byte_size": 596380,
+          "dimensions": {
+            "width_px": 1692,
+            "height_px": 1452
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "mode": "anchor",
+      "anchor_attributes": {
+        "allowOverlap": "1",
+        "behindDoc": "1",
+        "distB": "0",
+        "distT": "0",
+        "distL": "0",
+        "distR": "0",
+        "hidden": "0",
+        "layoutInCell": "1",
+        "locked": "0",
+        "relativeHeight": "0",
+        "simplePos": "0"
+      },
+      "horizontal_position": {
+        "relative_from": "page",
+        "offset_emu": "-363371"
+      },
+      "vertical_position": {
+        "relative_from": "page",
+        "offset_emu": "-57850"
+      },
+      "extent_emu": {
+        "cx": "8453438",
+        "cy": "7249802"
+      },
+      "extent_inches": {
+        "width": 9.2448,
+        "height": 7.9285
+      },
+      "doc_properties": {
+        "id": "1",
+        "name": "image1.png"
+      },
+      "relationship_ids": [
+        "rId8"
+      ],
+      "targets": [
+        "media/image1.png"
+      ],
+      "images": [
+        {
+          "part": "word/media/image1.png",
+          "sha256": "18d840af2c50eff9a5241d4b50833a596e6b71af0cee87cf2b3435345f2f7aba",
+          "byte_size": 70,
+          "dimensions": {
+            "width_px": 1,
+            "height_px": 1
+          }
+        }
+      ]
+    }
+  ],
+  "direct_run_format_histogram": {
+    "inherited": 105,
+    "{\"bold\": \"1\", \"color\": \"000000\", \"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"italic\": \"0\", \"size_half_points\": \"22\", \"underline\": \"none\"}": 74,
+    "{\"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"size_half_points\": \"22\"}": 10,
+    "{\"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"size_half_points\": \"24\"}": 8,
+    "{\"bold\": \"0\", \"color\": \"000000\", \"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"italic\": \"0\", \"size_half_points\": \"22\", \"underline\": \"none\"}": 6,
+    "{\"bold\": \"0\", \"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}}": 2,
+    "{\"bold\": \"0\", \"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"size_half_points\": \"40\"}": 1,
+    "{\"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"size_half_points\": \"40\"}": 1,
+    "{\"bold\": \"1\", \"color\": \"000000\", \"fonts\": {\"ascii\": \"Malgun Gothic\", \"cs\": \"Malgun Gothic\", \"eastAsia\": \"Malgun Gothic\", \"hAnsi\": \"Malgun Gothic\"}, \"italic\": \"0\", \"size_half_points\": \"40\", \"underline\": \"none\"}": 1,
+    "{\"bold\": \"0\", \"color\": \"000000\", \"fonts\": {\"ascii\": \"Calibri\", \"cs\": \"Calibri\", \"eastAsia\": \"Calibri\", \"hAnsi\": \"Calibri\"}, \"italic\": \"0\", \"size_half_points\": \"22\", \"underline\": \"none\"}": 1
+  },
+  "feature_counts": {
+    "drawings": 2,
+    "tables_total_including_nested": 5,
+    "hyperlinks": 0,
+    "fields": 0,
+    "bookmarks": 0,
+    "content_controls": 0,
+    "tracked_insertions": 0,
+    "tracked_deletions": 0,
+    "comments_parts": 0,
+    "footnotes_part": 0,
+    "endnotes_part": 0,
+    "embedded_fonts": 2,
+    "custom_xml_parts": 2,
+    "alt_text_tokens": 0
+  },
+  "structural_qa": {
+    "zip_test": true,
+    "required_parts_present": true,
+    "relationship_targets_checked": [
+      {
+        "relationship_id": "rId11",
+        "target": "header1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId10",
+        "target": "header3.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId13",
+        "target": "footer3.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId12",
+        "target": "footer2.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId1",
+        "target": "theme/theme1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId2",
+        "target": "settings.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId3",
+        "target": "fontTable.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId4",
+        "target": "numbering.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId9",
+        "target": "header2.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId14",
+        "target": "footer1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId5",
+        "target": "styles.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId6",
+        "target": "../customXML/item1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId7",
+        "target": "media/image2.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId8",
+        "target": "media/image1.png",
+        "external": false
+      }
+    ],
+    "duplicate_docpr_ids": [
+      "1"
+    ]
+  }
+}

@@ -1,0 +1,3405 @@
+{
+  "audit_version": "1.0",
+  "source": {
+    "path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/documents/[데이터 전처리] 학습한 ML_DL 모델_30기_3팀.docx",
+    "byte_size": 800297,
+    "sha256": "3bfbb767b59bae77edc5ed0c7f7124b6b8cb1f23ced4dfe5972cb275d4acbf7d"
+  },
+  "render_status": {
+    "status": "not_rendered",
+    "reason": "Bundled Windows Python cannot execute under WSL; Linux Python lacks pdf2image/Pillow; soffice/libreoffice and pdftoppm are unavailable.",
+    "page_count_status": "inferred from explicit page breaks; not visually verified"
+  },
+  "package": [
+    {
+      "path": "[Content_Types].xml",
+      "uncompressed_bytes": 2328,
+      "compressed_bytes": 443,
+      "sha256": "e2f7493cb4376b45c4afe2605b676a9b992adef02beaf2488ff74a18854fbbef",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "_rels/.rels",
+      "uncompressed_bytes": 443,
+      "compressed_bytes": 214,
+      "sha256": "88d76211b102228f89f16af987143ea302d84c02be687d87eda92323efe3454b",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/document.xml",
+      "uncompressed_bytes": 70904,
+      "compressed_bytes": 5102,
+      "sha256": "bb94dd061cd155a713466b69d3a35ab4fec09e2d30408097eb1bf6c6da377ecc",
+      "policy": "editable_content_slots"
+    },
+    {
+      "path": "word/_rels/document.xml.rels",
+      "uncompressed_bytes": 2124,
+      "compressed_bytes": 354,
+      "sha256": "c2d76e5fce6d2df5db5a6152324e47cec00145d5a6298c1ceeac4a3db5aaf54a",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/header1.xml",
+      "uncompressed_bytes": 2929,
+      "compressed_bytes": 813,
+      "sha256": "0b1e6c8c041c250d904c4b2d246f1d873ed2ee324ce0ce92b72668d294823756",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/header3.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 507,
+      "sha256": "b2f4fa7713328357011d48d3d5e8463258538f680f6c0c1a421bf3f88eaf33b7",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer3.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 507,
+      "sha256": "77b48d07d3e760d2b3ab23ef90cdaa11796ea432b99b17e4301a1ae698ea5058",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer2.xml",
+      "uncompressed_bytes": 2215,
+      "compressed_bytes": 584,
+      "sha256": "49e64a44a09528032af1b4efc1f9a24c80fec3ae25d25ee63ea3060773d27c61",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/theme/theme1.xml",
+      "uncompressed_bytes": 7643,
+      "compressed_bytes": 1580,
+      "sha256": "b2295d3198893d2c03f5e584c749a15751b798aefdcd9bee2889f13903d68cb2",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/settings.xml",
+      "uncompressed_bytes": 2152,
+      "compressed_bytes": 593,
+      "sha256": "fb088d0a3dbf7f5e5a5a399b898acf16aa2a6fc3b2984bc3eb0d4946f73ac005",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/fontTable.xml",
+      "uncompressed_bytes": 2040,
+      "compressed_bytes": 540,
+      "sha256": "ad0d94740ae768ff8a3d583140985777982484c9bdb08ddd1fe81f964f179402",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/_rels/fontTable.xml.rels",
+      "uncompressed_bytes": 449,
+      "compressed_bytes": 207,
+      "sha256": "18b9c91ee35007ae3d239898d32c7287b7eb5574de0f45216e4cb95ee560d2a6",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/fonts/NotoSansSymbols-regular.ttf",
+      "uncompressed_bytes": 183620,
+      "compressed_bytes": 91020,
+      "sha256": "3c9c40311ae6012f7d3c4a4ff98952b2c7bbc0d4c89a93ba22986ff1f1884af5",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/fonts/NotoSansSymbols-bold.ttf",
+      "uncompressed_bytes": 183344,
+      "compressed_bytes": 95578,
+      "sha256": "afc2a6b7050df884f5deb2618ebbdecb9fa2f163d3ca66ca75f8b069febc6741",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/numbering.xml",
+      "uncompressed_bytes": 19492,
+      "compressed_bytes": 1039,
+      "sha256": "57a7f87c71a88b4dbf70e1f9878c3ff8889d7ed5c14341e7bcc7ec19ce5abb65",
+      "policy": "preserve_design_authority; extend only for new semantic roles"
+    },
+    {
+      "path": "word/header2.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 506,
+      "sha256": "0a8178b3e5f45c0807843ca6012ea2c289b1fe56110f238cc96502d62210c09a",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer1.xml",
+      "uncompressed_bytes": 2929,
+      "compressed_bytes": 813,
+      "sha256": "7949df359ad2bd72f2f376944bf596a9dd0cda50dc17ef50f89d493e0acb2135",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/styles.xml",
+      "uncompressed_bytes": 9442,
+      "compressed_bytes": 1261,
+      "sha256": "d0ae71f7a534fb720e1f805460ff91f16952f3760cc6bd4da70ddcab4ee46a97",
+      "policy": "preserve_design_authority; extend only for new semantic roles"
+    },
+    {
+      "path": "customXML/item1.xml",
+      "uncompressed_bytes": 485,
+      "compressed_bytes": 305,
+      "sha256": "fcf8069043d4f088707c498154ec58974cf80602261b446273c9df190b64b2e7",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "customXML/_rels/item1.xml.rels",
+      "uncompressed_bytes": 295,
+      "compressed_bytes": 189,
+      "sha256": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "customXML/itemProps1.xml",
+      "uncompressed_bytes": 404,
+      "compressed_bytes": 214,
+      "sha256": "fc2e321bb5ca54d5f2b99b99f91d681d004417098918a318be88fe525218c9a3",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/media/image2.png",
+      "uncompressed_bytes": 596380,
+      "compressed_bytes": 567346,
+      "sha256": "870dde32a180bc9498566da821287becb142cc047bf2f9bd4278b5eb39a3869a",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/media/image1.png",
+      "uncompressed_bytes": 70,
+      "compressed_bytes": 63,
+      "sha256": "18d840af2c50eff9a5241d4b50833a596e6b71af0cee87cf2b3435345f2f7aba",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/media/image3.png",
+      "uncompressed_bytes": 34838,
+      "compressed_bytes": 27087,
+      "sha256": "5df5bc9f7352dac81bc6b8953e3486ad24e5609ddb614e7c7eeb8dea96093499",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "docProps/core.xml",
+      "uncompressed_bytes": 759,
+      "compressed_bytes": 480,
+      "sha256": "f5cc7ae8073a5c6995dc147da41a5f0e1d7606a6457072fc3ddf1dd86c520fcb",
+      "policy": "preserve_package_infrastructure"
+    }
+  ],
+  "relationships": [
+    {
+      "Id": "rId11",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header1.xml"
+    },
+    {
+      "Id": "rId10",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header3.xml"
+    },
+    {
+      "Id": "rId13",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer3.xml"
+    },
+    {
+      "Id": "rId12",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer2.xml"
+    },
+    {
+      "Id": "rId1",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+      "Target": "theme/theme1.xml"
+    },
+    {
+      "Id": "rId2",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+      "Target": "settings.xml"
+    },
+    {
+      "Id": "rId3",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+      "Target": "fontTable.xml"
+    },
+    {
+      "Id": "rId4",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
+      "Target": "numbering.xml"
+    },
+    {
+      "Id": "rId9",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header2.xml"
+    },
+    {
+      "Id": "rId14",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer1.xml"
+    },
+    {
+      "Id": "rId5",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "Target": "styles.xml"
+    },
+    {
+      "Id": "rId6",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+      "Target": "../customXML/item1.xml"
+    },
+    {
+      "Id": "rId7",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image2.png"
+    },
+    {
+      "Id": "rId8",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image1.png"
+    },
+    {
+      "Id": "rId15",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image3.png"
+    }
+  ],
+  "page_system": {
+    "sections": [
+      {
+        "index": 1,
+        "type": "continuous/default",
+        "page_size_twips": {
+          "h": "16834",
+          "w": "11909",
+          "orient": "portrait"
+        },
+        "margins_twips": {
+          "bottom": "1559",
+          "top": "1275",
+          "left": "992",
+          "right": "992",
+          "header": "720",
+          "footer": "720"
+        },
+        "columns": {},
+        "page_numbering": {
+          "start": "0"
+        },
+        "different_first_page": true,
+        "references": [
+          {
+            "kind": "header",
+            "type": "default",
+            "relationship_id": "rId9"
+          },
+          {
+            "kind": "header",
+            "type": "first",
+            "relationship_id": "rId10"
+          },
+          {
+            "kind": "header",
+            "type": "even",
+            "relationship_id": "rId11"
+          },
+          {
+            "kind": "footer",
+            "type": "default",
+            "relationship_id": "rId12"
+          },
+          {
+            "kind": "footer",
+            "type": "first",
+            "relationship_id": "rId13"
+          },
+          {
+            "kind": "footer",
+            "type": "even",
+            "relationship_id": "rId14"
+          }
+        ]
+      }
+    ],
+    "even_and_odd_headers_enabled": false,
+    "body_explicit_page_break_count": 1,
+    "page_count_inferred_from_explicit_breaks": 2
+  },
+  "styles": {
+    "document_defaults": {
+      "run": {
+        "fonts": {
+          "ascii": "Arial",
+          "cs": "Arial",
+          "eastAsia": "Arial",
+          "hAnsi": "Arial"
+        },
+        "size_half_points": "22",
+        "bold": "1",
+        "language": "ko"
+      },
+      "paragraph": {
+        "spacing": {
+          "line": "276",
+          "lineRule": "auto"
+        }
+      }
+    },
+    "styles": [
+      {
+        "style_id": "TableNormal",
+        "type": "table",
+        "default": "1",
+        "name": "TableNormal",
+        "based_on": null,
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "100.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Normal",
+        "type": "paragraph",
+        "default": "1",
+        "name": "normal",
+        "based_on": null,
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "after": "100",
+            "line": "300",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "21",
+          "bold": "0",
+          "italic": null,
+          "color": "222222"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading1",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 1",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "140",
+            "before": "280",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "30",
+          "bold": null,
+          "italic": null,
+          "color": "17365D"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading2",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 2",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "100",
+            "before": "200",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "24",
+          "bold": null,
+          "italic": null,
+          "color": "2F5597"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading3",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 3",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "320",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "21",
+          "bold": null,
+          "italic": null,
+          "color": "17365D"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading4",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 4",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "280",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "24",
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading5",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 5",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading6",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 6",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": "1",
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Title",
+        "type": "paragraph",
+        "default": null,
+        "name": "Title",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "60",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "48",
+          "bold": null,
+          "italic": null,
+          "color": "17365D"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Subtitle",
+        "type": "paragraph",
+        "default": null,
+        "name": "Subtitle",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "320",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "24",
+          "bold": "0",
+          "italic": null,
+          "color": "2F5597"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table1",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table2",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table3",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "0.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table4",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table5",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      }
+    ]
+  },
+  "numbering": {
+    "abstract_definitions": {
+      "1": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "2": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "3": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "4": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "decimal",
+          "text": "%1.",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "decimal",
+          "text": "%2.",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "decimal",
+          "text": "%3.",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "decimal",
+          "text": "%4.",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "decimal",
+          "text": "%5.",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "decimal",
+          "text": "%6.",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "decimal",
+          "text": "%7.",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "decimal",
+          "text": "%8.",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "decimal",
+          "text": "%9.",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {}
+        }
+      ],
+      "5": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ],
+      "6": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "bullet",
+          "text": "●",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "bullet",
+          "text": "o",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Courier New",
+            "cs": "Courier New",
+            "eastAsia": "Courier New",
+            "hAnsi": "Courier New"
+          }
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "bullet",
+          "text": "▪",
+          "justification": "left",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {
+            "ascii": "Noto Sans Symbols",
+            "cs": "Noto Sans Symbols",
+            "eastAsia": "Noto Sans Symbols",
+            "hAnsi": "Noto Sans Symbols"
+          }
+        }
+      ]
+    },
+    "instances": [
+      {
+        "num_id": "1",
+        "abstract_num_id": "1"
+      },
+      {
+        "num_id": "2",
+        "abstract_num_id": "2"
+      },
+      {
+        "num_id": "3",
+        "abstract_num_id": "3"
+      },
+      {
+        "num_id": "4",
+        "abstract_num_id": "4"
+      },
+      {
+        "num_id": "5",
+        "abstract_num_id": "5"
+      },
+      {
+        "num_id": "6",
+        "abstract_num_id": "6"
+      }
+    ]
+  },
+  "body": {
+    "body_child_count": 55,
+    "nonempty_body_paragraphs": 30,
+    "tables": [
+      {
+        "locator": "word/document.xml/body/tbl[5]",
+        "page_by_explicit_breaks": 1,
+        "rows": 6,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2381\"}": 6,
+          "{\"type\": \"dxa\", \"w\": \"6803\"}": 6
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 12
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "항목",
+          "내용"
+        ],
+        "character_count": 147
+      },
+      {
+        "locator": "word/document.xml/body/tbl[7]",
+        "page_by_explicit_breaks": 1,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "제출 범위  기존 프로젝트의 합성 상담 시나리오에서 규칙 기반 대리 라벨을 파생한 소규모 ML PoC이다. 실제 사용자 데이터나 실서비스 성능을 의미하지 않는다."
+        ],
+        "character_count": 90
+      },
+      {
+        "locator": "word/document.xml/body/tbl[11]",
+        "page_by_explicit_breaks": 2,
+        "rows": 7,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2381\"}": 7,
+          "{\"type\": \"dxa\", \"w\": \"6803\"}": 7
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 6
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 14
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "항목",
+          "내용"
+        ],
+        "character_count": 209
+      },
+      {
+        "locator": "word/document.xml/body/tbl[16]",
+        "page_by_explicit_breaks": 2,
+        "rows": 9,
+        "max_columns": 3,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "3308",
+          "3308",
+          "3308"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"1474\"}": 9,
+          "{\"type\": \"dxa\", \"w\": \"2948\"}": 9,
+          "{\"type\": \"dxa\", \"w\": \"4762\"}": 9
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 3,
+          "EDF4FB": 12
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 27
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "구분",
+          "항목",
+          "설명"
+        ],
+        "character_count": 192
+      },
+      {
+        "locator": "word/document.xml/body/tbl[20]",
+        "page_by_explicit_breaks": 2,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "라벨 한계  실제 사용자 수락·수정·거절 데이터가 아니며 모델 성능을 실서비스에 일반화할 수 없다."
+        ],
+        "character_count": 55
+      },
+      {
+        "locator": "word/document.xml/body/tbl[23]",
+        "page_by_explicit_breaks": 2,
+        "rows": 6,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2835\"}": 6,
+          "{\"type\": \"dxa\", \"w\": \"6350\"}": 6
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 12
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "항목",
+          "내용"
+        ],
+        "character_count": 182
+      },
+      {
+        "locator": "word/document.xml/body/tbl[26]",
+        "page_by_explicit_breaks": 2,
+        "rows": 4,
+        "max_columns": 6,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "1654",
+          "1654",
+          "1654",
+          "1654",
+          "1654",
+          "1654"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2268\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"1417\"}": 8,
+          "{\"type\": \"dxa\", \"w\": \"1361\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"1247\"}": 8
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 6,
+          "EDF4FB": 6
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 24
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "Model",
+          "Train Acc.",
+          "Test Acc.",
+          "Precision",
+          "Recall",
+          "F1"
+        ],
+        "character_count": 168
+      },
+      {
+        "locator": "word/document.xml/body/tbl[32]",
+        "page_by_explicit_breaks": 2,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "선정 모델  Logistic Regression"
+        ],
+        "character_count": 26
+      },
+      {
+        "locator": "word/document.xml/body/tbl[35]",
+        "page_by_explicit_breaks": 2,
+        "rows": 5,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"4649\"}": 5,
+          "{\"type\": \"dxa\", \"w\": \"4535\"}": 5
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 10
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "Test 지표",
+          "값"
+        ],
+        "character_count": 57
+      },
+      {
+        "locator": "word/document.xml/body/tbl[52]",
+        "page_by_explicit_breaks": 2,
+        "rows": 4,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"5102\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"4082\"}": 4
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 2
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 8
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "파일",
+          "설명"
+        ],
+        "character_count": 139
+      }
+    ],
+    "table_count": 10,
+    "paragraphs": [
+      {
+        "locator": "word/document.xml/body/p[1]",
+        "page_by_explicit_breaks": 1,
+        "text": "SK 네트웍스 Family AI 30기 : 3팀",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "SK 네트웍스 Family AI 30기 : 3팀",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "28",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[2]",
+        "page_by_explicit_breaks": 1,
+        "text": "학습한 ML / DL 모델",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {
+            "before": "520",
+            "after": "160"
+          },
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "학습한 ML / DL 모델",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "48",
+              "color": "17365D"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[3]",
+        "page_by_explicit_breaks": 1,
+        "text": "Field Proposal Review Risk Model - 최종 모델 설명서",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "Field Proposal Review Risk Model - 최종 모델 설명서",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "24",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[10]",
+        "page_by_explicit_breaks": 2,
+        "text": "1. 모델 개요",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "1. 모델 개요",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[13]",
+        "page_by_explicit_breaks": 2,
+        "text": "2. 모델 구조",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2. 모델 구조",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[14]",
+        "page_by_explicit_breaks": 2,
+        "text": "합성 상담 → 필드 후보 탐지 → 정형 Feature 생성 → 80:20 층화 분할 → 모델 비교 → Recall/F1 기반 최종 선택 → Pipeline joblib 저장",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "합성 상담 → 필드 후보 탐지 → 정형 Feature 생성 → 80:20 층화 분할 → 모델 비교 → Recall/F1 기반 최종 선택 → Pipeline joblib 저장",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[15]",
+        "page_by_explicit_breaks": 2,
+        "text": "3. 입력 / 출력 정의",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3. 입력 / 출력 정의",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[18]",
+        "page_by_explicit_breaks": 2,
+        "text": "4. Target 정의",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4. Target 정의",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[19]",
+        "page_by_explicit_breaks": 2,
+        "text": "needs_review는 실제 사용자 피드백이 아니라 충돌·부정·낮은 confidence·복수 후보·파싱 실패 및 공동중개/단순문의 문맥을 조합한 proxy risk score로 생성하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "needs_review는 실제 사용자 피드백이 아니라 충돌·부정·낮은 confidence·복수 후보·파싱 실패 및 공동중개/단순문의 문맥을 조합한 proxy risk score로 생성하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[22]",
+        "page_by_explicit_breaks": 2,
+        "text": "5. 전처리와 사용 프레임워크",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "5. 전처리와 사용 프레임워크",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[25]",
+        "page_by_explicit_breaks": 2,
+        "text": "6. 학습 모델과 평가",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "6. 학습 모델과 평가",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[28]",
+        "page_by_explicit_breaks": 2,
+        "text": "검토 필요 항목 누락을 줄이기 위해 Recall을 우선했고, 실제 실행 결과에 따라 Logistic Regression을 최종 선택하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "검토 필요 항목 누락을 줄이기 위해 Recall을 우선했고, 실제 실행 결과에 따라 Logistic Regression을 최종 선택하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[30]",
+        "page_by_explicit_breaks": 2,
+        "text": "그림 1. 최종 모델(Logistic Regression) confusion matrix",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "그림 1. 최종 모델(Logistic Regression) confusion matrix",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "18",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[31]",
+        "page_by_explicit_breaks": 2,
+        "text": "7. 최종 모델",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "7. 최종 모델",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[34]",
+        "page_by_explicit_breaks": 2,
+        "text": "Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[37]",
+        "page_by_explicit_breaks": 2,
+        "text": "전체 전처리 Pipeline과 분류기를 field_proposal_review_risk_model.joblib로 저장하였다. 입력은 정의된 7개 Feature를 가진 pandas DataFrame이며 출력은 0 또는 1이다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "전체 전처리 Pipeline과 분류기를 field_proposal_review_risk_model.joblib로 저장하였다. 입력은 정의된 7개 Feature를 가진 pandas DataFrame이며 출력은 0 또는 1이다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[38]",
+        "page_by_explicit_breaks": 2,
+        "text": "8. 적용 전략",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "8. 적용 전략",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[39]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 현재 모델은 제출용 오프라인 artifact로만 보관한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 현재 모델은 제출용 오프라인 artifact로만 보관한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[40]",
+        "page_by_explicit_breaks": 2,
+        "text": "• F2 서비스 API나 사용자 승인·저장 흐름에는 연결하지 않는다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• F2 서비스 API나 사용자 승인·저장 흐름에는 연결하지 않는다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[41]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 실제 승인 전후 데이터가 축적되면 대리 라벨을 폐기하고 실제 피드백 Target으로 재학습한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 실제 승인 전후 데이터가 축적되면 대리 라벨을 폐기하고 실제 피드백 Target으로 재학습한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[42]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 새 데이터로 평가할 때 동일 그룹·동일 문장 파생본의 Train/Test 누수를 차단한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 새 데이터로 평가할 때 동일 그룹·동일 문장 파생본의 Train/Test 누수를 차단한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[43]",
+        "page_by_explicit_breaks": 2,
+        "text": "9. 한계 및 향후 개선",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "9. 한계 및 향후 개선",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[44]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 세 원천 파일 총 1,250행 중 중복 제거 후 1,200개의 합성 상담만 후보로 사용하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 세 원천 파일 총 1,250행 중 중복 제거 후 1,200개의 합성 상담만 후보로 사용하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[45]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 학습 데이터는 150건, Test Set은 30건으로 작다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 학습 데이터는 150건, Test Set은 30건으로 작다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[46]",
+        "page_by_explicit_breaks": 2,
+        "text": "• confidence와 needs_review가 실제 관측값이 아니다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• confidence와 needs_review가 실제 관측값이 아니다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[47]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 실제 F2 sLLM 오류 분포 및 사용자의 검토 행동과 다를 수 있다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 실제 F2 sLLM 오류 분포 및 사용자의 검토 행동과 다를 수 있다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[48]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 본 결과는 소규모 합성 Test Set 결과이며 실서비스 성능을 의미하지 않는다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 본 결과는 소규모 합성 Test Set 결과이며 실서비스 성능을 의미하지 않는다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[49]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 향후 실제 사용자 수락·수정·거절 데이터와 시간 기반 평가셋으로 재검증해야 한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 향후 실제 사용자 수락·수정·거절 데이터와 시간 기반 평가셋으로 재검증해야 한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[50]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 딥러닝은 이번 PoC 범위에서 수행하지 않았다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 딥러닝은 이번 PoC 범위에서 수행하지 않았다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[51]",
+        "page_by_explicit_breaks": 2,
+        "text": "10. 모델 Artifact",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "10. 모델 Artifact",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "outline": [
+      {
+        "kind": "table",
+        "page": 1,
+        "locator": "word/document.xml/body/tbl[5]",
+        "label": "항목 | 내용"
+      },
+      {
+        "kind": "table",
+        "page": 1,
+        "locator": "word/document.xml/body/tbl[7]",
+        "label": "제출 범위  기존 프로젝트의 합성 상담 시나리오에서 규칙 기반 대리 라벨을 파생한 소규모 ML PoC이다. 실제 사용자 데이터나 실서비스 성능을 의미하지 않는다."
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[10]",
+        "label": "1. 모델 개요"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[11]",
+        "label": "항목 | 내용"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[13]",
+        "label": "2. 모델 구조"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[15]",
+        "label": "3. 입력 / 출력 정의"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[16]",
+        "label": "구분 | 항목 | 설명"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[18]",
+        "label": "4. Target 정의"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[20]",
+        "label": "라벨 한계  실제 사용자 수락·수정·거절 데이터가 아니며 모델 성능을 실서비스에 일반화할 수 없다."
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[22]",
+        "label": "5. 전처리와 사용 프레임워크"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[23]",
+        "label": "항목 | 내용"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[25]",
+        "label": "6. 학습 모델과 평가"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[26]",
+        "label": "Model | Train Acc. | Test Acc. | Precision | Recall | F1"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[31]",
+        "label": "7. 최종 모델"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[32]",
+        "label": "선정 모델  Logistic Regression"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[35]",
+        "label": "Test 지표 | 값"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[38]",
+        "label": "8. 적용 전략"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[43]",
+        "label": "9. 한계 및 향후 개선"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[51]",
+        "label": "10. 모델 Artifact"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[52]",
+        "label": "파일 | 설명"
+      }
+    ],
+    "explicit_page_break_count": 1,
+    "page_break_locations": [
+      {
+        "body_index": 9,
+        "count": 1,
+        "page_before": 1
+      }
+    ],
+    "page_count_inferred_from_explicit_breaks": 2
+  },
+  "content_controls": [],
+  "headers_and_footers": [
+    {
+      "part": "word/footer1.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/footer2.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 1,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/footer3.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header1.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header2.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header3.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    }
+  ],
+  "drawings": [
+    {
+      "index": 1,
+      "mode": "inline",
+      "anchor_attributes": {},
+      "horizontal_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "vertical_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "extent_emu": {
+        "cx": "4206240",
+        "cy": "3650386"
+      },
+      "extent_inches": {
+        "width": 4.6,
+        "height": 3.9921
+      },
+      "doc_properties": {
+        "id": "1",
+        "name": "Picture 1"
+      },
+      "relationship_ids": [
+        "rId15"
+      ],
+      "targets": [
+        "media/image3.png"
+      ],
+      "images": [
+        {
+          "part": "word/media/image3.png",
+          "sha256": "5df5bc9f7352dac81bc6b8953e3486ad24e5609ddb614e7c7eeb8dea96093499",
+          "byte_size": 34838,
+          "dimensions": {
+            "width_px": 1014,
+            "height_px": 880
+          }
+        }
+      ]
+    }
+  ],
+  "direct_run_format_histogram": {
+    "{\"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"17\"}": 88,
+    "{\"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}}": 29,
+    "{\"color\": \"FFFFFF\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"17\"}": 19,
+    "{\"color\": \"17365D\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}}": 3,
+    "inherited": 2,
+    "{\"color\": \"2F5597\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"28\"}": 1,
+    "{\"color\": \"17365D\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"48\"}": 1,
+    "{\"color\": \"2F5597\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"24\"}": 1,
+    "{\"color\": \"2F5597\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"18\"}": 1
+  },
+  "feature_counts": {
+    "drawings": 1,
+    "tables_total_including_nested": 10,
+    "hyperlinks": 0,
+    "fields": 0,
+    "bookmarks": 0,
+    "content_controls": 0,
+    "tracked_insertions": 0,
+    "tracked_deletions": 0,
+    "comments_parts": 0,
+    "footnotes_part": 0,
+    "endnotes_part": 0,
+    "embedded_fonts": 2,
+    "custom_xml_parts": 2,
+    "alt_text_tokens": 0
+  },
+  "structural_qa": {
+    "zip_test": true,
+    "required_parts_present": true,
+    "relationship_targets_checked": [
+      {
+        "relationship_id": "rId11",
+        "target": "header1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId10",
+        "target": "header3.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId13",
+        "target": "footer3.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId12",
+        "target": "footer2.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId1",
+        "target": "theme/theme1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId2",
+        "target": "settings.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId3",
+        "target": "fontTable.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId4",
+        "target": "numbering.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId9",
+        "target": "header2.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId14",
+        "target": "footer1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId5",
+        "target": "styles.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId6",
+        "target": "../customXML/item1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId7",
+        "target": "media/image2.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId8",
+        "target": "media/image1.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId15",
+        "target": "media/image3.png",
+        "external": false
+      }
+    ],
+    "duplicate_docpr_ids": []
+  }
+}

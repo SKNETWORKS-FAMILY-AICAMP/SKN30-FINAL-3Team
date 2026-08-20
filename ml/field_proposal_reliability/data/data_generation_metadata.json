@@ -1,0 +1,53 @@
+{
+  "generated_at_utc": "2026-08-20T06:57:22+00:00",
+  "dataset_name": "Field Proposal Review Risk Model PoC",
+  "dataset_type": "synthetic_proxy_label_poc",
+  "random_state": 42,
+  "row_count": 150,
+  "source_raw_row_count": 1250,
+  "source_deduplicated_row_count": 1200,
+  "source_duplicate_row_count": 50,
+  "rows_per_field_type": 15,
+  "positive_rows_per_field_type": 7,
+  "target_distribution": {
+    "0": 80,
+    "1": 70
+  },
+  "feature_columns": [
+    "field_type",
+    "confidence",
+    "evidence_length",
+    "mention_count",
+    "has_conflict",
+    "has_negation",
+    "parse_success"
+  ],
+  "target_column": "needs_review",
+  "trace_columns": [
+    "proposal_id",
+    "source_scenario_id",
+    "source_group_id",
+    "source_transcript_hash",
+    "source_dataset",
+    "source_label",
+    "proxy_risk_score"
+  ],
+  "source_inventory": "source_inventory.json",
+  "dataset_file": "synthetic_field_proposals.csv",
+  "dataset_sha256": "379ebb2d86d76df9725efac3bed5958cdc8b3e111b06918ad7f59a5c454ec55c",
+  "generator_sha256": "889e522327a70ffa629336df07186a1dc9bda3ee122c3776a785b6be8c9c280b",
+  "proxy_label_rule": {
+    "formula": "2*(1-confidence) + 1.5*has_conflict + 1.2*has_negation + 0.35*(mention_count-1) + 1.4*(1-parse_success) + 0.75*no_fill_context + N(0,0.35)",
+    "assignment": "Top 7 proxy risk scores within each field_type are class 1.",
+    "no_fill_context_labels": [
+      "공동중개",
+      "단순문의"
+    ]
+  },
+  "limitations": [
+    "Source conversations are synthetic project fixtures.",
+    "needs_review is a deterministic proxy label, not human acceptance/edit/rejection feedback.",
+    "confidence is simulated and is not an observed production sLLM confidence.",
+    "The dataset is for a small submission PoC and must not be used to claim production performance."
+  ]
+}

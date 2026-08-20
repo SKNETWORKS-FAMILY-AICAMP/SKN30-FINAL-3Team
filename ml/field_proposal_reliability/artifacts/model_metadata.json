@@ -1,0 +1,78 @@
+{
+  "generated_at_utc": "2026-08-20T06:58:59+00:00",
+  "model_name": "Logistic Regression",
+  "task": "binary_classification",
+  "target": "needs_review",
+  "positive_class": 1,
+  "positive_class_name": "NEEDS_REVIEW",
+  "negative_class_name": "LOW_RISK",
+  "random_state": 42,
+  "dataset_type": "synthetic_proxy_label_poc",
+  "dataset_path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/data/synthetic_field_proposals.csv",
+  "dataset_sha256": "379ebb2d86d76df9725efac3bed5958cdc8b3e111b06918ad7f59a5c454ec55c",
+  "feature_columns": [
+    "field_type",
+    "confidence",
+    "evidence_length",
+    "mention_count",
+    "has_conflict",
+    "has_negation",
+    "parse_success"
+  ],
+  "train_rows": 120,
+  "test_rows": 30,
+  "split": {
+    "train_ratio": 0.8,
+    "test_ratio": 0.2,
+    "stratify": "needs_review",
+    "all_field_types_present_in_test": true,
+    "source_group_overlap": 0,
+    "source_transcript_hash_overlap": 0
+  },
+  "selection_priority": [
+    "needs_review=1 recall",
+    "F1",
+    "train/test accuracy gap",
+    "model simplicity"
+  ],
+  "selection_reason": "Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다.",
+  "selected_test_metrics": {
+    "test_accuracy": 0.8,
+    "precision": 0.9,
+    "recall": 0.6428571428571429,
+    "f1": 0.75,
+    "train_test_accuracy_gap": -0.008333333333333415,
+    "confusion_matrix": [
+      [
+        15,
+        1
+      ],
+      [
+        5,
+        9
+      ]
+    ]
+  },
+  "library_versions": {
+    "python": "3.14.3",
+    "pandas": "3.0.5",
+    "numpy": "2.5.2",
+    "scikit_learn": "1.9.0",
+    "matplotlib": "3.11.1",
+    "joblib": "1.5.3"
+  },
+  "runtime_environment": {
+    "runtime_env": "local_or_other",
+    "google_colab_import_available": false,
+    "cwd": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python_executable": "/tmp/f2_ml_poc_venv/bin/python"
+  },
+  "execution_label": "local_notebook_verification",
+  "limitations": [
+    "Synthetic project conversations and proxy labels only.",
+    "Simulated confidence; no production sLLM scores.",
+    "No real user acceptance/edit/rejection feedback.",
+    "PoC artifact only; not integrated with the F2 service."
+  ]
+}

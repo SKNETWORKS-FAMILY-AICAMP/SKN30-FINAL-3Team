@@ -1,0 +1,11 @@
+{
+  "status": "not_executed",
+  "reason": "Colab CLI authentication was not configured in the execution environment.",
+  "remote_results_claimed": false,
+  "available_verified_run": "local_notebook_verification",
+  "output_notebook": "notebooks/field_proposal_review_risk_poc_output.ipynb",
+  "output_notebook_code_cells": 4,
+  "output_notebook_executed_code_cells": 4,
+  "output_notebook_error_outputs": 0,
+  "colab_upload_policy": "Upload the derived numeric/categorical CSV and execution files only; do not upload raw JSONL transcripts."
+}

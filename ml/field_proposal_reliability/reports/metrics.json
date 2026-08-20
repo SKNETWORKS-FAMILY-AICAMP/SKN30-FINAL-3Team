@@ -1,0 +1,250 @@
+{
+  "generated_at_utc": "2026-08-20T06:58:59+00:00",
+  "execution_label": "local_notebook_verification",
+  "dataset": {
+    "path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/data/synthetic_field_proposals.csv",
+    "sha256": "379ebb2d86d76df9725efac3bed5958cdc8b3e111b06918ad7f59a5c454ec55c",
+    "rows": 150,
+    "positive_rows": 70,
+    "positive_ratio": 0.4666666666666667
+  },
+  "split": {
+    "train_rows": 120,
+    "test_rows": 30,
+    "train_target_distribution": {
+      "0": 64,
+      "1": 56
+    },
+    "test_target_distribution": {
+      "0": 16,
+      "1": 14
+    },
+    "source_group_overlap": 0,
+    "source_transcript_hash_overlap": 0
+  },
+  "models": {
+    "Dummy": {
+      "train_accuracy": 0.5333333333333333,
+      "test_accuracy": 0.5333333333333333,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "train_test_accuracy_gap": 0.0,
+      "confusion_matrix": [
+        [
+          16,
+          0
+        ],
+        [
+          14,
+          0
+        ]
+      ],
+      "classification_report": {
+        "LOW_RISK": {
+          "precision": 0.5333333333333333,
+          "recall": 1.0,
+          "f1-score": 0.6956521739130435,
+          "support": 16.0
+        },
+        "NEEDS_REVIEW": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 14.0
+        },
+        "accuracy": 0.5333333333333333,
+        "macro avg": {
+          "precision": 0.26666666666666666,
+          "recall": 0.5,
+          "f1-score": 0.34782608695652173,
+          "support": 30.0
+        },
+        "weighted avg": {
+          "precision": 0.28444444444444444,
+          "recall": 0.5333333333333333,
+          "f1-score": 0.3710144927536232,
+          "support": 30.0
+        }
+      },
+      "classification_report_text": "              precision    recall  f1-score   support\n\n    LOW_RISK       0.53      1.00      0.70        16\nNEEDS_REVIEW       0.00      0.00      0.00        14\n\n    accuracy                           0.53        30\n   macro avg       0.27      0.50      0.35        30\nweighted avg       0.28      0.53      0.37        30\n"
+    },
+    "Logistic Regression": {
+      "train_accuracy": 0.7916666666666666,
+      "test_accuracy": 0.8,
+      "precision": 0.9,
+      "recall": 0.6428571428571429,
+      "f1": 0.75,
+      "train_test_accuracy_gap": -0.008333333333333415,
+      "confusion_matrix": [
+        [
+          15,
+          1
+        ],
+        [
+          5,
+          9
+        ]
+      ],
+      "classification_report": {
+        "LOW_RISK": {
+          "precision": 0.75,
+          "recall": 0.9375,
+          "f1-score": 0.8333333333333334,
+          "support": 16.0
+        },
+        "NEEDS_REVIEW": {
+          "precision": 0.9,
+          "recall": 0.6428571428571429,
+          "f1-score": 0.75,
+          "support": 14.0
+        },
+        "accuracy": 0.8,
+        "macro avg": {
+          "precision": 0.825,
+          "recall": 0.7901785714285714,
+          "f1-score": 0.7916666666666667,
+          "support": 30.0
+        },
+        "weighted avg": {
+          "precision": 0.8200000000000001,
+          "recall": 0.8,
+          "f1-score": 0.7944444444444445,
+          "support": 30.0
+        }
+      },
+      "classification_report_text": "              precision    recall  f1-score   support\n\n    LOW_RISK       0.75      0.94      0.83        16\nNEEDS_REVIEW       0.90      0.64      0.75        14\n\n    accuracy                           0.80        30\n   macro avg       0.82      0.79      0.79        30\nweighted avg       0.82      0.80      0.79        30\n"
+    },
+    "Random Forest": {
+      "train_accuracy": 0.975,
+      "test_accuracy": 0.8,
+      "precision": 0.9,
+      "recall": 0.6428571428571429,
+      "f1": 0.75,
+      "train_test_accuracy_gap": 0.17499999999999993,
+      "confusion_matrix": [
+        [
+          15,
+          1
+        ],
+        [
+          5,
+          9
+        ]
+      ],
+      "classification_report": {
+        "LOW_RISK": {
+          "precision": 0.75,
+          "recall": 0.9375,
+          "f1-score": 0.8333333333333334,
+          "support": 16.0
+        },
+        "NEEDS_REVIEW": {
+          "precision": 0.9,
+          "recall": 0.6428571428571429,
+          "f1-score": 0.75,
+          "support": 14.0
+        },
+        "accuracy": 0.8,
+        "macro avg": {
+          "precision": 0.825,
+          "recall": 0.7901785714285714,
+          "f1-score": 0.7916666666666667,
+          "support": 30.0
+        },
+        "weighted avg": {
+          "precision": 0.8200000000000001,
+          "recall": 0.8,
+          "f1-score": 0.7944444444444445,
+          "support": 30.0
+        }
+      },
+      "classification_report_text": "              precision    recall  f1-score   support\n\n    LOW_RISK       0.75      0.94      0.83        16\nNEEDS_REVIEW       0.90      0.64      0.75        14\n\n    accuracy                           0.80        30\n   macro avg       0.82      0.79      0.79        30\nweighted avg       0.82      0.80      0.79        30\n"
+    }
+  },
+  "random_forest_feature_importance": [
+    {
+      "feature": "numeric__confidence",
+      "importance": 0.37397194257530525
+    },
+    {
+      "feature": "numeric__evidence_length",
+      "importance": 0.1377392228259574
+    },
+    {
+      "feature": "numeric__has_conflict",
+      "importance": 0.12899781389344037
+    },
+    {
+      "feature": "numeric__mention_count",
+      "importance": 0.08338202505333354
+    },
+    {
+      "feature": "numeric__parse_success",
+      "importance": 0.08285775975315438
+    },
+    {
+      "feature": "numeric__has_negation",
+      "importance": 0.04077395664073199
+    },
+    {
+      "feature": "field_type__field_type_monthly_rent",
+      "importance": 0.03121157462879059
+    },
+    {
+      "feature": "field_type__field_type_building_number",
+      "importance": 0.019745221463329146
+    },
+    {
+      "feature": "field_type__field_type_handover_condition",
+      "importance": 0.017049559777906453
+    },
+    {
+      "feature": "field_type__field_type_unit_number",
+      "importance": 0.01627963574849117
+    },
+    {
+      "feature": "field_type__field_type_deal_type",
+      "importance": 0.012431723979355434
+    },
+    {
+      "feature": "field_type__field_type_pyeong",
+      "importance": 0.011656757630737494
+    },
+    {
+      "feature": "field_type__field_type_sale_price",
+      "importance": 0.01133468329044762
+    },
+    {
+      "feature": "field_type__field_type_jeonse_deposit",
+      "importance": 0.010921687760904849
+    },
+    {
+      "feature": "field_type__field_type_expiry_date",
+      "importance": 0.010838575495302032
+    },
+    {
+      "feature": "field_type__field_type_monthly_deposit",
+      "importance": 0.0108078594828122
+    }
+  ],
+  "final_model": {
+    "name": "Logistic Regression",
+    "selection_reason": "Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다."
+  },
+  "library_versions": {
+    "python": "3.14.3",
+    "pandas": "3.0.5",
+    "numpy": "2.5.2",
+    "scikit_learn": "1.9.0",
+    "matplotlib": "3.11.1",
+    "joblib": "1.5.3"
+  },
+  "runtime_environment": {
+    "runtime_env": "local_or_other",
+    "google_colab_import_available": false,
+    "cwd": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python_executable": "/tmp/f2_ml_poc_venv/bin/python"
+  }
+}

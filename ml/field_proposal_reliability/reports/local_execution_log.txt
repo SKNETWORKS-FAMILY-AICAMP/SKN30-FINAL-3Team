@@ -1,0 +1,47 @@
+Execution label: local_notebook_verification
+Generated at (UTC): 2026-08-20T06:58:59+00:00
+Python: 3.14.3
+scikit-learn: 1.9.0
+
+Runtime environment: {"runtime_env": "local_or_other", "google_colab_import_available": false, "cwd": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team", "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35", "python_executable": "/tmp/f2_ml_poc_venv/bin/python"}
+
+작업 완료
+
+Dataset
+- 행 수: 150
+- Train: 120
+- Test: 30
+- Positive class 비율: 0.4667
+
+Logistic Regression
+- Accuracy: 0.8000
+- Precision: 0.9000
+- Recall: 0.6429
+- F1: 0.7500
+
+Random Forest
+- Accuracy: 0.8000
+- Precision: 0.9000
+- Recall: 0.6429
+- F1: 0.7500
+
+Final Model
+- 선정 모델: Logistic Regression
+- 선정 이유: Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다.
+
+Generated Files
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/eda_summary.json
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/model_comparison.csv
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/metrics.json
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/confusion_matrix_logistic_regression.png
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/confusion_matrix_random_forest.png
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/random_forest_feature_importance.png
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/reports/experiment_summary.md
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/artifacts/field_proposal_review_risk_model.joblib
+- /home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/artifacts/model_metadata.json
+
+Model comparison
+Model,Train Accuracy,Test Accuracy,Precision,Recall,F1
+Dummy,0.5333333333333333,0.5333333333333333,0.0,0.0,0.0
+Logistic Regression,0.7916666666666666,0.8,0.9,0.6428571428571429,0.75
+Random Forest,0.975,0.8,0.9,0.6428571428571429,0.75

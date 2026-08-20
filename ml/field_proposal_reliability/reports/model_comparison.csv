@@ -1,0 +1,4 @@
+﻿Model,Train Accuracy,Test Accuracy,Precision,Recall,F1
+Dummy,0.5333333333333333,0.5333333333333333,0.0,0.0,0.0
+Logistic Regression,0.7916666666666666,0.8,0.9,0.6428571428571429,0.75
+Random Forest,0.975,0.8,0.9,0.6428571428571429,0.75

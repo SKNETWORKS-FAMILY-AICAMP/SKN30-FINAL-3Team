@@ -1,0 +1,89 @@
+{
+  "all_checks_passed": true,
+  "checks": {
+    "exactly_two_final_docx": true,
+    "final_docx_nonempty": true,
+    "reference_templates_unchanged": true,
+    "dataset_sha_matches_metrics": true,
+    "dataset_contract": true,
+    "source_inventory_contract": true,
+    "split_contract": true,
+    "metric_recomputation": true,
+    "selected_model_consistent": true,
+    "selected_metric_contract": true,
+    "docx_numbers_match": true,
+    "docx_model_and_reason_match": true,
+    "docx_disclosures_present": true,
+    "split_description_matches_code": true,
+    "forbidden_legacy_or_claim_text_absent": true,
+    "model_reload_smoke": true,
+    "notebook_executed_without_errors": true,
+    "colab_status_honest": true,
+    "training_docx_structure": true,
+    "model_docx_structure": true,
+    "rendered_all_pages": true
+  },
+  "final_documents": {
+    "[데이터 전처리] 머신러닝_딥러닝 학습 결과서_30기_3팀.docx": {
+      "sha256": "5ca6e929918174d18da51abaff6f59bb659c103071c46167ce50250167a4f83e",
+      "bytes": 1283807,
+      "rendered_pages": 9
+    },
+    "[데이터 전처리] 학습한 ML_DL 모델_30기_3팀.docx": {
+      "sha256": "3bfbb767b59bae77edc5ed0c7f7124b6b8cb1f23ced4dfe5972cb275d4acbf7d",
+      "bytes": 800297,
+      "rendered_pages": 5
+    }
+  },
+  "dataset": {
+    "rows": 150,
+    "target_distribution": {
+      "0": 80,
+      "1": 70
+    },
+    "field_type_distribution": {
+      "building_number": 15,
+      "deal_type": 15,
+      "expiry_date": 15,
+      "handover_condition": 15,
+      "jeonse_deposit": 15,
+      "monthly_deposit": 15,
+      "monthly_rent": 15,
+      "pyeong": 15,
+      "sale_price": 15,
+      "unit_number": 15
+    },
+    "sha256": "379ebb2d86d76df9725efac3bed5958cdc8b3e111b06918ad7f59a5c454ec55c"
+  },
+  "model": {
+    "name": "Logistic Regression",
+    "test_accuracy": 0.8,
+    "precision": 0.9,
+    "recall": 0.6428571428571429,
+    "f1": 0.75,
+    "reload_predictions": [
+      0,
+      0,
+      1
+    ],
+    "unknown_field_prediction": [
+      0
+    ]
+  },
+  "notebook": {
+    "code_cells": 4,
+    "executed_code_cells": 4,
+    "error_outputs": 0
+  },
+  "colab": {
+    "status": "not_executed",
+    "reason": "Colab CLI authentication was not configured in the execution environment.",
+    "remote_results_claimed": false,
+    "available_verified_run": "local_notebook_verification",
+    "output_notebook": "notebooks/field_proposal_review_risk_poc_output.ipynb",
+    "output_notebook_code_cells": 4,
+    "output_notebook_executed_code_cells": 4,
+    "output_notebook_error_outputs": 0,
+    "colab_upload_policy": "Upload the derived numeric/categorical CSV and execution files only; do not upload raw JSONL transcripts."
+  }
+}

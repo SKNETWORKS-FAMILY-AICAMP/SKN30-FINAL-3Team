@@ -1,0 +1,4613 @@
+{
+  "audit_version": "1.0",
+  "source": {
+    "path": "/home/hong/project/ai-camp-project-note/projects/SKN30-FINAL-3Team/ml/field_proposal_reliability/documents/[데이터 전처리] 머신러닝_딥러닝 학습 결과서_30기_3팀.docx",
+    "byte_size": 1283807,
+    "sha256": "5ca6e929918174d18da51abaff6f59bb659c103071c46167ce50250167a4f83e"
+  },
+  "render_status": {
+    "status": "not_rendered",
+    "reason": "Bundled Windows Python cannot execute under WSL; Linux Python lacks pdf2image/Pillow; soffice/libreoffice and pdftoppm are unavailable.",
+    "page_count_status": "inferred from explicit page breaks; not visually verified"
+  },
+  "package": [
+    {
+      "path": "[Content_Types].xml",
+      "uncompressed_bytes": 2228,
+      "compressed_bytes": 435,
+      "sha256": "e9b9940d6e1bc951f3cf9cf47d028928751decc4759002325f645f4ca9a12620",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "_rels/.rels",
+      "uncompressed_bytes": 443,
+      "compressed_bytes": 214,
+      "sha256": "88d76211b102228f89f16af987143ea302d84c02be687d87eda92323efe3454b",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/document.xml",
+      "uncompressed_bytes": 126643,
+      "compressed_bytes": 8367,
+      "sha256": "46792d7a42c6968a75568c6401c5d54c7893394af6d0586d4f5980fdb07c3f87",
+      "policy": "editable_content_slots"
+    },
+    {
+      "path": "word/_rels/document.xml.rels",
+      "uncompressed_bytes": 2390,
+      "compressed_bytes": 367,
+      "sha256": "3a744795dd9ee9c19d8198027fe25e93c652ea505340773ad7386dd58d493e3d",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/header1.xml",
+      "uncompressed_bytes": 2929,
+      "compressed_bytes": 815,
+      "sha256": "58386a605d003b77bca90599bcc385758544b497e555207165fc4c0ff234f07e",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/header3.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 507,
+      "sha256": "655d3c107dd83c18033b075321074073448d66f52fa88fb5a3702aaa8181468e",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer3.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 507,
+      "sha256": "5509d8332212383fe6db233c9e8708bbd2601f80d49aaa337b528df7034f5c06",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer2.xml",
+      "uncompressed_bytes": 2215,
+      "compressed_bytes": 584,
+      "sha256": "fb245bf678eea76ecc682e4293cd145768ecfebcdcfe6ce8c54c88899be7b603",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/theme/theme1.xml",
+      "uncompressed_bytes": 7643,
+      "compressed_bytes": 1580,
+      "sha256": "b2295d3198893d2c03f5e584c749a15751b798aefdcd9bee2889f13903d68cb2",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/settings.xml",
+      "uncompressed_bytes": 2152,
+      "compressed_bytes": 593,
+      "sha256": "fb088d0a3dbf7f5e5a5a399b898acf16aa2a6fc3b2984bc3eb0d4946f73ac005",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/fontTable.xml",
+      "uncompressed_bytes": 1921,
+      "compressed_bytes": 524,
+      "sha256": "bf90ead4b2324a7495cefdb5781fe0b93d5a4fcd2e6b2df35a0e577aa7321cdf",
+      "policy": "preserve_package_infrastructure"
+    },
+    {
+      "path": "word/_rels/fontTable.xml.rels",
+      "uncompressed_bytes": 300,
+      "compressed_bytes": 193,
+      "sha256": "53eeeb9d566b6e785f7432932cb9aa2e8aa2b5276eee52b09808f5a6c21accae",
+      "policy": "preserve_relationship_contract; update only with linked edits"
+    },
+    {
+      "path": "word/fonts/CambriaMath-regular.ttf",
+      "uncompressed_bytes": 922744,
+      "compressed_bytes": 553397,
+      "sha256": "ee8d47e02278a325b7decca1809e6929e99d3b5ab53ead4e7d0dc6fc5044b5cd",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/numbering.xml",
+      "uncompressed_bytes": 5453,
+      "compressed_bytes": 786,
+      "sha256": "da0726318dfa9379a856bdd545c6807d52c50112d2ef47affcd4fece22867237",
+      "policy": "preserve_design_authority; extend only for new semantic roles"
+    },
+    {
+      "path": "word/header2.xml",
+      "uncompressed_bytes": 1958,
+      "compressed_bytes": 507,
+      "sha256": "93980e955536206548f76f092af417d18b3d99df62468850a930b437deb84cdf",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/footer1.xml",
+      "uncompressed_bytes": 2929,
+      "compressed_bytes": 814,
+      "sha256": "db1135868cd6dc9cd2ffcc6968f6ed96c02c8e079d271f67d9ed49f2489a13d3",
+      "policy": "preserve_page_furniture"
+    },
+    {
+      "path": "word/styles.xml",
+      "uncompressed_bytes": 13975,
+      "compressed_bytes": 1173,
+      "sha256": "fb81a7fccbff4dae554e623049b29c6354dc85d66b89e4ce5503412e33abd69f",
+      "policy": "preserve_design_authority; extend only for new semantic roles"
+    },
+    {
+      "path": "customXML/item1.xml",
+      "uncompressed_bytes": 1713,
+      "compressed_bytes": 535,
+      "sha256": "6790b436d555ac6ae6616e3ca5848f1eec08d11a8d2d01df640c4c874c8d3149",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "customXML/_rels/item1.xml.rels",
+      "uncompressed_bytes": 295,
+      "compressed_bytes": 189,
+      "sha256": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "customXML/itemProps1.xml",
+      "uncompressed_bytes": 404,
+      "compressed_bytes": 214,
+      "sha256": "fc2e321bb5ca54d5f2b99b99f91d681d004417098918a318be88fe525218c9a3",
+      "policy": "preserve_opaque_part"
+    },
+    {
+      "path": "word/media/image2.png",
+      "uncompressed_bytes": 596380,
+      "compressed_bytes": 567346,
+      "sha256": "870dde32a180bc9498566da821287becb142cc047bf2f9bd4278b5eb39a3869a",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/media/image1.png",
+      "uncompressed_bytes": 70,
+      "compressed_bytes": 63,
+      "sha256": "18d840af2c50eff9a5241d4b50833a596e6b71af0cee87cf2b3435345f2f7aba",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/media/image3.png",
+      "uncompressed_bytes": 34838,
+      "compressed_bytes": 27087,
+      "sha256": "5df5bc9f7352dac81bc6b8953e3486ad24e5609ddb614e7c7eeb8dea96093499",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/media/image4.png",
+      "uncompressed_bytes": 35133,
+      "compressed_bytes": 27251,
+      "sha256": "81387939e3c4b8b30f01ab68c7fbf3cc69df12cb42b3e574c76e6786e65b033e",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "word/media/image5.png",
+      "uncompressed_bytes": 103966,
+      "compressed_bytes": 86227,
+      "sha256": "20ebf4242d9b8e6cac76cd01beabf417151e953deb75b5330c6c88382d5c1c60",
+      "policy": "preserve_design_asset"
+    },
+    {
+      "path": "docProps/core.xml",
+      "uncompressed_bytes": 776,
+      "compressed_bytes": 498,
+      "sha256": "c8e57a8538f3bc4169f1ca37d1e6c0469284404d59ab277c76280c7d346abdbd",
+      "policy": "preserve_package_infrastructure"
+    }
+  ],
+  "relationships": [
+    {
+      "Id": "rId11",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header1.xml"
+    },
+    {
+      "Id": "rId10",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header3.xml"
+    },
+    {
+      "Id": "rId13",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer3.xml"
+    },
+    {
+      "Id": "rId12",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer2.xml"
+    },
+    {
+      "Id": "rId1",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+      "Target": "theme/theme1.xml"
+    },
+    {
+      "Id": "rId2",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+      "Target": "settings.xml"
+    },
+    {
+      "Id": "rId3",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+      "Target": "fontTable.xml"
+    },
+    {
+      "Id": "rId4",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
+      "Target": "numbering.xml"
+    },
+    {
+      "Id": "rId9",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+      "Target": "header2.xml"
+    },
+    {
+      "Id": "rId14",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+      "Target": "footer1.xml"
+    },
+    {
+      "Id": "rId5",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      "Target": "styles.xml"
+    },
+    {
+      "Id": "rId6",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+      "Target": "../customXML/item1.xml"
+    },
+    {
+      "Id": "rId7",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image2.png"
+    },
+    {
+      "Id": "rId8",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image1.png"
+    },
+    {
+      "Id": "rId15",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image3.png"
+    },
+    {
+      "Id": "rId16",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image4.png"
+    },
+    {
+      "Id": "rId17",
+      "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      "Target": "media/image5.png"
+    }
+  ],
+  "page_system": {
+    "sections": [
+      {
+        "index": 1,
+        "type": "continuous/default",
+        "page_size_twips": {
+          "h": "16834",
+          "w": "11909",
+          "orient": "portrait"
+        },
+        "margins_twips": {
+          "bottom": "1559",
+          "top": "1275",
+          "left": "992",
+          "right": "992",
+          "header": "720",
+          "footer": "720"
+        },
+        "columns": {},
+        "page_numbering": {
+          "start": "0"
+        },
+        "different_first_page": true,
+        "references": [
+          {
+            "kind": "header",
+            "type": "default",
+            "relationship_id": "rId9"
+          },
+          {
+            "kind": "header",
+            "type": "first",
+            "relationship_id": "rId10"
+          },
+          {
+            "kind": "header",
+            "type": "even",
+            "relationship_id": "rId11"
+          },
+          {
+            "kind": "footer",
+            "type": "default",
+            "relationship_id": "rId12"
+          },
+          {
+            "kind": "footer",
+            "type": "first",
+            "relationship_id": "rId13"
+          },
+          {
+            "kind": "footer",
+            "type": "even",
+            "relationship_id": "rId14"
+          }
+        ]
+      }
+    ],
+    "even_and_odd_headers_enabled": false,
+    "body_explicit_page_break_count": 3,
+    "page_count_inferred_from_explicit_breaks": 4
+  },
+  "styles": {
+    "document_defaults": {
+      "run": {
+        "fonts": {
+          "ascii": "Arial",
+          "cs": "Arial",
+          "eastAsia": "Arial",
+          "hAnsi": "Arial"
+        },
+        "size_half_points": "22",
+        "bold": "1",
+        "language": "ko"
+      },
+      "paragraph": {
+        "spacing": {
+          "line": "276",
+          "lineRule": "auto"
+        }
+      }
+    },
+    "styles": [
+      {
+        "style_id": "TableNormal",
+        "type": "table",
+        "default": "1",
+        "name": "TableNormal",
+        "based_on": null,
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "100.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "100.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Normal",
+        "type": "paragraph",
+        "default": "1",
+        "name": "normal",
+        "based_on": null,
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "after": "100",
+            "line": "300",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "21",
+          "bold": "0",
+          "italic": null,
+          "color": "222222"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading1",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 1",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "140",
+            "before": "280",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "30",
+          "bold": null,
+          "italic": null,
+          "color": "17365D"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading2",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 2",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "100",
+            "before": "200",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "24",
+          "bold": null,
+          "italic": null,
+          "color": "2F5597"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading3",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 3",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "320",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "21",
+          "bold": null,
+          "italic": null,
+          "color": "17365D"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading4",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 4",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "280",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": "24",
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading5",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 5",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Heading6",
+        "type": "paragraph",
+        "default": null,
+        "name": "heading 6",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "80",
+            "before": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": "1",
+          "color": "666666"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Title",
+        "type": "paragraph",
+        "default": null,
+        "name": "Title",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "60",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "48",
+          "bold": null,
+          "italic": null,
+          "color": "17365D"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Subtitle",
+        "type": "paragraph",
+        "default": null,
+        "name": "Subtitle",
+        "based_on": "Normal",
+        "next": "Normal",
+        "paragraph": {
+          "spacing": {
+            "after": "320",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": true,
+          "keep_lines": true
+        },
+        "run": {
+          "fonts": {
+            "ascii": "Arial",
+            "hAnsi": "Arial",
+            "eastAsia": "맑은 고딕"
+          },
+          "size_half_points": "24",
+          "bold": "0",
+          "italic": null,
+          "color": "2F5597"
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table1",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table2",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table3",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table4",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      },
+      {
+        "style_id": "Table5",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table6",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table7",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table8",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table9",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table10",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table11",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table12",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table13",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table14",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table15",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table16",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table17",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table18",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table19",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table20",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table21",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table22",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table23",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {
+            "line": "240",
+            "lineRule": "auto"
+          },
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {
+          "top": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "left": {
+            "w": "108.0",
+            "type": "dxa"
+          },
+          "bottom": {
+            "w": "0.0",
+            "type": "dxa"
+          },
+          "right": {
+            "w": "108.0",
+            "type": "dxa"
+          }
+        }
+      },
+      {
+        "style_id": "Table24",
+        "type": "table",
+        "default": null,
+        "name": null,
+        "based_on": "TableNormal",
+        "next": null,
+        "paragraph": {
+          "spacing": {},
+          "indent": {},
+          "alignment": null,
+          "keep_next": false,
+          "keep_lines": false
+        },
+        "run": {
+          "fonts": {},
+          "size_half_points": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        "table_cell_margins": {}
+      }
+    ]
+  },
+  "numbering": {
+    "abstract_definitions": {
+      "1": [
+        {
+          "level": "0",
+          "start": "1",
+          "format": "decimal",
+          "text": "%1.",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "lowerLetter",
+          "text": "%2.",
+          "justification": "left",
+          "indent": {
+            "left": "1440",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "lowerRoman",
+          "text": "%3.",
+          "justification": "right",
+          "indent": {
+            "left": "2160",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "decimal",
+          "text": "%4.",
+          "justification": "left",
+          "indent": {
+            "left": "2880",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "lowerLetter",
+          "text": "%5.",
+          "justification": "left",
+          "indent": {
+            "left": "3600",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "lowerRoman",
+          "text": "%6.",
+          "justification": "right",
+          "indent": {
+            "left": "4320",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "decimal",
+          "text": "%7.",
+          "justification": "left",
+          "indent": {
+            "left": "5040",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "lowerLetter",
+          "text": "%8.",
+          "justification": "left",
+          "indent": {
+            "left": "5760",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "lowerRoman",
+          "text": "%9.",
+          "justification": "right",
+          "indent": {
+            "left": "6480",
+            "hanging": "360"
+          },
+          "fonts": {}
+        }
+      ],
+      "2": [
+        {
+          "level": "0",
+          "start": "8",
+          "format": "decimal",
+          "text": "%1.",
+          "justification": "left",
+          "indent": {
+            "left": "720",
+            "hanging": "360"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "1",
+          "start": "1",
+          "format": "upperLetter",
+          "text": "%2.",
+          "justification": "left",
+          "indent": {
+            "left": "1240",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "2",
+          "start": "1",
+          "format": "lowerRoman",
+          "text": "%3.",
+          "justification": "right",
+          "indent": {
+            "left": "1680",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "3",
+          "start": "1",
+          "format": "decimal",
+          "text": "%4.",
+          "justification": "left",
+          "indent": {
+            "left": "2120",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "4",
+          "start": "1",
+          "format": "upperLetter",
+          "text": "%5.",
+          "justification": "left",
+          "indent": {
+            "left": "2560",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "5",
+          "start": "1",
+          "format": "lowerRoman",
+          "text": "%6.",
+          "justification": "right",
+          "indent": {
+            "left": "3000",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "6",
+          "start": "1",
+          "format": "decimal",
+          "text": "%7.",
+          "justification": "left",
+          "indent": {
+            "left": "3440",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "7",
+          "start": "1",
+          "format": "upperLetter",
+          "text": "%8.",
+          "justification": "left",
+          "indent": {
+            "left": "3880",
+            "hanging": "440"
+          },
+          "fonts": {}
+        },
+        {
+          "level": "8",
+          "start": "1",
+          "format": "lowerRoman",
+          "text": "%9.",
+          "justification": "right",
+          "indent": {
+            "left": "4320",
+            "hanging": "440"
+          },
+          "fonts": {}
+        }
+      ]
+    },
+    "instances": [
+      {
+        "num_id": "1",
+        "abstract_num_id": "1"
+      },
+      {
+        "num_id": "2",
+        "abstract_num_id": "2"
+      }
+    ]
+  },
+  "body": {
+    "body_child_count": 93,
+    "nonempty_body_paragraphs": 50,
+    "tables": [
+      {
+        "locator": "word/document.xml/body/tbl[5]",
+        "page_by_explicit_breaks": 1,
+        "rows": 6,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2381\"}": 6,
+          "{\"type\": \"dxa\", \"w\": \"6803\"}": 6
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 12
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "항목",
+          "내용"
+        ],
+        "character_count": 147
+      },
+      {
+        "locator": "word/document.xml/body/tbl[7]",
+        "page_by_explicit_breaks": 1,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "제출 범위  기존 프로젝트의 합성 상담 시나리오에서 규칙 기반 대리 라벨을 파생한 소규모 ML PoC이다. 실제 사용자 데이터나 실서비스 성능을 의미하지 않는다."
+        ],
+        "character_count": 90
+      },
+      {
+        "locator": "word/document.xml/body/tbl[13]",
+        "page_by_explicit_breaks": 2,
+        "rows": 6,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2268\"}": 6,
+          "{\"type\": \"dxa\", \"w\": \"6917\"}": 6
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 12
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "구분",
+          "정의"
+        ],
+        "character_count": 203
+      },
+      {
+        "locator": "word/document.xml/body/tbl[15]",
+        "page_by_explicit_breaks": 2,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "중요 해석  Target과 confidence는 실제 운영 로그가 아니라 규칙과 고정 난수로 만든 대리 값이다. 따라서 결과는 생성 규칙을 학습할 수 있는지에 대한 초기 확인이며 실제 중개 상담 성능이 아니다."
+        ],
+        "character_count": 117
+      },
+      {
+        "locator": "word/document.xml/body/tbl[28]",
+        "page_by_explicit_breaks": 3,
+        "rows": 4,
+        "max_columns": 4,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "2481",
+          "2481",
+          "2481",
+          "2481"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"3742\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"1134\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"1304\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"3118\"}": 4
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 4,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 16
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "원천 파일",
+          "원본 행",
+          "중복 제거 후",
+          "라벨 분포"
+        ],
+        "character_count": 204
+      },
+      {
+        "locator": "word/document.xml/body/tbl[36]",
+        "page_by_explicit_breaks": 3,
+        "rows": 9,
+        "max_columns": 3,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "3308",
+          "3308",
+          "3308"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2381\"}": 9,
+          "{\"type\": \"dxa\", \"w\": \"1701\"}": 9,
+          "{\"type\": \"dxa\", \"w\": \"5216\"}": 9
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 3,
+          "EDF4FB": 12
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 27
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "Feature",
+          "형식",
+          "정의"
+        ],
+        "character_count": 278
+      },
+      {
+        "locator": "word/document.xml/body/tbl[39]",
+        "page_by_explicit_breaks": 3,
+        "rows": 8,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"3515\"}": 8,
+          "{\"type\": \"dxa\", \"w\": \"5783\"}": 8
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 6
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 16
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "검사 항목",
+          "결과"
+        ],
+        "character_count": 104
+      },
+      {
+        "locator": "word/document.xml/body/tbl[41]",
+        "page_by_explicit_breaks": 3,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "재현성  random_state=42를 고정하고 데이터·생성기·원천 파일 SHA-256을 함께 기록하였다."
+        ],
+        "character_count": 59
+      },
+      {
+        "locator": "word/document.xml/body/tbl[47]",
+        "page_by_explicit_breaks": 4,
+        "rows": 5,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"3118\"}": 5,
+          "{\"type\": \"dxa\", \"w\": \"6180\"}": 5
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 10
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "구분",
+          "처리"
+        ],
+        "character_count": 203
+      },
+      {
+        "locator": "word/document.xml/body/tbl[50]",
+        "page_by_explicit_breaks": 4,
+        "rows": 4,
+        "max_columns": 3,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "3308",
+          "3308",
+          "3308"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2494\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"3458\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"3345\"}": 4
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 3,
+          "EDF4FB": 3
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 12
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "모델",
+          "주요 설정",
+          "역할"
+        ],
+        "character_count": 184
+      },
+      {
+        "locator": "word/document.xml/body/tbl[53]",
+        "page_by_explicit_breaks": 4,
+        "rows": 5,
+        "max_columns": 3,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "3308",
+          "3308",
+          "3308"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"1814\"}": 5,
+          "{\"type\": \"dxa\", \"w\": \"4535\"}": 5,
+          "{\"type\": \"dxa\", \"w\": \"2948\"}": 5
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 3,
+          "EDF4FB": 6
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 15
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "지표",
+          "해석",
+          "사용 목적"
+        ],
+        "character_count": 166
+      },
+      {
+        "locator": "word/document.xml/body/tbl[57]",
+        "page_by_explicit_breaks": 4,
+        "rows": 4,
+        "max_columns": 6,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "1654",
+          "1654",
+          "1654",
+          "1654",
+          "1654",
+          "1654"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2268\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"1417\"}": 8,
+          "{\"type\": \"dxa\", \"w\": \"1361\"}": 4,
+          "{\"type\": \"dxa\", \"w\": \"1247\"}": 8
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 6,
+          "EDF4FB": 6
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 24
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "Model",
+          "Train Acc.",
+          "Test Acc.",
+          "Precision",
+          "Recall",
+          "F1"
+        ],
+        "character_count": 168
+      },
+      {
+        "locator": "word/document.xml/body/tbl[68]",
+        "page_by_explicit_breaks": 4,
+        "rows": 9,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"6236\"}": 9,
+          "{\"type\": \"dxa\", \"w\": \"2948\"}": 9
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 8
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 18
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "상위 Feature",
+          "Importance"
+        ],
+        "character_count": 270
+      },
+      {
+        "locator": "word/document.xml/body/tbl[72]",
+        "page_by_explicit_breaks": 4,
+        "rows": 1,
+        "max_columns": 1,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {},
+        "grid_widths_twips": [
+          "9925"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"9925\"}": 1
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "D9EAF7": 1
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {},
+        "repeat_header_rows": [],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "선정 모델  Logistic Regression"
+        ],
+        "character_count": 26
+      },
+      {
+        "locator": "word/document.xml/body/tbl[75]",
+        "page_by_explicit_breaks": 4,
+        "rows": 6,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"5102\"}": 6,
+          "{\"type\": \"dxa\", \"w\": \"4082\"}": 6
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 12
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "선정 모델 Test 지표",
+          "값"
+        ],
+        "character_count": 92
+      },
+      {
+        "locator": "word/document.xml/body/tbl[87]",
+        "page_by_explicit_breaks": 4,
+        "rows": 7,
+        "max_columns": 2,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "4962",
+          "4962"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"2268\"}": 7,
+          "{\"type\": \"dxa\", \"w\": \"6917\"}": 7
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 2,
+          "EDF4FB": 6
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 14
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "분류",
+          "파일"
+        ],
+        "character_count": 270
+      },
+      {
+        "locator": "word/document.xml/body/tbl[90]",
+        "page_by_explicit_breaks": 4,
+        "rows": 2,
+        "max_columns": 4,
+        "style_id": null,
+        "table_width": {
+          "type": "auto",
+          "w": "0"
+        },
+        "table_indent": {},
+        "alignment": "center",
+        "layout": {
+          "type": "fixed"
+        },
+        "grid_widths_twips": [
+          "2481",
+          "2481",
+          "2481",
+          "2481"
+        ],
+        "cell_width_signatures": {
+          "{\"type\": \"dxa\", \"w\": \"1757\"}": 2,
+          "{\"type\": \"dxa\", \"w\": \"1814\"}": 2,
+          "{\"type\": \"dxa\", \"w\": \"4422\"}": 2,
+          "{\"type\": \"dxa\", \"w\": \"1191\"}": 2
+        },
+        "cell_margins": {},
+        "fill_histogram": {
+          "17365D": 4
+        },
+        "border_histogram": {},
+        "vertical_alignment_histogram": {
+          "center": 8
+        },
+        "repeat_header_rows": [
+          0
+        ],
+        "cant_split_rows": [],
+        "merged_cells": [],
+        "first_row_labels": [
+          "변경일",
+          "변경자",
+          "변경내용",
+          "버전"
+        ],
+        "character_count": 62
+      }
+    ],
+    "table_count": 17,
+    "paragraphs": [
+      {
+        "locator": "word/document.xml/body/p[1]",
+        "page_by_explicit_breaks": 1,
+        "text": "SK 네트웍스 Family AI 30기 : 3팀",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "SK 네트웍스 Family AI 30기 : 3팀",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "28",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[2]",
+        "page_by_explicit_breaks": 1,
+        "text": "머신러닝 / 딥러닝 학습 결과서",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {
+            "before": "520",
+            "after": "160"
+          },
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "머신러닝 / 딥러닝 학습 결과서",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "48",
+              "color": "17365D"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[3]",
+        "page_by_explicit_breaks": 1,
+        "text": "F2 Field Proposal Review Risk Model - 합성 대리 라벨 기반 ML PoC",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "F2 Field Proposal Review Risk Model - 합성 대리 라벨 기반 ML PoC",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "24",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[10]",
+        "page_by_explicit_breaks": 2,
+        "text": "1. 개요",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "1. 개요",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[11]",
+        "page_by_explicit_breaks": 2,
+        "text": "1.1 실험 목적",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "1.1 실험 목적",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[12]",
+        "page_by_explicit_breaks": 2,
+        "text": "F2의 sLLM이 만든 장부 필드 제안 중 사용자의 추가 검토가 필요한 제안을 정형 Feature 기반 이진 분류 문제로 구분할 수 있는지 확인하였다. 본 실험은 sLLM을 대체하거나 자동 저장을 수행하지 않으며, 제출을 위한 최소 ML 적용 가능성 확인에 한정한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "F2의 sLLM이 만든 장부 필드 제안 중 사용자의 추가 검토가 필요한 제안을 정형 Feature 기반 이진 분류 문제로 구분할 수 있는지 확인하였다. 본 실험은 sLLM을 대체하거나 자동 저장을 수행하지 않으며, 제출을 위한 최소 ML 적용 가능성 확인에 한정한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[17]",
+        "page_by_explicit_breaks": 2,
+        "text": "1.2 작업 범위",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "1.2 작업 범위",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[18]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 합성 상담 원천의 중복 제거와 150건 필드 제안 데이터 파생",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 합성 상담 원천의 중복 제거와 150건 필드 제안 데이터 파생",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[19]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 간단한 EDA와 80:20 층화 분할",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 간단한 EDA와 80:20 층화 분할",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[20]",
+        "page_by_explicit_breaks": 2,
+        "text": "• Dummy, Logistic Regression, Random Forest 비교",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• Dummy, Logistic Regression, Random Forest 비교",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[21]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 혼동행렬·Feature Importance·모델 비교 결과 생성",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 혼동행렬·Feature Importance·모델 비교 결과 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[22]",
+        "page_by_explicit_breaks": 2,
+        "text": "• 선정 Pipeline 전체 joblib 저장과 재로드 추론 확인",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 선정 Pipeline 전체 joblib 저장과 재로드 추론 확인",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[23]",
+        "page_by_explicit_breaks": 2,
+        "text": "딥러닝·Transformer·XGBoost·SHAP·외부 API·서비스 연동은 이번 범위에서 제외하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "딥러닝·Transformer·XGBoost·SHAP·외부 API·서비스 연동은 이번 범위에서 제외하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[25]",
+        "page_by_explicit_breaks": 3,
+        "text": "2. 데이터와 전처리",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2. 데이터와 전처리",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[26]",
+        "page_by_explicit_breaks": 3,
+        "text": "2.1 원천 데이터",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2.1 원천 데이터",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[27]",
+        "page_by_explicit_breaks": 3,
+        "text": "세 원천 파일에는 총 1,250행이 있으며, 파일 간 완전 중복 50건을 제거한 뒤 1,200개의 고유 합성 상담을 후보 풀로 사용하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "세 원천 파일에는 총 1,250행이 있으며, 파일 간 완전 중복 50건을 제거한 뒤 1,200개의 고유 합성 상담을 후보 풀로 사용하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[30]",
+        "page_by_explicit_breaks": 3,
+        "text": "모든 원천 레코드는 contains_real_personal_data=false로 표시된 합성 문장이다. 다만 사람 검수된 운영 데이터가 아니므로 실제 상담 분포를 대표한다고 가정하지 않았다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "모든 원천 레코드는 contains_real_personal_data=false로 표시된 합성 문장이다. 다만 사람 검수된 운영 데이터가 아니므로 실제 상담 분포를 대표한다고 가정하지 않았다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[31]",
+        "page_by_explicit_breaks": 3,
+        "text": "2.2 필드 제안 단위 데이터 생성",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2.2 필드 제안 단위 데이터 생성",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[32]",
+        "page_by_explicit_breaks": 3,
+        "text": "1. 상담 문장에서 금액·거래유형·동·호·평형·날짜·명도 관련 후보 근거를 정규식과 키워드로 탐지한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "1. 상담 문장에서 금액·거래유형·동·호·평형·날짜·명도 관련 후보 근거를 정규식과 키워드로 탐지한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[33]",
+        "page_by_explicit_breaks": 3,
+        "text": "2. 각 field_type마다 서로 다른 상담 15건을 선택하고 같은 원천 그룹과 같은 transcript hash를 중복 사용하지 않는다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2. 각 field_type마다 서로 다른 상담 15건을 선택하고 같은 원천 그룹과 같은 transcript hash를 중복 사용하지 않는다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[34]",
+        "page_by_explicit_breaks": 3,
+        "text": "3. 근거 길이, 후보 수, 충돌·부정 여부, 파싱 성공 여부와 모사 confidence를 산출한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3. 근거 길이, 후보 수, 충돌·부정 여부, 파싱 성공 여부와 모사 confidence를 산출한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[35]",
+        "page_by_explicit_breaks": 3,
+        "text": "4. 필드별 proxy risk score 상위 7건을 NEEDS_REVIEW로 지정하여 총 70건의 positive class를 구성한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4. 필드별 proxy risk score 상위 7건을 NEEDS_REVIEW로 지정하여 총 70건의 positive class를 구성한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[38]",
+        "page_by_explicit_breaks": 3,
+        "text": "2.3 데이터 품질과 분포",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "2.3 데이터 품질과 분포",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[44]",
+        "page_by_explicit_breaks": 4,
+        "text": "3. 실험 설계",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3. 실험 설계",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[45]",
+        "page_by_explicit_breaks": 4,
+        "text": "3.1 전처리와 분할",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3.1 전처리와 분할",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[46]",
+        "page_by_explicit_breaks": 4,
+        "text": "needs_review 기준 층화 분할을 사용해 Train 120건, Test 30건으로 나누고 Test에 10개 field_type이 모두 포함되는지 별도 검증하였다. 같은 source_group_id와 transcript hash의 Train/Test 교차는 모두 0건이다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "needs_review 기준 층화 분할을 사용해 Train 120건, Test 30건으로 나누고 Test에 10개 field_type이 모두 포함되는지 별도 검증하였다. 같은 source_group_id와 transcript hash의 Train/Test 교차는 모두 0건이다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[49]",
+        "page_by_explicit_breaks": 4,
+        "text": "3.2 모델 후보",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3.2 모델 후보",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[52]",
+        "page_by_explicit_breaks": 4,
+        "text": "3.3 평가 지표",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "3.3 평가 지표",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[55]",
+        "page_by_explicit_breaks": 4,
+        "text": "4. 실험 결과",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4. 실험 결과",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[56]",
+        "page_by_explicit_breaks": 4,
+        "text": "4.1 모델 비교",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4.1 모델 비교",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[59]",
+        "page_by_explicit_breaks": 4,
+        "text": "모든 수치는 고정된 30건 합성 Test Set에서 실제 실행한 결과이며, 일반화된 실서비스 성능이 아니다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "모든 수치는 고정된 30건 합성 Test Set에서 실제 실행한 결과이며, 일반화된 실서비스 성능이 아니다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[60]",
+        "page_by_explicit_breaks": 4,
+        "text": "4.2 혼동행렬",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4.2 혼동행렬",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[62]",
+        "page_by_explicit_breaks": 4,
+        "text": "그림 1. Logistic Regression confusion matrix",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "그림 1. Logistic Regression confusion matrix",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "18",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[64]",
+        "page_by_explicit_breaks": 4,
+        "text": "그림 2. Random Forest confusion matrix",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "그림 2. Random Forest confusion matrix",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "18",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[65]",
+        "page_by_explicit_breaks": 4,
+        "text": "4.3 Random Forest Feature Importance",
+        "properties": {
+          "style_id": "Heading2",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "4.3 Random Forest Feature Importance",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[67]",
+        "page_by_explicit_breaks": 4,
+        "text": "그림 3. 변환된 Feature 기준 Random Forest 중요도",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": "center",
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "그림 3. 변환된 Feature 기준 Random Forest 중요도",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              },
+              "size_half_points": "18",
+              "color": "2F5597"
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[70]",
+        "page_by_explicit_breaks": 4,
+        "text": "Feature Importance는 이 규칙 기반 합성 데이터 안에서의 분할 기여도이며 인과관계나 실제 업무 중요도를 의미하지 않는다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "Feature Importance는 이 규칙 기반 합성 데이터 안에서의 분할 기여도이며 인과관계나 실제 업무 중요도를 의미하지 않는다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[71]",
+        "page_by_explicit_breaks": 4,
+        "text": "5. 최종 모델 선정",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "5. 최종 모델 선정",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[74]",
+        "page_by_explicit_breaks": 4,
+        "text": "Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "Recall과 F1이 같아 Train/Test 성능 차이가 더 작은 Logistic Regression을 선택하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[77]",
+        "page_by_explicit_breaks": 4,
+        "text": "선정된 전처리·모델 Pipeline 전체는 field_proposal_review_risk_model.joblib로 저장했으며 재로드 후 알려진 입력과 미지 field_type 입력 모두에서 0/1 예측을 확인하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "선정된 전처리·모델 Pipeline 전체는 field_proposal_review_risk_model.joblib로 저장했으며 재로드 후 알려진 입력과 미지 field_type 입력 모두에서 0/1 예측을 확인하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[78]",
+        "page_by_explicit_breaks": 4,
+        "text": "6. 한계 및 향후 개선",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "6. 한계 및 향후 개선",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[79]",
+        "page_by_explicit_breaks": 4,
+        "text": "• 실제 사용자 데이터가 아닌 합성 상담 시나리오를 사용하였다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 실제 사용자 데이터가 아닌 합성 상담 시나리오를 사용하였다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[80]",
+        "page_by_explicit_breaks": 4,
+        "text": "• needs_review와 confidence가 실제 관측값이 아니라 규칙 기반 대리 값이다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• needs_review와 confidence가 실제 관측값이 아니라 규칙 기반 대리 값이다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[81]",
+        "page_by_explicit_breaks": 4,
+        "text": "• 데이터 150건, Test 30건으로 표본이 매우 작다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 데이터 150건, Test 30건으로 표본이 매우 작다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[82]",
+        "page_by_explicit_breaks": 4,
+        "text": "• 실제 F2 sLLM 오류 및 사용자 검토 분포와 다를 수 있다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 실제 F2 sLLM 오류 및 사용자 검토 분포와 다를 수 있다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[83]",
+        "page_by_explicit_breaks": 4,
+        "text": "• 현재 결과는 제출용 PoC이며 실서비스 환경에서 검증되지 않았다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 현재 결과는 제출용 PoC이며 실서비스 환경에서 검증되지 않았다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[84]",
+        "page_by_explicit_breaks": 4,
+        "text": "• 향후 사용자 수락·수정·거절 이력을 Target으로 전환하고 시간·사용자 그룹 누수를 차단해 재학습해야 한다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 향후 사용자 수락·수정·거절 이력을 Target으로 전환하고 시간·사용자 그룹 누수를 차단해 재학습해야 한다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[85]",
+        "page_by_explicit_breaks": 4,
+        "text": "• 딥러닝 모델은 이번 범위에서 학습하지 않았다.",
+        "properties": {
+          "style_id": null,
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "• 딥러닝 모델은 이번 범위에서 학습하지 않았다.",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[86]",
+        "page_by_explicit_breaks": 4,
+        "text": "7. 주요 산출물",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "7. 주요 산출물",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "locator": "word/document.xml/body/p[89]",
+        "page_by_explicit_breaks": 4,
+        "text": "8. 변경 이력",
+        "properties": {
+          "style_id": "Heading1",
+          "num_id": null,
+          "ilvl": null,
+          "alignment": null,
+          "spacing": {},
+          "indent": {},
+          "tabs": [],
+          "keep_next": false,
+          "keep_lines": false,
+          "page_break_before": false,
+          "borders": {}
+        },
+        "run_formats": [
+          {
+            "text": "8. 변경 이력",
+            "format": {
+              "fonts": {
+                "ascii": "Arial",
+                "hAnsi": "Arial",
+                "eastAsia": "맑은 고딕"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "outline": [
+      {
+        "kind": "table",
+        "page": 1,
+        "locator": "word/document.xml/body/tbl[5]",
+        "label": "항목 | 내용"
+      },
+      {
+        "kind": "table",
+        "page": 1,
+        "locator": "word/document.xml/body/tbl[7]",
+        "label": "제출 범위  기존 프로젝트의 합성 상담 시나리오에서 규칙 기반 대리 라벨을 파생한 소규모 ML PoC이다. 실제 사용자 데이터나 실서비스 성능을 의미하지 않는다."
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[10]",
+        "label": "1. 개요"
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[11]",
+        "label": "1.1 실험 목적"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[13]",
+        "label": "구분 | 정의"
+      },
+      {
+        "kind": "table",
+        "page": 2,
+        "locator": "word/document.xml/body/tbl[15]",
+        "label": "중요 해석  Target과 confidence는 실제 운영 로그가 아니라 규칙과 고정 난수로 만든 대리 값이다. 따라서 결과는 생성 규칙을 학습할 수 있는지에 대한 초기 확인이며 실제 중개 상담 성능이 아니다."
+      },
+      {
+        "kind": "heading",
+        "page": 2,
+        "locator": "word/document.xml/body/p[17]",
+        "label": "1.2 작업 범위"
+      },
+      {
+        "kind": "heading",
+        "page": 3,
+        "locator": "word/document.xml/body/p[25]",
+        "label": "2. 데이터와 전처리"
+      },
+      {
+        "kind": "heading",
+        "page": 3,
+        "locator": "word/document.xml/body/p[26]",
+        "label": "2.1 원천 데이터"
+      },
+      {
+        "kind": "table",
+        "page": 3,
+        "locator": "word/document.xml/body/tbl[28]",
+        "label": "원천 파일 | 원본 행 | 중복 제거 후 | 라벨 분포"
+      },
+      {
+        "kind": "heading",
+        "page": 3,
+        "locator": "word/document.xml/body/p[31]",
+        "label": "2.2 필드 제안 단위 데이터 생성"
+      },
+      {
+        "kind": "table",
+        "page": 3,
+        "locator": "word/document.xml/body/tbl[36]",
+        "label": "Feature | 형식 | 정의"
+      },
+      {
+        "kind": "heading",
+        "page": 3,
+        "locator": "word/document.xml/body/p[38]",
+        "label": "2.3 데이터 품질과 분포"
+      },
+      {
+        "kind": "table",
+        "page": 3,
+        "locator": "word/document.xml/body/tbl[39]",
+        "label": "검사 항목 | 결과"
+      },
+      {
+        "kind": "table",
+        "page": 3,
+        "locator": "word/document.xml/body/tbl[41]",
+        "label": "재현성  random_state=42를 고정하고 데이터·생성기·원천 파일 SHA-256을 함께 기록하였다."
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[44]",
+        "label": "3. 실험 설계"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[45]",
+        "label": "3.1 전처리와 분할"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[47]",
+        "label": "구분 | 처리"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[49]",
+        "label": "3.2 모델 후보"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[50]",
+        "label": "모델 | 주요 설정 | 역할"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[52]",
+        "label": "3.3 평가 지표"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[53]",
+        "label": "지표 | 해석 | 사용 목적"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[55]",
+        "label": "4. 실험 결과"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[56]",
+        "label": "4.1 모델 비교"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[57]",
+        "label": "Model | Train Acc. | Test Acc. | Precision | Recall | F1"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[60]",
+        "label": "4.2 혼동행렬"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[65]",
+        "label": "4.3 Random Forest Feature Importance"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[68]",
+        "label": "상위 Feature | Importance"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[71]",
+        "label": "5. 최종 모델 선정"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[72]",
+        "label": "선정 모델  Logistic Regression"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[75]",
+        "label": "선정 모델 Test 지표 | 값"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[78]",
+        "label": "6. 한계 및 향후 개선"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[86]",
+        "label": "7. 주요 산출물"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[87]",
+        "label": "분류 | 파일"
+      },
+      {
+        "kind": "heading",
+        "page": 4,
+        "locator": "word/document.xml/body/p[89]",
+        "label": "8. 변경 이력"
+      },
+      {
+        "kind": "table",
+        "page": 4,
+        "locator": "word/document.xml/body/tbl[90]",
+        "label": "변경일 | 변경자 | 변경내용 | 버전"
+      }
+    ],
+    "explicit_page_break_count": 3,
+    "page_break_locations": [
+      {
+        "body_index": 9,
+        "count": 1,
+        "page_before": 1
+      },
+      {
+        "body_index": 24,
+        "count": 1,
+        "page_before": 2
+      },
+      {
+        "body_index": 43,
+        "count": 1,
+        "page_before": 3
+      }
+    ],
+    "page_count_inferred_from_explicit_breaks": 4
+  },
+  "content_controls": [],
+  "headers_and_footers": [
+    {
+      "part": "word/footer1.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/footer2.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 1,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/footer3.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header1.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header2.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    },
+    {
+      "part": "word/header3.xml",
+      "text": "",
+      "paragraph_count": 1,
+      "field_instruction_count": 0,
+      "drawing_count": 0
+    }
+  ],
+  "drawings": [
+    {
+      "index": 1,
+      "mode": "inline",
+      "anchor_attributes": {},
+      "horizontal_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "vertical_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "extent_emu": {
+        "cx": "4389120",
+        "cy": "3809098"
+      },
+      "extent_inches": {
+        "width": 4.8,
+        "height": 4.1657
+      },
+      "doc_properties": {
+        "id": "1",
+        "name": "Picture 1"
+      },
+      "relationship_ids": [
+        "rId15"
+      ],
+      "targets": [
+        "media/image3.png"
+      ],
+      "images": [
+        {
+          "part": "word/media/image3.png",
+          "sha256": "5df5bc9f7352dac81bc6b8953e3486ad24e5609ddb614e7c7eeb8dea96093499",
+          "byte_size": 34838,
+          "dimensions": {
+            "width_px": 1014,
+            "height_px": 880
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "mode": "inline",
+      "anchor_attributes": {},
+      "horizontal_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "vertical_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "extent_emu": {
+        "cx": "4389120",
+        "cy": "3809098"
+      },
+      "extent_inches": {
+        "width": 4.8,
+        "height": 4.1657
+      },
+      "doc_properties": {
+        "id": "2",
+        "name": "Picture 2"
+      },
+      "relationship_ids": [
+        "rId16"
+      ],
+      "targets": [
+        "media/image4.png"
+      ],
+      "images": [
+        {
+          "part": "word/media/image4.png",
+          "sha256": "81387939e3c4b8b30f01ab68c7fbf3cc69df12cb42b3e574c76e6786e65b033e",
+          "byte_size": 35133,
+          "dimensions": {
+            "width_px": 1014,
+            "height_px": 880
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "mode": "inline",
+      "anchor_attributes": {},
+      "horizontal_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "vertical_position": {
+        "relative_from": null,
+        "offset_emu": null
+      },
+      "extent_emu": {
+        "cx": "5303520",
+        "cy": "3232717"
+      },
+      "extent_inches": {
+        "width": 5.8,
+        "height": 3.5353
+      },
+      "doc_properties": {
+        "id": "3",
+        "name": "Picture 3"
+      },
+      "relationship_ids": [
+        "rId17"
+      ],
+      "targets": [
+        "media/image5.png"
+      ],
+      "images": [
+        {
+          "part": "word/media/image5.png",
+          "sha256": "20ebf4242d9b8e6cac76cd01beabf417151e953deb75b5330c6c88382d5c1c60",
+          "byte_size": 103966,
+          "dimensions": {
+            "width_px": 1593,
+            "height_px": 971
+          }
+        }
+      ]
+    }
+  ],
+  "direct_run_format_histogram": {
+    "{\"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"17\"}": 159,
+    "{\"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}}": 48,
+    "{\"color\": \"FFFFFF\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"17\"}": 37,
+    "inherited": 6,
+    "{\"color\": \"17365D\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}}": 4,
+    "{\"color\": \"2F5597\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"18\"}": 3,
+    "{\"color\": \"2F5597\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"28\"}": 1,
+    "{\"color\": \"17365D\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"48\"}": 1,
+    "{\"color\": \"2F5597\", \"fonts\": {\"ascii\": \"Arial\", \"eastAsia\": \"맑은 고딕\", \"hAnsi\": \"Arial\"}, \"size_half_points\": \"24\"}": 1
+  },
+  "feature_counts": {
+    "drawings": 3,
+    "tables_total_including_nested": 17,
+    "hyperlinks": 0,
+    "fields": 0,
+    "bookmarks": 0,
+    "content_controls": 0,
+    "tracked_insertions": 0,
+    "tracked_deletions": 0,
+    "comments_parts": 0,
+    "footnotes_part": 0,
+    "endnotes_part": 0,
+    "embedded_fonts": 1,
+    "custom_xml_parts": 2,
+    "alt_text_tokens": 0
+  },
+  "structural_qa": {
+    "zip_test": true,
+    "required_parts_present": true,
+    "relationship_targets_checked": [
+      {
+        "relationship_id": "rId11",
+        "target": "header1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId10",
+        "target": "header3.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId13",
+        "target": "footer3.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId12",
+        "target": "footer2.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId1",
+        "target": "theme/theme1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId2",
+        "target": "settings.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId3",
+        "target": "fontTable.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId4",
+        "target": "numbering.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId9",
+        "target": "header2.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId14",
+        "target": "footer1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId5",
+        "target": "styles.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId6",
+        "target": "../customXML/item1.xml",
+        "external": false
+      },
+      {
+        "relationship_id": "rId7",
+        "target": "media/image2.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId8",
+        "target": "media/image1.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId15",
+        "target": "media/image3.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId16",
+        "target": "media/image4.png",
+        "external": false
+      },
+      {
+        "relationship_id": "rId17",
+        "target": "media/image5.png",
+        "external": false
+      }
+    ],
+    "duplicate_docpr_ids": []
+  }
+}
