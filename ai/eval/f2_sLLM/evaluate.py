@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qwen3 후보들을 F2 분류·추출 작업에서 동일한 조건으로 비교한다.
+"""Qwen3 후보들을 F2 상담 유형 분류 또는 전체 분류·추출 작업에서 비교한다.
 
 실행 순서
 1. models.yaml에서 Qwen3 모델 ID와 공통 생성 설정을 읽는다.
@@ -56,6 +56,13 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
   "summary": "상담 로그 초안"
 }"""
 
+CLASSIFICATION_SYSTEM_PROMPT = """당신은 부동산 상담 유형 분류기입니다.
+입력으로 STT 상담 텍스트만 받습니다.
+
+상담 유형을 매도의뢰, 매수문의, 공동중개, 단순문의 중 하나로 분류하세요.
+설명이나 마크다운 없이 다음 형식의 JSON 객체 하나만 출력하세요.
+{"consultation_type": "매도의뢰|매수문의|공동중개|단순문의"}"""
+
 
 @dataclass(frozen=True)
 class ModelSpec:
@@ -74,6 +81,12 @@ def parse_args() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True, help="평가 JSONL 경로")
+    parser.add_argument(
+        "--task",
+        choices=("classification", "full"),
+        default="full",
+        help="classification: transcript/label 분류 평가, full: 기존 F2 분류·추출 평가",
+    )
     parser.add_argument(
         "--config",
         type=Path,
@@ -115,14 +128,24 @@ def load_config(path: Path) -> dict[str, Any]:
     return config
 
 
-def load_dataset(path: Path, limit: int | None) -> list[dict[str, Any]]:
+def load_dataset(
+    path: Path,
+    limit: int | None,
+    task: str,
+    allowed_types: list[str],
+) -> list[dict[str, Any]]:
     """평가 JSONL을 한 줄씩 읽고 필수 필드가 있는지 검사한다.
 
-    각 줄은 하나의 상담 사례다. 모델 입력에는 transcript와 ledger_type을 사용하고,
-    expected는 모델 예측과 비교할 정답으로만 사용한다. expected를 프롬프트에 넣지 않는다.
+    각 줄은 하나의 상담 사례다. classification은 transcript만 입력하고 label을 정답으로
+    사용한다. full은 transcript와 ledger_type을 입력하고 expected를 정답으로 사용한다.
+    어느 모드에서도 정답은 모델 프롬프트에 넣지 않는다.
     """
 
-    required = {"sample_id", "transcript", "ledger_type", "expected"}
+    required = (
+        {"scenario_id", "transcript", "label"}
+        if task == "classification"
+        else {"sample_id", "transcript", "ledger_type", "expected"}
+    )
     samples: list[dict[str, Any]] = []
     with path.open(encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
@@ -133,7 +156,16 @@ def load_dataset(path: Path, limit: int | None) -> list[dict[str, Any]]:
             missing = required - sample.keys()
             if missing:
                 raise ValueError(f"{path}:{line_number}: missing {sorted(missing)}")
-            if not isinstance(sample["expected"], dict):
+            if task == "classification":
+                if not isinstance(sample["scenario_id"], str) or not sample["scenario_id"].strip():
+                    raise ValueError(f"{path}:{line_number}: scenario_id must be a non-empty string")
+                if not isinstance(sample["transcript"], str) or not sample["transcript"].strip():
+                    raise ValueError(f"{path}:{line_number}: transcript must be a non-empty string")
+                if sample["label"] not in allowed_types:
+                    raise ValueError(
+                        f"{path}:{line_number}: label must be one of {allowed_types}"
+                    )
+            elif not isinstance(sample["expected"], dict):
                 raise ValueError(f"{path}:{line_number}: expected must be an object")
             samples.append(sample)
             if limit is not None and len(samples) >= limit:
@@ -186,12 +218,14 @@ def model_load_kwargs(quantization: str) -> dict[str, Any]:
     return kwargs
 
 
-def build_user_prompt(sample: dict[str, Any]) -> str:
+def build_user_prompt(sample: dict[str, Any], task: str) -> str:
     """현재 장부 종류와 STT 결과만 모델의 사용자 입력으로 만든다.
 
     평가 정답 expected가 입력에 섞이면 모델이 답을 미리 보게 되므로 포함하지 않는다.
     """
 
+    if task == "classification":
+        return f"STT 상담 텍스트:\n{sample['transcript']}"
     return (
         f"현재 장부 종류: {sample['ledger_type']}\n"
         f"STT 상담 텍스트:\n{sample['transcript']}"
@@ -376,6 +410,85 @@ def calculate_metrics(
     }
 
 
+def calculate_classification_metrics(
+    rows: list[dict[str, Any]], allowed_types: list[str]
+) -> dict[str, Any]:
+    """분류 전용 데이터의 정확도, 클래스별 지표와 혼동 행렬을 계산한다.
+
+    JSON 파싱 실패와 허용되지 않은 라벨 출력도 전체 표본에 남겨 오답으로 계산한다.
+    따라서 일부 실패 사례를 제외해 모델 점수가 높아지는 일을 막는다.
+    """
+
+    true_positive: Counter[str] = Counter()
+    false_positive: Counter[str] = Counter()
+    false_negative: Counter[str] = Counter()
+    confusion_labels = [*allowed_types, "__invalid__"]
+    confusion_matrix = {
+        expected: {predicted: 0 for predicted in confusion_labels}
+        for expected in allowed_types
+    }
+    parsed_count = 0
+    valid_label_count = 0
+    correct_count = 0
+
+    for row in rows:
+        expected_class = row["expected"]["consultation_type"]
+        prediction = row["prediction"]
+        if prediction is not None:
+            parsed_count += 1
+            predicted_value = prediction.get("consultation_type")
+        else:
+            predicted_value = None
+        predicted_class = (
+            predicted_value if predicted_value in allowed_types else "__invalid__"
+        )
+        if predicted_class != "__invalid__":
+            valid_label_count += 1
+        if predicted_class == expected_class:
+            correct_count += 1
+        confusion_matrix[expected_class][predicted_class] += 1
+
+        for label in allowed_types:
+            if expected_class == label and predicted_class == label:
+                true_positive[label] += 1
+            elif expected_class != label and predicted_class == label:
+                false_positive[label] += 1
+            elif expected_class == label and predicted_class != label:
+                false_negative[label] += 1
+
+    metrics_by_class: dict[str, dict[str, float | int]] = {}
+    for label in allowed_types:
+        precision = safe_divide(
+            true_positive[label], true_positive[label] + false_positive[label]
+        )
+        recall = safe_divide(
+            true_positive[label], true_positive[label] + false_negative[label]
+        )
+        metrics_by_class[label] = {
+            "precision": precision,
+            "recall": recall,
+            "f1": safe_divide(2 * precision * recall, precision + recall),
+            "support": sum(
+                row["expected"]["consultation_type"] == label for row in rows
+            ),
+        }
+
+    latencies = [row["latency_seconds"] for row in rows if row["error"] is None]
+    return {
+        "samples": len(rows),
+        "json_parse_rate": safe_divide(parsed_count, len(rows)),
+        "valid_label_rate": safe_divide(valid_label_count, len(rows)),
+        "classification_accuracy": safe_divide(correct_count, len(rows)),
+        "classification_macro_f1": statistics.fmean(
+            class_metrics["f1"] for class_metrics in metrics_by_class.values()
+        ),
+        "classification_metrics_by_class": metrics_by_class,
+        "confusion_matrix": confusion_matrix,
+        "mean_latency_seconds": statistics.fmean(latencies) if latencies else None,
+        "p95_latency_seconds": percentile(latencies, 0.95),
+    }
+
+
 def run_model(
     spec: ModelSpec,
     samples: list[dict[str, Any]],
@@ -383,6 +496,7 @@ def run_model(
     quantization: str,
     output_path: Path,
     allowed_types: list[str],
+    task: str,
 ) -> dict[str, Any]:
     """Qwen 모델 하나를 불러와 모든 평가 사례를 실행한다.
 
@@ -425,8 +539,15 @@ def run_model(
             # 3. 모든 후보에 같은 시스템 프롬프트와 사용자 입력을 적용한다.
             # 모델마다 프롬프트를 다르게 하면 모델 크기에 따른 공정한 비교가 어려워진다.
             messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_prompt(sample)},
+                {
+                    "role": "system",
+                    "content": (
+                        CLASSIFICATION_SYSTEM_PROMPT
+                        if task == "classification"
+                        else SYSTEM_PROMPT
+                    ),
+                },
+                {"role": "user", "content": build_user_prompt(sample, task)},
             ]
             # 4. Qwen이 학습할 때 사용한 채팅 형식에 맞춰 system/user 메시지를 조립한다.
             # add_generation_prompt=True는 assistant가 답변을 시작할 위치를 표시한다.
@@ -455,7 +576,11 @@ def run_model(
                 with torch.inference_mode():
                     generated = model.generate(
                         **encoded,
-                        max_new_tokens=int(generation["max_new_tokens"]),
+                        max_new_tokens=int(
+                            generation.get("classification_max_new_tokens", 64)
+                            if task == "classification"
+                            else generation["max_new_tokens"]
+                        ),
                         do_sample=bool(generation["do_sample"]),
                         pad_token_id=tokenizer.eos_token_id,
                     )
@@ -472,24 +597,35 @@ def run_model(
             # transcript 원문 자체는 결과에 다시 쓰지 않지만, raw_output과 expected에도
             # 민감정보가 포함될 수 있으므로 results/는 Git에서 제외한다.
             row = {
-                "sample_id": sample["sample_id"],
-                "ledger_type": sample["ledger_type"],
-                "expected": sample["expected"],
+                "sample_id": (
+                    sample["scenario_id"] if task == "classification" else sample["sample_id"]
+                ),
+                "expected": (
+                    {"consultation_type": sample["label"]}
+                    if task == "classification"
+                    else sample["expected"]
+                ),
                 "prediction": prediction,
                 "raw_output": raw_output,
-                "evidence_grounding_violations": (
-                    count_evidence_violations(prediction, sample["transcript"])
-                    if prediction is not None
-                    else 0
-                ),
                 "latency_seconds": latency,
                 "error": error,
             }
+            if task == "full":
+                row["ledger_type"] = sample["ledger_type"]
+                row["evidence_grounding_violations"] = (
+                    count_evidence_violations(prediction, sample["transcript"])
+                    if prediction is not None
+                    else 0
+                )
             rows.append(row)
             output_file.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     # 8. 모든 사례가 끝나면 모델 하나의 종합 지표를 계산한다.
-    metrics = calculate_metrics(rows, allowed_types)
+    metrics = (
+        calculate_classification_metrics(rows, allowed_types)
+        if task == "classification"
+        else calculate_metrics(rows, allowed_types)
+    )
     metrics.update(
         {
             "model_id": spec.model_id,
@@ -517,13 +653,13 @@ def main() -> None:
 
     # 2. models.yaml과 평가 JSONL을 읽는다.
     config = load_config(args.config)
-    samples = load_dataset(args.dataset, args.limit)
+    allowed_types = config["evaluation"]["allowed_consultation_types"]
+    samples = load_dataset(args.dataset, args.limit, args.task, allowed_types)
 
     # 3. models.yaml의 네 후보를 ModelSpec 목록으로 만든다.
     # --models를 지정했다면 그중 요청된 모델만 남는다.
     specs = select_models(config, args.models)
     generation = config["generation"]
-    allowed_types = config["evaluation"]["allowed_consultation_types"]
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_dir = args.output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -542,6 +678,7 @@ def main() -> None:
                 args.quantization,
                 output_path,
                 allowed_types,
+                args.task,
             )
         )
 
@@ -551,6 +688,7 @@ def main() -> None:
         "run_id": run_id,
         "dataset": str(args.dataset.resolve()),
         "sample_count": len(samples),
+        "task": args.task,
         "quantization": args.quantization,
         "generation": generation,
         "models": summaries,

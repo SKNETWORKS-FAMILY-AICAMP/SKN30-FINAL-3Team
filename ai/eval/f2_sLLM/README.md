@@ -27,7 +27,28 @@ ai/eval/f2_sLLM/
 
 ## 평가 데이터 형식
 
-각 줄이 하나의 JSON 객체인 JSONL 파일을 사용한다.
+각 줄이 하나의 JSON 객체인 JSONL 파일을 사용한다. 현재 평가는 상담 유형만 비교하는
+`classification`과 기존 분류·필드 추출을 함께 비교하는 `full` 두 가지 모드를 지원한다.
+
+### 상담 유형 분류
+
+`--task classification`은 다음 필드만 모델 입력과 정답으로 사용한다. 그 밖의 데이터셋
+메타데이터는 평가 입력에 전달하지 않는다.
+
+```json
+{
+  "scenario_id": "f2_sell_001",
+  "transcript": "아파트를 매도하려고 전화드렸어요.",
+  "label": "매도의뢰"
+}
+```
+
+- `scenario_id`, `transcript`, `label`은 필수다.
+- `label`은 `매도의뢰`, `매수문의`, `공동중개`, `단순문의` 중 하나다.
+- 정확도, macro F1, 클래스별 precision·recall·F1, 혼동 행렬을 계산한다.
+- JSON 파싱 실패와 허용되지 않은 라벨 출력은 제외하지 않고 오답으로 계산한다.
+
+### 전체 분류·추출
 
 ```json
 {
@@ -71,14 +92,24 @@ uv pip install \
 
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
-  --dataset data/f2_llm/releases/0.1.0/test.jsonl
+  --dataset data/f2_llm/releases/0.2.0/test.jsonl \
+  --task classification
+```
+
+전체 분류·추출 형식을 평가할 때는 기존 모드를 명시한다.
+
+```bash
+ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
+  --dataset data/f2_llm/releases/0.1.0/test.jsonl \
+  --task full
 ```
 
 VRAM이 부족하면 같은 양자화 조건을 모든 모델에 적용한다.
 
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
-  --dataset data/f2_llm/releases/0.1.0/test.jsonl \
+  --dataset data/f2_llm/releases/0.2.0/test.jsonl \
+  --task classification \
   --quantization 4bit
 ```
 
@@ -86,7 +117,8 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
-  --dataset data/f2_llm/releases/0.1.0/test.jsonl \
+  --dataset data/f2_llm/releases/0.2.0/test.jsonl \
+  --task classification \
   --models Qwen/Qwen3-0.6B Qwen/Qwen3-1.7B
 ```
 
