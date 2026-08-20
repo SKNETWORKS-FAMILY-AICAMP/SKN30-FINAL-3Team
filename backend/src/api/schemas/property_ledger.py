@@ -25,6 +25,7 @@ class PropertyComplexSummary(BaseModel):
     name: str
     property_type: str
     road_address: str | None
+    row_version: int = 1
 
     @classmethod
     def from_domain(cls, row: PropertyComplex) -> PropertyComplexSummary:
@@ -33,7 +34,22 @@ class PropertyComplexSummary(BaseModel):
             name=row.name,
             property_type=row.property_type,
             road_address=row.road_address,
+            row_version=row.row_version,
         )
+
+
+class PropertyComplexCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    property_type: str = Field(default="APARTMENT", max_length=30)
+    road_address: str | None = None
+    memo: str | None = None
+
+
+class PropertyComplexListResponse(BaseModel):
+    items: list[PropertyComplexSummary]
+    total: int
+    limit: int
+    offset: int
 
 
 class PropertyListingResponse(BaseModel):
@@ -109,6 +125,8 @@ class PropertyUnitRow(BaseModel):
     last_contact_at: datetime | None
     row_version: int
     current_listing: PropertyListingResponse | None
+    """가장 최근 상담 로그 본문. 목록의 로그 열을 채우기 위한 값이며 없으면 null이다."""
+    latest_interaction_content: str | None = None
 
     @classmethod
     def from_domain(
@@ -116,6 +134,7 @@ class PropertyUnitRow(BaseModel):
         unit: PropertyUnit,
         complex_row: PropertyComplex,
         listing: PropertyListing | None,
+        interaction: ClientInteraction | None = None,
     ) -> PropertyUnitRow:
         return cls(
             id=unit.id or 0,
@@ -145,6 +164,9 @@ class PropertyUnitRow(BaseModel):
             row_version=unit.row_version,
             current_listing=(
                 PropertyListingResponse.from_domain(listing) if listing is not None else None
+            ),
+            latest_interaction_content=(
+                interaction.interaction_content if interaction is not None else None
             ),
         )
 

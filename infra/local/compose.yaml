@@ -1,0 +1,34 @@
+# 로컬 개발용 PostgreSQL.
+#
+# 운영 인프라는 Terraform이 관리한다. 이 파일은 개발자 노트북에서 backend를
+# 실제 DB에 붙여 보기 위한 것이며, 여기 적힌 자격증명은 로컬 전용이다.
+#
+# 사용법
+#   docker compose -f infra/local/compose.yaml up -d
+#   export DB_URL="postgresql+psycopg://brokerage:localdev@127.0.0.1:5432/brokerage"
+#   export DB_MIGRATION_URL="postgresql://brokerage:localdev@127.0.0.1:5432/brokerage"
+#   (backend/) uv run yoyo apply --batch
+
+services:
+  postgres:
+    # docs/db/README.md의 기준선이 PostgreSQL 15다.
+    image: postgres:15-alpine
+    container_name: brokerage-local-postgres
+    environment:
+      POSTGRES_USER: brokerage
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: brokerage
+      # 한글 데이터가 들어가므로 UTF-8로 초기화한다.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brokerage -d brokerage"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:

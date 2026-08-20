@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlmodel import Session
+from sqlmodel import Session, col
 
 from core.errors import (
     NotFoundError,
@@ -14,6 +14,7 @@ from core.errors import (
 from domain.property_ledger import repository
 from domain.property_ledger.models import (
     ClientInteraction,
+    PropertyComplex,
     PropertyListing,
     PropertyRequirement,
     PropertyUnit,
@@ -32,6 +33,53 @@ def require_property_requirement(session: Session, brokerage_id: int, requiremen
     if found is None:
         raise NotFoundError("property requirement is not found")
     return found
+
+
+def create_property_complex(session: Session, brokerage_id: int, payload: dict[str, Any]) -> int:
+    """단지를 만든다. 세대를 등록하려면 단지가 먼저 있어야 한다."""
+    name = str(payload.get("name", "")).strip()
+    if not name:
+        raise ValidationError("name must not be empty")
+    if repository.find_property_complex_by_name(session, brokerage_id, name) is not None:
+        raise ValidationError("complex name already exists in this brokerage")
+
+    complex_row = PropertyComplex(brokerage_id=brokerage_id, **{**payload, "name": name})
+    session.add(complex_row)
+    session.flush()
+    session.commit()
+    return complex_row.id or 0
+
+
+def delete_property_complex(
+    session: Session, brokerage_id: int, complex_id: int, expected_row_version: int
+) -> None:
+    """단지를 소프트 삭제한다.
+
+    세대가 남아 있으면 거절한다. 세대는 단지를 필수로 참조하므로 단지를 먼저 감추면
+    그 세대들이 이름 없는 상태가 된다. 지우려면 세대를 먼저 정리해야 한다.
+    """
+    if repository.find_property_complex(session, brokerage_id, complex_id) is None:
+        raise NotFoundError("property complex is not found")
+
+    remaining = repository.count_units_in_complex(session, brokerage_id, complex_id)
+    if remaining > 0:
+        # 화면이 사유를 그대로 안내할 수 있도록 코드를 준다.
+        raise ValidationError(
+            f"this complex still has {remaining} unit(s)", code="COMPLEX_HAS_UNITS"
+        )
+
+    updated = repository.bump_row_version(
+        session,
+        PropertyComplex,
+        brokerage_id,
+        complex_id,
+        expected_row_version,
+        {"is_deleted": True, "deleted_at": datetime.now(UTC)},
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+    session.commit()
 
 
 def create_property_unit(session: Session, brokerage_id: int, payload: dict[str, Any]) -> int:
@@ -56,6 +104,54 @@ def update_property_unit(
 
     updated = repository.bump_row_version(
         session, PropertyUnit, brokerage_id, unit_id, expected_row_version, payload
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+    session.commit()
+
+
+def delete_property_unit(
+    session: Session, brokerage_id: int, unit_id: int, expected_row_version: int
+) -> None:
+    """세대를 소프트 삭제한다.
+
+    행을 실제로 지우지 않는다. 상담 로그와 매물 이력이 세대를 참조하고 있어 물리 삭제는
+    이력을 함께 잃는다. 목록 조회는 이미 `is_deleted = false`만 본다.
+    """
+    require_property_unit(session, brokerage_id, unit_id)
+    deleted_at = datetime.now(UTC)
+    updated = repository.bump_row_version(
+        session,
+        PropertyUnit,
+        brokerage_id,
+        unit_id,
+        expected_row_version,
+        {"is_deleted": True, "deleted_at": deleted_at},
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+
+    # 세대가 사라지면 그 세대의 매물 건도 목록에 남을 이유가 없다.
+    repository.soft_delete_children(
+        session, PropertyListing, brokerage_id, col(PropertyListing.unit_id), unit_id
+    )
+    session.commit()
+
+
+def delete_property_requirement(
+    session: Session, brokerage_id: int, requirement_id: int, expected_row_version: int
+) -> None:
+    """구입장 행을 소프트 삭제한다. 상담 로그는 남긴다."""
+    require_property_requirement(session, brokerage_id, requirement_id)
+    updated = repository.bump_row_version(
+        session,
+        PropertyRequirement,
+        brokerage_id,
+        requirement_id,
+        expected_row_version,
+        {"is_deleted": True, "deleted_at": datetime.now(UTC)},
     )
     if not updated:
         session.rollback()

@@ -11,7 +11,7 @@ import test from "node:test";
 import { formatMoney, formatMoneyPair, parseMoney, parseMoneyPair } from "../src/features/ledger/model/money.ts";
 import { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "../src/features/ledger/model/area.ts";
 import { addYears, formatTimestampAsDate, parseDate } from "../src/features/ledger/model/dates.ts";
-import { formatPhone, isSamePhone, maskPhone, normalizePhone } from "../src/features/ledger/model/phone.ts";
+import { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "../src/features/ledger/model/phone.ts";
 import { LIFECYCLE_STATUS, toCode, toLabel } from "../src/features/ledger/model/codes.ts";
 import {
   applyUnitDetail,
@@ -266,4 +266,25 @@ test("인물이 없는 구입장은 저장 요청을 만들지 않는다", () =>
   assert.equal(payload.budget_raw_text, "28억선");
   assert.equal(payload.max_budget_amount, 28 * EOK);
   assert.deepEqual(payload.desired_pyeongs, [25, 33]);
+});
+
+
+test("전화번호 입력은 타이핑 도중에도 하이픈으로 끊는다", () => {
+  assert.equal(formatPhoneInput("010"), "010");
+  assert.equal(formatPhoneInput("0101234"), "010-1234");
+  assert.equal(formatPhoneInput("01012345678"), "010-1234-5678");
+  assert.equal(formatPhoneInput("0212345678"), "02-1234-5678");
+  assert.equal(formatPhoneInput(""), "");
+});
+
+test("규칙을 벗어난 연락처는 손대지 않는다", () => {
+  // 내선·국제번호는 실제 장부에 섞여 있다. 형식을 강제하면 적을 자리가 없어진다.
+  assert.equal(formatPhoneInput("+82 10 1234 5678"), "+82 10 1234 5678");
+  assert.equal(formatPhoneInput("내선 302"), "내선 302");
+});
+
+test("지우는 중에는 형식을 다시 붙이지 않는다", () => {
+  // 하이픈이 곧바로 되붙으면 백스페이스가 먹지 않는 것처럼 보인다.
+  assert.equal(nextPhoneInput("010-1234-5678", "010-1234-567"), "010-1234-567");
+  assert.equal(nextPhoneInput("010-1234", "010-12345"), "010-1234-5");
 });

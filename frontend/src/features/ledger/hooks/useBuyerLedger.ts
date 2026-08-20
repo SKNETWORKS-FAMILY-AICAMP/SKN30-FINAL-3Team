@@ -25,6 +25,7 @@ export interface BuyerLedger extends LedgerCollection<BuyerRow> {
   loadDetail: (row: BuyerRow) => Promise<BuyerRow>;
   saveRow: (row: BuyerRow) => Promise<BuyerRow>;
   discardRow: (row: BuyerRow) => void;
+  deleteRow: (row: BuyerRow) => Promise<void>;
 }
 
 export function useBuyerLedger(
@@ -144,8 +145,40 @@ export function useBuyerLedger(
     [removeRow],
   );
 
+  const deleteRow = useCallback(
+    async (row: BuyerRow): Promise<void> => {
+      if (row.serverId == null) {
+        removeRow(row.id);
+        return;
+      }
+      if (row.rowVersion == null) {
+        throw new LedgerApiError({
+          kind: "validation",
+          message: "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.",
+        });
+      }
+
+      patchRow(row.id, (current) => ({ ...current, sync: { status: "saving" } }));
+      try {
+        await ledgerTransport.deleteRequirement(row.serverId, row.rowVersion);
+        removeRow(row.id);
+      } catch (error: unknown) {
+        const apiError = toApiError(error);
+        patchRow(row.id, (current) => ({
+          ...current,
+          sync:
+            apiError.kind === "conflict"
+              ? { status: "conflict", reason: apiError.message }
+              : { status: "failed", reason: apiError.message },
+        }));
+        throw apiError;
+      }
+    },
+    [patchRow, removeRow],
+  );
+
   return useMemo(
-    () => ({ ...collection, loadDetail, saveRow, discardRow }),
-    [collection, loadDetail, saveRow, discardRow],
+    () => ({ ...collection, loadDetail, saveRow, discardRow, deleteRow }),
+    [collection, loadDetail, saveRow, discardRow, deleteRow],
   );
 }

@@ -127,6 +127,7 @@ export function decodeComplexSummary(value: unknown, path = "complex"): ComplexS
     name: asString(record["name"], `${path}.name`),
     property_type: asString(record["property_type"], `${path}.property_type`),
     road_address: asNullableString(record["road_address"], `${path}.road_address`),
+    row_version: typeof record["row_version"] === "number" ? record["row_version"] : 1,
   };
 }
 
@@ -231,6 +232,10 @@ export function decodePropertyUnitRow(value: unknown, path = "item"): PropertyUn
     last_contact_at: asNullableString(record["last_contact_at"], `${path}.last_contact_at`),
     row_version: asNumber(record["row_version"], `${path}.row_version`),
     current_listing: listing == null ? null : decodeListing(listing, `${path}.current_listing`),
+    latest_interaction_content: asNullableString(
+      record["latest_interaction_content"],
+      `${path}.latest_interaction_content`,
+    ),
   };
 }
 

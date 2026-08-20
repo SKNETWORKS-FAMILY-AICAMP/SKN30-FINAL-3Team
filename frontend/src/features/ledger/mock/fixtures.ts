@@ -23,10 +23,10 @@ const EOK = 100_000_000;
 const MAN = 10_000;
 
 export const MOCK_COMPLEXES: ComplexSummaryDto[] = [
-  { id: 1, name: "래미안 원베일리", property_type: "APARTMENT", road_address: "서울 서초구 신반포로 275" },
-  { id: 2, name: "아크로리버파크", property_type: "APARTMENT", road_address: "서울 서초구 신반포로 15길" },
-  { id: 3, name: "반포자이", property_type: "APARTMENT", road_address: "서울 서초구 신반포로 270" },
-  { id: 4, name: "래미안 퍼스티지", property_type: "APARTMENT", road_address: "서울 서초구 반포대로 275" },
+  { id: 1, name: "래미안 원베일리", property_type: "APARTMENT", road_address: "서울 서초구 신반포로 275", row_version: 1 },
+  { id: 2, name: "아크로리버파크", property_type: "APARTMENT", road_address: "서울 서초구 신반포로 15길", row_version: 1 },
+  { id: 3, name: "반포자이", property_type: "APARTMENT", road_address: "서울 서초구 신반포로 270", row_version: 1 },
+  { id: 4, name: "래미안 퍼스티지", property_type: "APARTMENT", road_address: "서울 서초구 반포대로 275", row_version: 1 },
 ];
 
 /**
@@ -203,6 +203,8 @@ export function createUnitRowDtos(count: number): PropertyUnitRowDto[] {
       last_contact_at: index % 7 === 0 ? null : isoTimestamp(2026, 8, (index % 12) + 1),
       row_version: 1,
       current_listing: listingFor(index, unitId),
+      // 실제 서버도 목록에 최신 상담 로그 1건을 함께 싣는다.
+      latest_interaction_content: index % 3 === 0 ? interactionFor(index, unitId, null).interaction_content : null,
     };
   });
 }

@@ -8,6 +8,7 @@
 
 import {
   decodeClientInteraction,
+  decodeComplexSummary,
   decodeColumnValues,
   decodeListing,
   decodePage,
@@ -16,11 +17,12 @@ import {
   decodeRequirementDetail,
   decodeRequirementRow,
 } from "../model/decode.ts";
-import { request } from "./httpClient.ts";
+import { expectNoContent, request } from "./httpClient.ts";
 import type { QueryValue } from "./httpClient.ts";
 import type { ColumnFilters, LedgerTransport, ListQuery } from "./transport.ts";
 
 const PATHS = {
+  complexes: "/property-complexes",
   units: "/property-units",
   unitColumnValues: "/property-units/column-values",
   listings: "/property-listings",
@@ -42,6 +44,32 @@ function toQuery(query: ListQuery, extra: Record<string, QueryValue> = {}): Reco
 }
 
 export const httpTransport: LedgerTransport = {
+  async listComplexes(query, signal) {
+    return request(PATHS.complexes, {
+      query: toQuery(query),
+      signal,
+      decode: (value) => decodePage(value, (entry, path) => decodeComplexSummary(entry, path)),
+    });
+  },
+
+  async createComplex(payload, signal) {
+    return request(PATHS.complexes, {
+      method: "POST",
+      body: payload,
+      signal,
+      decode: (value) => decodeComplexSummary(value),
+    });
+  },
+
+  async deleteComplex(complexId, rowVersion, signal) {
+    return request(`${PATHS.complexes}/${complexId}`, {
+      method: "DELETE",
+      query: { row_version: rowVersion },
+      signal,
+      decode: expectNoContent,
+    });
+  },
+
   async listPropertyUnits(query, signal) {
     return request(PATHS.units, {
       query: toQuery(query),
@@ -72,6 +100,15 @@ export const httpTransport: LedgerTransport = {
       body: payload,
       signal,
       decode: (value) => decodePropertyUnitDetail(value),
+    });
+  },
+
+  async deletePropertyUnit(unitId, rowVersion, signal) {
+    return request(`${PATHS.units}/${unitId}`, {
+      method: "DELETE",
+      query: { row_version: rowVersion },
+      signal,
+      decode: expectNoContent,
     });
   },
 
@@ -123,6 +160,15 @@ export const httpTransport: LedgerTransport = {
       body: payload,
       signal,
       decode: (value) => decodeRequirementDetail(value),
+    });
+  },
+
+  async deleteRequirement(requirementId, rowVersion, signal) {
+    return request(`${PATHS.requirements}/${requirementId}`, {
+      method: "DELETE",
+      query: { row_version: rowVersion },
+      signal,
+      decode: expectNoContent,
     });
   },
 

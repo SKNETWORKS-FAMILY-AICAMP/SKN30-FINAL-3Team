@@ -12,8 +12,9 @@ import {
   TextArea,
   TextInput,
 } from "@patternfly/react-core";
-import { MicrophoneIcon, SaveIcon, TimesIcon } from "@patternfly/react-icons";
+import { SaveIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
+import { nextPhoneInput } from "./ledger/model/phone.ts";
 import "./DetailWorkspace.css";
 
 const EMPTY_BUYER = {
@@ -41,15 +42,15 @@ const EMPTY_BUYER = {
   rowKind: "buyer",
 };
 
-function Field({ id, label, value, onChange, type = "text" }) {
-  return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><TextInput id={id} type={type} value={value || ""} onChange={(_event, next) => onChange(next)} /></label>;
+function Field({ id, label, value, onChange, type = "text", inputMode, autoComplete, placeholder }) {
+  return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><TextInput id={id} type={type} inputMode={inputMode} autoComplete={autoComplete} placeholder={placeholder} value={value || ""} onChange={(_event, next) => onChange(next)} /></label>;
 }
 
 function SelectField({ id, label, value, options, onChange }) {
   return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><FormSelect id={id} value={value} onChange={(_event, next) => onChange(next)}>{options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}</FormSelect></label>;
 }
 
-export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, crossMatchPanel, focusF2Request = 0 }) {
+export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, crossMatchPanel, focusF2Request = 0 }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY_BUYER, ...(row || {}) }));
   const [f2Open, setF2Open] = useState(false);
   const [closeDecision, setCloseDecision] = useState(false);
@@ -65,6 +66,17 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
     setCloseDecision(false);
     setError("");
   }, [focusF2Request, isOpen, row]);
+
+  /* 상세는 항상 맨 위에서 시작한다. 안쪽 패널이 스크롤을 가져가는 일이 있어 열릴 때 되돌린다. */
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelectorAll(".detail-workspace-modal .pf-v6-c-modal-box__body").forEach((node) => {
+        node.scrollTop = 0;
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isOpen, row?.id]);
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(baselineRef.current), [draft]);
   const completionReady = Boolean(draft.buyer?.trim() && draft.category && (draft.complex?.trim() || draft.area?.trim()) && draft.budget?.trim());
@@ -98,11 +110,11 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
 
   return <Modal isOpen={isOpen} onClose={requestClose} variant="large" className="detail-workspace-modal" aria-label="손님 상세·상담 로그">
     <ModalHeader title="손님 상세 · 상담 로그" description={`${draft.buyer || "별칭 미입력"} · ${draft.category || "구분 미입력"} · ${draft.saveState}`} />
-    <ModalBody>
+    <ModalBody className="detail-workspace__modal-body">
       <div className="buyer-detail-workspace" data-screen-id="F1-MOD-020 F1-MOD-130" data-requirement-ids="F1-DM-08~16, F1-LG-01~06, F1-LG-08~19, F1-LG-33~34, F1-TR-06, F2-POP-01~03">
         {error && <Alert variant="danger" isInline isLiveRegion title="저장할 수 없습니다" data-screen-id="F1-MOD-140" data-requirement-ids="F1-SE-04, F1-DM-16">{error}</Alert>}
         <div className="detail-info-grid">
-          <section className="detail-info-column"><h3>손님과 접수</h3><Field id="buyer-name" label="이름·별칭" value={draft.buyer} onChange={(value) => update("buyer", value)} /><Field id="buyer-phone" label="전화번호" type="tel" value={draft.phone} onChange={(value) => update("phone", value)} /><Field id="buyer-date" label="접수일" type="date" value={draft.date} onChange={(value) => update("date", value)} /><Field id="buyer-assignee" label="담당자" value={draft.assignee} onChange={(value) => update("assignee", value)} /></section>
+          <section className="detail-info-column"><h3>손님과 접수</h3><Field id="buyer-name" label="이름·별칭" value={draft.buyer} onChange={(value) => update("buyer", value)} /><Field id="buyer-phone" label="전화번호" type="tel" inputMode="tel" autoComplete="tel" placeholder="010-0000-0000" value={draft.phone} onChange={(value) => update("phone", nextPhoneInput(draft.phone, value))} /><Field id="buyer-date" label="접수일" type="date" value={draft.date} onChange={(value) => update("date", value)} /><Field id="buyer-assignee" label="담당자" value={draft.assignee} onChange={(value) => update("assignee", value)} /></section>
           <section className="detail-info-column"><h3>희망 조건</h3><SelectField id="buyer-category" label="거래 구분" value={draft.category} options={["매수", "매도", "전세", "월세"]} onChange={(value) => update("category", value)} /><Field id="buyer-complex" label="희망 단지·지역" value={draft.complex} onChange={(value) => update("complex", value)} /><Field id="buyer-area" label="희망 평형" value={draft.area} onChange={(value) => update("area", value)} /><Field id="buyer-budget" label="금액 조건" value={draft.budget} onChange={(value) => update("budget", value)} /><Field id="buyer-move-date" label="이사일" type="date" value={draft.moveDate} onChange={(value) => update("moveDate", value)} /></section>
           <section className="detail-info-column"><h3>진행 관리</h3><Field id="buyer-stage" label="진행 단계" value={draft.stage} onChange={(value) => update("stage", value)} /><SelectField id="buyer-completion" label="완료 여부" value={draft.completion} options={["진행", "완료"]} onChange={(value) => update("completion", value)} /><Field id="buyer-expiry" label="만기일" type="date" value={draft.expiry} onChange={(value) => update("expiry", value)} /><Field id="buyer-classification" label="분류" value={draft.classification} onChange={(value) => update("classification", value)} /><Field id="buyer-brokerage" label="관련 부동산" value={draft.brokerage} onChange={(value) => update("brokerage", value)} /></section>
         </div>
@@ -111,8 +123,8 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
         <Checkbox id="buyer-consent" label="개인정보 활용 동의를 확인했습니다" isChecked={consented} onChange={(_event, checked) => update("consent", checked ? "동의" : "미확인")} />
         <div className="detail-workspace__action-row">
           <Button variant="primary" icon={<SaveIcon />} onClick={() => save()}>저장</Button>
-          <Button variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)}>음성메모</Button>
           <Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button>
+          <Button variant="secondary" isDanger icon={<TrashIcon />} onClick={() => onDelete?.(draft)}>삭제</Button>
         </div>
         {crossMatchPanel}
       </div>

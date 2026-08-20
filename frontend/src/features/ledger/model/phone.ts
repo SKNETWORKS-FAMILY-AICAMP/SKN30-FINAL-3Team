@@ -35,6 +35,41 @@ export function formatPhone(value: string | null | undefined): string {
   return String(value);
 }
 
+/**
+ * 입력 중인 번호를 하이픈 표기로 맞춘다.
+ *
+ * 완성된 번호만 다루는 `formatPhone`과 달리 타이핑 도중에도 끊어 준다.
+ * 규칙을 벗어난 값(내선, +82, 해외번호)은 그대로 둔다. 실제 장부에 그런 값이 섞여 있어
+ * 형식을 강제하면 적을 자리가 없어진다.
+ */
+export function formatPhoneInput(value: string | null | undefined): string {
+  const raw = value ?? "";
+  if (/[^0-9\-\s]/.test(raw)) return raw;
+  const digits = normalizePhone(raw);
+  if (digits === "") return "";
+
+  if (digits.startsWith("02")) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+  }
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+}
+
+/**
+ * 전화번호 입력칸의 다음 값.
+ *
+ * 지우는 중에는 형식을 다시 붙이지 않는다. 그러지 않으면 백스페이스로 하이픈을 지우는 순간
+ * 다시 붙어서 지워지지 않는 것처럼 느껴진다.
+ */
+export function nextPhoneInput(previous: string | null | undefined, next: string | null | undefined): string {
+  const before = previous ?? "";
+  const after = next ?? "";
+  return after.length < before.length ? after : formatPhoneInput(after);
+}
+
 /** 로그·오류 메시지에 넣어도 되는 형태로 가린다. "010-0000-9009" → "010-****-9009" */
 export function maskPhone(value: string | null | undefined): string {
   const digits = normalizePhone(value);

@@ -10,7 +10,7 @@ export type { PropertyLedger, UserNameLookup } from "./hooks/usePropertyLedger.t
 export { useBuyerLedger } from "./hooks/useBuyerLedger.ts";
 export type { BuyerLedger } from "./hooks/useBuyerLedger.ts";
 export { useComplexOptions } from "./hooks/useComplexOptions.ts";
-export type { ComplexOption } from "./hooks/useComplexOptions.ts";
+export type { ComplexCreateInput, ComplexOption, ComplexOptions } from "./hooks/useComplexOptions.ts";
 export type { CollectionState, CollectionStatus, LedgerCollection } from "./hooks/useLedgerCollection.ts";
 
 export type { ColumnFilters, ListQuery } from "./api/transport.ts";
@@ -25,7 +25,7 @@ export { isBuyerRow, isPropertyRow, isUnsavedDraft } from "./model/row.ts";
 export { formatMoney, parseMoney } from "./model/money.ts";
 export { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "./model/area.ts";
 export { addYears, todayDate } from "./model/dates.ts";
-export { formatPhone, isSamePhone, maskPhone, normalizePhone } from "./model/phone.ts";
+export { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "./model/phone.ts";
 export {
   CONTACTABILITY,
   DEMAND_TYPE,

@@ -72,8 +72,23 @@ export function describeForUser(error: unknown): string {
     return "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
-  const base = messageFor(error.kind);
+  const base = messageForCode(error.code) ?? messageFor(error.kind);
   return error.requestId == null ? base : `${base} (요청 번호 ${error.requestId})`;
+}
+
+/**
+ * 서버가 코드로 구분해 준 사유는 그대로 안내한다.
+ * 코드가 없으면 상태 코드에서 유추한 일반 문구로 떨어진다.
+ */
+function messageForCode(code: string | undefined): string | null {
+  switch (code) {
+    case "COMPLEX_HAS_UNITS":
+      return "이 단지에 등록된 세대가 남아 있어 삭제할 수 없습니다. 세대를 먼저 정리해 주세요.";
+    case "PRIVACY_CONSENT_REQUIRED":
+      return "개인정보 활용 동의가 없어 저장할 수 없습니다.";
+    default:
+      return null;
+  }
 }
 
 function messageFor(kind: LedgerErrorKind): string {

@@ -49,7 +49,11 @@ export async function apiFetch(endpoint, options = {}) {
 }
 
 export async function fetchCurrentUser() {
-  return apiFetch(`${API_BASE}/auth/me`);
+  // /auth/me는 사용자와 함께 새 CSRF 토큰을 준다. 새로고침으로 메모리가 비어도
+  // 이 응답으로 다시 채워야 쓰기 요청이 403이 되지 않는다.
+  const data = await apiFetch(`${API_BASE}/auth/me`);
+  if (data?.csrf_token) setCsrfToken(data.csrf_token);
+  return data?.user ?? data;
 }
 
 export async function loginDevelopmentSession() {

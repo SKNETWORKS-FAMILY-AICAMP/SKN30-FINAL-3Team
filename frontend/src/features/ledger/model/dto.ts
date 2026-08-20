@@ -41,6 +41,15 @@ export interface ComplexSummaryDto {
   name: string;
   property_type: string;
   road_address: string | null;
+  /** 삭제 요청에 실어 보낼 낙관적 잠금 값. 세대 목록에 실려 오는 요약에는 없을 수 있다. */
+  row_version: number;
+}
+
+export interface PropertyComplexCreateDto {
+  name: string;
+  property_type?: string;
+  road_address: string | null;
+  memo: string | null;
 }
 
 export interface PartyContactDto {
@@ -127,6 +136,8 @@ export interface PropertyUnitRowDto {
   last_contact_at: string | null;
   row_version: number;
   current_listing: PropertyListingDto | null;
+  /** 가장 최근 상담 로그 본문. 목록의 로그 열을 채운다. */
+  latest_interaction_content: string | null;
 }
 
 export interface PropertyUnitDetailDto {

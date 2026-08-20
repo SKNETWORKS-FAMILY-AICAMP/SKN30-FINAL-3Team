@@ -12,6 +12,9 @@ from api.schemas.property_ledger import (
     ClientInteractionResponse,
     ColumnValueItem,
     ColumnValuesResponse,
+    PropertyComplexCreateRequest,
+    PropertyComplexListResponse,
+    PropertyComplexSummary,
     PropertyListingCreateRequest,
     PropertyListingResponse,
     PropertyListingUpdateRequest,
@@ -111,6 +114,49 @@ def changed_fields(payload: Any) -> dict[str, Any]:
     return payload.model_dump(exclude_unset=True)
 
 
+@router.get("/property-complexes", response_model=PropertyComplexListResponse)
+def list_property_complexes(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    limit: int = Query(default=100, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(default=0, ge=0),
+) -> PropertyComplexListResponse:
+    page = build_page(limit, offset)
+    total = repository.count_property_complexes(db, user.brokerage_id)
+    rows = repository.list_property_complexes(db, user.brokerage_id, page)
+    return PropertyComplexListResponse(
+        items=[PropertyComplexSummary.from_domain(row) for row in rows],
+        total=total,
+        limit=page.limit,
+        offset=page.offset,
+    )
+
+
+@router.post("/property-complexes", response_model=PropertyComplexSummary, status_code=201)
+def create_property_complex(
+    payload: PropertyComplexCreateRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    _: None = Depends(require_csrf),
+) -> PropertyComplexSummary:
+    complex_id = service.create_property_complex(db, user.brokerage_id, payload.model_dump())
+    created = repository.find_property_complex(db, user.brokerage_id, complex_id)
+    if created is None:
+        raise ValidationError("complex was not created")
+    return PropertyComplexSummary.from_domain(created)
+
+
+@router.delete("/property-complexes/{complex_id}", status_code=204)
+def delete_property_complex(
+    complex_id: int,
+    row_version: int = Query(ge=1),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    _: None = Depends(require_csrf),
+) -> None:
+    service.delete_property_complex(db, user.brokerage_id, complex_id, row_version)
+
+
 @router.get("/property-units", response_model=PropertyUnitListResponse)
 def list_property_units(
     user: CurrentUser = Depends(get_current_user),
@@ -123,7 +169,7 @@ def list_property_units(
     total = repository.count_property_units(db, user.brokerage_id, filters)
     rows = repository.list_property_units(db, user.brokerage_id, filters, page)
     return PropertyUnitListResponse(
-        items=[PropertyUnitRow.from_domain(row[0], row[1], row[2]) for row in rows],
+        items=[PropertyUnitRow.from_domain(row[0], row[1], row[2], row[3]) for row in rows],
         total=total,
         limit=page.limit,
         offset=page.offset,
@@ -193,6 +239,17 @@ def update_property_unit(
 ) -> PropertyUnitDetailResponse:
     service.update_property_unit(db, user.brokerage_id, unit_id, changed_fields(payload))
     return get_property_unit(unit_id, user, db)
+
+
+@router.delete("/property-units/{unit_id}", status_code=204)
+def delete_property_unit(
+    unit_id: int,
+    row_version: int = Query(ge=1),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    _: None = Depends(require_csrf),
+) -> None:
+    service.delete_property_unit(db, user.brokerage_id, unit_id, row_version)
 
 
 @router.post(
@@ -326,6 +383,17 @@ def update_property_requirement(
         db, user.brokerage_id, requirement_id, changed_fields(payload)
     )
     return get_property_requirement(requirement_id, user, db)
+
+
+@router.delete("/property-requirements/{requirement_id}", status_code=204)
+def delete_property_requirement(
+    requirement_id: int,
+    row_version: int = Query(ge=1),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    _: None = Depends(require_csrf),
+) -> None:
+    service.delete_property_requirement(db, user.brokerage_id, requirement_id, row_version)
 
 
 @router.get("/client-interactions", response_model=ClientInteractionListResponse)

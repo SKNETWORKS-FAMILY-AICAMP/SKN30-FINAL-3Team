@@ -13,6 +13,8 @@
 
 import type {
   ClientInteractionCreateDto,
+  ComplexSummaryDto,
+  PropertyComplexCreateDto,
   ClientInteractionDto,
   ColumnValuesDto,
   PageDto,
@@ -39,6 +41,15 @@ export interface ListQuery {
 }
 
 export interface LedgerTransport {
+  /** 단지 마스터. 세대를 만들려면 단지가 먼저 있어야 한다. */
+  listComplexes(query: ListQuery, signal?: AbortSignal): Promise<PageDto<ComplexSummaryDto>>;
+  createComplex(
+    payload: PropertyComplexCreateDto,
+    signal?: AbortSignal,
+  ): Promise<ComplexSummaryDto>;
+  /** 단지 삭제. 세대가 남아 있으면 서버가 거절한다. */
+  deleteComplex(complexId: number, rowVersion: number, signal?: AbortSignal): Promise<void>;
+
   listPropertyUnits(query: ListQuery, signal?: AbortSignal): Promise<PageDto<PropertyUnitRowDto>>;
   getPropertyUnit(unitId: number, signal?: AbortSignal): Promise<PropertyUnitDetailDto>;
   createPropertyUnit(payload: PropertyUnitCreateDto, signal?: AbortSignal): Promise<PropertyUnitDetailDto>;
@@ -47,6 +58,9 @@ export interface LedgerTransport {
     payload: PropertyUnitUpdateDto,
     signal?: AbortSignal,
   ): Promise<PropertyUnitDetailDto>;
+
+  /** 소프트 삭제. 낙관적 잠금을 위해 마지막으로 읽은 row_version을 함께 보낸다. */
+  deletePropertyUnit(unitId: number, rowVersion: number, signal?: AbortSignal): Promise<void>;
 
   createPropertyListing(
     unitId: number,
@@ -70,6 +84,8 @@ export interface LedgerTransport {
     payload: PropertyRequirementUpdateDto,
     signal?: AbortSignal,
   ): Promise<PropertyRequirementDetailDto>;
+
+  deleteRequirement(requirementId: number, rowVersion: number, signal?: AbortSignal): Promise<void>;
 
   listClientInteractions(
     scope: { unitId?: number; requirementId?: number; partyId?: number; limit?: number },

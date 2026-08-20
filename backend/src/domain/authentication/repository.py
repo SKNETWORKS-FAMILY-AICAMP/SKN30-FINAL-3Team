@@ -28,6 +28,10 @@ def find_user_session_by_hash(session: Session, session_token_hash: str) -> User
     return session.exec(statement).first()
 
 
+def find_user_session_by_id(session: Session, session_id: int) -> UserSession | None:
+    return session.exec(select(UserSession).where(UserSession.id == session_id)).first()
+
+
 def add_user_session(session: Session, user_session: UserSession) -> UserSession:
     session.add(user_session)
     session.flush()

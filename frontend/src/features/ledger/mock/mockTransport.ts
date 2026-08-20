@@ -13,6 +13,7 @@ import { EMPTY_VALUE, MAX_PAGE_SIZE } from "../model/dto.ts";
 import type {
   ClientInteractionDto,
   ColumnValuesDto,
+  ComplexSummaryDto,
   PageDto,
   PropertyListingDto,
   PropertyRequirementRowDto,
@@ -28,6 +29,7 @@ import {
 } from "./fixtures.ts";
 
 interface MockState {
+  complexes: ComplexSummaryDto[];
   units: PropertyUnitRowDto[];
   requirements: PropertyRequirementRowDto[];
   interactions: ClientInteractionDto[];
@@ -41,6 +43,7 @@ function getState(): MockState {
   if (stateRef == null) {
     const units = createUnitRowDtos(APP_ENV.mockRowCount);
     stateRef = {
+      complexes: [...MOCK_COMPLEXES],
       units,
       requirements: createRequirementRowDtos(24),
       interactions: units.slice(0, 400).map((unit, index) => interactionFor(index, unit.id, null)),
@@ -212,6 +215,58 @@ function columnValues(values: unknown[], column: string): ColumnValuesDto {
 }
 
 export const mockTransport: LedgerTransport = {
+  async listComplexes(query, signal) {
+    await delay(signal);
+    const state = getState();
+    const limit = Math.min(query.limit ?? 100, MAX_PAGE_SIZE);
+    const offset = query.offset ?? 0;
+    return {
+      items: structuredClone(state.complexes.slice(offset, offset + limit)),
+      total: state.complexes.length,
+      limit,
+      offset,
+    };
+  },
+
+  async createComplex(payload, signal) {
+    await delay(signal);
+    const state = getState();
+    const name = payload.name.trim();
+    if (name === "") {
+      throw new LedgerApiError({ kind: "validation", message: "단지명을 입력해 주세요." });
+    }
+    if (state.complexes.some((entry) => entry.name.toLowerCase() === name.toLowerCase())) {
+      throw new LedgerApiError({ kind: "validation", message: `이미 등록된 단지입니다: ${name}` });
+    }
+    const created: ComplexSummaryDto = {
+      id: nextId(),
+      name,
+      property_type: payload.property_type ?? "APARTMENT",
+      road_address: payload.road_address,
+      row_version: 1,
+    };
+    state.complexes.push(created);
+    return structuredClone(created);
+  },
+
+  async deleteComplex(complexId, rowVersion, signal) {
+    await delay(signal);
+    const state = getState();
+    const found = state.complexes.find((entry) => entry.id === complexId);
+    if (found == null) {
+      throw new LedgerApiError({ kind: "notFound", message: "단지를 찾지 못했습니다.", status: 404 });
+    }
+    assertVersion(found.row_version, rowVersion);
+    if (state.units.some((unit) => unit.complex.id === complexId)) {
+      throw new LedgerApiError({
+        kind: "validation",
+        message: "이 단지에 등록된 세대가 있어 삭제할 수 없습니다.",
+        status: 422,
+      });
+    }
+    state.complexes = state.complexes.filter((entry) => entry.id !== complexId);
+  },
+
   async listPropertyUnits(query, signal) {
     await delay(signal);
     return paginate(filterUnits(query).sort(byBuildingAndUnit), query);
@@ -258,6 +313,7 @@ export const mockTransport: LedgerTransport = {
       last_contact_at: null,
       row_version: 1,
       current_listing: null,
+      latest_interaction_content: null,
     };
     // 새 행은 그리드 최상단에 보이도록 앞에 넣는다(F1-GR-30).
     state.units.unshift(created);
@@ -293,6 +349,15 @@ export const mockTransport: LedgerTransport = {
     });
     unit.complex = MOCK_COMPLEXES.find((entry) => entry.id === complexId) ?? unit.complex;
     return structuredClone(detailFor(unit));
+  },
+
+  async deletePropertyUnit(unitId, rowVersion, signal) {
+    await delay(signal);
+    const state = getState();
+    const unit = requireUnit(unitId);
+    assertVersion(unit.row_version, rowVersion);
+    // 서버는 소프트 삭제하지만 목록에서 사라진다는 결과는 같다.
+    state.units = state.units.filter((row) => row.id !== unitId);
   },
 
   async createPropertyListing(unitId, payload, signal) {
@@ -436,6 +501,17 @@ export const mockTransport: LedgerTransport = {
       row_version: requirement.row_version + 1,
     });
     return structuredClone({ requirement, desired_complexes: [] });
+  },
+
+  async deleteRequirement(requirementId, rowVersion, signal) {
+    await delay(signal);
+    const state = getState();
+    const requirement = state.requirements.find((row) => row.id === requirementId);
+    if (requirement == null) {
+      throw new LedgerApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
+    }
+    assertVersion(requirement.row_version, rowVersion);
+    state.requirements = state.requirements.filter((row) => row.id !== requirementId);
   },
 
   async listClientInteractions(scope, signal) {

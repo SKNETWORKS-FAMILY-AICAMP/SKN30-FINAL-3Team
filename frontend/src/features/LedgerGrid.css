@@ -165,6 +165,132 @@
   box-shadow: inset 0 0 0 2px #0066cc;
 }
 
+/* 표시가 셀 오른쪽 끝에 붙도록 렌더러가 셀 폭을 다 쓰게 한다. */
+.ledger-grid .ledger-grid__affordance .ag-cell-wrapper,
+.ledger-grid .ledger-grid__affordance .ag-cell-value {
+  width: 100%;
+}
+
+/* 목록에서 고르는 칸임을 알리는 화살표. 값이 길면 화살표를 밀어내지 않고 값을 줄인다. */
+.ledger-grid__affordance-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+}
+
+.ledger-grid__affordance-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-grid__affordance-mark {
+  flex: none;
+  color: #8a8d90;
+  font-size: 11px;
+}
+
+.ledger-grid .ag-cell:hover .ledger-grid__affordance-mark {
+  color: #0066cc;
+}
+
+.ledger-grid__status--sync-saving { color: #0066cc; background: #e7f1fa; }
+.ledger-grid__status--sync-failed { color: #b1380b; background: #faeae8; }
+.ledger-grid__status--sync-conflict { color: #795600; background: #fdf7e7; }
+
+/* 목록 선택 편집기. 지금 값과 무관하게 항상 전체 선택지를 보여준다. */
+.ledger-grid__combo {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid #0066cc;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(3, 3, 3, 0.16);
+}
+
+.ledger-grid__combo-list {
+  max-height: 220px;
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  list-style: none;
+  border-top: 1px solid #d2d2d2;
+}
+
+.ledger-grid__combo-list button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  color: #151515;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ledger-grid__combo-list button:hover,
+.ledger-grid__combo-list button:focus-visible {
+  background: #f0f7ff;
+}
+
+.ledger-grid__combo-list button.is-current {
+  font-weight: 700;
+}
+
+.ledger-grid__combo-empty {
+  padding: 8px 10px;
+  color: #6a6e73;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ledger-grid__text-or-date {
+  display: flex;
+  align-items: center;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #0066cc;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(3, 3, 3, 0.16);
+}
+
+.ledger-grid__text-or-date-picker {
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+  border-left: 1px solid #d2d2d2;
+}
+
+.ledger-grid__text-or-date-picker input {
+  width: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+}
+
+.ledger-grid__cell-editor--date {
+  min-width: 150px;
+}
+
+/* 목록 선택·달력 편집기. 셀 크기를 그대로 채워 다른 열과 높이가 어긋나지 않게 한다. */
+.ledger-grid__cell-editor {
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
 .ledger-grid .ag-row-selected::before {
   background-color: #e7f1fa;
 }

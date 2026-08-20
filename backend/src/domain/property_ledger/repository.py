@@ -104,6 +104,25 @@ def latest_listing_alias() -> Any:
     return aliased(PropertyListing, lateral)
 
 
+def latest_interaction_alias() -> Any:
+    """세대별 가장 최근 상담 로그 1건.
+
+    목록에서 로그 열이 늘 비어 보이지 않도록 lateral로 붙인다. 행마다 별도 질의를 보내면
+    한 화면에 수백 건의 요청이 생기므로 join으로 해결한다.
+    """
+    lateral = (
+        select(ClientInteraction)
+        .where(
+            col(ClientInteraction.brokerage_id) == PropertyUnit.brokerage_id,
+            col(ClientInteraction.unit_id) == PropertyUnit.id,
+        )
+        .order_by(col(ClientInteraction.interaction_at).desc(), col(ClientInteraction.id).desc())
+        .limit(1)
+        .lateral("latest_interaction")
+    )
+    return aliased(ClientInteraction, lateral)
+
+
 def property_unit_conditions(
     brokerage_id: int, filters: PropertyUnitFilters, listing: Any
 ) -> list[ColumnElement[bool]]:
@@ -143,14 +162,16 @@ def property_unit_conditions(
 
 def property_unit_query(brokerage_id: int, filters: PropertyUnitFilters) -> tuple[Select[Any], Any]:
     listing = latest_listing_alias()
+    interaction = latest_interaction_alias()
     statement = (
-        select(PropertyUnit, PropertyComplex, listing)
+        select(PropertyUnit, PropertyComplex, listing, interaction)
         .join(
             PropertyComplex,
             (col(PropertyComplex.brokerage_id) == PropertyUnit.brokerage_id)
             & (col(PropertyComplex.id) == PropertyUnit.complex_id),
         )
         .outerjoin(listing, true())
+        .outerjoin(interaction, true())
         .where(*property_unit_conditions(brokerage_id, filters, listing))
     )
     return statement, listing
@@ -246,6 +267,52 @@ def find_property_complex(
     statement = select(PropertyComplex).where(
         col(PropertyComplex.brokerage_id) == brokerage_id,
         col(PropertyComplex.id) == complex_id,
+        col(PropertyComplex.is_deleted).is_(False),
+    )
+    return session.execute(statement).scalars().first()
+
+
+def count_property_complexes(session: Session, brokerage_id: int) -> int:
+    statement = select(func.count()).select_from(PropertyComplex).where(
+        col(PropertyComplex.brokerage_id) == brokerage_id,
+        col(PropertyComplex.is_deleted).is_(False),
+    )
+    return int(session.execute(statement).scalar_one())
+
+
+def list_property_complexes(
+    session: Session, brokerage_id: int, page: Page
+) -> list[PropertyComplex]:
+    statement = (
+        select(PropertyComplex)
+        .where(
+            col(PropertyComplex.brokerage_id) == brokerage_id,
+            col(PropertyComplex.is_deleted).is_(False),
+        )
+        .order_by(col(PropertyComplex.name))
+        .limit(page.limit)
+        .offset(page.offset)
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+def count_units_in_complex(session: Session, brokerage_id: int, complex_id: int) -> int:
+    """단지에 남아 있는 세대 수. 삭제를 막을지 판단하는 데 쓴다."""
+    statement = select(func.count()).select_from(PropertyUnit).where(
+        col(PropertyUnit.brokerage_id) == brokerage_id,
+        col(PropertyUnit.complex_id) == complex_id,
+        col(PropertyUnit.is_deleted).is_(False),
+    )
+    return int(session.execute(statement).scalar_one())
+
+
+def find_property_complex_by_name(
+    session: Session, brokerage_id: int, name: str
+) -> PropertyComplex | None:
+    """같은 중개사무소 안에서 이름이 겹치는 단지. 중복 등록을 막기 위해 쓴다."""
+    statement = select(PropertyComplex).where(
+        col(PropertyComplex.brokerage_id) == brokerage_id,
+        func.lower(col(PropertyComplex.name)) == name.strip().lower(),
         col(PropertyComplex.is_deleted).is_(False),
     )
     return session.execute(statement).scalars().first()
@@ -527,6 +594,24 @@ def touch_last_contact(
             )
             .values(last_contact_at=contacted_at)
         )
+
+
+def soft_delete_children(
+    session: Session, model: Any, brokerage_id: int, column: Any, parent_id: int
+) -> int:
+    """부모가 지워질 때 딸린 레코드도 함께 감춘다. 낙관적 잠금은 부모에서 이미 확인했다."""
+    deleted_at = datetime.now(UTC)
+    statement = (
+        update(model)
+        .where(
+            model.brokerage_id == brokerage_id,
+            column == parent_id,
+            model.is_deleted.is_(False),
+        )
+        .values(is_deleted=True, deleted_at=deleted_at, updated_at=deleted_at)
+    )
+    result = cast(CursorResult[Any], session.execute(statement))
+    return result.rowcount
 
 
 def bump_row_version(

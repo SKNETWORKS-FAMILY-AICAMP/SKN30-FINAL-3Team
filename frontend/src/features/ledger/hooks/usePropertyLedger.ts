@@ -31,6 +31,8 @@ export interface PropertyLedger extends LedgerCollection<PropertyRow> {
   loadDetail: (row: PropertyRow) => Promise<PropertyRow>;
   saveRow: (row: PropertyRow) => Promise<PropertyRow>;
   discardRow: (row: PropertyRow) => void;
+  /** 소프트 삭제. 저장되지 않은 빈 행은 서버를 부르지 않고 화면에서만 없앤다. */
+  deleteRow: (row: PropertyRow) => Promise<void>;
 }
 
 /** 담당자 이름 조회표. 계약에 사용자 목록 엔드포인트가 없어 비어 있을 수 있다. */
@@ -88,9 +90,13 @@ export function usePropertyLedger(
         if (row.serverId == null) {
           const create = toUnitCreatePayload(row);
           if (create == null) {
+            // 실패 사유를 뭉뚱그리지 않는다. 둘은 사용자가 할 일이 전혀 다르다.
             throw new LedgerApiError({
               kind: "validation",
-              message: "단지와 호는 저장 전에 반드시 입력해야 합니다.",
+              message:
+                row.complexId == null
+                  ? `'${row.complex || "선택한 단지"}'는 아직 서버에 등록되지 않은 단지입니다. 단지 등록 API가 없어 화면에서 만든 단지로는 저장할 수 없습니다. 목록에 있는 단지를 선택해 주세요.`
+                  : "호는 저장 전에 반드시 입력해야 합니다.",
             });
           }
           detail = await ledgerTransport.createPropertyUnit(create);
@@ -152,8 +158,40 @@ export function usePropertyLedger(
     [removeRow],
   );
 
+  const deleteRow = useCallback(
+    async (row: PropertyRow): Promise<void> => {
+      if (row.serverId == null) {
+        removeRow(row.id);
+        return;
+      }
+      if (row.rowVersion == null) {
+        throw new LedgerApiError({
+          kind: "validation",
+          message: "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.",
+        });
+      }
+
+      patchRow(row.id, (current) => ({ ...current, sync: { status: "saving" } }));
+      try {
+        await ledgerTransport.deletePropertyUnit(row.serverId, row.rowVersion);
+        removeRow(row.id);
+      } catch (error: unknown) {
+        const apiError = toApiError(error);
+        patchRow(row.id, (current) => ({
+          ...current,
+          sync:
+            apiError.kind === "conflict"
+              ? { status: "conflict", reason: apiError.message }
+              : { status: "failed", reason: apiError.message },
+        }));
+        throw apiError;
+      }
+    },
+    [patchRow, removeRow],
+  );
+
   return useMemo(
-    () => ({ ...collection, loadDetail, saveRow, discardRow }),
-    [collection, loadDetail, saveRow, discardRow],
+    () => ({ ...collection, loadDetail, saveRow, discardRow, deleteRow }),
+    [collection, loadDetail, saveRow, discardRow, deleteRow],
   );
 }

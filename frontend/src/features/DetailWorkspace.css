@@ -102,13 +102,13 @@
 }
 
 .detail-section {
-  padding: 20px;
+  padding: 14px 16px;
   border: 1px solid var(--dw-border);
   background: var(--pf-t--global--background--color--primary--default, #fff);
 }
 
 .detail-section + .detail-section {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .detail-section__heading {
@@ -116,7 +116,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .detail-section__heading > span,
@@ -143,16 +143,18 @@
 .detail-people-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
+  /* 각 그룹이 제 내용만큼만 차지하게 한다. 늘어나면 짧은 그룹 아래가 빈칸으로 남는다. */
+  align-items: start;
 }
 
 .detail-info-column,
 .detail-person-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 16px;
+  padding: 12px;
   border: 1px solid var(--dw-border-subtle);
   background: var(--dw-surface-subtle);
 }
@@ -168,7 +170,7 @@
 .detail-inline-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .detail-field {
@@ -177,7 +179,7 @@
 
 .detail-field__label {
   display: inline-block;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   color: var(--pf-t--global--text--color--regular, #151515);
   font-size: 12px;
   font-weight: 600;

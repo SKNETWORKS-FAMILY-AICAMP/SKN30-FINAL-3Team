@@ -157,8 +157,8 @@ export function toPropertyRow(dto: PropertyUnitRowDto, assigneeName = ""): Prope
     assigneeId: dto.assigned_user_id,
     assignee: assigneeName,
     lastContact: formatTimestampAsDate(dto.last_contact_at),
-    // 상담 로그는 목록 응답에 없다. GET /client-interactions로 따로 가져온다.
-    log: "",
+    // 목록 응답이 최신 상담 로그 1건을 함께 싣는다. 상세를 열면 같은 값으로 덮어쓴다.
+    log: textOrEmpty(dto.latest_interaction_content),
     memo: textOrEmpty(dto.memo),
 
     owner: "",

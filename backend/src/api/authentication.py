@@ -4,15 +4,19 @@ from sqlmodel import Session
 from api.schemas.authentication import (
     CurrentUserResponse,
     DevelopmentSessionResponse,
+    SessionUserResponse,
 )
 from core.config import Config
 from domain.authentication.dependencies import (
     get_authentication_context,
-    get_current_user,
     require_csrf,
 )
-from domain.authentication.models import AuthenticationContext, CurrentUser
-from domain.authentication.service import issue_development_session, revoke_session
+from domain.authentication.models import AuthenticationContext
+from domain.authentication.service import (
+    issue_development_session,
+    revoke_session,
+    rotate_csrf_token,
+)
 from domain.session import get_app_config, get_db_session
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -45,9 +49,15 @@ def create_development_session(
     )
 
 
-@router.get("/me", response_model=CurrentUserResponse)
-def me(user: CurrentUser = Depends(get_current_user)) -> CurrentUserResponse:
-    return CurrentUserResponse.from_domain(user)
+@router.get("/me", response_model=SessionUserResponse)
+def me(
+    context: AuthenticationContext = Depends(get_authentication_context),
+    db: Session = Depends(get_db_session),
+) -> SessionUserResponse:
+    return SessionUserResponse(
+        user=CurrentUserResponse.from_domain(context.user),
+        csrf_token=rotate_csrf_token(db, context.session_id),
+    )
 
 
 @router.delete("/session", status_code=204, dependencies=[Depends(require_csrf)])

@@ -30,10 +30,10 @@ updated: 2026-08-18
 | GET | /health/live | 불필요 | 프로세스 생존 확인 |
 | GET | /health/ready | 불필요 | PostgreSQL 준비 상태 확인 |
 | POST | /api/v1/auth/development-session | local 전용 | 설정된 개발 계정의 서버 세션·CSRF 발급 |
-| GET | /api/v1/auth/me | 서버 세션 | 현재 사용자와 역할 반환 |
+| GET | /api/v1/auth/me | 서버 세션 | 현재 사용자와 역할, 그리고 새 CSRF 토큰 반환 |
 | DELETE | /api/v1/auth/session | 서버 세션·CSRF | 현재 세션 폐기 |
 
-서버 세션은 HttpOnly Cookie로 전달하며 상태 변경 요청은 X-CSRF-Token을 요구한다. 개발 세션 발급 경로는 운영 애플리케이션에 등록하지 않는다. 실제 비밀번호 로그인 계약은 현재 MVP 범위에 포함하지 않는다.
+서버 세션은 HttpOnly Cookie로 전달하며 상태 변경 요청은 X-CSRF-Token을 요구한다. 서버는 토큰의 해시만 보관하므로 원본을 다시 줄 수 없다. 그래서 `/auth/me`가 세션 확인 시점에 토큰을 새로 발급해 교체한다. 새로고침으로 화면 메모리의 토큰이 사라져도 쓰기가 이어지게 하려는 것이다. 같은 세션을 여러 탭에서 열면 나중에 연 탭이 앞선 탭의 토큰을 무효화한다. 개발 세션 발급 경로는 운영 애플리케이션에 등록하지 않는다. 실제 비밀번호 로그인 계약은 현재 MVP 범위에 포함하지 않는다.
 
 오류 응답은 code, message, request_id를 포함하고 인증 실패는 401, 권한 부족은 403으로 구분한다.
 
@@ -44,7 +44,8 @@ updated: 2026-08-18
 ### 공통 규칙
 
 - 모든 경로가 서버 세션을 요구한다. `brokerage_id`는 세션에서만 도출하고 요청 본문이나 쿼리로 받지 않는다.
-- 상태를 바꾸는 POST와 PATCH는 `X-CSRF-Token`을 요구한다.
+- 상태를 바꾸는 POST, PATCH, DELETE는 `X-CSRF-Token`을 요구한다.
+- DELETE는 소프트 삭제다. 행을 지우지 않고 `is_deleted`를 세워 목록에서 제외한다. 상담 로그와 매물 이력이 참조하고 있어 물리 삭제는 이력을 함께 잃는다. 낙관적 잠금을 위해 `row_version`을 질의 변수로 요구하며, 어긋나면 409를 돌려준다.
 - 금액은 원 단위 정수로 주고받는다. 억·만 단위 표시 변환은 클라이언트가 담당한다.
 - 소프트 삭제된 행은 응답에서 제외한다.
 - 목록 응답은 `items`, `total`, `limit`, `offset`을 포함하며 `total`은 현재 필터 조건의 전체 건수다.
@@ -57,13 +58,19 @@ updated: 2026-08-18
 
 목록의 기준 행은 세대이며 매물이 아닌 세대도 반환한다. 매매·전세·월세 값이 비어 있는 행이 다수인 상태가 정상이다.
 
+목록 응답의 각 행은 가장 최근 상담 로그 본문을 `latest_interaction_content`로 함께 싣는다. 행마다 별도 질의를 보내지 않도록 lateral join으로 붙이며, 로그가 없으면 null이다.
+
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
+| GET | /api/v1/property-complexes | 세션 | 단지 목록. 이름 오름차순 |
+| POST | /api/v1/property-complexes | 세션·CSRF | 단지 추가. 같은 중개사무소 안에서 이름 중복은 거절 |
+| DELETE | /api/v1/property-complexes/{complex_id} | 세션·CSRF | 단지 삭제. `row_version` 질의 변수 필수. 세대가 남아 있으면 거절 |
 | GET | /api/v1/property-units | 세션 | 세대 목록과 현재 매물 조건. 기본 정렬은 동·호 오름차순 |
 | GET | /api/v1/property-units/column-values | 세션 | 현재 필터 범위에 실재하는 컬럼 값 목록과 건수 |
 | GET | /api/v1/property-units/{unit_id} | 세션 | 세대 상세. 단지, 인물 관계, 매물 이력 포함 |
 | POST | /api/v1/property-units | 세션·CSRF | 세대 추가 |
 | PATCH | /api/v1/property-units/{unit_id} | 세션·CSRF | 세대 부분 수정 |
+| DELETE | /api/v1/property-units/{unit_id} | 세션·CSRF | 세대 삭제. `row_version` 질의 변수 필수, 딸린 매물 건도 함께 감춘다 |
 | POST | /api/v1/property-units/{unit_id}/listings | 세션·CSRF | 해당 세대의 매물 건 등록 |
 | PATCH | /api/v1/property-listings/{listing_id} | 세션·CSRF | 매물 건 조건 수정 |
 
@@ -82,6 +89,7 @@ updated: 2026-08-18
 | GET | /api/v1/property-requirements/{requirement_id} | 세션 | 구입장 상세. 인물, 연락처, 희망 단지 포함 |
 | POST | /api/v1/property-requirements | 세션·CSRF | 구입장 추가 |
 | PATCH | /api/v1/property-requirements/{requirement_id} | 세션·CSRF | 구입장 부분 수정 |
+| DELETE | /api/v1/property-requirements/{requirement_id} | 세션·CSRF | 구입장 행 삭제. `row_version` 질의 변수 필수 |
 
 현재 구현된 필터는 `demand_type`, `status`, `classification`, `workflow_stage`, `assigned_user_id`다.
 
@@ -105,6 +113,7 @@ updated: 2026-08-18
 | code | HTTP | 발생 조건 |
 |---|---|---|
 | UNAUTHENTICATED | 401 | 세션이 없거나 만료됨 |
+| COMPLEX_HAS_UNITS | 422 | 세대가 남아 있는 단지를 삭제하려 함 |
 | FORBIDDEN | 403 | 역할 권한이 부족하거나 CSRF 토큰이 일치하지 않음 |
 | NOT_FOUND | 404 | 대상이 없거나 다른 중개사무소 소유임 |
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
