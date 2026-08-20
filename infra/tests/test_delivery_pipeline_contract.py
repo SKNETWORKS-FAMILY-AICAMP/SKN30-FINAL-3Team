@@ -1,3 +1,7 @@
+import json
+import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -76,6 +80,81 @@ class DeliveryPipelineContractTests(unittest.TestCase):
     def test_legacy_combined_buildspecs_are_removed(self) -> None:
         self.assertFalse((DELIVERY_ROOT / "buildspec-backend.yml").exists())
         self.assertFalse((DELIVERY_ROOT / "buildspec-frontend.yml").exists())
+
+    def test_rds_ca_is_mounted_without_exposing_root_only_config(self) -> None:
+        common = read("infra/deploy/scripts/common.sh")
+        compose = read("infra/deploy/compose.dev.yml")
+        after_install = read("infra/deploy/scripts/after_install.sh")
+        render_env = read("infra/deploy/scripts/render_env.py")
+
+        self.assertIn('RDS_CA_FILE="${CONFIG_DIR}/global-bundle.pem"', common)
+        self.assertIn(
+            'RDS_CA_CONTAINER_FILE="/etc/ssl/certs/aws-rds-global-bundle.pem"',
+            common,
+        )
+        self.assertIn("${RDS_CA_FILE:?RDS_CA_FILE is required}", compose)
+        self.assertIn("${RDS_CA_CONTAINER_FILE:?RDS_CA_CONTAINER_FILE is required}", compose)
+        self.assertNotIn("${CONFIG_DIR:?CONFIG_DIR is required}:/opt/brokerage/config", compose)
+        self.assertIn("test -r '${RDS_CA_CONTAINER_FILE}'", after_install)
+        self.assertIn('os.environ.get("RDS_CA_CONTAINER_FILE", "")', render_env)
+
+    def test_migration_profile_renders_rds_ca_file_mount(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "config"
+            config.mkdir(mode=0o700)
+            ca_file = config / "global-bundle.pem"
+            runtime_env = Path(directory) / "runtime.env"
+            migration_env = Path(directory) / "migration.env"
+            ca_file.touch(mode=0o644)
+            runtime_env.touch(mode=0o600)
+            migration_env.touch(mode=0o600)
+
+            environment = dict(os.environ)
+            environment.update(
+                {
+                    "BACKEND_IMAGE": "repository@sha256:" + ("a" * 64),
+                    "RUNTIME_ENV_FILE": str(runtime_env),
+                    "MIGRATION_ENV_FILE": str(migration_env),
+                    "RDS_CA_FILE": str(ca_file),
+                    "RDS_CA_CONTAINER_FILE": "/etc/ssl/certs/aws-rds-global-bundle.pem",
+                    "AWS_REGION": "ap-northeast-2",
+                    "API_LOG_GROUP": "local-api",
+                    "WORKER_LOG_GROUP": "local-worker",
+                    "INSTANCE_ID": "local",
+                }
+            )
+            result = subprocess.run(
+                [
+                    "docker",
+                    "compose",
+                    "--file",
+                    str(DELIVERY_ROOT.parent / "deploy/compose.dev.yml"),
+                    "--profile",
+                    "migration",
+                    "config",
+                    "--format",
+                    "json",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+            compose = json.loads(result.stdout)
+
+        for service_name in ("api", "worker", "migrate"):
+            self.assertEqual(
+                compose["services"][service_name]["volumes"],
+                [
+                    {
+                        "type": "bind",
+                        "source": str(ca_file),
+                        "target": "/etc/ssl/certs/aws-rds-global-bundle.pem",
+                        "read_only": True,
+                        "bind": {},
+                    }
+                ],
+            )
 
 
 if __name__ == "__main__":

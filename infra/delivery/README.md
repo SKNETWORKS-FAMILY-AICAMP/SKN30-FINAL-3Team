@@ -167,6 +167,12 @@ aws deploy list-deployment-instances \
 Lifecycle script의 AWS CLI 오류는 원래 AWS service error와 operation 이름을 stderr에
 남겨야 한다. Secret 값, Parameter 값, DB URL과 IAM DB token은 출력하지 않는다.
 
+`root certificate file ... does not exist`가 발생하면 host config directory를 컨테이너에
+통째로 mount했는지 확인한다. 이 directory는 root `0700`이므로 비루트 UID 10001이 탐색할
+수 없다. 현재 계약은 `/opt/brokerage/config/global-bundle.pem` 파일 하나만 container의
+`/etc/ssl/certs/aws-rds-global-bundle.pem`에 read-only mount하며, `AfterInstall`이 migration
+전에 실제 readability를 검사한다. config directory mode를 `0755`로 완화해 우회하지 않는다.
+
 ## 검증 순서
 
 1. Backend 독립 Pipeline에서 Verify 실패가 Build·CodeDeploy를 시작하지 않는지 확인한 뒤 첫 정상 CodeDeploy revision을 만든다.

@@ -6,11 +6,13 @@ readonly REVISION_DIR="${APP_ROOT}/revision"
 readonly CONFIG_DIR="${APP_ROOT}/config"
 readonly RUNTIME_ENV_FILE="${CONFIG_DIR}/runtime.env"
 readonly MIGRATION_ENV_FILE="${CONFIG_DIR}/migration.env"
+readonly RDS_CA_FILE="${CONFIG_DIR}/global-bundle.pem"
+readonly RDS_CA_CONTAINER_FILE="/etc/ssl/certs/aws-rds-global-bundle.pem"
 readonly COMPOSE_FILE="${REVISION_DIR}/compose.dev.yml"
 readonly BACKEND_IMAGE_FILE="${REVISION_DIR}/backend-image.env"
 
 export AWS_REGION="${AWS_REGION:-ap-northeast-2}"
-export CONFIG_DIR RUNTIME_ENV_FILE MIGRATION_ENV_FILE
+export CONFIG_DIR RUNTIME_ENV_FILE MIGRATION_ENV_FILE RDS_CA_FILE RDS_CA_CONTAINER_FILE
 export API_LOG_GROUP="${API_LOG_GROUP:-/skn30-final-3team-dev/application/api}"
 export WORKER_LOG_GROUP="${WORKER_LOG_GROUP:-/skn30-final-3team-dev/application/worker}"
 export INSTANCE_ID="${INSTANCE_ID:-$(curl -fsS --connect-timeout 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 300' | xargs -I{} curl -fsS --connect-timeout 2 -H 'X-aws-ec2-metadata-token: {}' http://169.254.169.254/latest/meta-data/instance-id)}"

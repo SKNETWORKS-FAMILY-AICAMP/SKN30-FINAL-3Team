@@ -70,7 +70,9 @@ def main() -> None:
     database = str(secret["dbname"])
     username = str(secret["username"])
     password = str(secret["password"])
-    ca_path = "/opt/brokerage/config/global-bundle.pem"
+    ca_path = os.environ.get("RDS_CA_CONTAINER_FILE", "").strip()
+    if not ca_path.startswith("/"):
+        raise SystemExit("RDS_CA_CONTAINER_FILE must be an absolute container path")
 
     parameter_payload = json.loads(
         aws(

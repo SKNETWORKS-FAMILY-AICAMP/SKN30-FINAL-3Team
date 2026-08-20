@@ -60,13 +60,18 @@ docker build --file backend/Dockerfile --tag brokerage-backend:local .
 docker run --rm --entrypoint sh brokerage-backend:local -c 'test "$(id -u)" = "10001"'
 
 mkdir -p "${validation_dir}/config"
-touch "${validation_dir}/runtime.env" "${validation_dir}/migration.env"
+touch \
+  "${validation_dir}/runtime.env" \
+  "${validation_dir}/migration.env" \
+  "${validation_dir}/config/global-bundle.pem"
 export BACKEND_IMAGE=brokerage-backend:local
 export RUNTIME_ENV_FILE="${validation_dir}/runtime.env"
 export MIGRATION_ENV_FILE="${validation_dir}/migration.env"
 export CONFIG_DIR="${validation_dir}/config"
+export RDS_CA_FILE="${validation_dir}/config/global-bundle.pem"
+export RDS_CA_CONTAINER_FILE=/etc/ssl/certs/aws-rds-global-bundle.pem
 export AWS_REGION=ap-northeast-2
 export API_LOG_GROUP=local-api
 export WORKER_LOG_GROUP=local-worker
 export INSTANCE_ID=local
-docker compose --file infra/deploy/compose.dev.yml config >/dev/null
+docker compose --file infra/deploy/compose.dev.yml --profile migration config >/dev/null

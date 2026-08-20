@@ -11,7 +11,7 @@ x-application: &application
   security_opt:
     - no-new-privileges:true
   volumes:
-    - "${CONFIG_DIR:?CONFIG_DIR is required}:/opt/brokerage/config:ro"
+    - "${RDS_CA_FILE:?RDS_CA_FILE is required}:${RDS_CA_CONTAINER_FILE:?RDS_CA_CONTAINER_FILE is required}:ro"
   logging:
     driver: awslogs
     options:
