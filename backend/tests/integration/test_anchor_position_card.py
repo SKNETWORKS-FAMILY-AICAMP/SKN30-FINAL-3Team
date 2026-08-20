@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import text
 from sqlmodel import Session, create_engine
 
+from core.errors import NotFoundError
 from domain.agent_execution import repository, service
 from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
@@ -365,6 +366,56 @@ def test_changed_anchor_version_stops_the_lookup() -> None:
 
         with pytest.raises(InputVersionChangedError):
             prepare(session, run_id)
+
+
+@requires_database
+def test_unit_deleted_after_queueing_stops_the_lookup() -> None:
+    """적재 시점에는 유효했어도 Worker가 집을 때 세대가 삭제됐으면 앵커로 쓰지 않는다.
+
+    세대 소프트 삭제는 매물 행도 row_version도 건드리지 않는다. 입력 버전 비교만으로는
+    이 변화를 볼 수 없으므로 앵커 조회 자체가 삭제된 세대를 걸러야 한다.
+    """
+    with anchor_session() as session:
+        fixture = Fixture(session)
+        run_id = fixture.run(input_data_version=1)
+        session.execute(
+            text("UPDATE property_unit SET is_deleted = true, deleted_at = now() WHERE id = :i"),
+            {"i": fixture.unit_id},
+        )
+
+        with pytest.raises(NotFoundError):
+            prepare(session, run_id)
+
+        # 앵커를 거부해도 카드나 상태를 남기지 않는다.
+        cards = scalar(
+            session,
+            "SELECT count(*) FROM negotiation_position_analysis WHERE brokerage_id = :b",
+            b=fixture.brokerage_id,
+        )
+        assert cards == 0
+        assert (
+            session.execute(
+                text("SELECT status FROM agent_run WHERE id = :i"), {"i": run_id}
+            ).scalar_one()
+            == "RUNNING"
+        )
+
+
+@requires_database
+def test_deleted_unit_does_not_hide_a_requirement_anchor() -> None:
+    """매물 쪽 경계를 좁혀도 구입장 앵커 조회는 그대로 동작한다."""
+    with anchor_session() as session:
+        fixture = Fixture(session)
+        run_id = fixture.run(listing=False, requirement=True)
+        session.execute(
+            text("UPDATE property_unit SET is_deleted = true, deleted_at = now() WHERE id = :i"),
+            {"i": fixture.unit_id},
+        )
+
+        lookup = prepare(session, run_id)
+
+        assert lookup.anchor_type is AnchorType.REQUIREMENT
+        assert lookup.anchor_id == fixture.requirement_id
 
 
 @requires_database

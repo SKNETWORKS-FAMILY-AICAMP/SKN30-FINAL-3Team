@@ -138,6 +138,89 @@ def test_unit_delete_returns_no_content_and_leaves_the_listing(config: Config) -
 
 
 @requires_database
+def test_listing_under_a_deleted_unit_leaves_every_read_and_write_path(config: Config) -> None:
+    """세대가 삭제되면 그 매물 건은 단건 조회 범위에서도 함께 사라진다.
+
+    목록은 세대를 join해서 이미 감췄지만 단건 조회는 매물 행만 봤다. 그래서 화면에 없는
+    매물 ID를 직접 넣으면 수정과 상담 로그가 계속 통과했다. 행 자체는 이력으로 남긴다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, "매물잔존단지")
+        unit = create_unit(client, complex_id, unit_number="101")
+        listing = client.post(
+            f"/api/v1/property-units/{unit['unit']['id']}/listings",
+            json={"is_sale_available": True, "sale_price": 2_880_000_000},
+        ).json()
+        assert (
+            client.patch(
+                f"/api/v1/property-listings/{listing['id']}",
+                json={"row_version": listing["row_version"], "sale_price": 2_700_000_000},
+            ).status_code
+            == 200
+        )
+
+        assert (
+            client.delete(
+                f"/api/v1/property-units/{unit['unit']['id']}",
+                params={"row_version": unit["unit"]["row_version"]},
+            ).status_code
+            == 204
+        )
+
+        patched = client.patch(
+            f"/api/v1/property-listings/{listing['id']}",
+            json={"row_version": listing["row_version"] + 1, "sale_price": 2_600_000_000},
+        )
+        assert patched.status_code == 404
+        assert patched.json()["code"] == "NOT_FOUND"
+
+        logged = client.post(
+            "/api/v1/client-interactions",
+            json={"listing_id": listing["id"], "interaction_content": "삭제된 세대 매물 상담"},
+        )
+        assert logged.status_code == 422
+        assert logged.json()["code"] == "VALIDATION_FAILED"
+
+        stored = (
+            session.execute(
+                text("SELECT is_deleted, sale_price FROM property_listing WHERE id = :i"),
+                {"i": listing["id"]},
+            )
+            .mappings()
+            .one()
+        )
+        assert stored["is_deleted"] is False
+        assert stored["sale_price"] == 2_700_000_000
+
+
+@requires_database
+def test_listing_paths_still_work_while_the_unit_is_alive(config: Config) -> None:
+    """살아 있는 세대의 매물은 등록·수정·상담 로그가 모두 기존처럼 동작한다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, "정상매물단지")
+        unit = create_unit(client, complex_id, unit_number="102")
+        created = client.post(
+            f"/api/v1/property-units/{unit['unit']['id']}/listings",
+            json={"is_sale_available": True, "sale_price": 2_880_000_000},
+        )
+        assert created.status_code == 201, created.text
+        listing = created.json()
+
+        patched = client.patch(
+            f"/api/v1/property-listings/{listing['id']}",
+            json={"row_version": listing["row_version"], "sale_price": 2_700_000_000},
+        )
+        logged = client.post(
+            "/api/v1/client-interactions",
+            json={"listing_id": listing["id"], "interaction_content": "정상 매물 상담"},
+        )
+
+        assert patched.status_code == 200, patched.text
+        assert patched.json()["sale_price"] == 2_700_000_000
+        assert logged.status_code == 201, logged.text
+
+
+@requires_database
 def test_unit_delete_rejects_a_stale_row_version(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "세대버전단지")
