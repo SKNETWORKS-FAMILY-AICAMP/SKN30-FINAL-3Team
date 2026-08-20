@@ -231,9 +231,9 @@ try {
       );
       usage = sumUsage(chunkRuns.map((run) => run.usage));
       effectiveModel = [...new Set(chunkRuns.map((run) => run.model))].join(", ") || model;
-      const leafReviews = chunkRuns.map((run) =>
-        withContextEvidence(run.review, run.context, run.chunk.id)
-      );
+      // 실제 patch·정책 파일 누락은 모든 chunk를 합친 context에서 한 번만 추가한다.
+      // chunk별 접두사가 붙은 동일 누락을 최종 결과에 반복하지 않는다.
+      const leafReviews = chunkRuns.map((run) => run.review);
 
       if (chunkRuns.some((run) => !run.ok)) {
         openAiFailure = true;
@@ -548,8 +548,8 @@ async function notifyDiscord(content) {
 
 function effectiveLimits(configured) {
   const maxFindings = Math.min(
-    10,
-    positiveInteger(process.env.AI_REVIEW_MAX_FINDINGS, configured.maxFindings ?? 10)
+    5,
+    positiveInteger(process.env.AI_REVIEW_MAX_FINDINGS, configured.maxFindings ?? 5)
   );
   return {
     maxFiles: positiveInteger(process.env.AI_REVIEW_MAX_FILES, configured.maxFiles ?? 200),
@@ -575,10 +575,11 @@ function effectiveLimits(configured) {
       positiveInteger(process.env.AI_REVIEW_MAX_CONCURRENCY, configured.maxConcurrency ?? 3)
     ),
     chunkMaxFindings: Math.min(
+      3,
       maxFindings,
       positiveInteger(
         process.env.AI_REVIEW_CHUNK_MAX_FINDINGS,
-        configured.chunkMaxFindings ?? 5
+        configured.chunkMaxFindings ?? 3
       )
     ),
     maxMergeContextChars: positiveInteger(

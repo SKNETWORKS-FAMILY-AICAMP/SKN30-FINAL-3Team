@@ -6,6 +6,8 @@ updated: 2026-08-20
 # 위키 변경 로그
 
 - 2026-08-20: F3 실행 상태 조회가 DB `failure_message` 원문을 공개하지 않고 allowlist 기반 `failure_code`·고정 문구만 반환하도록 공개 경계를 좁히고, 알 수 없는 내부 실패를 `EXECUTION_FAILED`로 일반화했으며, `agent_run.requested_by`의 수집 목적·저장 위치·비노출과 OQ-007 보존 미확정을 F3 실행 계약에 명시하고 Worker 구현 범위 서술의 상충을 정정함.
+- 2026-08-20: 4인 공유 개발 환경의 비용 절감을 위해 EC2 instance class를 `t3.medium`에서 `t3.small`로 축소하고 Infra ADR-0010과 Terraform·자원 인벤토리·아키텍처 현재값을 동기화함. RDS와 gp3 40 GiB는 변경하지 않음.
+
 - 2026-08-20: ADR-0010의 PR 리뷰 한도를 전체 10,000줄로 높이고, 최대 10개 chunk를 동시성 3으로 독립 검토한 뒤 결과를 통합하는 결정적 fan-out/fan-in 방식과 incomplete 보존 규칙을 구현함.
 - 2026-08-20: GitHub Actions 기반 권고형 PR AI 리뷰와 Discord 결과 전달을 ADR-0010으로 승인하고 Git 정책, 개인정보 외부 전송, CI secret·변수와 운영 런북을 반영함.
 - 2026-08-19: 앵커 포지션 카드 캐시 조회와 AI 생성 요청 준비를 구현하고, `ANCHOR_READY`가 원장 조회 완료가 아니라 유효한 포지션 카드 확보를 뜻한다는 점을 명시함. cache key(`position-card:v2`)는 대상·입력 버전·상담 로그 건수·마지막 상담 시각·최대 로그 ID·모델 구성 버전의 canonical JSON SHA-256이며, 과거 시각 로그 추가와 로그 무효화도 cache miss가 된다. `negotiation_side` 값 어휘 미확정을 OQ-012로 등록함.
