@@ -76,6 +76,8 @@ updated: 2026-08-20
 
 세대와 매물 건은 `row_version`을 각각 보유하므로 한 요청으로 두 테이블을 함께 수정하지 않는다. 세대 삭제도 마찬가지로 매물 건을 수정하지 않는다. 매물 조회는 세대를 join하므로 세대가 감춰지면 그 세대의 매물 건도 응답에 나타나지 않는다.
 
+같은 범위를 단건 경로에도 적용한다. 부모 세대가 삭제된 매물 건은 `PATCH /api/v1/property-listings/{listing_id}`에서 404이고, 상담 로그의 `listing_id`로도 쓸 수 없어 422 `VALIDATION_FAILED`가 된다. 매물 행 자체는 이력으로 남는다.
+
 단지 삭제와 세대 추가는 같은 단지 행을 두고 직렬화된다. 두 요청이 동시에 들어오면 나중에 처리되는 쪽이 반드시 거절된다. 삭제가 먼저 반영되면 세대 추가가 `VALIDATION_FAILED`로, 세대 추가가 먼저 반영되면 삭제가 `COMPLEX_HAS_UNITS`로 거절된다. 따라서 삭제된 단지에 살아 있는 세대가 남는 상태는 생기지 않는다.
 
 현재 구현된 필터는 세대와 최신 매물 건의 컬럼으로 한정한다. `complex_id`, `building_number`, `unit_number`, `floor_number`, `orientation`, `tenancy_status`, `lifecycle_status`, `unit_type`, `assigned_user_id`, `is_expanded`와 매물 건의 `listing_status`, `handover_condition`, `is_sale_available`, `is_jeonse_available`, `is_monthly_rent_available`를 지원한다. 임대인·임차인 등 인물 컬럼과 상담 로그 컬럼의 필터는 아직 제공하지 않는다.
@@ -165,21 +167,22 @@ updated: 2026-08-20
 같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
 
 같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)은 아직 구현하지 않았다.
-Worker 작업 선점 유스케이스 `claim_next_run`은 구현했지만 그것을 돌리는 Worker 프로세스와 polling
-loop는 아직 없다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만
-하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+요청마다 새 `QUEUED` 실행이 생긴다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고
+`agent_run` 적재까지만 하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
 
-### 요청자 기록과 개인정보
+`LISTING` 앵커는 사무소가 같고 `property_listing.is_deleted = false`이며 **부모 세대도
+`property_unit.is_deleted = false`** 여야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물
+행을 건드리지 않으므로 매물 자신의 삭제 표시만으로는 부족하다. 세 조건 중 하나라도 어긋나면 다른
+사무소의 식별자와 똑같이 404로 답해 삭제 여부와 존재 여부를 구분해서 드러내지 않는다.
+`REQUIREMENT` 앵커는 사무소와 `property_requirement.is_deleted = false`를 본다.
 
-- 수집 필드: 세션에서 도출한 내부 `app_user.id` 한 개. 성명, 연락처와 로그인 ID는 쓰지 않는다.
-- 목적: 실행 요청자 식별과 감사 추적.
-- 저장 위치: PostgreSQL `agent_run.requested_by`.
-- API 응답 노출: 없음. 실행 요청과 상태 조회 응답 모두 요청자를 싣지 않는다.
-- AI 또는 외부 서비스 전송: 현재 구현에서는 없음.
-- 애플리케이션 로그와 Queue 적재: 현재 구현에서는 없음.
-- 접근 범위: Backend 조회는 세션의 `brokerage_id`로 격리한다.
-- 보존과 삭제: 아직 미확정이며 [OQ-007](../open-questions.md)에서 결정한다. DB 백업에도 포함될 수
-  있으므로 최종 보존·파기 정책과 함께 정한다.
+### 요청자 기록
+
+요청자는 세션에서 도출한 내부 `app_user.id` 하나이며 `agent_run.requested_by`에 저장한다. 실행
+요청과 상태 조회 응답 모두 요청자를 싣지 않고 Backend 조회는 세션의 `brokerage_id`로 격리한다.
+
+처리 위치, 접근 주체, 보존 기간과 삭제 방식의 정본은
+[개인정보 정책](../privacy/policy.md)의 `agent_run.requested_by` 절이다.
 
 ### 실행 상태 조회
 
@@ -256,8 +259,13 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
 
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
-않는다. `claim_next_run` 유스케이스는 구현했고 이를 호출하는 Worker 프로세스와 polling loop는 아직
-구현하지 않았다.
+않는다.
+
+`claim_next_run` 유스케이스와 배포용 Worker 프로세스(`backend/src/worker.py`)는 둘 다 있지만 서로
+연결되어 있지 않다. Worker는 `WORKER_ENABLED=false`로만 뜨고 실행을 하나도 claim하지 않는다.
+polling loop, `claim_next_run` 호출 연결과 실제 F3 handler는 아직 없다. 구현됨·미구현의 정본은
+[온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)의 현재 구현 절이고,
+배포 계약은 [백엔드 ADR-0003](../../../backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 
 `anchor_type`과 `anchor_id`는 `target_listing_id`와 `target_requirement_id` 중 **정확히 하나**가 있을
 때만 도출한다. 둘 다 없거나 둘 다 있는 실행은 존재하지 않는 앵커를 정상 응답으로 내보내지 않고

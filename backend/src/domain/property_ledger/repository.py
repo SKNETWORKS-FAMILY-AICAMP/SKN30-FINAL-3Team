@@ -378,10 +378,25 @@ def list_listings_for_unit(
 def find_property_listing(
     session: Session, brokerage_id: int, listing_id: int
 ) -> PropertyListing | None:
-    statement = select(PropertyListing).where(
-        col(PropertyListing.brokerage_id) == brokerage_id,
-        col(PropertyListing.id) == listing_id,
-        col(PropertyListing.is_deleted).is_(False),
+    """단건 조회도 목록과 같은 범위를 본다. 부모 세대가 삭제된 매물은 없는 것으로 다룬다.
+
+    세대 소프트 삭제는 딸린 매물 건을 건드리지 않는다 (`delete_property_unit`). 목록은
+    세대를 join해서 그 매물을 감추지만 이 단건 조회는 매물 행만 봤다. 그래서 화면에 없는
+    매물 ID를 직접 넣으면 수정·상담 로그·F3 앵커에서 여전히 살아 있는 것처럼 보였다.
+    """
+    statement = (
+        select(PropertyListing)
+        .join(
+            PropertyUnit,
+            (col(PropertyUnit.brokerage_id) == PropertyListing.brokerage_id)
+            & (col(PropertyUnit.id) == PropertyListing.unit_id),
+        )
+        .where(
+            col(PropertyListing.brokerage_id) == brokerage_id,
+            col(PropertyListing.id) == listing_id,
+            col(PropertyListing.is_deleted).is_(False),
+            col(PropertyUnit.is_deleted).is_(False),
+        )
     )
     return session.execute(statement).scalars().first()
 

@@ -40,7 +40,11 @@ def find_root_cross_judgment_run(
 def find_listing_anchor(
     session: Session, brokerage_id: int, listing_id: int
 ) -> PropertyListing | None:
-    """매물 앵커. 조회 범위는 F1 매물장과 같아야 하므로 장부 repository를 그대로 쓴다."""
+    """매물 앵커. 조회 범위는 F1 매물장과 같아야 하므로 장부 repository를 그대로 쓴다.
+
+    사무소, 매물 삭제 여부와 부모 세대 삭제 여부를 모두 그 조회가 판정한다. F3가 같은
+    규칙을 따로 복사하면 F1이 범위를 바꿀 때 두 곳이 조용히 어긋난다.
+    """
     return ledger_repository.find_property_listing(session, brokerage_id, listing_id)
 
 
