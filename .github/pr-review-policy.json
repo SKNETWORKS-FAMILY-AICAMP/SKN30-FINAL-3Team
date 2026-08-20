@@ -1,9 +1,15 @@
 {
   "version": 1,
   "limits": {
-    "maxFiles": 60,
-    "maxChangedLines": 2000,
+    "maxFiles": 200,
+    "maxChangedLines": 10000,
     "maxContextChars": 200000,
+    "chunkChangedLines": 2000,
+    "chunkPatchChars": 80000,
+    "maxChunks": 10,
+    "maxConcurrency": 3,
+    "chunkMaxFindings": 5,
+    "maxMergeContextChars": 300000,
     "maxFindings": 10,
     "maxOutputTokens": 4000
   },

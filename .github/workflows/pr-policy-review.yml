@@ -45,7 +45,7 @@ jobs:
       (github.event.pull_request.head.repo.full_name == github.repository &&
        github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out trusted base revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -60,9 +60,17 @@ jobs:
           DISCORD_PR_WEBHOOK_URL: ${{ secrets.DISCORD_PR_WEBHOOK_URL }}
           OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL }}
           OPENAI_REVIEW_REASONING_EFFORT: ${{ vars.OPENAI_REVIEW_REASONING_EFFORT }}
+          OPENAI_REVIEW_MERGE_MODEL: ${{ vars.OPENAI_REVIEW_MERGE_MODEL }}
+          OPENAI_REVIEW_MERGE_REASONING_EFFORT: ${{ vars.OPENAI_REVIEW_MERGE_REASONING_EFFORT }}
           AI_REVIEW_MAX_FILES: ${{ vars.AI_REVIEW_MAX_FILES }}
           AI_REVIEW_MAX_CHANGED_LINES: ${{ vars.AI_REVIEW_MAX_CHANGED_LINES }}
           AI_REVIEW_MAX_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_CONTEXT_CHARS }}
+          AI_REVIEW_CHUNK_CHANGED_LINES: ${{ vars.AI_REVIEW_CHUNK_CHANGED_LINES }}
+          AI_REVIEW_CHUNK_PATCH_CHARS: ${{ vars.AI_REVIEW_CHUNK_PATCH_CHARS }}
+          AI_REVIEW_MAX_CHUNKS: ${{ vars.AI_REVIEW_MAX_CHUNKS }}
+          AI_REVIEW_MAX_CONCURRENCY: ${{ vars.AI_REVIEW_MAX_CONCURRENCY }}
+          AI_REVIEW_CHUNK_MAX_FINDINGS: ${{ vars.AI_REVIEW_CHUNK_MAX_FINDINGS }}
+          AI_REVIEW_MAX_MERGE_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_MERGE_CONTEXT_CHARS }}
           AI_REVIEW_MAX_FINDINGS: ${{ vars.AI_REVIEW_MAX_FINDINGS }}
           AI_REVIEW_MAX_OUTPUT_TOKENS: ${{ vars.AI_REVIEW_MAX_OUTPUT_TOKENS }}
           PR_REVIEW_PR_NUMBER: ${{ inputs.pr_number }}

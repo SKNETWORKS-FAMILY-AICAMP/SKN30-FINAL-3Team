@@ -23,9 +23,28 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 
 Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. 실제 두 번째 환경이나 반복 자원이 생기기 전에는 module과 workspace를 추가하지 않는다.
 
+## 사전 요구 사항
+- [just](https://github.com/casey/just)
+- uv
+- [aws cli](https://docs.aws.amazon.com/ko_kr/cli/latest/userguide/getting-started-install.html)
+- python 3.13
+- [terraform](https://developer.hashicorp.com/terraform/install)
+
+```
+# python
+python3 -m venv .venv
+source .venv/bin/activate
+
+# uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# just
+uv tool install rust-just
+```
+
 ## 일상 사용
 
-AWS CLI 2.36 이상, `.terraform-version`의 Terraform, `just`, Python 3.13과 `uv`를 설치한다. DB 명령에는 Session Manager plugin도 필요하다. 모든 `just` 명령은 `infra/`에서 실행한다.
+DB 명령에는 Session Manager plugin도 필요하다. 모든 `just` 명령은 `infra/`에서 실행한다.
 
 계정 ID는 명령마다 전달하지 않고 Git에서 제외되는 `.env`로 관리한다. 실제 자격 증명, access key와 Secret은 넣지 않는다.
 
