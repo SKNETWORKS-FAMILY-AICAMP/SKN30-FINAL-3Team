@@ -8,9 +8,11 @@
 !*/raw/*.example.*
 !*/working/*.example.*
 
+# 생성한 평가용 JSONL은 working 단계에서도 Git으로 추적할 수 있다.
+!*/working/*.jsonl
+
 # 대용량·민감 원본의 흔한 형식은 위치와 관계없이 차단한다.
 *.wav
 *.mp3
 *.m4a
 *.flac
-
