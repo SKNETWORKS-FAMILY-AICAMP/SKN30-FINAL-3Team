@@ -104,6 +104,25 @@ def latest_listing_alias() -> Any:
     return aliased(PropertyListing, lateral)
 
 
+def latest_interaction_alias() -> Any:
+    """세대별 가장 최근 상담 로그 1건.
+
+    목록에서 로그 열이 늘 비어 보이지 않도록 lateral로 붙인다. 행마다 별도 질의를 보내면
+    한 화면에 수백 건의 요청이 생기므로 join으로 해결한다.
+    """
+    lateral = (
+        select(ClientInteraction)
+        .where(
+            col(ClientInteraction.brokerage_id) == PropertyUnit.brokerage_id,
+            col(ClientInteraction.unit_id) == PropertyUnit.id,
+        )
+        .order_by(col(ClientInteraction.interaction_at).desc(), col(ClientInteraction.id).desc())
+        .limit(1)
+        .lateral("latest_interaction")
+    )
+    return aliased(ClientInteraction, lateral)
+
+
 def property_unit_conditions(
     brokerage_id: int, filters: PropertyUnitFilters, listing: Any
 ) -> list[ColumnElement[bool]]:
@@ -143,14 +162,16 @@ def property_unit_conditions(
 
 def property_unit_query(brokerage_id: int, filters: PropertyUnitFilters) -> tuple[Select[Any], Any]:
     listing = latest_listing_alias()
+    interaction = latest_interaction_alias()
     statement = (
-        select(PropertyUnit, PropertyComplex, listing)
+        select(PropertyUnit, PropertyComplex, listing, interaction)
         .join(
             PropertyComplex,
             (col(PropertyComplex.brokerage_id) == PropertyUnit.brokerage_id)
             & (col(PropertyComplex.id) == PropertyUnit.complex_id),
         )
         .outerjoin(listing, true())
+        .outerjoin(interaction, true())
         .where(*property_unit_conditions(brokerage_id, filters, listing))
     )
     return statement, listing
@@ -246,6 +267,94 @@ def find_property_complex(
     statement = select(PropertyComplex).where(
         col(PropertyComplex.brokerage_id) == brokerage_id,
         col(PropertyComplex.id) == complex_id,
+        col(PropertyComplex.is_deleted).is_(False),
+    )
+    return session.execute(statement).scalars().first()
+
+
+def lock_property_complex(
+    session: Session, brokerage_id: int, complex_id: int, *, exclusive: bool
+) -> PropertyComplex | None:
+    """단지 행을 잠근 채로 읽는다. 커밋 또는 롤백까지 잠금이 유지된다.
+
+    단지 삭제와 세대 등록이 같은 단지를 두고 경합한다. 잠그지 않으면 삭제가 남은 세대 수를
+    센 뒤 커밋하기 전에 다른 트랜잭션이 그 단지에 세대를 넣을 수 있고, 그러면 감춰진 단지에
+    살아 있는 세대가 남는다. 세대 조회는 단지를 inner join하되 단지의 `is_deleted`는 보지
+    않으므로, 그 세대는 이미 지운 단지 이름을 달고 목록에 계속 나타난다.
+
+    두 잠금의 세기가 다르다.
+
+    - `exclusive=False`(FOR SHARE): 단지가 사라지지 않는 것만 보장하면 되는 쪽이 쓴다.
+      세대 등록이 여기 해당한다. 공유 잠금끼리는 서로 막지 않으므로 같은 단지에 세대를
+      여러 건 동시에 넣는 정상 작업이 직렬화되지 않는다.
+    - `exclusive=True`(FOR UPDATE): 단지 상태를 바꾸는 삭제가 쓴다. 진행 중인 등록이
+      모두 끝날 때까지 기다린 뒤에야 세대 수를 센다.
+
+    그 결과 나중에 처리되는 쪽이 반드시 상대의 결과를 보고 거절된다. 삭제가 먼저 커밋되면
+    등록 쪽 질의가 `is_deleted = false` 조건에 걸려 빈 결과를 받아 거절되고, 등록이 먼저
+    커밋되면 삭제가 COMPLEX_HAS_UNITS로 거절된다.
+    """
+    statement = (
+        select(PropertyComplex)
+        .where(
+            col(PropertyComplex.brokerage_id) == brokerage_id,
+            col(PropertyComplex.id) == complex_id,
+            col(PropertyComplex.is_deleted).is_(False),
+        )
+        .with_for_update(read=not exclusive)
+    )
+    return session.execute(statement).scalars().first()
+
+
+def count_property_complexes(session: Session, brokerage_id: int) -> int:
+    statement = (
+        select(func.count())
+        .select_from(PropertyComplex)
+        .where(
+            col(PropertyComplex.brokerage_id) == brokerage_id,
+            col(PropertyComplex.is_deleted).is_(False),
+        )
+    )
+    return int(session.execute(statement).scalar_one())
+
+
+def list_property_complexes(
+    session: Session, brokerage_id: int, page: Page
+) -> list[PropertyComplex]:
+    statement = (
+        select(PropertyComplex)
+        .where(
+            col(PropertyComplex.brokerage_id) == brokerage_id,
+            col(PropertyComplex.is_deleted).is_(False),
+        )
+        .order_by(col(PropertyComplex.name))
+        .limit(page.limit)
+        .offset(page.offset)
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+def count_units_in_complex(session: Session, brokerage_id: int, complex_id: int) -> int:
+    """단지에 남아 있는 세대 수. 삭제를 막을지 판단하는 데 쓴다."""
+    statement = (
+        select(func.count())
+        .select_from(PropertyUnit)
+        .where(
+            col(PropertyUnit.brokerage_id) == brokerage_id,
+            col(PropertyUnit.complex_id) == complex_id,
+            col(PropertyUnit.is_deleted).is_(False),
+        )
+    )
+    return int(session.execute(statement).scalar_one())
+
+
+def find_property_complex_by_name(
+    session: Session, brokerage_id: int, name: str
+) -> PropertyComplex | None:
+    """같은 중개사무소 안에서 이름이 겹치는 단지. 중복 등록을 막기 위해 쓴다."""
+    statement = select(PropertyComplex).where(
+        col(PropertyComplex.brokerage_id) == brokerage_id,
+        func.lower(col(PropertyComplex.name)) == name.strip().lower(),
         col(PropertyComplex.is_deleted).is_(False),
     )
     return session.execute(statement).scalars().first()

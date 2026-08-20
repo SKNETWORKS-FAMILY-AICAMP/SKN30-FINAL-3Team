@@ -135,9 +135,10 @@ def authenticate_session(
     )
 
 
-def validate_csrf(context: AuthenticationContext, csrf_token: str | None) -> None:
+def validate_csrf(context: AuthenticationContext, csrf_token: str | None) -> str:
     if not csrf_token or not hmac.compare_digest(context.csrf_token_hash, hash_token(csrf_token)):
         raise AuthenticationError("INVALID_CSRF_TOKEN", "the CSRF token is invalid")
+    return csrf_token
 
 
 def revoke_session(

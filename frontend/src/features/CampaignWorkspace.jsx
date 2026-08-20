@@ -197,7 +197,7 @@ export function CampaignWorkspace({ targets = [], onBack, onOpenComposer }) {
         <div>
           <span className="campaign-workspace__eyebrow">F3 · 사용자가 명시적으로 시작하는 배치 판단</span>
           <Title id="campaign-title" headingLevel="h1" size="xl">문자 캠페인 대상 판정</Title>
-          <p>F1 선택 집합을 판정·제외·세그먼트로 검토한 뒤 F1 문자 작업으로 넘깁니다.</p>
+          <p>F1 선택 집합을 판정·제외·세그먼트로 검토한 뒤 F1 문자 작성으로 넘깁니다.</p>
         </div>
         <Button variant="secondary" icon={<ArrowLeftIcon />} onClick={onBack}>매물장으로 돌아가기</Button>
       </header>
@@ -344,7 +344,7 @@ export function CampaignWorkspace({ targets = [], onBack, onOpenComposer }) {
                 </button>
               </div>
               <label className="campaign-workspace__field" htmlFor="campaign-segment">
-                <span>문자 작업 대상 세그먼트</span>
+                <span>문자 작성 대상 세그먼트</span>
                 <FormSelect id="campaign-segment" value={selectedSegment} onChange={(_event, value) => changeSegment(value)}>
                   {availableSegments.map((segment) => <FormSelectOption key={segment} value={segment} label={`${segment} · ${included.filter((row) => row.segment === segment).length}건`} />)}
                 </FormSelect>
@@ -377,7 +377,7 @@ export function CampaignWorkspace({ targets = [], onBack, onOpenComposer }) {
               </div>
               {NO_SEND_SEGMENTS.has(selectedSegment) && (
                 <Alert variant="warning" isInline title="발송 제외 세그먼트">
-                  최근 거절·결정권 없음 대상은 로그 근거와 함께 표시되며 F1 문자 작업으로 넘길 수 없습니다.
+                  최근 거절·결정권 없음 대상은 로그 근거와 함께 표시되며 F1 문자 작성으로 넘길 수 없습니다.
                 </Alert>
               )}
               <div className="campaign-workspace__card-action">
@@ -387,7 +387,7 @@ export function CampaignWorkspace({ targets = [], onBack, onOpenComposer }) {
                     {approved ? "승인 완료" : "세그먼트 문안 승인"}
                   </Button>
                   <Button icon={<CommentDotsIcon />} onClick={handoff} isDisabled={!canHandoff}>
-                    F1 문자 작업으로 넘기기 · {segmentTargets.length}건
+                    F1 문자 작성으로 넘기기 · {segmentTargets.length}건
                   </Button>
                 </div>
               </div>

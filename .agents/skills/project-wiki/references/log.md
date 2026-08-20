@@ -5,6 +5,7 @@ updated: 2026-08-20
 
 # 위키 변경 로그
 
+- 2026-08-20: 세션 발급 시 CSRF 원문을 별도 HttpOnly Cookie에 보관하고 `/auth/me`는 Cookie와 DB 해시를 검증해 같은 값을 반환만 하도록 인증 계약을 변경하여, GET의 CSRF 해시 변경과 다중 탭 토큰 무효화를 제거함.
 - 2026-08-20: Identity Center 전환을 폐기하고 2026-09-23까지 기존 개인 IAM 사용자·MFA·`aws login`·`TerraformOperatorRole`을 유지하며, 승인된 `student` 사용자에게 세 dev Pipeline 최소 운영 policy를 직접 연결하기로 ADR-0012에서 확정함. INFRA-OQ-001과 delivery 적용 차단 조건을 제거함.
 
 - 2026-08-20: 통합 main 자동 배포와 Backend·Frontend 수동 독립 배포를 세 CodePipeline V2 QUEUED로 승인하고, 충돌 상태 검사·CodeDeploy 전진 migration/rollback·Frontend index 복원·Discord 알림·Worker 비활성 계약을 ADR-0011과 delivery 구현에 반영함. dev workload와 DB migration의 실제 적용 상태를 문서에 동기화하고 delivery apply는 Identity Center 운영자 결정 뒤로 유지함.

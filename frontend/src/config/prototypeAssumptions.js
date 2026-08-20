@@ -12,7 +12,7 @@ export const PROTOTYPE_ASSUMPTIONS = Object.freeze({
     minimumRecordedSeconds: 1,
   }),
   grid: Object.freeze({
-    demoRowCount: 7200,
+    demoRowCount: 50,
     undoLimit: 20,
   }),
   campaign: Object.freeze({

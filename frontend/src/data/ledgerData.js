@@ -1,12 +1,4 @@
 export const initialComplexes = ["래미안 원베일리", "아크로리버파크", "반포자이", "래미안 퍼스티지"];
-const complexes = initialComplexes;
-const owners = ["박이서", "이정민", "윤서준", "최유진", "한도윤", "서예린", "장현우", "문소율"];
-const assignees = ["김이순", "실장", "박소장"];
-const directions = ["남향", "남동향", "남서향", "동향"];
-const listingTypes = ["", "매매", "전세", "월세"];
-// 장부 목록에서 노출하는 저장 상태는 F2 처리 상태와 독립적인 두 값만 사용한다.
-const saveStates = ["저장 완료", "저장 완료", "저장 완료", "임시저장", "임시저장"];
-const aiStates = ["대기", "대기", "분석 완료", "분석 실패"];
 
 const seedRows = [
   {
@@ -115,63 +107,68 @@ const seedRows = [
     consent: "동의",
     memo: "반려동물 협의",
   },
+  {
+    id: "H-0005",
+    complex: "아크로리버파크",
+    building: "102",
+    unit: "1201",
+    saveState: "저장 완료",
+    aiState: "분석 완료",
+    householdState: "매물화",
+    area: "42평",
+    listingType: "매매",
+    price: "36.5억",
+    expiry: "2027-01-15",
+    owner: "윤서준",
+    tenant: "한도윤",
+    phone: "010-3382-9901",
+    direction: "남향",
+    floor: "12/38",
+    rooms: 4,
+    baths: 2,
+    lastContact: "2026-08-14",
+    log: "한강 조망 가능, 리모델링 완료세대",
+    assignee: "박소장",
+    source: "전화",
+    consent: "동의",
+    memo: "한강조망 우수",
+  },
+  {
+    id: "H-0006",
+    complex: "반포자이",
+    building: "201",
+    unit: "802",
+    saveState: "저장 완료",
+    aiState: "대기",
+    householdState: "일반",
+    area: "25평",
+    listingType: "전세",
+    price: "11.5억",
+    expiry: "2026-10-20",
+    owner: "서예린",
+    tenant: "",
+    phone: "010-5491-1120",
+    direction: "동향",
+    floor: "8/29",
+    rooms: 3,
+    baths: 2,
+    lastContact: "2026-08-15",
+    log: "전세 보증금 조절 문의",
+    assignee: "김이순",
+    source: "전화",
+    consent: "동의",
+    memo: "확장형",
+  },
 ];
 
-function buildGeneratedRow(index) {
-  const ordinal = index + 1;
-  const complex = complexes[index % complexes.length];
-  const building = String(101 + (Math.floor(index / 84) % 8));
-  const unit = String(201 + (index % 84));
-  const listingType = listingTypes[index % listingTypes.length];
-  return {
-    id: `H-${String(ordinal).padStart(4, "0")}`,
-    complex,
-    building,
-    unit,
-    saveState: saveStates[index % saveStates.length],
-    aiState: aiStates[index % aiStates.length],
-    householdState: index % 9 === 0 ? "매물화" : "일반",
-    area: `${[24, 33, 42, 50][index % 4]}평`,
-    listingType,
-    price: listingType === "" ? "" : listingType === "매매" ? `${24 + (index % 9)}.${index % 10}억` : listingType === "전세" ? `${12 + (index % 8)}억` : `${5 + (index % 5)}억/${240 + (index % 8) * 20}만`,
-    deposit: listingType === "월세" ? `${5 + (index % 5)}억` : "",
-    rent: listingType === "월세" ? `${240 + (index % 8) * 20}만` : "",
-    expiry: index % 5 === 0 ? "" : `202${6 + (index % 2)}-${String((index % 12) + 1).padStart(2, "0")}-${String((index % 27) + 1).padStart(2, "0")}`,
-    owner: index % 11 === 0 ? "" : owners[index % owners.length],
-    tenant: index % 3 === 0 ? owners[(index + 3) % owners.length] : "",
-    phone: index % 11 === 0 ? "" : `010-${String(1000 + (index * 37) % 9000)}-${String(1000 + (index * 71) % 9000)}`,
-    direction: directions[index % directions.length],
-    floor: `${2 + (index % 30)}/35`,
-    rooms: 3 + (index % 2),
-    baths: 2,
-    lastContact: index % 7 === 0 ? "" : `2026-08-${String((index % 12) + 1).padStart(2, "0")}`,
-    log: index % 4 === 0 ? "매물 의사 없음 · 6개월 후 재확인" : "상담 조건을 확인하고 후속 연락 예정",
-    assignee: assignees[index % assignees.length],
-    source: index % 5 === 0 ? "음성메모" : "전화",
-    consent: index % 8 === 0 ? "확인 필요" : "동의",
-    memo: index % 6 === 0 ? "일정 협의 필요" : "",
-    createdAt: `2026-07-${String((index % 27) + 1).padStart(2, "0")}`,
-    updatedAt: `2026-08-${String((index % 12) + 1).padStart(2, "0")}`,
-    createdBy: assignees[(index + 1) % assignees.length],
-    updatedBy: assignees[index % assignees.length],
-    parking: `${1 + (index % 2)}대`,
-    moveIn: index % 3 === 0 ? "즉시" : "협의",
-    tax: index % 4 === 0 ? "확인 필요" : "일반",
-  };
-}
-
-/**
- * 13.1 매물장 33개 컬럼에 맞춘 표시용 필드를 보완한다.
- * 기존 상세 화면이 사용하는 필드명은 호환을 위해 그대로 보존한다.
- */
 function withPropertyColumns(row) {
   const listingType = row.listingType || "";
   return {
     ...row,
     type: row.type || "J1",
     loan: row.loan || "",
-    receivedAt: row.receivedAt || row.createdAt || "",
-    clearance: row.clearance || row.moveIn || "",
+    receivedAt: row.receivedAt || row.createdAt || "2026-08-15",
+    clearance: row.clearance || row.moveIn || "협의",
     saleFlag: row.saleFlag || (listingType === "매매" ? "Y" : ""),
     leaseFlag: row.leaseFlag || (listingType === "전세" ? "Y" : ""),
     monthlyFlag: row.monthlyFlag || (listingType === "월세" ? "Y" : ""),
@@ -180,7 +177,7 @@ function withPropertyColumns(row) {
     rentCondition: row.rentCondition || (listingType === "월세" ? [row.deposit, row.rent].filter(Boolean).join(" / ") : ""),
     spec: row.spec || [row.rooms && `${row.rooms}실`, row.baths && `${row.baths}욕실`].filter(Boolean).join(" "),
     builtIn: row.builtIn || "",
-    facilityState: row.facilityState || row.tax || "",
+    facilityState: row.facilityState || row.tax || "양호",
     ownerPhone: row.ownerPhone || row.phone || "",
     brokerage: row.brokerage || "",
     tenantPhone: row.tenantPhone || "",
@@ -189,13 +186,8 @@ function withPropertyColumns(row) {
 }
 
 export function createLedgerRows(count) {
-  if (!Number.isInteger(count) || count < 0) {
-    throw new TypeError("createLedgerRows에는 0 이상의 행 수를 명시적으로 전달해야 합니다.");
-  }
-  const generated = Array.from({ length: Math.max(0, count - seedRows.length) }, (_, index) =>
-    buildGeneratedRow(index + seedRows.length),
-  );
-  return [...seedRows, ...generated].map(withPropertyColumns);
+  const dataset = (count && count > 0) ? seedRows.slice(0, count) : seedRows;
+  return dataset.map(withPropertyColumns);
 }
 
 export const emptyDraftRow = {
@@ -247,39 +239,22 @@ const buyerSeedRows = [
     moveDate: "2026-09-15", content: "입주일 조정 가능", stage: "조건 확인", completion: "진행",
     assignee: "실장", background: "", expiry: "2026-09-30", classification: "전세", memo: "만기 임박",
   },
+  {
+    id: "B-0003", date: "2026-08-10", area: "42평", category: "매수", budget: "35~37억",
+    complex: "아크로리버파크", buyer: "강남매수인", phone: "010-9941-2031", brokerage: "",
+    moveDate: "2026-12-01", content: "한강 조망 고층 매물 희망", stage: "방문 일정", completion: "진행",
+    assignee: "박소장", background: "", expiry: "2026-12-31", classification: "실거주", memo: "한강뷰 필수",
+  },
+  {
+    id: "B-0004", date: "2026-08-14", area: "25평", category: "월세", budget: "3억/250만",
+    complex: "반포자이", buyer: "신혼부부", phone: "010-1102-8374", brokerage: "",
+    moveDate: "2026-10-15", content: "빠른 입주 가능한 집", stage: "매물 탐색", completion: "진행",
+    assignee: "김이순", background: "", expiry: "2026-10-31", classification: "월세", memo: "",
+  },
 ];
 
-function buildBuyerRow(index) {
-  const ordinal = index + 1;
-  const category = ["매수", "전세", "월세", "매도"][index % 4];
-  return {
-    id: `B-${String(ordinal).padStart(4, "0")}`,
-    date: `2026-08-${String((index % 12) + 1).padStart(2, "0")}`,
-    area: ["25평", "33평", "25 33평"][index % 3],
-    category,
-    budget: category === "매수" ? `${24 + (index % 8)}억선` : category === "전세" ? `${10 + (index % 5)}억 이하` : "협의",
-    complex: complexes[index % complexes.length],
-    buyer: ["인천사모님", "414동 세입자", "30억이하 엄마", "김손님"][index % 4],
-    phone: `010-${String(2000 + (index * 31) % 7000)}-${String(1200 + (index * 53) % 7000)}`,
-    brokerage: index % 3 === 0 ? "대송" : "",
-    moveDate: `2026-${String((index % 6) + 8).padStart(2, "0")}-15`,
-    content: index % 2 ? "가격 협의 가능" : "입주 시점 우선",
-    stage: ["매물 탐색", "조건 확인", "방문 일정"][index % 3],
-    completion: index % 5 === 0 ? "완료" : "진행",
-    assignee: assignees[index % assignees.length],
-    background: "",
-    expiry: index % 4 === 0 ? `2026-${String((index % 8) + 8).padStart(2, "0")}-30` : "",
-    classification: category,
-    memo: index % 6 === 0 ? "후속 연락 필요" : "",
-  };
-}
-
-export function createBuyerRows(count = 12) {
-  if (!Number.isInteger(count) || count < 0) {
-    throw new TypeError("createBuyerRows에는 0 이상의 행 수를 명시적으로 전달해야 합니다.");
-  }
-  const generated = Array.from({ length: Math.max(0, count - buyerSeedRows.length) }, (_, index) => buildBuyerRow(index + buyerSeedRows.length));
-  return [...buyerSeedRows, ...generated];
+export function createBuyerRows(count = 4) {
+  return (count && count > 0) ? buyerSeedRows.slice(0, count) : buyerSeedRows;
 }
 
 export const emptyBuyerRow = {

@@ -39,3 +39,9 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* 날짜·문구 겸용 필드. 달력 아이콘만 남기고 입력칸은 글자 입력에 내준다. */
+.detail-field__text-or-date { display: flex; align-items: center; gap: 6px; }
+.detail-field__text-or-date > :first-child { flex: 1; }
+.detail-field__date-picker { display: flex; align-items: center; padding: 0 4px; border: 1px solid #8a8d90; border-radius: 3px; }
+.detail-field__date-picker input { width: 24px; padding: 0; color: transparent; background: transparent; border: 0; }

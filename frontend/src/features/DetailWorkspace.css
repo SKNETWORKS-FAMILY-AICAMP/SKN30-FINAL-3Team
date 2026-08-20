@@ -1,24 +1,29 @@
 .detail-workspace-modal {
   --dw-border: var(--pf-t--global--border--color--default, #d2d2d2);
   --dw-border-subtle: var(--pf-t--global--border--color--subtle, #e7e7e7);
-  --dw-surface-subtle: var(--pf-t--global--background--color--secondary--default, #f7f7f7);
-  --dw-text-subtle: var(--pf-t--global--text--color--subtle, #4f5255);
-  --dw-accent: var(--pf-t--global--color--brand--default, #0066cc);
-  --dw-success: var(--pf-t--global--color--status--success--default, #3e8635);
-  --dw-warning: var(--pf-t--global--color--status--warning--default, #f0ab00);
+  --dw-surface-subtle: var(--pf-t--global--background--color--secondary--default, #f8fafc);
+  --dw-text-subtle: var(--pf-t--global--text--color--subtle, #64748b);
+  --dw-accent: var(--pf-t--global--color--brand--default, #0284c7);
+  --dw-success: var(--pf-t--global--color--status--success--default, #16a34a);
+  --dw-warning: var(--pf-t--global--color--status--warning--default, #d97706);
 }
 
 .detail-workspace-modal.pf-v6-c-modal-box {
+  z-index: 501 !important;
   width: min(1456px, calc(100vw - 40px));
   max-width: min(1456px, calc(100vw - 40px));
   height: min(900px, calc(100vh - 40px));
   max-height: min(900px, calc(100vh - 40px));
   overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+  background: #ffffff;
 }
 
 .detail-workspace-modal .pf-v6-c-modal-box__header,
 .detail-workspace-modal > .pf-v6-c-modal-box__header {
-  padding: 20px 24px;
+  padding: 16px 24px;
+  background: #ffffff;
   border-bottom: 1px solid var(--dw-border);
 }
 
@@ -79,7 +84,7 @@
 
 .detail-workspace__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 200px;
+  grid-template-columns: minmax(0, 1fr) 230px;
   min-height: 0;
   height: 100%;
 }
@@ -97,13 +102,13 @@
 }
 
 .detail-section {
-  padding: 20px;
+  padding: 14px 16px;
   border: 1px solid var(--dw-border);
   background: var(--pf-t--global--background--color--primary--default, #fff);
 }
 
 .detail-section + .detail-section {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .detail-section__heading {
@@ -111,7 +116,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .detail-section__heading > span,
@@ -138,16 +143,18 @@
 .detail-people-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
+  /* 각 그룹이 제 내용만큼만 차지하게 한다. 늘어나면 짧은 그룹 아래가 빈칸으로 남는다. */
+  align-items: start;
 }
 
 .detail-info-column,
 .detail-person-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 16px;
+  padding: 12px;
   border: 1px solid var(--dw-border-subtle);
   background: var(--dw-surface-subtle);
 }
@@ -163,7 +170,7 @@
 .detail-inline-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .detail-field {
@@ -172,7 +179,7 @@
 
 .detail-field__label {
   display: inline-block;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   color: var(--pf-t--global--text--color--regular, #151515);
   font-size: 12px;
   font-weight: 600;
@@ -739,6 +746,24 @@
 
 .decision-card__error {
   margin: -8px 0 18px;
+}
+
+.detail-workspace__delete-modal-body > p:first-child {
+  margin: 0 0 22px;
+  color: var(--dw-text-subtle);
+  line-height: 1.55;
+}
+
+/* 저장하지 않은 변경이 함께 사라진다는 경고는 본문 설명보다 눈에 띄어야 한다. */
+.detail-workspace__decision-card p.decision-card__unsaved,
+.detail-workspace__delete-modal-body p.decision-card__unsaved {
+  margin: -8px 0 18px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--pf-t--global--color--status--danger--default--dark, #8a1519);
+  background: var(--pf-t--global--color--status--danger--default--light, #fce6e6);
+  color: var(--pf-t--global--color--status--danger--default--dark, #8a1519);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .decision-card__actions {
