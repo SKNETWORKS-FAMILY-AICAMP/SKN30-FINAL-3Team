@@ -5,6 +5,7 @@ updated: 2026-08-20
 
 # 위키 변경 로그
 
+- 2026-08-20: 세션 발급 시 CSRF 원문을 별도 HttpOnly Cookie에 보관하고 `/auth/me`는 Cookie와 DB 해시를 검증해 같은 값을 반환만 하도록 인증 계약을 변경하여, GET의 CSRF 해시 변경과 다중 탭 토큰 무효화를 제거함.
 - 2026-08-20: F3 실행 상태 조회가 DB `failure_message` 원문을 공개하지 않고 allowlist 기반 `failure_code`·고정 문구만 반환하도록 공개 경계를 좁히고, 알 수 없는 내부 실패를 `EXECUTION_FAILED`로 일반화했으며, `agent_run.requested_by`의 수집 목적·저장 위치·비노출과 OQ-007 보존 미확정을 F3 실행 계약에 명시하고 Worker 구현 범위 서술의 상충을 정정함.
 - 2026-08-20: 4인 공유 개발 환경의 비용 절감을 위해 EC2 instance class를 `t3.medium`에서 `t3.small`로 축소하고 Infra ADR-0010과 Terraform·자원 인벤토리·아키텍처 현재값을 동기화함. RDS와 gp3 40 GiB는 변경하지 않음.
 

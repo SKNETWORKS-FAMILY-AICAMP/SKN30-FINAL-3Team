@@ -29,8 +29,8 @@ class DevelopmentSessionResponse(BaseModel):
 class SessionUserResponse(BaseModel):
     """세션 확인 응답.
 
-    CSRF 토큰을 함께 싣는다. 토큰은 발급 응답에만 있었기 때문에, 새로고침으로 화면 메모리가
-    비면 세션은 살아 있는데 쓰기만 403이 되는 구멍이 있었다.
+    세션 발급 때 HttpOnly 쿠키에 함께 보관한 CSRF 원문을 DB 해시와 대조한 뒤 그대로 싣는다.
+    조회 시 서버의 CSRF 상태를 바꾸지 않아 여러 탭이 서로의 토큰을 무효화하지 않는다.
     """
 
     user: CurrentUserResponse

@@ -15,7 +15,7 @@ from domain.authentication.models import AuthenticationContext
 from domain.authentication.service import (
     issue_development_session,
     revoke_session,
-    rotate_csrf_token,
+    validate_csrf,
 )
 from domain.session import get_app_config, get_db_session
 
@@ -33,9 +33,20 @@ def create_development_session(
     db: Session = Depends(get_db_session),
 ) -> DevelopmentSessionResponse:
     issued = issue_development_session(db, config)
+    response.headers["Cache-Control"] = "no-store"
     response.set_cookie(
         key=config.auth.session.cookie_name,
         value=issued.session_token,
+        httponly=True,
+        secure=config.secure_cookie,
+        samesite="lax",
+        domain=config.auth.session.cookie_domain,
+        path="/",
+        max_age=config.auth.session.absolute_timeout_minutes * 60,
+    )
+    response.set_cookie(
+        key=config.auth.session.csrf_cookie_name,
+        value=issued.csrf_token,
         httponly=True,
         secure=config.secure_cookie,
         samesite="lax",
@@ -51,12 +62,19 @@ def create_development_session(
 
 @router.get("/me", response_model=SessionUserResponse)
 def me(
+    request: Request,
+    response: Response,
     context: AuthenticationContext = Depends(get_authentication_context),
-    db: Session = Depends(get_db_session),
+    config: Config = Depends(get_app_config),
 ) -> SessionUserResponse:
+    csrf_token = validate_csrf(
+        context,
+        request.cookies.get(config.auth.session.csrf_cookie_name),
+    )
+    response.headers["Cache-Control"] = "no-store"
     return SessionUserResponse(
         user=CurrentUserResponse.from_domain(context.user),
-        csrf_token=rotate_csrf_token(db, context.session_id),
+        csrf_token=csrf_token,
     )
 
 
@@ -74,6 +92,14 @@ def delete_session(
         revoke_session(db, session_token)
     response.delete_cookie(
         key=config.auth.session.cookie_name,
+        domain=config.auth.session.cookie_domain,
+        path="/",
+        secure=config.secure_cookie,
+        httponly=True,
+        samesite="lax",
+    )
+    response.delete_cookie(
+        key=config.auth.session.csrf_cookie_name,
         domain=config.auth.session.cookie_domain,
         path="/",
         secure=config.secure_cookie,

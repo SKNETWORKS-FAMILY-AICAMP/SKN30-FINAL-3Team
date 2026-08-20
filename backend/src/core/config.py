@@ -61,11 +61,18 @@ class DevelopmentAuthConfig(BaseModel):
 
 
 class SessionConfig(BaseModel):
-    cookie_name: str = "brokerage_session"
+    cookie_name: str = Field(default="brokerage_session", min_length=1)
+    csrf_cookie_name: str = Field(default="brokerage_csrf", min_length=1)
     idle_timeout_minutes: int = Field(default=1440, ge=1)
     absolute_timeout_minutes: int = Field(default=10080, ge=1)
     last_seen_update_seconds: int = Field(default=300, ge=1)
     cookie_domain: str | None = None
+
+    @model_validator(mode="after")
+    def validate_cookie_names(self) -> SessionConfig:
+        if self.cookie_name == self.csrf_cookie_name:
+            raise ValueError("session and CSRF cookies must use different names")
+        return self
 
 
 class AuthConfig(BaseModel):
@@ -188,6 +195,7 @@ def bind_config(source: Mapping[str, str]) -> Config:
             ),
             session=SessionConfig(
                 cookie_name=source.get("AUTH_SESSION_COOKIE_NAME", "brokerage_session"),
+                csrf_cookie_name=source.get("AUTH_CSRF_COOKIE_NAME", "brokerage_csrf"),
                 idle_timeout_minutes=_integer(source, "AUTH_SESSION_IDLE_TIMEOUT_MINUTES", 1440),
                 absolute_timeout_minutes=_integer(
                     source, "AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES", 10080

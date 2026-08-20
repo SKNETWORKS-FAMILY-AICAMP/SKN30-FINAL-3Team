@@ -22,7 +22,6 @@ from domain.authentication.repository import (
     find_active_user,
     find_user_by_id,
     find_user_session_by_hash,
-    find_user_session_by_id,
 )
 
 
@@ -136,29 +135,10 @@ def authenticate_session(
     )
 
 
-def rotate_csrf_token(db: Session, session_id: int) -> str:
-    """살아 있는 세션에 새 CSRF 토큰을 발급한다.
-
-    서버는 토큰의 해시만 보관하므로 원본을 다시 꺼내 줄 수 없다. 그래서 세션 확인 시점에
-    새로 발급해 교체한다. 새로고침으로 화면 메모리의 토큰이 사라져도 쓰기가 계속 되게 하려는 것이다.
-
-    주의: 같은 세션을 여러 탭에서 열면 나중에 연 탭이 앞선 탭의 토큰을 무효화한다.
-    앞선 탭은 쓰기에서 403을 받고, 새로고침하면 다시 정상으로 돌아온다.
-    """
-    stored_session = find_user_session_by_id(db, session_id)
-    if stored_session is None or stored_session.revoked_at is not None:
-        raise AuthenticationError("UNAUTHENTICATED", "authentication is required")
-
-    csrf_token = secrets.token_urlsafe(32)
-    stored_session.csrf_token_hash = hash_token(csrf_token)
-    db.add(stored_session)
-    db.commit()
-    return csrf_token
-
-
-def validate_csrf(context: AuthenticationContext, csrf_token: str | None) -> None:
+def validate_csrf(context: AuthenticationContext, csrf_token: str | None) -> str:
     if not csrf_token or not hmac.compare_digest(context.csrf_token_hash, hash_token(csrf_token)):
         raise AuthenticationError("INVALID_CSRF_TOKEN", "the CSRF token is invalid")
+    return csrf_token
 
 
 def revoke_session(

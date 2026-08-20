@@ -257,7 +257,7 @@ export function AppShell() {
   };
 
   /*
-   * 세대 상세의 삭제.
+   * 세대·구입장 상세의 삭제.
    *
    * 상세는 자체 확인 창에서 대상과 영향을 보여주고 오류도 그 자리에서 알린다.
    * 여기서 확인 창을 한 번 더 띄우면 같은 질문을 두 번 하게 되므로 바로 실행하고,
@@ -624,7 +624,7 @@ export function AppShell() {
         focusF2Request={f2FocusRequest}
         onClose={closeDetail}
         onDiscard={discardDetail}
-        onDelete={(row) => requestDeleteRows([row], "detail")}
+        onDelete={deleteRowFromDetail}
         onSave={saveDetail}
         crossMatchPanel={crossMatchPanel}
       />
