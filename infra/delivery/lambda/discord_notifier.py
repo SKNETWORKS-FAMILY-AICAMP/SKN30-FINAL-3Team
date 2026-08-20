@@ -85,7 +85,10 @@ def handler(event: dict[str, Any], _context: Any) -> None:
         request = urllib.request.Request(
             secret_url(),
             data=json.dumps({"content": content}).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (compatible; SKN30-DiscordNotifier/1.0)",
+            },
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=10) as response:
