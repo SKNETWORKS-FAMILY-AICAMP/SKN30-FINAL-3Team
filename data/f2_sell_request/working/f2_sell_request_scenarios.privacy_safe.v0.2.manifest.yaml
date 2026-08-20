@@ -1,44 +1,112 @@
 dataset_id: f2-sell-request-privacy-safe
-version: 0.2.0
+dataset_version: 0.2.0
 status: draft_privacy_review_pending
 created_at: 2026-08-18
-purpose: F2 상담유형 분류를 위한 매도의뢰 합성 대화 초안
+updated_at: 2026-08-20
+
+purpose:
+  - F2 상담유형 분류의 `매도의뢰` 라벨 합성 대화 초안 제공
+  - 개인정보 담당자 검토 전 내부 MVP 실험 입력으로만 사용
+
 format: jsonl
 data_file: f2_sell_request_scenarios.privacy_safe.v0.2.jsonl
 privacy_record: f2_sell_request_scenarios.privacy_safe.v0.2.privacy.md
-record_count: 50
+
+schema:
+  record_id_field: scenario_id
+  fields:
+    - scenario_id: 사례 식별자, 변경하지 않는다
+    - dataset_version: 사례가 속한 데이터셋 버전
+    - label: 상담유형 라벨
+    - transcript: 합성 상담 대화문
+    - source_type: 생성 유형
+    - source_group_id: 분할 누수 방지용 그룹 키
+    - split: 분할 배정 상태
+    - contains_real_personal_data: 실제 개인정보 포함 여부
+  label_values:
+    - 매도의뢰
+  label_guide: 미확정. 라벨 정의와 경계 사례는 F2 요구사항 정본이 소유하며 아직 버전된 라벨 가이드가 없다.
+
+lineage:
+  source_types:
+    - fully_synthetic_from_abstract_blueprint
+  source_reference: 없음. 실제 상담 레코드, 로그 또는 외부 코퍼스를 입력으로 사용하지 않았다.
+  derivation: 거래유형·물건유형·점유상태·조건상태·소유관계의 추상 조합으로 청사진 50개를 구성하고 각 청사진을 대화문 1건으로 작성했다.
+  source_group_policy: 각 레코드에 독립적인 합성 청사진 그룹(`source_group_id`)을 부여한다.
+  usage_terms: 내부 전용. 원천 제3자 라이선스나 정보주체 동의에 종속되지 않는다. 외부 공개와 재배포는 개인정보 담당자 검토 통과 전까지 금지한다.
+  human_verified: false
+  supersedes: 0.1.0
+  generation:
+    tooling: 미기록
+    random_seed: null
+    reproducible: false
+    note: 생성 도구와 설정을 기록하지 않아 동일 산출물을 재생성할 수 없다. 무결성은 sha256으로만 확인한다. 기록 형식은 데이터 모듈 open-questions DQ-007이 소유한다.
+
+counts:
+  total: 50
+  train: 0
+  validation: 0
+  test: 0
 label_distribution:
   매도의뢰: 50
-source_type: fully_synthetic_from_abstract_blueprint
-source_group_policy: 각 레코드에 독립적인 합성 청사진 그룹 부여
-raw_personal_data_in_artifact: false
-split: unassigned
-privacy_controls:
-  - 직접식별자는 명백한 가상 토큰으로 대체
-  - 위치는 가상 토큰으로 대체
-  - 금액은 범위로 일반화
-  - 날짜는 상대 시점으로 일반화
-  - 면적은 크기 범주로 일반화
-  - 구체 가족관계는 업무 역할로 일반화
+
+split:
+  method: unassigned
+  group_key: source_group_id
+  random_seed: null
+  note: 분할 정책 확정 전까지 모든 레코드는 `unassigned`이며, 확정 후에도 같은 `source_group_id`를 둘 이상의 분할에 배치하지 않는다.
+
+privacy:
+  classification: 내부
+  contains_real_personal_data: false
+  raw_personal_data_in_artifact: false
+  processing_purpose: F2 상담유형 분류 모델·프롬프트의 내부 실험 입력
+  storage_location: 이 Git 저장소의 data/f2_sell_request/working/. 별도 외부 저장소나 외부 처리자에게 전송하지 않았다.
+  access_subjects: 저장소 접근 권한이 있는 팀 구성원
+  external_transfer: 없음. 외부 처리자(OpenAI API, RunPod 등)로 전송한 이력이 없다.
+  retention_and_deletion: 개인정보 담당자 검토 결과가 나올 때까지 보존한다. 통과 시 releases/0.2.0/으로 승격하고 working 사본을 정리한다. 반려 시 저장소에서 삭제하고 registry에 처리 이력을 남긴다. 확정 보존 기한은 미정이며 데이터 모듈 open-questions DQ-006이 소유한다.
+  controls:
+    - 직접식별자는 명백한 가상 토큰으로 대체
+    - 위치는 가상 토큰으로 대체
+    - 금액은 범위로 일반화
+    - 날짜는 상대 시점으로 일반화
+    - 면적은 크기 범주로 일반화
+    - 구체 가족관계는 업무 역할로 일반화
+  reidentification_mapping: 없음. 가상 토큰과 실제 값 사이의 대응표를 만들지 않았다.
+
 validation:
-  json_parse: passed
-  unique_ids: 50
-  unique_source_groups: 50
-  duplicate_transcripts: 0
-  direct_identifier_pattern_matches: 0
-  real_place_pattern_matches: 0
-  exact_calendar_date_pattern_matches: 0
-  exact_money_pattern_matches: 0
-  unclear_intent_records: 0
-  max_five_gram_jaccard: 0.1361
-sha256: FE39CD2447CFCD436CC3359B6E707A3CA6FDF9627CE887BCA84BFCA6E1E1EFFC
+  validated_at: 2026-08-20
+  validated_by: 자동 패턴 검사(사람 검수 아님)
+  method: 데이터 파일을 JSONL로 파싱한 뒤 정규식 패턴 검사와 n-gram 유사도를 계산한다. 유사도는 공백을 제거한 문자 5-gram 집합의 레코드 쌍 Jaccard 최댓값이다.
+  results:
+    json_parse: passed
+    record_count_matches_manifest: true
+    unique_ids: 50
+    unique_source_groups: 50
+    duplicate_transcripts: 0
+    direct_identifier_pattern_matches: 0
+    real_place_pattern_matches: 0
+    exact_calendar_date_pattern_matches: 0
+    exact_money_pattern_matches: 0
+    unclear_intent_records: 0
+    max_five_gram_jaccard: 0.1859
+
+checksums:
+  algorithm: sha256
+  f2_sell_request_scenarios.privacy_safe.v0.2.jsonl: fe39cd2447cfcd436cc3359b6e707a3ca6fdf9627ce887bca84bfca6e1e1effc
+
 known_limitations:
-  - 완전한 클린룸 생성 결과로 단정하지 않음
-  - 실제 원본과의 안전한 내부 유사도 비교가 추가로 필요함
-  - 자동 검사는 법적 적정성 검토를 대체하지 않음
-  - 실제 상담 분포의 대표성을 보장하지 않음
+  - 완전한 클린룸 생성 결과로 단정하지 않는다.
+  - 실제 원본과의 안전한 내부 유사도 비교가 추가로 필요하다.
+  - 자동 패턴 검사는 법적 적정성 검토를 대체하지 않는다.
+  - 실제 상담 분포의 대표성을 보장하지 않는다.
+  - 사람 검수를 거치지 않았다(`human_verified: false`).
+  - 생성 도구와 시드를 기록하지 않아 동일 산출물을 재생성할 수 없다.
+  - 라벨이 `매도의뢰` 한 종류뿐이라 이 산출물만으로 분류 성능을 평가할 수 없다.
+
 allowed_use: 개인정보 담당자 검토 전 내부 MVP 실험용
 prohibited_use:
   - 검토 전 외부 공개
   - 실제 상담 분포를 대표하는 근거로 사용
   - 개인정보 안전성이 확정된 데이터로 표현
+  - 검수 없이 골드 정답으로 사용

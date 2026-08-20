@@ -1,6 +1,11 @@
 registry_version: 0.1.0
 updated: 2026-08-20
 
+# 등록 규칙
+# - 저장소에 두는 데이터 산출물은 같은 폴더에 manifest와 개인정보 처리 기록을 함께 둔다.
+# - manifest는 manifest.template.yaml의 항목(출처·이용 조건·개인정보 등급·보존 조건·체크섬)을 채운다.
+# - 두 문서가 없는 산출물은 working/에 있더라도 Git에 추가하지 않는다.
+
 datasets:
   - dataset_id: f2-llm-analysis
     path: f2_llm
@@ -18,6 +23,15 @@ datasets:
     notes:
       - 발행된 릴리스가 없다. 산출물은 전부 working/의 초안이다.
       - 0.2.0은 개인정보 담당자 검토 대기 상태다(manifest status draft_privacy_review_pending).
-      - 0.2.0의 출처, 개인정보 통제, 검사 결과와 한계는 같은 폴더의 manifest가 소유한다.
-      - 0.1.0은 manifest와 개인정보 기록이 없는 초기 초안이며 0.2.0으로 대체됐다. 사용하지 않는다.
-      - 검토를 통과하면 releases/0.2.0/으로 발행하고 latest_release를 갱신한다.
+      - 0.2.0의 출처, 이용 조건, 개인정보 등급, 보존·삭제 조건, 검사 결과와 한계는 같은 폴더의
+        manifest와 개인정보 처리 기록이 소유한다.
+      - 0.2.0은 사람 검수를 거치지 않았고 생성 도구·시드를 기록하지 않아 재생성할 수 없다.
+        무결성은 manifest의 sha256으로만 확인한다.
+      - 0.1.0은 저장소에서 제거했다. manifest와 개인정보 기록이 없었고, 부분 마스킹 흔적과
+        seed 그룹이 남아 실제 상담에서 파생됐을 가능성을 배제할 수 없었다. 0.2.0이 대체한다.
+      - 0.1.0 파일은 커밋 9e7ba4b의 Git 이력에 남아 있다. 이 커밋은 front/refactor에만 있고
+        main에는 없다. 이력에서 지우려면 병합 전에 해당 커밋을 squash 또는 재작성해야 하며,
+        조치 여부는 브랜치 소유자와 팀이 결정한다.
+      - manifest와 개인정보 기록을 갖추지 않은 산출물은 working/에 두더라도 Git에 추가하지 않는다.
+      - 검토를 통과하면 releases/0.2.0/으로 발행하고 latest_release를 갱신한다. 반려하면 산출물을
+        삭제하고 이 항목에 처리 이력을 남긴다.

@@ -2,20 +2,39 @@ dataset_id: replace-me
 dataset_version: 0.1.0
 status: draft
 created_at: YYYY-MM-DD
+updated_at: YYYY-MM-DD
 
 purpose: []
+
+format: jsonl
+data_file: replace-me
+privacy_record: replace-me   # 같은 폴더의 개인정보 처리 기록 파일. 없으면 Git에 추가하지 않는다.
+
+schema:
+  record_id_field: sample_id
+  fields: []
+  label_values: []
+  label_guide: pending
 
 lineage:
   source_types: []
   source_reference: null
+  derivation: null
+  source_group_policy: null
   usage_terms: pending
   human_verified: false
+  supersedes: null
+  generation:
+    tooling: null
+    random_seed: null
+    reproducible: false
 
 counts:
   total: 0
   train: 0
   validation: 0
   test: 0
+label_distribution: {}
 
 split:
   method: unassigned
@@ -23,10 +42,25 @@ split:
   random_seed: null
 
 privacy:
-  classification: internal
+  classification: internal     # 공개 | 내부 | 개인정보 | 민감·비밀
   contains_real_personal_data: false
+  processing_purpose: pending
   storage_location: pending
+  access_subjects: pending
+  external_transfer: none
   retention_and_deletion: pending
+  controls: []
+  reidentification_mapping: none
 
-checksums: {}
+validation:
+  validated_at: null
+  validated_by: null
+  method: null
+  results: {}
+
+checksums:
+  algorithm: sha256
+
 known_limitations: []
+allowed_use: pending
+prohibited_use: []

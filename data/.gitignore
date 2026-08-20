@@ -8,12 +8,13 @@
 !*/raw/*.example.*
 !*/working/*.example.*
 
-# f2_sell_request 초안은 예외로 추적한다. 전부 합성 생성물이고 실제 개인정보가 없다
-# (manifest의 raw_personal_data_in_artifact: false). 개인정보 검토 이력을 남겨야 하므로
-# 릴리스 전이라도 Git에 둔다. 실제 상담 데이터에는 이 예외를 적용하지 않는다.
-!f2_sell_request/working/f2_sell_request_scenarios*.jsonl
-!f2_sell_request/working/f2_sell_request_scenarios*.manifest.yaml
-!f2_sell_request/working/f2_sell_request_scenarios*.privacy.md
+# f2_sell_request 초안은 예외로 추적한다. 개인정보 검토 이력을 남겨야 하므로 릴리스 전이라도
+# Git에 둔다. 다만 예외는 `.privacy_safe.` 표식이 붙은 산출물, 즉 같은 폴더에 manifest와
+# 개인정보 처리 기록을 함께 둔 것에만 적용한다. 출처·이용 조건·개인정보 등급을 기록하지 않은
+# 초안과 실제 상담에서 파생된 데이터에는 이 예외를 적용하지 않는다.
+!f2_sell_request/working/*.privacy_safe.*.jsonl
+!f2_sell_request/working/*.privacy_safe.*.manifest.yaml
+!f2_sell_request/working/*.privacy_safe.*.privacy.md
 
 # 대용량·민감 원본의 흔한 형식은 위치와 관계없이 차단한다.
 *.wav

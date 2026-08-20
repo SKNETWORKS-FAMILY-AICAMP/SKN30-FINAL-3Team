@@ -24,6 +24,20 @@ def create_party(
     ).scalar_one()
 
 
+def create_contact(
+    session: Session, brokerage_id: int, party_id: int, value: str, *, is_primary: bool = True
+) -> int:
+    return session.execute(
+        text(
+            "INSERT INTO party_contact (brokerage_id, party_id, contact_value,"
+            " normalized_contact_value, is_primary)"
+            " VALUES (:b, :p, :v, :v, :m)"
+            " RETURNING id"
+        ),
+        {"b": brokerage_id, "p": party_id, "v": value, "m": is_primary},
+    ).scalar_one()
+
+
 @requires_database
 def test_requirement_is_rejected_without_privacy_consent(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
@@ -117,6 +131,52 @@ def test_requirement_list_is_sorted_by_last_contact(config: Config) -> None:
 
         assert body["items"][0]["id"] == first["id"]
         assert body["items"][0]["last_contact_at"] is not None
+
+
+@requires_database
+def test_requirement_list_carries_party_and_contacts(config: Config) -> None:
+    """구입장 목록은 행마다 인물과 연락처를 싣는다.
+
+    화면 표에 손님과 연락처가 고정 컬럼이고 다중 문자 발송이 여러 행을 한꺼번에 다루므로,
+    클라이언트는 목록 응답만으로 두 값을 얻어야 한다. 상세로 미루면 행마다 추가 요청이 생긴다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        party_id = create_party(session, brokerage_id, "연락처 있는 손님", consented_by=user_id)
+        create_contact(session, brokerage_id, party_id, "01012345678")
+        create_contact(session, brokerage_id, party_id, "01099998888", is_primary=False)
+        client.post(
+            "/api/v1/property-requirements",
+            json={"party_id": party_id, "demand_type": "매수"},
+        )
+
+        body = client.get("/api/v1/property-requirements").json()
+
+        row = body["items"][0]
+        assert row["party"]["id"] == party_id
+        assert row["party"]["name"] == "연락처 있는 손님"
+        contacts = {contact["contact_value"]: contact for contact in row["party"]["contacts"]}
+        assert set(contacts) == {"01012345678", "01099998888"}
+        assert contacts["01012345678"]["is_primary"] is True
+        assert contacts["01099998888"]["is_primary"] is False
+
+
+@requires_database
+def test_requirement_list_gives_an_empty_contact_list_when_none_exist(config: Config) -> None:
+    """연락처가 없어도 `contacts`는 빈 배열이며 생략되지 않는다.
+
+    클라이언트가 `party`와 `contacts`를 필수로 디코드하므로 필드 자체가 빠지면 목록 전체가
+    오류 상태가 된다. 없음은 생략이 아니라 빈 배열로 표현한다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        party_id = create_party(session, brokerage_id, "연락처 없는 손님", consented_by=user_id)
+        client.post(
+            "/api/v1/property-requirements",
+            json={"party_id": party_id, "demand_type": "매수"},
+        )
+
+        body = client.get("/api/v1/property-requirements").json()
+
+        assert body["items"][0]["party"]["contacts"] == []
 
 
 @requires_database

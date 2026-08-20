@@ -45,7 +45,7 @@ updated: 2026-08-20
 
 - 모든 경로가 서버 세션을 요구한다. `brokerage_id`는 세션에서만 도출하고 요청 본문이나 쿼리로 받지 않는다.
 - 상태를 바꾸는 POST, PATCH, DELETE는 `X-CSRF-Token`을 요구한다.
-- DELETE는 소프트 삭제다. 행을 지우지 않고 `is_deleted`를 세워 목록에서 제외한다. 상담 로그와 매물 이력이 참조하고 있어 물리 삭제는 이력을 함께 잃는다. 낙관적 잠금을 위해 `row_version`을 질의 변수로 요구하며, 어긋나면 409를 돌려준다.
+- DELETE는 소프트 삭제다. 행을 지우지 않고 `is_deleted`를 세워 목록에서 제외한다. 상담 로그와 매물 이력이 참조하고 있어 물리 삭제는 이력을 함께 잃는다. 낙관적 잠금을 위해 `row_version`을 질의 변수로 요구하며, 어긋나면 409를 돌려준다. 본문이 아니라 질의 변수인 이유는 DELETE가 본문을 싣지 않는 클라이언트에서도 같게 동작해야 하기 때문이다. 성공하면 본문 없이 204를 돌려준다.
 - 금액은 원 단위 정수로 주고받는다. 억·만 단위 표시 변환은 클라이언트가 담당한다.
 - 소프트 삭제된 행은 응답에서 제외한다.
 - 목록 응답은 `items`, `total`, `limit`, `offset`을 포함하며 `total`은 현재 필터 조건의 전체 건수다.
@@ -86,12 +86,16 @@ updated: 2026-08-20
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| GET | /api/v1/property-requirements | 세션 | 구입장 목록. 기본 정렬은 최종접촉일 내림차순 |
+| GET | /api/v1/property-requirements | 세션 | 구입장 목록. 각 행에 인물과 연락처를 포함한다. 기본 정렬은 최종접촉일 내림차순 |
 | GET | /api/v1/property-requirements/column-values | 세션 | 현재 필터 범위에 실재하는 컬럼 값 목록과 건수 |
 | GET | /api/v1/property-requirements/{requirement_id} | 세션 | 구입장 상세. 인물, 연락처, 희망 단지 포함 |
 | POST | /api/v1/property-requirements | 세션·CSRF | 구입장 추가 |
 | PATCH | /api/v1/property-requirements/{requirement_id} | 세션·CSRF | 구입장 부분 수정 |
 | DELETE | /api/v1/property-requirements/{requirement_id} | 세션·CSRF | 구입장 행 삭제. `row_version` 질의 변수 필수 |
+
+구입장은 인물이 행의 주체이고 화면 표에 손님과 연락처가 고정 컬럼으로 있으므로, 목록 응답이 `party`와 그 안의 `contacts`를 함께 싣는다. 행마다 상세를 다시 부르면 목록 한 번에 N번의 추가 요청이 생기고 다중 문자 발송처럼 여러 행을 한꺼번에 다루는 기능이 성립하지 않는다. 인물이 없는 구입장 행은 존재할 수 없으므로 `party`는 목록과 상세 모두에서 필수이며, 클라이언트는 이를 선택 필드로 다루지 않는다. 반대로 매물장 목록은 인물을 싣지 않고 세대 상세에서만 인물 관계를 제공한다. 두 장부의 차이는 인물이 행의 주체인지 여부에서 온다.
+
+개인정보 최소 노출은 장부 사이의 경계가 아니라 중개사무소 경계와 동의 여부로 지킨다. 세션의 `brokerage_id`가 소유하지 않은 인물은 어떤 경로로도 나오지 않고, 동의가 없는 인물은 애초에 구입장으로 저장되지 않는다.
 
 현재 구현된 필터는 `demand_type`, `status`, `classification`, `workflow_stage`, `assigned_user_id`다.
 

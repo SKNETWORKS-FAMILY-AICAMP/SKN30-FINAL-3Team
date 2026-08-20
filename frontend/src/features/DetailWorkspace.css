@@ -748,6 +748,24 @@
   margin: -8px 0 18px;
 }
 
+.detail-workspace__delete-modal-body > p:first-child {
+  margin: 0 0 22px;
+  color: var(--dw-text-subtle);
+  line-height: 1.55;
+}
+
+/* 저장하지 않은 변경이 함께 사라진다는 경고는 본문 설명보다 눈에 띄어야 한다. */
+.detail-workspace__decision-card p.decision-card__unsaved,
+.detail-workspace__delete-modal-body p.decision-card__unsaved {
+  margin: -8px 0 18px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--pf-t--global--color--status--danger--default--dark, #8a1519);
+  background: var(--pf-t--global--color--status--danger--default--light, #fce6e6);
+  color: var(--pf-t--global--color--status--danger--default--dark, #8a1519);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .decision-card__actions {
   display: flex;
   flex-wrap: wrap;

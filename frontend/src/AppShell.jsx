@@ -210,12 +210,12 @@ export function AppShell() {
     setDeleteTarget({ rows, source });
   };
 
-  /** 확인 후 실제 삭제. 부분 실패를 성공으로 뭉뚱그리지 않는다. */
-  const confirmDelete = async () => {
-    const rows = deleteTarget?.rows ?? [];
-    if (rows.length === 0) return;
-    setIsDeleting(true);
-
+  /*
+   * 실제 삭제. 확인 화면은 호출한 쪽이 책임진다.
+   * 부분 실패를 성공으로 뭉뚱그리지 않고, 실패한 행은 열려 있는 화면에서 그대로 둔다.
+   * 자체 확인 창에서 오류를 직접 보여주는 호출부는 reportFailure를 꺼서 같은 말을 두 번 하지 않는다.
+   */
+  const deleteRows = async (rows, { reportFailure = true } = {}) => {
     const failures = [];
     for (const row of rows) {
       const ledger = row.ledgerType === "buyer" || row.rowKind === "buyer" ? buyerLedger : propertyLedger;
@@ -226,23 +226,46 @@ export function AppShell() {
       }
     }
 
-    setIsDeleting(false);
-    setDeleteTarget(null);
     setSelectedRows([]);
     setSelectionResetToken((current) => current + 1);
-    if (detailRow && rows.some((row) => row.id === detailRow.id)) closeDetail();
+    const deletedRows = rows.filter((row) => !failures.some((failure) => failure.row.id === row.id));
+    if (detailRow && deletedRows.some((row) => row.id === detailRow.id)) closeDetail();
 
-    const deleted = rows.length - failures.length;
+    const deleted = deletedRows.length;
     if (failures.length === 0) {
       setToast({ variant: "success", title: `${deleted.toLocaleString()}건을 삭제했습니다.` });
     } else if (deleted === 0) {
-      setToast({ variant: "danger", title: `삭제하지 못했습니다 · ${failures[0].message}` });
+      if (reportFailure) setToast({ variant: "danger", title: `삭제하지 못했습니다 · ${failures[0].message}` });
     } else {
       setToast({
         variant: "warning",
         title: `${deleted.toLocaleString()}건을 삭제했고 ${failures.length.toLocaleString()}건은 실패했습니다 · ${failures[0].message}`,
       });
     }
+
+    return failures;
+  };
+
+  /** 확인 창의 삭제 버튼. */
+  const confirmDelete = async () => {
+    const rows = deleteTarget?.rows ?? [];
+    if (rows.length === 0) return;
+    setIsDeleting(true);
+    await deleteRows(rows);
+    setIsDeleting(false);
+    setDeleteTarget(null);
+  };
+
+  /*
+   * 세대 상세의 삭제.
+   *
+   * 상세는 자체 확인 창에서 대상과 영향을 보여주고 오류도 그 자리에서 알린다.
+   * 여기서 확인 창을 한 번 더 띄우면 같은 질문을 두 번 하게 되므로 바로 실행하고,
+   * 실패는 던져서 상세가 열린 채로 사유를 보여주게 한다.
+   */
+  const deleteRowFromDetail = async (row) => {
+    const failures = await deleteRows([row], { reportFailure: false });
+    if (failures.length > 0) throw new Error(failures[0].message);
   };
 
   /*
@@ -615,7 +638,7 @@ export function AppShell() {
         onDeleteComplex={handleDeleteComplex}
         onClose={closeDetail}
         onDiscard={discardDetail}
-        onDelete={(row) => requestDeleteRows([row], "detail")}
+        onDelete={deleteRowFromDetail}
         onSave={saveDetail}
         onOpenCrossMatch={openCrossMatch}
         isCrossMatchOpen={crossMatchOpen}

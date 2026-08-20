@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Checkbox, Divider, FormSelect, FormSelectOption, Label, Modal, ModalBody, ModalHeader, TextArea, TextInput, Title } from "@patternfly/react-core";
+import { Alert, Button, Checkbox, Divider, FormSelect, FormSelectOption, Label, Modal, ModalBody, ModalFooter, ModalHeader, TextArea, TextInput, Title } from "@patternfly/react-core";
 import { CheckCircleIcon, HistoryIcon, InfoCircleIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import { PROTOTYPE_ASSUMPTIONS } from "../config/prototypeAssumptions.js";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
@@ -144,6 +144,9 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const [relationOpen, setRelationOpen] = useState(false);
   const [relationTarget, setRelationTarget] = useState(null);
   const [closeDecision, setCloseDecision] = useState(false);
+  const [deleteDecision, setDeleteDecision] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [securityWarning, setSecurityWarning] = useState("");
   const [securityConfirmed, setSecurityConfirmed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -155,11 +158,11 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const [complexQuickAddStatus, setComplexQuickAddStatus] = useState("");
   const initializedOpenRef = useRef(false);
   const securityRef = useRef(null);
+  const deleteTriggerRef = useRef(null);
 
-  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); }, [focusF2Request, isOpen, row]);
+  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); }, [focusF2Request, isOpen, row]);
   useEffect(() => { if (isOpen && focusF2Request) setF2Open(true); }, [focusF2Request, isOpen]);
   useEffect(() => { if (securityWarning) securityRef.current?.focus(); }, [securityWarning]);
-
   /*
    * 상세는 항상 맨 위(기본 정보)에서 시작한다.
    * 안쪽 패널이 열리며 스크롤을 가져가는 일이 있어 열릴 때 한 번 되돌린다.
@@ -207,8 +210,38 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const createComplex = async () => { const name = newComplexName.trim(); const address = newComplexAddress.trim(); if (!name) { setComplexQuickAddError("단지명을 입력해 주세요."); return; } const duplicate = complexOptions.find((option) => (typeof option === "string" ? option : option.name)?.toLocaleLowerCase("ko-KR") === name.toLocaleLowerCase("ko-KR")); if (duplicate) { setComplexQuickAddError(`이미 등록된 단지입니다: ${typeof duplicate === "string" ? duplicate : duplicate.name}`); return; } try { const created = await onCreateComplex?.({ name, address }); const selectedName = created?.name || name; stagePatch({ complex: selectedName, complexId: created?.id ?? null, duplicateCheck: false }); setComplexQuickAddOpen(false); setNewComplexName(""); setNewComplexAddress(""); setComplexQuickAddError(""); setComplexQuickAddStatus(`${selectedName} 단지를 추가하고 선택했습니다.`); } catch (error) { setComplexQuickAddError(error?.message || "단지를 추가하지 못했습니다."); } };
 
   const saveDraft = async ({ closeAfter = false, allowSensitive = false } = {}) => { const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); setDraft(nextDraft); baselineRef.current = nextDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
-  const requestClose = () => { if (isDirty) setCloseDecision(true); else onClose?.(); };
+  const closeDeleteDecision = () => {
+    if (isDeleting) return;
+    setDeleteDecision(false);
+    window.requestAnimationFrame(() => deleteTriggerRef.current?.focus());
+  };
+  /* Esc와 닫기 버튼이 삭제 확인 위로 지나가면 상세가 통째로 닫혀 확인이 사라진다. 확인 중에는 확인만 닫는다. */
+  const requestClose = () => { if (isDeleting) return; if (deleteDecision) { closeDeleteDecision(); return; } if (isDirty) setCloseDecision(true); else onClose?.(); };
   const discardAndClose = async () => { try { await onDiscard?.(baselineRef.current); setCloseDecision(false); onClose?.(); } catch (error) { setSaveError(error?.message || "변경 내용을 되돌리지 못했습니다."); } };
+
+  /*
+   * 세대 삭제.
+   *
+   * 지금 보고 있는 세대를 지우는 작업이라 버튼 한 번으로 실행하지 않는다.
+   * 어떤 세대인지, 무엇이 사라지고 무엇이 남는지, 화면에서 되돌릴 수 있는지를 먼저 보여준 뒤
+   * 확인을 받아야 실행하고, 처리 중에는 버튼을 잠가 같은 요청이 두 번 나가지 않게 한다.
+   */
+  const isUnsavedDraftRow = String(draft.id || "").startsWith("DRAFT-");
+  const deleteTargetLabel = `${draft.complex || "단지 미입력"} ${draft.building || "-"}동 ${draft.unit || "-"}호`;
+  const requestDelete = () => { setDeleteError(""); setDeleteDecision(true); };
+  const confirmDelete = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await onDelete?.(draft);
+      setDeleteDecision(false);
+    } catch (error) {
+      setDeleteError(error?.message || "삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   const updatePeople = (nextPerson) => { const nextPeople = people.map((person) => person.id === nextPerson.id ? nextPerson : person); const owners = nextPeople.filter((person) => person.role === "임대인"); const tenants = nextPeople.filter((person) => person.role === "임차인"); stagePatch({ people: nextPeople, owner: owners.map((person) => person.name).join("·"), tenant: tenants.map((person) => person.name).join("·"), phone: owners[0]?.phone || draft.phone, consent: owners[0]?.consent === "O" ? "동의" : "확인 필요", relationship: owners[0]?.relationship || draft.relationship }); };
   const f2Draft = draft.f2Draft || {};
   const handleF2Apply = (patch, nextF2Draft) => {
@@ -224,7 +257,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     stageField("f2Draft", nextF2Draft);
   };
 
-  return <Modal isOpen={isOpen} onClose={requestClose} className="detail-workspace-modal" aria-label="세대 상세·상담 로그">
+  return <Modal id="detail-workspace-modal" isOpen={isOpen} onClose={requestClose} disableFocusTrap={deleteDecision} className="detail-workspace-modal" aria-label="세대 상세·상담 로그">
     <ModalHeader><div className="detail-workspace__header"><div className="detail-workspace__title-group"><Title headingLevel="h1" id="detail-workspace-title" size="xl">세대 상세 · 상담 로그</Title><span>{draft.complex || "단지 미입력"} {draft.building || "-"}동 {draft.unit || "-"}호 · {draft.id || "신규"}</span></div><div className="detail-workspace__state-summary"><StateSummary label="저장 상태" value={draft.saveState} status={statusForStorage(draft.saveState)} /></div></div></ModalHeader>
     <ModalBody className="detail-workspace__modal-body"><div className="detail-workspace__layout" data-screen-id="F1-MOD-010 F1-MOD-130" data-requirement-ids="F1-UD-01~28, F1-LG-01~06, F1-LG-08~34, F1-TR-01~05, F2-POP-01, F1-GR-32, F1-GR-35~36, F1-ST-18, F2-POP-02">
       <main className="detail-workspace__content">
@@ -262,11 +295,36 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
         <section id="detail-section-log" className="detail-section" aria-labelledby="detail-log-heading"><div className="detail-section__heading"><div><Title headingLevel="h2" id="detail-log-heading" size="md">상담 로그</Title><span>음성메모 제안은 검토 후 이 초안에 반영됩니다.</span></div><HistoryIcon aria-hidden="true" /></div><TextArea id="detail-log" aria-label="상담 로그" value={draft.log} placeholder="상담 내용, 다음 연락 일정, 요청사항을 기록하세요." resizeOrientation="vertical" onChange={(_event, value) => stageField("log", value)} /><div className="detail-log-meta"><span>유입 경로: {draft.source || "미입력"}</span><span>담당자: {draft.assignee || "미지정"}</span></div></section>
         {crossMatchPanel}
       </main>
-      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 매칭</Button><Button variant="secondary" isDanger icon={<TrashIcon />} onClick={() => onDelete?.(draft)}>삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>조건 미충족 상태에서도 임시저장할 수 있습니다.</p>}</div></aside>
+      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 매칭</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>조건 미충족 상태에서도 임시저장할 수 있습니다.</p>}</div></aside>
     </div>
     {closeDecision && <div className="detail-workspace__decision-layer" role="presentation"><section className="detail-workspace__decision-card" role="alertdialog" aria-modal="true" aria-labelledby="close-decision-title"><div className="decision-card__icon"><SaveIcon aria-hidden="true" /></div><Title headingLevel="h2" id="close-decision-title" size="lg">변경사항을 저장할까요?</Title><p>임시저장은 언제든 가능하며, 저장 완료는 단지·동·호·중복 검사 조건을 충족해야 합니다.</p><dl className="decision-card__summary"><div><dt>변경 항목</dt><dd>{changedFieldCount}개</dd></div><div><dt>저장 후 상태</dt><dd>{canComplete ? "저장 완료" : "임시저장"}</dd></div><div><dt>미충족 조건</dt><dd>{unmet.join(", ") || "없음"}</dd></div></dl>{saveError && <Alert className="decision-card__error" variant="danger" isInline title="저장하지 못했습니다">{saveError}</Alert>}<div className="decision-card__actions"><Button variant="primary" onClick={() => saveDraft({ closeAfter: true })} isLoading={isSaving}>저장</Button><Button variant="danger" onClick={discardAndClose} isDisabled={isSaving}>저장 안 함</Button><Button variant="secondary" onClick={() => setCloseDecision(false)} isDisabled={isSaving}>취소</Button></div></section></div>}
     </ModalBody>
     <VoiceMemoModal isOpen={f2Open} draft={draft} initialDraft={f2Draft} onClose={() => setF2Open(false)} onApply={handleF2Apply} onDraftChange={handleF2DraftChange} />
     <RelationEditModal isOpen={relationOpen} person={relationTarget} onClose={() => setRelationOpen(false)} onApply={updatePeople} />
+    <Modal
+      appendTo={() => document.getElementById("detail-workspace-modal")}
+      variant="small"
+      isOpen={deleteDecision}
+      onClose={closeDeleteDecision}
+      onEscapePress={(event) => { event.stopPropagation(); closeDeleteDecision(); }}
+      elementToFocus="#detail-delete-cancel"
+      aria-labelledby="delete-decision-title"
+      aria-describedby="delete-decision-effect"
+      className="detail-workspace__delete-modal"
+    >
+      <ModalHeader title="이 세대를 삭제할까요?" titleIconVariant="danger" labelId="delete-decision-title" />
+      <ModalBody className="detail-workspace__delete-modal-body">
+        <p id="delete-decision-effect">{isUnsavedDraftRow
+          ? "아직 저장하지 않은 행이라 서버에 남는 기록 없이 화면에서만 없어집니다. 입력한 내용은 복구할 수 없습니다."
+          : "장부 목록과 검색에서 즉시 사라집니다. 데이터는 서버에 남아 상담 로그와 매물 이력은 보존되지만, 화면에서 되살리는 기능은 없어 관리자에게 요청해야 합니다."}</p>
+        <dl className="decision-card__summary"><div><dt>삭제 대상</dt><dd>{deleteTargetLabel}</dd></div><div><dt>세대 번호</dt><dd>{isUnsavedDraftRow ? "저장 전" : (draft.id || "미지정")}</dd></div><div><dt>되돌리기</dt><dd>{isUnsavedDraftRow ? "불가" : "관리자 요청 필요"}</dd></div></dl>
+        {isDirty && <p className="decision-card__unsaved" role="status">저장하지 않은 변경 {changedFieldCount}개도 함께 사라집니다.</p>}
+        {deleteError && <Alert className="decision-card__error" variant="danger" isInline isLiveRegion title="삭제하지 못했습니다">{deleteError}</Alert>}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="danger" icon={<TrashIcon />} onClick={confirmDelete} isLoading={isDeleting} isDisabled={isDeleting}>삭제</Button>
+        <Button id="detail-delete-cancel" variant="secondary" onClick={closeDeleteDecision} isDisabled={isDeleting}>취소</Button>
+      </ModalFooter>
+    </Modal>
   </Modal>;
 }
