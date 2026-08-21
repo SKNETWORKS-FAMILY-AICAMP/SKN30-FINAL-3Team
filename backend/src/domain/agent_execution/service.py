@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session
 
 from core.errors import NotFoundError
-from domain.agent_execution import repository
+from domain.agent_execution import repository, snapshot
 from domain.agent_execution.cache_key import position_card_cache_key
+from domain.agent_execution.fingerprint import input_fingerprint
 from domain.agent_execution.models import (
     BROKERAGE_WORKFLOW_AGENT_TYPE,
     CROSS_JUDGMENT_RUN_TYPE,
@@ -194,24 +195,19 @@ class AnchorCardLookup:
     generation_request: PositionCardRequest | None = None
 
 
+def anchor_interaction_scope(
+    session: Session, brokerage_id: int, anchor_type: AnchorType, anchor_id: int
+) -> repository.InteractionScope:
+    """대리 측면이 읽어도 되는 상담 로그 범위. 정의는 repository 한 곳에만 둔다."""
+    return repository.build_interaction_scope(session, brokerage_id, anchor_type, anchor_id)
+
+
 def anchor_interaction_summary(
     session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int
 ) -> repository.InteractionSummary:
-    """앵커에 달린 상담 로그 집합의 신원. 매물은 세대 로그를 함께 본다."""
-    if anchor_type is AnchorType.LISTING:
-        listing = repository.find_listing_anchor(session, run.brokerage_id, anchor_id)
-        if listing is None:
-            raise NotFoundError("property listing is not found")
-        return repository.summarize_interactions(
-            session, run.brokerage_id, unit_id=listing.unit_id, listing_id=listing.id
-        )
-
-    requirement = repository.find_requirement_anchor(session, run.brokerage_id, anchor_id)
-    if requirement is None:
-        raise NotFoundError("property requirement is not found")
-    return repository.summarize_interactions(
-        session, run.brokerage_id, requirement_id=requirement.id
-    )
+    """앵커 범위 상담 로그 집합의 신원."""
+    scope = anchor_interaction_scope(session, run.brokerage_id, anchor_type, anchor_id)
+    return repository.summarize_scoped_interactions(session, scope)
 
 
 def current_anchor_version(
@@ -243,7 +239,20 @@ def prepare_anchor_position_card(
     if current_anchor_version(session, run, anchor_type, anchor_id) != run.input_data_version:
         raise InputVersionChangedError("the anchor changed after the run was queued")
 
-    interactions = anchor_interaction_summary(session, run, anchor_type, anchor_id)
+    # cache key 입력은 실제 생성 경로와 **같은 조립 결과**에서 뽑는다. 여기서 따로 세면 두
+    # 경로가 서로 다른 키를 만들어 한쪽의 cache hit 이 다른 쪽에서 miss 가 된다.
+    assembled = snapshot.build_anchor_snapshot(
+        session,
+        run.brokerage_id,
+        anchor_type,
+        anchor_id,
+        as_of=datetime.now(UTC),
+        requested_by=run.requested_by,
+    )
+    source = assembled.request.source
+    interactions = repository.InteractionSummary(
+        source.interaction_count, source.last_interaction_at, source.max_interaction_id
+    )
     # 앵커 카드는 앵커 자신을 대리하므로 측면이 앵커 종류를 따른다.
     # negotiation_side 어휘는 LISTING·REQUIREMENT 로 확정됐고 AnchorType 과 값이 같다.
     # 정본은 project-wiki 의 contracts/f3-ai.md 이고 AI 쪽 정의는 NegotiationSide 다.
@@ -261,6 +270,8 @@ def prepare_anchor_position_card(
         model_config_id=run.model_config_id,
         prompt_version=run.prompt_version,
         workflow_version=run.workflow_version,
+        input_fingerprint=input_fingerprint(assembled.request),
+        scope_identity=assembled.scope.identity(),
     )
 
     cached = repository.find_active_position_card(

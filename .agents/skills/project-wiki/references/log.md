@@ -1,10 +1,13 @@
 ---
 status: 구현됨
-updated: 2026-08-20
+updated: 2026-08-21
 ---
 
 # 위키 변경 로그
 
+- 2026-08-21: 앵커 포지션 카드의 실행 중 변경 감지를 전면 보강했다. 앵커 `row_version` 만으로는 세대 스펙·단지명·당사자 역할·날짜 신호 변화를 볼 수 없어, AI에 보낸 요청 전체를 정규화한 SHA-256 입력 지문(`position-card-input:v1`)을 도입하고 cache key 를 `position-card:v3` 로 올려 지문과 로그 범위 지문을 함께 넣었다. snapshot의 `as_of`와 파생 날짜 신호를 UTC 기준으로 통일해 동일 순간의 시간대 표기가 달라도 실제 AI 요청과 지문이 같게 했다. 저장 단계는 범위를 현재 장부에서 다시 만들어 준비 이후 생긴 당사자 관계를 감지하고, cache hit 카드 행을 `FOR UPDATE`로 잠가 활성 확인과 `ANCHOR_READY` 전이 사이의 동시 무효화를 직렬화하며, 모델 바인딩 네 값(`model_snapshot` 포함)을 모두 대조한다. 미바인딩 판정을 `model_snapshot = '{}'::jsonb` 조건까지 포함하도록 고쳐 손상된 행을 덮지 않는다. 매물 대리 로그 범위에서 세대에만 달리고 당사자도 없는 모호한 로그를 제외했다.
+- 2026-08-21: 앵커 포지션 카드 구현의 격리·개인정보 구멍을 막았다. 대리 측면별 상담 로그 범위를 `InteractionScope` 하나로 정의해 같은 세대에 달린 반대편 당사자의 로그가 매물 대리 입력에 섞이지 않게 했고, 요청자·담당자·로그 작성자와 실제로 선택된 로그 당사자의 식별값까지 마스킹 대상에 넣었으며 `handover_condition`도 같은 마스킹을 거치게 했다. 모델 출력 자유 문자열을 저장 직전에 훑어 금지 패턴이나 가렸던 식별값이 다시 나타나면 전체 저장을 거절한다. source identity 재검증을 cache hit 경로에도 적용하고, cache lookup이 대상·버전·상담 집합까지 대조하게 했다. 실행의 모델·prompt·workflow 바인딩을 lease fencing 아래 최초 1회 기록하고 재시도에서 고정하며, allowlist 필드만 model snapshot으로 저장한다. `target_label`은 Backend가 F1 구조화 값에서 만들어 모델이 바꿀 수 없게 했다. 준비 단계는 모든 예외에서 transaction을 닫는다.
+- 2026-08-20: F3 앵커 포지션 카드의 생성·검증·저장 수직 슬라이스를 구현했다. AI는 `position-card-prompt:v1`·`position-card-workflow:v1`로 구조화 출력 1회를 내고 모델 출력 schema에서 대상·source·장부 표기 금액을 아예 제외했다. Backend는 F1 장부와 상담 로그 전량을 읽어 길이 보존 마스킹을 적용한 뒤 날짜 신호와 함께 요청을 조립하고, AI 호출 전후로 transaction을 분리해 모델을 기다리는 동안 DB를 쥐지 않으며, 저장 직전에 lease·앵커 버전·source identity를 다시 확인한다. 거래 유형별 금액을 잃지 않도록 migration 012로 `negotiation_position_price`를 추가했고 가격이 하나일 때만 기존 scalar 컬럼을 호환 projection으로 채운다. 근거는 마스킹 본문 기준 offset과 함께 저장하고 `ANCHOR_READY`를 실제 상태로 기록한다. Worker polling, 후보 추출, 중개 판정과 운영 Provider·모델은 여전히 미구현·미확정이다.
 - 2026-08-20: F3 포지션 카드의 Backend–AI 계약을 `contracts/f3-ai.md`로 확정했다. `negotiation_side`를 `LISTING`·`REQUIREMENT`로 고정해 OQ-012를 종료하고, 계약 버전 `position-card:v1`을 cache key 버전 `position-card:v2`와 별개 축으로 분리했으며, intent·urgency·contactability·evidence·price_kind 어휘와 화면 한국어 매핑, LISTING/REQUIREMENT 입력 격리, 근거 필수 규칙, 마스킹된 상담 로그만 전달하는 개인정보 경계를 정의했다. F3-SE-03의 원문 보관 요구보다 승인된 개인정보 정책의 전체 프롬프트·응답 로그 금지를 우선한다. 프롬프트, 모델 호출, LangGraph workflow, 카드 저장과 `ANCHOR_READY` 전환은 아직 구현하지 않았고 운영 Provider·모델은 미확정이다.
 - 2026-08-20: F3 매물 앵커가 F1 세대 소프트 삭제를 따르도록 매물 단건 조회 범위에 부모 세대 삭제 여부를 포함하고, `agent_run.requested_by`의 보존·삭제를 개인정보 정책 정본에서 `agent_run` 감사 이력과 같은 생명주기로 확정해 OQ-007 범위를 미확정 항목만으로 좁힘. 배포용 Worker 프로세스는 있으나 polling loop·handler는 없다는 구현 상태와 활성 실행 재사용·`SUPERSEDED`·SSE 미구현을 F3 아키텍처와 API 계약에 같은 사실로 반영함.
 - 2026-08-20: 세션 발급 시 CSRF 원문을 별도 HttpOnly Cookie에 보관하고 `/auth/me`는 Cookie와 DB 해시를 검증해 같은 값을 반환만 하도록 인증 계약을 변경하여, GET의 CSRF 해시 변경과 다중 탭 토큰 무효화를 제거함.

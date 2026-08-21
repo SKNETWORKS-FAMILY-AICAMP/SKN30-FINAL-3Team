@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-21
 ---
 
 # F3 포지션 카드 Backend–AI 계약
@@ -16,17 +16,35 @@ updated: 2026-08-20
 | 어휘와 DTO | `ai/src/brokerage_ai/f3/contracts.py` |
 | 생성 Protocol | `ai/src/brokerage_ai/f3/ports.py` |
 | 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/validation.py` |
+| 모델 구조화 출력 schema | `ai/src/brokerage_ai/f3/model_output.py` |
+| 프롬프트와 prompt version | `ai/src/brokerage_ai/f3/prompts.py` |
+| 생성 구현과 workflow version | `ai/src/brokerage_ai/f3/generator.py` |
 | Backend 앵커 종류 | `backend/src/domain/agent_execution/models.py` (`AnchorType`) |
 | Backend cache key | `backend/src/domain/agent_execution/cache_key.py` |
+| Backend snapshot 조립과 날짜 신호 | `backend/src/domain/agent_execution/snapshot.py` |
+| Backend 마스킹 | `backend/src/domain/agent_execution/masking.py` |
+| Backend 생성·저장 유스케이스, cache lookup, 바인딩 | `backend/src/domain/agent_execution/anchor_card.py` |
+| Backend 모델 출력 개인정보 검사 | `backend/src/domain/agent_execution/pii_guard.py` |
+| Backend 모델 입력 지문 | `backend/src/domain/agent_execution/fingerprint.py` |
+| Backend 상담 로그 범위 | `backend/src/domain/agent_execution/repository.py` (`InteractionScope`) |
 
 ## 두 버전 축
 
 | 축 | 값 | 의미 | 소유 |
 |---|---|---|---|
 | 계약 버전 | `position-card:v1` | DTO와 의미 규격의 버전 | AI |
-| Cache key 버전 | `position-card:v2` | 캐시 키 계산 방식의 버전 | Backend |
+| Prompt 버전 | `position-card-prompt:v1` | 프롬프트 원문의 버전 | AI |
+| Workflow 버전 | `position-card-workflow:v1` | 생성 절차의 버전 | AI |
+| Cache key 버전 | `position-card:v3` | 캐시 키 계산 방식의 버전 | Backend |
+| 입력 지문 버전 | `position-card-input:v1` | 모델 입력 정규화 방식의 버전 | Backend |
+| 로그 범위 버전 | `interaction-scope:v2` | 상담 로그 포함 정책의 버전 | Backend |
 
-둘은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
+여섯은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
+
+prompt·workflow 버전은 AI가 소유하지만 Backend가 cache key를 계산할 때 필요하다. 모델을
+부르기 전에 알 수 있어야 하므로 `PositionCardGenerator.versions`가 프레임워크 중립
+`PositionCardGeneratorVersions`로 먼저 알려준다. Provider SDK 객체와 DB의 `model_config_id`는
+이 값에 담지 않는다.
 
 ## negotiation_side 어휘
 
@@ -112,6 +130,7 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
 | `contract_version` | `position-card:v1` 고정 |
 | `negotiation_side` | 대리하는 측 |
 | `anchor_id` | 대상 식별자. `anchor`의 대상 ID와 같아야 한다 |
+| `target_label` | 화면 표시용 라벨. Backend가 만들며 모델이 바꿀 수 없다 |
 | `source` | `SourceIdentity`. Backend가 준 입력 snapshot 신원 |
 | `anchor` | `LISTING`/`REQUIREMENT` 중 하나의 context |
 | `date_signals` | Backend가 계산한 날짜 신호 |
@@ -145,6 +164,8 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 | `tenancy_status`, `current_deposit_amount`, `current_monthly_rent_amount` | `property_unit` |
 | `tenancy_expiry_date`, `tenancy_raw_text` | `property_unit` |
 | `complex_name` | `property_complex.name` |
+| `party_roles` | 현재 유효한 `property_unit_party_relation`의 `role`·`is_primary`·`is_co_owner` |
+| `client_party_role` | 의뢰인(`property_listing.client_party_id`)의 위 관계상 역할 |
 
 | REQUIREMENT context 필드 | F1 출처 |
 |---|---|
@@ -155,6 +176,11 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 | `desired_move_in_date`, `move_in_date_raw_text` | `property_requirement` |
 | `request_expiry_date`, `current_tenancy_expiry_date` | `property_requirement` |
 | `desired_complex_names` | `property_requirement_complex` + `property_complex.name` |
+| `has_co_broker` | `property_requirement.co_broker_party_id`의 존재 여부 |
+
+`PartyRoleContext`는 결정권 판정(F3-LA-07)에만 쓰는 비식별 값이다. `party_id`, 성명, 연락처는
+담지 않는다. 임차인이라 처분 결정권이 없거나 공동명의라 단독 결정이 불가한 상황, 의뢰인이 실질
+결정권자가 아닌 상황은 별도 출력 enum을 만들지 않고 `inflexible`에 근거와 함께 적는다.
 
 `memo`, `custom_fields`와 대출 금액은 계약에 넣지 않는다. 자유 메모에는 성명·연락처가 섞일
 수 있고 대출 금액은 판정에 필요한 최소 항목이 아니다 (F3-SE-01). `*_raw_text`는 사용자 입력
@@ -163,6 +189,51 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 `demand_type`, `status`, `classification`, `workflow_stage`, `listing_status`,
 `tenancy_status`, `unit_type`, `lifecycle_status`는 F1이 아직 값 목록을 확정하지 않은 장부
 표기값이라 문자열로 통과시킨다. 카드 판정 어휘가 아니다.
+
+### 대리 측면별 상담 로그 범위
+
+같은 세대에 달린 로그라도 반대편 당사자의 말은 읽지 않는다 (F3-LA-02, F3-CA-02). 범위 정의는
+`InteractionScope` **한 곳**에만 둔다. 목록 조회, source identity 계산, cache key와 저장 직전
+재검증이 모두 같은 정의를 쓴다. 서로 다른 조건을 쓰면 AI에 넘긴 로그와 fencing이 어긋난다.
+
+`counterparty_role` 문자열만 믿어 격리하지 않는다. F1의 tenant 복합 관계와 `party_id`로
+판정한다.
+
+| 측면 | 포함 조건 |
+|---|---|
+| `LISTING` | `requirement_id IS NULL` **그리고** 다음 중 하나<br>① `listing_id`가 앵커 매물과 일치 (당사자 무관)<br>② `listing_id IS NULL` 이고 `unit_id`가 앵커 세대와 일치하며 `party_id`가 허용 당사자 |
+| `REQUIREMENT` | `requirement_id`가 앵커와 일치 **그리고** `party_id`가 NULL 이거나 허용 당사자 |
+
+허용 당사자:
+
+| 측면 | 집합 |
+|---|---|
+| `LISTING` | `property_unit_party_relation`에 이 세대와 관계를 맺은 적 있는 모든 `party_id` + `property_listing.client_party_id` |
+| `REQUIREMENT` | `property_requirement.party_id` + `co_broker_party_id` |
+
+`party_id IS NULL`인 로그의 처리가 측면마다 다르다.
+
+- `REQUIREMENT`는 포함한다. `requirement_id`가 이미 측면을 확정하므로 당사자가 비어 있어도
+  수요 측 기록이다.
+- `LISTING`은 **매물 건에 명시적으로 달린 로그만** 포함한다. 세대에만 달리고 당사자도 없는
+  로그는 구입장 연결 없이 기록된 수요 측 상담일 수 있어 제외한다. 반대편 정보가 한 건이라도
+  섞이는 것보다 판단 재료가 한 건 줄어드는 쪽이 낫다 (F3-LA-02).
+
+이 규칙은 이번 구현이 적용하는 보수적 데이터 격리 정책이며 팀이 별도로 승인한 요구사항이
+아니다. 모호한 unit-only 로그를 매물 대리가 읽어야 한다는 판단이 서면 이 표를 먼저 바꾸고
+`interaction-scope` 버전을 올린다.
+
+판단 근거:
+
+- 구입장이 달린 로그는 세대에도 연결돼 있어도 수요 측이다. 매물 대리 범위에서 제외한다.
+- 관계가 **끝난**(`valid_to`가 찬) 과거 소유자·임차인의 말은 그 시점의 매물 측 진술이므로
+  포함한다. 2018년 기록까지 남기는 F1 정책이 여기서 자산이 된다 (F3-LA-05). 화면에 보여줄
+  현재 역할(`party_roles`)은 유효한 관계만 쓰므로 이와 별개다.
+- 매수 희망자는 세대 관계 자체가 없어 어떤 경우에도 매물 측 범위에 들어오지 않는다.
+
+사무소 격리와 `is_voided = false`는 그대로 유지하고, 허용 범위 안에서는 전량을
+`interaction_at ASC, id ASC`로 전달한다. source identity는 실제로 전달되는 **필터링 완료**
+로그 집합에서 계산한다.
 
 ### 상담 로그 입력
 
@@ -183,6 +254,16 @@ DB snapshot 어디에도 넣지 않는다.
 `days_until_request_expiry`, `days_since_last_contact`, `days_since_received`,
 `hard_deadline_candidate`로 구성한다. 경과일은 이미 지난 기한을 뜻하는 음수를 허용한다.
 현재 데이터로 계산할 수 없는 신호는 null이며 필수로 강제하지 않는다.
+
+현재 구현 규칙:
+
+- 기준 시각을 한 번만 정하고 모든 신호가 그 값을 공유한다. 신호마다 시계를 다시 읽지 않는다.
+- timezone-aware datetime만 사용한다.
+- `hard_deadline_candidate`는 **직접 확인 가능한 날짜 중 가장 이른 값**이다. LISTING은
+  `property_unit.tenancy_expiry_date`, REQUIREMENT는 `desired_move_in_date`,
+  `request_expiry_date`, `current_tenancy_expiry_date` 중 최솟값이다.
+- 영업일이나 준비 기간을 임의로 빼서 마감일을 앞당기지 않는다. 승인되지 않은 기간을 끼워 넣으면
+  근거 없는 마감일이 만들어진다.
 
 ## 결과 계약
 
@@ -209,14 +290,28 @@ DB snapshot 어디에도 넣지 않는다.
 
 ### target과 source 소유권
 
-`negotiation_side`, `anchor_id`, `data_version`, `interaction_count`,
+`negotiation_side`, `anchor_id`, `target_label`, `data_version`, `interaction_count`,
 `last_interaction_at`, `max_interaction_id`, `cache_key`, `generated_at`은 모델이 만들거나
 고치는 값이 아니다.
 
 - `PositionCardTarget`은 `PositionCardTarget.from_request()`로 요청에서 결정적으로 복사한다.
-- 모델 구조화 출력이 대상 ID나 source identity를 만들게 하지 않는다.
+- 모델 구조화 출력이 대상 ID, 라벨이나 source identity를 만들게 하지 않는다.
 - `cache_key`는 Backend가 계산하며 결과 DTO에 없다.
 - `generated_at`은 Backend 또는 DB가 저장 시점에 정하며 결과 DTO에 없다.
+- `validate_generation_result()`가 결과의 `target_label`이 요청값과 같은지 확인한다.
+
+#### target label
+
+Backend가 F1 구조화 값에서 결정적으로 만든다. 모델 출력 schema에는 존재하지 않는다.
+
+| 측면 | 규칙 | 예 |
+|---|---|---|
+| `LISTING` | 단지명·동·호. 이미 계약에 실린 구조화 값만 쓴다 | `검증단지 101동 1801호` |
+| `REQUIREMENT` | `구입장 #<requirement_id>`. 인물 이름을 쓰지 않는다 | `구입장 #91` |
+
+성명, 연락처는 어느 측면에도 넣지 않는다. 단지·동·호는 인물이 아니라 부동산을 가리키므로
+비개인정보 구조화 값으로 취급한다. `negotiation_position_analysis.target_label`이
+`VARCHAR(200)`이라 길이를 넘으면 결정적으로 잘라 붙인다.
 
 ### 가격 불변식
 
@@ -255,7 +350,7 @@ DB snapshot 어디에도 넣지 않는다.
 |---|---|---|
 | 구조 | Pydantic DTO | 어휘, 필수값, 빈 문자열, 음수, extra field, kind별 필수값 |
 | 요청·결과 | `validate_generation_result()` | 계약 버전, 대상과 side 일치, source identity 일치, hard deadline이 Backend 날짜 신호와 같은지, 인용 로그가 요청 범위 안인지, 인용문이 마스킹 본문에 실재하는지, price_kind가 해당 측과 활성 거래 유형에 허용되는지, 표기 금액이 장부와 같은지 |
-| DB 현재 상태 | Backend (후속 구현) | lease 소유권, 입력 버전, source identity 재대조, tenant 격리, offset 계산 |
+| DB 현재 상태 | Backend (`anchor_card.py`) | lease 소유권, 입력 버전, source identity 재대조, tenant 격리, offset 계산 |
 
 `validate_generation_result()`는 Session이나 Repository를 받지 않는다.
 
@@ -275,6 +370,290 @@ DB snapshot 어디에도 넣지 않는다.
 값 체계는 프롬프트가 생기는 다음 구현에서 정한다. Backend는 이 두 값을 cache key 입력으로만
 쓰고 의미를 해석하지 않는다.
 
+## 실행 모델 바인딩
+
+`GenerationBinding`은 cache key 계산에만 쓰이지 않는다. 준비 transaction에서 AI를 부르기 전에
+실행에 실제로 기록한다.
+
+기록하는 네 값: `agent_run.model_config_id`, `model_snapshot`, `prompt_version`,
+`workflow_version`.
+
+규칙:
+
+- Backend는 Provider나 모델의 기본값을 만들지 않는다. 무엇을 쓸지는 호출 조립 지점이 정한다.
+- 전달된 `model_config_id`가 **이 실행의 `brokerage_id`에 속한** 활성 `POSITION_CARD` 설정인지
+  확인한다.
+- 다른 tenant의 설정과 존재하지 않는 설정은 **같은 오류**로 거절한다. 구분해서 알리면 남의
+  설정 존재 여부가 새어 나간다.
+- `model_snapshot`은 DB 설정의 allowlist 필드로만 구성한다: `provider`, `model_name`,
+  `model_version`, `config_key`, `config_version`. 호출자가 준 임의 dict를 저장하지 않는다.
+- API key, token, 인증 헤더, Secret, 전체 endpoint URL은 넣지 않는다. `endpoint_alias`도
+  allowlist에 없다.
+- 미바인딩 상태는 **세 버전 컬럼이 NULL 이고 `model_snapshot`이 빈 JSON 객체**인 상태뿐이다.
+  `agent_run.model_snapshot`은 `NOT NULL DEFAULT '{}'::jsonb`이므로 "네 값이 모두 NULL"이라는
+  판정은 성립하지 않는다.
+- 최초 기록은 lease fencing 조건과 위 미바인딩 조건 아래 원자적으로 한 번에 쓴다. `WHERE`에
+  `model_snapshot::jsonb = '{}'::jsonb`를 포함한다. 바꾼 행이 1이 아니면 거절한다.
+- 그 밖의 조합(snapshot만 채워짐, 버전 일부만 채워짐)은 손상된 바인딩으로 보고 덮어쓰지 않는다.
+- 재시도에서는 네 값이 모두 기존 바인딩과 정확히 일치해야 한다. 하나라도 다르면
+  `GenerationBindingError`다.
+- 저장 직전에도 네 값을 다시 본다. `model_snapshot`은 실행에 기록된 값, 준비 단계가 확정한 값,
+  지금 설정에서 다시 만든 안전한 snapshot 셋이 모두 같아야 한다. AI를 기다리는 사이 다른
+  transaction이 `model_snapshot`을 바꾸면 결과를 저장하지 않는다.
+- 일부 컬럼만 채워진 비정상 행은 새 바인딩으로 덮지 않고 거절한다. 어떤 구성으로 돌았는지
+  확인할 수 없는 실행을 정상으로 만들면 감사 추적이 끊긴다.
+- cache key는 영속화하고 검증한 바인딩과 같은 값으로 계산한다.
+- cache hit의 `redacted_output_snapshot`에서도 계약·prompt·workflow 버전이 null이 되지 않는다.
+  모델 진단이 없으므로 provider·model은 거짓 값을 만들지 않고 실행에 기록된 `model_snapshot`의
+  허용 필드에서 가져온다.
+
+## 상담 로그 마스킹
+
+Backend가 AI 호출 **전에** 수행하는 순수 함수다 (`masking.py`). AI에는 DB 원문이 가지 않는다.
+
+**순서가 중요하다.** 로그를 먼저 고르고, 그 로그의 당사자까지 secret에 넣은 뒤 마스킹한다.
+현재 관계자만 모으면 관계가 끝난 과거 소유자의 이름이 원문에 남는다.
+
+| 출처 | 마스킹할 값 |
+|---|---|
+| 허용 범위 party (관계자 + 의뢰인 + **실제로 선택된 로그의 `party_id`**) | `party.name`, `party.alternate_name`, `party_contact.contact_value`, `party_contact.normalized_contact_value` |
+| `agent_run.requested_by` 사용자 | `app_user.login_id`, `app_user.display_name` |
+| 앵커의 `assigned_user_id` (세대·매물·구입장) | 같음 |
+| 로그를 작성·승인한 사용자 (`created_by`, `approved_by`) | 같음 |
+| 원문 패턴 | 전화번호, 이메일, 생년월일, 주민등록번호 |
+
+`requested_by`는 마스킹 목적으로만 `build_anchor_snapshot()`에 전달하며 AI 공개 DTO에는
+들어가지 않는다.
+
+적용 대상은 계약에 실리는 **모든 자유 문자열**이다: 상담 로그 `masked_content`,
+`price_raw_text`, `handover_condition`, `tenancy_raw_text`, `budget_raw_text`,
+`area_requirement_raw_text`, `move_in_date_raw_text`.
+
+단지명, 동·호수, 면적처럼 업무상 필요한 비개인정보 구조화 값은 마스킹하지 않는다.
+
+규칙:
+
+- **길이를 보존한다.** 가려진 값은 같은 길이의 `*`로 바뀌고 `-`, `.`, `@`, `/`, 공백은 자리를
+  지킨다.
+- 알려진 값은 긴 것부터 처리한다. 짧은 값을 먼저 지우면 긴 값의 나머지가 남는다.
+- 같은 입력은 항상 같은 결과가 된다.
+- 치환 대응표를 만들지 않는다. AI 요청, 결과, DB snapshot, 로그 어디에도 저장하지 않는다.
+- 마스킹 결과와 원문을 애플리케이션 로그에 출력하지 않는다.
+- 마스킹을 보장할 수 없는 값은 계약에서 제외한다.
+
+길이를 보존하는 이유는 근거 offset이다. AI는 마스킹된 본문에서 인용을 돌려주고 Backend는 그
+인용의 위치를 마스킹된 본문에서 찾는다. 길이가 같아야 그 위치가 원본 상담 로그의 같은 문자
+위치가 되고, 그래서 대응표를 영속화할 필요가 없다.
+
+## 모델 출력 개인정보 검증
+
+프롬프트에 "개인정보를 쓰지 말라"고 적는 것은 지시일 뿐 보장이 아니다. Backend가 저장 직전에
+모델이 만든 자유 문자열을 직접 훑는다 (`pii_guard.py`).
+
+검사 대상 (모델이 만든 자유 문자열만):
+
+- intent·urgency·contactability·price basis의 모든 evidence `note`와 `quote_text`
+- `PositionCondition.description` (timing constraints, flexible, inflexible)
+- `ContactabilityAssessment.note`
+
+`analysis_snapshot`은 검증을 통과한 결과를 그대로 직렬화하므로 위 검사가 곧 snapshot 검사다.
+
+금지 조건:
+
+- 전화번호, 이메일, 생년월일, 주민등록번호 형태의 패턴이 나타나면 거절한다.
+- 요청을 조립할 때 가린 성명·별칭·`login_id`·`display_name`·연락처가 결과에 다시 나타나면
+  거절한다. 마스킹된 본문만 봤는데 원문이 나왔다면 모델이 만들어 낸 것이다.
+
+처리 규칙:
+
+- **조용히 마스킹하고 성공 처리하지 않는다.** 가려서 넣으면 모델이 개인정보를 만들고 있다는
+  사실이 아무 데도 남지 않는다. 저장 전체를 `ModelOutputPrivacyError`로 거절한다.
+- 오류 메시지에 발견된 값을 넣지 않는다. 필드 위치와 종류만 알린다.
+- 전체 모델 원문을 로그에 남기지 않는다.
+- 구조화 필드(금액, 날짜, 어휘 enum)는 검사하지 않는다. `2026-11-30` 같은 정상 마감일을
+  생년월일 패턴으로 오인해 정상 카드를 막으면 안 된다.
+- 거절되면 카드·가격·근거가 하나도 남지 않고 실행은 `RUNNING`을 유지한다.
+
+## 실행 흐름과 transaction 경계
+
+AI를 기다리는 동안 DB transaction이나 row lock을 쥐고 있지 않는다. 흐름을 셋으로 나눈다.
+
+| 단계 | transaction | 하는 일 |
+|---|---|---|
+| 1. 준비 | 연다 → 닫는다 | lease 확인, **모델 바인딩 확정·기록**, 앵커 버전 확인, snapshot 조립과 마스킹, cache lookup |
+| 2. 생성 | **없음** | `generate_position_card()` await. cache hit이면 건너뛴다 |
+| 3. 저장 | 연다 → commit | 재검증 후 카드·가격·근거·상태를 원자 저장 |
+
+준비 단계는 **모든 예외에서** rollback한다. `SQLAlchemyError`뿐 아니라 lease·입력 버전·source·
+바인딩·검증 오류에서도 열린 transaction을 남기지 않는다. 남기면 AI를 기다리는 동안 그 커넥션이
+`idle in transaction`으로 잠긴다. 원래 예외 타입은 그대로 올린다.
+
+3단계가 저장 직전에 다시 확인하는 것 (**cache hit과 miss 모두**):
+
+- 같은 Worker가 여전히 유효한 lease를 쥐고 있는가 (`lease_owner`, `lease_expires_at`,
+  `attempt_count`, `status`)
+- 실행의 사무소가 준비 단계와 같은가
+- 실행에 기록된 모델 바인딩 **네 값**이 그대로이고 지금 기대되는 값과 같은가
+- 앵커 `row_version`이 그대로인가 (1차 검사)
+- **현재 장부에서 범위를 다시 만들어** 범위 지문이 준비 시점과 같은가
+- 그 현재 범위로 상담 로그를 다시 세어 source identity가 준비 시점과 같은가
+- **입력 전체를 다시 조립해** 지문이 준비 시점과 같은가
+- (cache hit만) 재사용할 카드가 아직 활성 상태로 그 자리에 있는가
+- (cache miss만) `validate_generation_result()`를 통과하는가
+- (cache miss만) 모델 출력에 개인정보가 없는가
+- (cache miss만) 결과의 prompt·workflow 버전이 cache key에 쓴 값과 같은가
+
+범위는 **준비 시점 객체를 재사용하지 않고 다시 만든다.** 준비 이후에 생긴 당사자 관계와 그
+로그를 저장 단계가 영영 보지 못하기 때문이다. 준비 시점 범위는 지문으로만 비교한다.
+
+하나라도 어긋나면 카드를 저장하지 않고 상태도 바꾸지 않는다. 앵커가 바뀌었으면
+`InputVersionChangedError`, 상담 로그 집합이 바뀌었으면 `SourceChangedError`, lease를 잃었으면
+`LeaseNotHeldError`, 바인딩이 어긋나면 `GenerationBindingError`, 재사용하려던 카드가 더 이상
+유효하지 않으면 `CachedCardUnavailableError`다. 마지막 것은 다시 준비해서 생성하면 되는
+재시도 가능한 오류다. `SUPERSEDED`는 아직 구현하지 않았다.
+
+`PreparedGeneration`은 cache hit에서도 `source`, 범위 지문, 입력 지문, 날짜 bucket을 항상 들고
+있다. 마스킹 본문은 cache hit일 때 들고 다니지 않지만 이 값들은 남겨야 재사용 경로에도 fencing이
+선다.
+
+### 모델 입력 지문
+
+`agent_run.input_data_version`은 앵커 **한 행**의 `row_version`이다. 그 값만으로는 세대 스펙,
+단지명, 당사자 역할, 상담 로그 집합, 날짜 신호처럼 모델 입력에 실제로 들어가는 나머지가
+바뀌었는지 알 수 없다.
+
+| 값 | 무엇을 나타내는가 | 어디에 쓰는가 |
+|---|---|---|
+| `input_data_version` | 앵커 장부 행의 `row_version` | 빠른 1차 검사. 이 값만으로 전체 입력이 같다고 보지 않는다 |
+| 입력 지문 | `PositionCardGenerationRequest` 전체 | cache key, 저장 직전 전체 입력 재검증 |
+
+지문에는 AI에 보낸 요청 그 자체가 들어간다. 앵커 context 전 필드, 날짜 신호, 마스킹된 상담
+로그 전량, source identity, `target_label`, 계약 버전이다.
+
+정규화 규칙:
+
+- `model_dump(mode="json")`이 Decimal은 문자열, datetime·date는 ISO 8601, enum은 값, None은
+  null로 고정한다.
+- `json.dumps(sort_keys=True, separators=(",", ":"))` 후 SHA-256 digest를 만든다.
+- Python `hash()`는 쓰지 않는다. 프로세스마다 값이 달라 캐시와 fencing에 쓸 수 없다.
+- 순서가 의미 없는 집합(`party_roles`)은 명시적으로 정렬한다. 조회 순서가 달라도 같은 지문이
+  나와야 한다. 선호 순서가 의미를 갖는 `desired_complex_names`는 정렬하지 않는다.
+- **digest만 사용한다.** 원문과 개인정보는 DB, 로그, 오류 어디에도 넣지 않는다. 지문은
+  준비 단계 메모리에서 저장 직전 비교에 쓰고 cache key에는 digest만 반영한다.
+
+### 날짜 bucket
+
+날짜 신호는 모델 입력을 바꾸지만 정확한 시각을 지문에 넣으면 모든 실행이 서로 다른 값이 되어
+캐시가 통째로 무의미해진다. snapshot 조립 입구에서 `as_of`를 UTC로 정규화하고, 그 UTC 날짜
+하나를 파생 신호 계산과 지문의 bucket으로 함께 쓴다. `DateSignals.as_of`도 정규화된 UTC 값이다.
+따라서 같은 순간을 KST나 UTC로 표현해도 실제 AI 요청과 지문이 같다.
+
+- 같은 날 안의 다른 시각은 같은 지문 → 재사용한다.
+- 날짜가 넘어가면 `days_since`·`days_until`이 달라져 지문이 바뀐다 → 어제 카드를 재사용하지
+  않는다.
+- 시간대 표기가 달라도 UTC 기준 같은 날이면 같은 bucket이다.
+
+### 로그 범위 지문
+
+`InteractionScope.identity()`는 `brokerage_id`, 대상 id(unit/listing/requirement), 정렬된
+`allowed_party_ids`, 범위 계약 버전을 canonical JSON으로 묶어 SHA-256한 값이다. 당사자 ID
+집합을 그대로 들고 다니면 오류 메시지나 로그로 새어 나갈 자리가 생기므로 digest로만 비교한다.
+
+범위가 바뀌면 상담 로그 수가 우연히 같아도 다른 입력으로 판단한다.
+
+### cache lookup
+
+일반 cache lookup은 `find_active_position_card()`이며 cache key만 믿지 않는다. 다음을 **함께**
+대조한다.
+
+| 확인 | 이유 |
+|---|---|
+| `brokerage_id` | tenant 격리 |
+| `cache_key` | 생성 구성과 입력 지문·범위 지문이 같은가 |
+| `negotiation_side` | 측면이 같은가 |
+| `listing_id` / `requirement_id` | 대상이 같은가 |
+| `data_version` | 장부 버전이 같은가 |
+| `source_interaction_count`, `last_interaction_at` | 저장된 상담 집합이 같은가 |
+| `invalidated_at IS NULL` | 무효화되지 않았는가 |
+
+`find_card_that_won_the_cache_key()`는 **저장 경합 전용**이다. `ON CONFLICT DO NOTHING`으로
+밀린 쪽이 이미 같은 키를 넣은 상대 카드를 찾을 때만 쓰고, 일반 lookup에는 쓰지 않는다.
+
+### cache hit과 저장 경합
+
+- cache hit이면 generator를 **0회** 호출하고 기존 카드를 재사용한다. 새 카드·가격·근거를 만들지
+  않고 실행만 `ANCHOR_READY`로 옮긴다.
+- cache hit에서도 저장 직전 재검증은 그대로 돈다. 새 로그 추가, 과거 시각 로그 추가, 로그
+  무효화, 범위 party 변경, 세대·단지·역할 변경, 날짜 bucket 변경을 모두 잡는다.
+- **재사용할 카드를 저장 직전에 다시 조회한다.** 준비와 저장 사이에 `invalidated_at`이
+  찍히거나 조건이 어긋날 수 있다. 준비 시점 ID를 그대로 믿으면 무효화된 카드를 가리킨 채
+  `ANCHOR_READY`로 넘어간다. 사무소, 카드 ID, `cache_key`, 측면, 대상, `data_version`, 현재
+  source identity, `invalidated_at IS NULL`을 모두 확인하고 준비 시점 ID와 같은지 본다. 이
+  저장 단계 조회는 `SELECT ... FOR UPDATE`로 카드 행을 잠그고 `ANCHOR_READY` 전이 transaction이
+  끝날 때까지 동시 무효화를 직렬화한다. 같은 cache key 저장 경합에서 이긴 카드를 재사용하는
+  경로도 그 행을 잠근다. 준비 단계의 일반 cache lookup은 행을 잠그지 않는다.
+- 재조회 결과가 없거나 ID가 다르면 기존 ID를 쓰지 않고, `ANCHOR_READY`로 넘어가지 않으며,
+  저장 단계에서 모델을 즉석 호출하지도 않는다. `CachedCardUnavailableError`로 rollback한다.
+- 두 실행이 같은 cache key를 동시에 저장할 수 있다. 카드 insert는
+  `uq_position_analysis_active_cache_key`와 같은 조건으로 `ON CONFLICT DO NOTHING` 한다.
+- 경합에서 이긴 쪽만 가격과 근거를 넣는다. 진 쪽은 실패하지 않고 이긴 카드를 재사용한다.
+- 중복 카드와 중복 근거가 남지 않는다.
+
+## 저장 구조
+
+카드 본문의 정본은 `negotiation_position_analysis`와 그 자식 테이블이다.
+
+| 테이블 | 담는 것 |
+|---|---|
+| `negotiation_position_analysis` | 카드 헤더, 판정값, 시점·양보 조건 JSON, `analysis_snapshot` |
+| `negotiation_position_price` | 거래 유형별 표기·추정 금액 (migration 012) |
+| `negotiation_position_evidence` | 항목별 근거와 인용 offset |
+
+`analysis_snapshot`에는 검증을 통과한 공개 계약 결과 전체를 JSON으로 넣는다.
+
+### 다중 가격
+
+한 매물이 매매·전세·월세를 동시에 열어 둘 수 있어 `negotiation_position_analysis`의 scalar
+가격 컬럼 하나로는 부족하다.
+
+- 모든 `PriceAssessment`를 `negotiation_position_price`에 저장하고 원래 순서를
+  `display_order`로 보존한다.
+- 가격이 **정확히 하나일 때만** 기존 `stated_price_amount`·`estimated_price_amount`를 호환
+  projection으로 채운다.
+- 둘 이상이면 scalar 컬럼을 null로 두고 child table만 정본으로 쓴다. 첫 번째 항목을 임의
+  대표값으로 저장하지 않는다.
+- 장부가 열어 두지 않은 거래 유형은 카드에 싣지 않는다.
+
+### 근거와 offset
+
+`field_name`은 결정적으로 만든다: `intent`, `urgency`, `contactability`,
+`price.<PRICE_KIND>`, `timing.constraints.<n>`, `flexible.<n>`, `inflexible.<n>`.
+
+| kind | 저장 |
+|---|---|
+| `QUOTE` | `interaction_id`, 마스킹된 `quote_text`, `quote_start_offset`, `quote_end_offset`, `note`는 null |
+| `INFERENCE` | `note`, 나머지는 모두 null |
+
+offset은 해당 `masked_content`에서 결정적으로 계산한다. 길이 보존 마스킹 덕분에 그 위치가 원본
+상담 로그의 같은 문자 위치다.
+
+### 상태 전이
+
+`ANCHOR_READY`는 Backend가 실제로 기록하는 상태다. 다음을 모두 만족할 때만 옮긴다.
+
+- 유효한 포지션 카드 ID가 있다 (cache hit 또는 새 카드 저장 완료)
+- lease 소유자·만료·시도 횟수가 그대로다
+- 앵커 버전과 source identity가 그대로다
+
+카드 없이 상태만 먼저 바꾸지 않는다. 중간 상태이므로 `completed_at`을 채우지 않고
+`failure_code`·`failure_message`를 새로 만들지 않으며 lease 세 값을 유지해 다음 단계가 같은
+fencing을 이어받게 한다. 상태 변경은 조건부 `UPDATE`로 보호하고 바뀐 행이 1이 아니면 전체를
+rollback한다.
+
+AI 호출이 실패하면 빈 카드를 저장하지 않고 상태도 바꾸지 않으며 Provider 원문 오류를 DB에
+넣지 않는다. 현재 슬라이스에는 Worker 실패 전이 정책이 없으므로 예외를 호출자에게 전달하고,
+실행은 lease 만료 후 기존 claim 정책으로 재시도된다.
+
 ## 개인정보 경계
 
 수집 목적: 장부와 상담 로그를 바탕으로 당사자의 협상 포지션을 구조화한다.
@@ -283,11 +662,19 @@ DB snapshot 어디에도 넣지 않는다.
 |---|---|
 | Backend → AI 전달 가능 | 내부 anchor ID, 구조화된 매물·구입 조건, 날짜 신호, 개인정보를 제거한 상담 내용, 내부 `interaction_id`, source identity |
 | 전달 금지 | 성명, 로그인 ID, 전화번호, 이메일, 생년월일, 인증·세션·CSRF 정보, `requested_by`, 치환 대응표, Secret, 프롬프트 원문 전체, 반대편 당사자 데이터 |
-| 저장 | Backend가 검증한 구조화 포지션 카드, 필요한 근거 인용, 안전한 모델 진단, 버전 정보 |
+| 저장 | Backend가 검증한 구조화 포지션 카드, 거래 유형별 금액, 마스킹된 근거 인용과 offset, 안전한 모델 진단, 버전 정보 |
 | 로그 금지 | 전체 프롬프트, 전체 모델 원문 응답, 상담 로그 전체 원문, 성명·연락처, 토큰·인증 헤더 |
 
 실행 제어 값(`run_id`, `lease_owner`, `lease_expires_at`, `attempt_count`)과 DB 객체
 (Session, Repository, `AgentRun`, SQLModel)는 Backend 내부 정보이며 AI 공개 계약에 넣지 않는다.
+
+`agent_run`에 남기는 것은 비식별 요약뿐이다: 앵커 종류·ID, `input_data_version`,
+`position_analysis_id`, cache hit 여부, 계약·prompt·workflow 버전, 안전한 provider·model 이름,
+그리고 token 수와 latency. 전체 카드 본문과 전체 상담 로그를 `redacted_output_snapshot`에
+중복 저장하지 않는다. 카드 본문은 position analysis와 자식 테이블이 소유한다.
+
+`ProviderDiagnostics`가 total token만 주고 output이 없으면 `output_tokens`를 0으로 둔다.
+total 값을 output 컬럼에 넣어 컬럼 의미를 왜곡하지 않는다.
 
 ### 외부 Provider 전송
 
@@ -313,27 +700,41 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider
 
 ## 구현 범위
 
-### 이번 구현 범위 (`구현됨`)
+### 구현됨
 
 - `negotiation_side`, intent, urgency, contactability, evidence, price_kind 어휘
-- 계약 버전 `position-card:v1`
+- 계약 버전 `position-card:v1`, prompt·workflow 버전 v1
 - 요청·결과 DTO와 LISTING/REQUIREMENT 입력 격리
-- `PositionCardGenerator` Protocol
+- `PositionCardGenerator` Protocol과 `LlmPositionCardGenerator` 구현
+- 프롬프트와 모델 구조화 출력 schema
 - 요청·결과 교차 검증 순수 함수
+- Backend의 F1 snapshot 조립, 대리 측면별 상담 로그 범위, 날짜 신호 계산
+- 요청자·담당자·로그 당사자 식별값과 자유 문자열 전체의 길이 보존 마스킹
+- 모델 출력 자유 문자열의 개인정보 검증
+- 실행 모델·prompt·workflow 바인딩의 최초 기록과 재시도 고정
+- Backend가 만드는 target label
+- 모델 입력 전체의 결정적 지문과 날짜 bucket
+- cache key 계산, 대상·버전·상담 집합·지문까지 대조하는 cache lookup, cache hit 재사용
+- AI 호출 전후 transaction 분리와 cache hit·miss 모두의 lease·바인딩·범위·source·지문 재검증
+- cache hit 카드의 저장 직전 활성 상태 잠금 재조회와 동시 무효화 직렬화
+- 카드·다중 가격·근거 저장과 quote offset 계산
+- `ANCHOR_READY` 상태 전이
+- 같은 cache key 저장 경합 처리
 - Backend `AnchorType`과의 값 일치 계약 테스트
 
 ### 아직 구현하지 않음 (`계획됨`)
 
-- 프롬프트와 실제 모델 호출
-- 포지션 카드 생성 알고리즘과 LangGraph workflow
-- Backend의 F1 snapshot 조립과 상담 로그 마스킹
-- 카드와 근거의 DB 저장, quote offset 계산
-- `ANCHOR_READY` 상태 전이
-- SQL 후보 추출, 후보 카드, 중개 판정
-- Worker polling과 `WORKER_ENABLED=true`
+- Worker polling loop와 `claim_next_run` 연결, `WORKER_ENABLED=true`
+- LangGraph production graph와 checkpoint
+- 활성 실행 재사용과 `SUPERSEDED` 전이
+- SQL 후보 추출, `CANDIDATES_READY`, 후보 카드, 중개 판정, `COMPLETED`
+- 결과 조회 API, SSE, Frontend, 피드백·평가
 
 ### 미확정
 
 - 실제 모델 ID와 운영 Provider (AI-OQ-001, AI-OQ-002, AI-OQ-003)
-- `prompt_version`·`workflow_version`의 실제 값 체계
 - LangGraph checkpoint 저장 계약 (AI-OQ-004)
+
+Provider와 모델은 Backend가 고르지 않는다. 호출 조립 지점이 `GenerationBinding`으로 주입한
+generator, `model_config_id`와 비밀이 제거된 model snapshot을 Backend가 기록해 cache key에
+사용할 뿐이다. 아직 Worker composition이 없으므로 운영 기본 binding은 만들지 않았다.

@@ -19,6 +19,8 @@ BASE = {
     "model_config_id": None,
     "prompt_version": None,
     "workflow_version": None,
+    "input_fingerprint": "position-card-input:v1:aaaa",
+    "scope_identity": "interaction-scope:v2:bbbb",
 }
 
 
@@ -34,6 +36,8 @@ def test_same_input_gives_the_same_key() -> None:
 @pytest.mark.parametrize(
     "overrides",
     [
+        {"input_fingerprint": "position-card-input:v1:cccc"},
+        {"scope_identity": "interaction-scope:v2:dddd"},
         {"anchor_id": 11},
         {"data_version": 4},
         {"interaction_count": 3},

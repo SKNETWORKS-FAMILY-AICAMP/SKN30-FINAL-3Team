@@ -14,7 +14,7 @@ def migration_files() -> list[Path]:
 def test_migration_names_and_sequence() -> None:
     files = migration_files()
 
-    assert [int(path.name[:3]) for path in files] == list(range(1, 12))
+    assert [int(path.name[:3]) for path in files] == list(range(1, 13))
     assert all(NAME_PATTERN.fullmatch(path.name) for path in files)
 
 
@@ -39,10 +39,10 @@ def test_migrations_use_business_names() -> None:
     assert "CREATE TABLE ai_decision_feedback" in text
 
 
-def test_schema_baseline_contains_26_tables() -> None:
+def test_schema_baseline_contains_27_tables() -> None:
     text = "\n".join(path.read_text() for path in migration_files())
 
-    assert len(re.findall(r"(?m)^CREATE TABLE ", text)) == 26
+    assert len(re.findall(r"(?m)^CREATE TABLE ", text)) == 27
 
 
 def test_all_tables_and_columns_have_comments() -> None:
@@ -75,4 +75,4 @@ def test_all_tables_and_columns_have_comments() -> None:
 def test_yoyo_can_parse_all_sql_migrations() -> None:
     migrations = read_migrations(str(MIGRATION_DIRECTORY))
 
-    assert len(migrations) == 11
+    assert len(migrations) == 12

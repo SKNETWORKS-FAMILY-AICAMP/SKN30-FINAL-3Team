@@ -42,7 +42,7 @@ def test_card_vocabularies_fit_the_stored_columns() -> None:
 
 def test_contract_version_and_cache_key_version_are_separate_axes() -> None:
     assert POSITION_CARD_CONTRACT_VERSION == "position-card:v1"
-    assert CACHE_KEY_SCHEMA_VERSION == "position-card:v2"
+    assert CACHE_KEY_SCHEMA_VERSION == "position-card:v3"
     assert POSITION_CARD_CONTRACT_VERSION != CACHE_KEY_SCHEMA_VERSION
 
 

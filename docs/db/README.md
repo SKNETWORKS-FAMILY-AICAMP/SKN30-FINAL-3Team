@@ -17,7 +17,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 
 ## 현재 기준선
 
-현재 기준선은 26개 테이블과 11개 전진 migration이다.
+현재 기준선은 27개 테이블과 12개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -32,6 +32,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 009_ALTER_PROPERTY_LEDGER_FIELDS.sql | 매물·수요 원장 확장 | 0 | 세대 스펙, 공동중개, 현 거주지 만기, 분류·진행단계 |
 | 010_ALTER_PARTY_PRIVACY_CONSENT.sql | 매물·수요 원장 확장 | 0 | 인물 개인정보 활용 동의 |
 | 011_ALTER_AGENT_EXECUTION_LEASE.sql | 에이전트 실행 확장 | 0 | Worker 선점 lease와 시도 횟수 |
+| 012_CREATE_NEGOTIATION_POSITION_PRICE.sql | 협상 포지션 확장 | 1 | 포지션 카드의 거래 유형별 표기·추정 금액 |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 

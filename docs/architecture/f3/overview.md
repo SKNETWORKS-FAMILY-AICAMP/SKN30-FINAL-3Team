@@ -146,8 +146,9 @@ pgvector 유사도는 거래 후보를 포함·제외하거나 SQL 후보 점수
 | AI가 워크플로를 지휘하고 Backend capability를 주입 | 제안 | Agent 구조를 AI에 가두고 DB 접근을 Backend가 통제 |
 | F3 AI workflow의 LangGraph 사용 | 결정 | [AI ADR-0002](../../../.agents/skills/ai/references/decisions/ADR-0002-langgraph-adoption.md); F2에는 강제하지 않음 |
 | 포지션 카드 `negotiation_side` 어휘 `LISTING`·`REQUIREMENT` | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md); Backend `AnchorType`과 값이 같고 OQ-012를 종료함 |
-| 포지션 카드 Backend–AI 요청·결과 DTO와 근거 규칙 (`position-card:v1`) | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md); 어휘와 DTO만 확정했고 프롬프트·모델 호출·저장은 미구현 |
+| 포지션 카드 Backend–AI 요청·결과 DTO와 근거 규칙 (`position-card:v1`) | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md) |
+| 앵커 포지션 카드 생성·검증·저장과 `ANCHOR_READY` 전이 | 구현됨 | 프롬프트·구조화 출력, 대리 측면별 로그 범위, 마스킹 snapshot, 모델 출력 개인정보 검증, 모델 바인딩, 다중 가격·근거 저장까지 동작한다. 후보 추출부터는 미구현 |
 | FastAPI·SQLAlchemy 계열·PostgreSQL·pgvector·SSE | 후보 | 팀 승인 전에는 제품 채택으로 간주하지 않음 |
 | 로컬/외부 모델 제공자와 구체 임베딩 모델 | 미확정 | 지연·비용·개인정보 전송 조건에 영향 |
 
-AI Provider/runtime 기반과 포지션 카드 공개 계약은 구현됐지만 F3 facade 구현체와 production graph는 아직 없다. 계약의 정본은 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이며 구현 여부는 [온라인 실행](online-runtime.md)의 현재 구현 범위를 본다. 팀이 다른 제안을 승인해 프로젝트 공통 결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.
+AI Provider/runtime 기반, 포지션 카드 공개 계약과 앵커 카드 생성·저장까지 구현됐다. LangGraph production graph, 후보 추출과 중개 판정은 아직 없다. 계약의 정본은 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이며 구현 여부는 [온라인 실행](online-runtime.md)의 현재 구현 범위를 본다. 팀이 다른 제안을 승인해 프로젝트 공통 결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.

@@ -1,6 +1,6 @@
 ---
 status: 제안
-updated: 2026-08-20
+updated: 2026-08-21
 ---
 
 # F3 온라인 실행 아키텍처
@@ -167,17 +167,21 @@ sequenceDiagram
 | `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
 
-현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 세 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 앵커 카드 확보 시 `ANCHOR_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 네 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
 `ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
 
-현재 구현된 범위는 lease 소유권 확인, 앵커·입력 버전 확인, cache key 계산, 캐시 조회와 생성 요청 준비까지다. AI 카드 생성과 `ANCHOR_READY` 전환은 아직 구현하지 않았다.
+카드 생성과 저장은 구현됐다. 준비 transaction 에서 lease 를 확인하고 이 실행의 모델·prompt·workflow 바인딩을 기록한 뒤, 앵커 버전을 확인하고 대리 측면이 읽어도 되는 상담 로그만 골라 마스킹해 조립한다. 그 결과로 cache key 를 계산하고 대상·버전·상담 집합까지 대조하는 cache lookup 을 한다. transaction 을 닫고 AI 를 호출한 다음, 저장 transaction 에서 lease·바인딩·앵커 버전·source identity 를 다시 확인하고 모델 출력에 개인정보가 없는지 검사한 뒤 카드·거래 유형별 금액·근거를 원자 저장하면서 `ANCHOR_READY` 로 옮긴다. cache hit 이면 모델을 호출하지 않고 기존 카드를 재사용하되 source 재검증은 그대로 돈다. 계약과 저장 구조의 정본은 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이다.
 
-포지션 카드 cache key의 현재 schema version은 `position-card:v2`이며 마지막 상담 시각만으로는 부족하다. F1의 상담 로그 추가는 매물·구입장의 `row_version`을 올리지 않으므로, 기존 최신 로그보다 **과거 시각의 로그를 추가**하거나 **로그를 무효화**하면 `MAX(interaction_at)`과 데이터 버전이 그대로여서 낡은 카드가 재사용된다. 따라서 key에는 상담 로그 **건수**와 **최대 로그 ID**를 source revision으로 함께 넣어 집합이 바뀌면 반드시 cache miss가 되게 한다.
+대리 측면별 로그 범위는 `InteractionScope` 하나로 정의한다. 같은 세대에 달린 매수 희망자의 로그는 매물 대리 입력에 들어가지 않으며, 관계가 끝난 과거 소유자의 로그는 그 시점의 매물 측 진술이라 포함한다 (F3-LA-02, F3-LA-05).
 
-이 `position-card:v2`는 키 계산 방식의 버전이며 Backend–AI 계약 버전 `position-card:v1`과 서로 다른 것을 버전한다. 번호가 다른 것은 정상이다.
+포지션 카드 cache key의 현재 schema version은 `position-card:v3`이며 마지막 상담 시각만으로는 부족하다. F1의 상담 로그 추가는 매물·구입장의 `row_version`을 올리지 않으므로, 기존 최신 로그보다 **과거 시각의 로그를 추가**하거나 **로그를 무효화**하면 `MAX(interaction_at)`과 데이터 버전이 그대로여서 낡은 카드가 재사용된다. 따라서 key에는 상담 로그 **건수**와 **최대 로그 ID**를 source revision으로 함께 넣어 집합이 바뀌면 반드시 cache miss가 되게 한다.
 
-재사용 판정은 cache key만 믿지 않고 저장된 카드의 `source_interaction_count`와 `last_interaction_at`을 현재 값과 다시 대조한다. 조회 시점과 카드 저장 시점 사이에 로그가 또 바뀔 수 있으므로, 카드 저장과 `ANCHOR_READY` 전환 단계에서 생성 요청에 실린 source identity를 한 번 더 확인해야 한다. 그 재검증은 아직 구현하지 않았다.
+v3 은 여기에 **모델 입력 전체의 지문**과 **로그 범위 지문**을 더한다. 앵커 `row_version` 은 세대 스펙, 단지명, 당사자 역할, 날짜 신호가 바뀌어도 그대로여서 그것만으로는 캐시를 믿을 수 없다. snapshot 조립 시 `as_of`를 먼저 UTC로 정규화하고 그 UTC 날짜를 파생 신호와 지문 bucket의 공통 기준으로 쓴다. 같은 UTC 날짜는 재사용하고 다음 날에는 낡은 `days_since`·`days_until` 카드를 다시 만든다.
+
+이 `position-card:v3`는 키 계산 방식의 버전이며 Backend–AI 계약 버전 `position-card:v1`과 서로 다른 것을 버전한다. 번호가 다른 것은 정상이다.
+
+재사용 판정은 cache key만 믿지 않는다. 사무소, 측면, 대상, 데이터 버전과 저장된 카드의 `source_interaction_count`·`last_interaction_at`을 함께 대조한다. 저장 단계에서는 범위를 현재 장부에서 **다시 만들어** 범위 지문을 비교하고, 그 범위로 상담 집합을 다시 세며, 입력 전체를 다시 조립해 지문을 비교한다. cache hit이면 재사용할 카드가 아직 활성 상태인지 `SELECT ... FOR UPDATE`로 잠금 조회하고, `ANCHOR_READY` 전이 transaction이 끝날 때까지 동시 무효화를 막는다. 같은 cache key 저장 경합에서 이긴 카드를 재사용하는 경로도 행을 잠근다. 준비 단계의 cache lookup은 잠그지 않는다. 이 재검증은 cache hit과 cache miss **양쪽 모두**에서 돌며, 어긋나면 카드를 저장하지 않고 상태도 바꾸지 않는다.
 
 **목표 정책은** 5초 안에 `COMPLETED`가 되지 않으면 빈 패널을 유지하지 않고 확보된 마지막 안전 단계를 표시하는 것이다. SSE 후보 연결이 끊기면 작업은 취소되지 않으며 상태 조회로 스냅샷을 복구한 뒤 마지막 이벤트 이후를 다시 구독한다.
 
@@ -197,13 +201,20 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `claim_next_run` 작업 선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
 | 앵커 포지션 카드 cache key 계산과 캐시 조회, 생성 요청 준비 | `backend/src/domain/agent_execution/service.py` |
 | 포지션 카드 Backend–AI 공개 계약. 어휘, 요청·결과 DTO, 생성 Protocol, 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/` |
+| 포지션 카드 프롬프트와 구조화 출력 생성 (`position-card-prompt:v1`, `position-card-workflow:v1`) | `ai/src/brokerage_ai/f3/prompts.py`, `generator.py` |
+| F1 snapshot 조립, 대리 측면별 상담 로그 범위, 날짜 신호 계산 | `backend/src/domain/agent_execution/snapshot.py` |
+| 모델 출력 자유 문자열의 개인정보 검증 | `backend/src/domain/agent_execution/pii_guard.py` |
+| 모델 입력 전체의 결정적 지문과 날짜 bucket | `backend/src/domain/agent_execution/fingerprint.py` |
+| 상담 로그와 자유 문자열의 길이 보존 마스킹 | `backend/src/domain/agent_execution/masking.py` |
+| 카드·다중 가격·근거 저장, cache lookup, 모델 바인딩, `ANCHOR_READY` 전이, 경합 처리 | `backend/src/domain/agent_execution/anchor_card.py` |
+| 거래 유형별 금액 테이블 | `docs/db/migrate/012_CREATE_NEGOTIATION_POSITION_PRICE.sql` |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
 
 Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 
-포지션 카드의 Backend–AI 어휘와 DTO 정본은 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이다. `negotiation_side`는 `LISTING`·`REQUIREMENT`로 확정됐고 더 이상 내부 임시값이 아니다. 계약 버전 `position-card:v1`은 아래 cache key 버전 `position-card:v2`와 다른 축이다.
+포지션 카드의 Backend–AI 어휘와 DTO 정본은 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이다. `negotiation_side`는 `LISTING`·`REQUIREMENT`로 확정됐고 더 이상 내부 임시값이 아니다. 계약 버전 `position-card:v1`은 아래 cache key 버전 `position-card:v3`와 다른 축이다.
 
 ### 미구현
 
@@ -212,11 +223,8 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker polling loop | 없음. `WORKER_ENABLED=false` Worker는 stop 이벤트만 기다린다 |
 | Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
 | 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
-| AI 호출 | 없음. F3 경로는 AI runtime을 부르지 않는다 |
-| 포지션 카드 생성 구현체 | 계약과 Protocol 만 있고 프롬프트·모델 호출·LangGraph workflow 는 없다 |
-| Backend 의 F1 snapshot 조립과 상담 로그 마스킹 | 없음. 계약이 요구하는 마스킹 입력을 아직 만들지 않는다 |
-| 포지션 카드 저장 | 조회와 생성 요청 준비까지만 있다. 근거 저장과 quote offset 계산도 없다 |
-| `ANCHOR_READY` 이후 상태 전이 완료 경로 | 없음 |
+| LangGraph production graph 와 checkpoint | 없음. 생성은 구조화 출력 1회다 |
+| `ANCHOR_READY` 이후 상태 전이 | 없음. 후보 추출부터 다시 미구현이다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | `SUPERSEDED` 전이 | 없음 |

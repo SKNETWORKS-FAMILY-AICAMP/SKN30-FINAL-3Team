@@ -8,6 +8,7 @@ from brokerage_ai.f3.contracts import (
     ALLOWED_PRICE_KINDS,
     POSITION_CARD_CONTRACT_VERSION,
     AnchorContext,
+    AnchorContextValue,
     ConsultationLogInput,
     ContactabilityAssessment,
     ContactabilityStatus,
@@ -19,6 +20,7 @@ from brokerage_ai.f3.contracts import (
     ListingAnchorContext,
     NegotiationIntent,
     NegotiationSide,
+    PartyRoleContext,
     PositionCardAnalysis,
     PositionCardGenerationRequest,
     PositionCardGenerationResult,
@@ -31,8 +33,15 @@ from brokerage_ai.f3.contracts import (
     TimingAssessment,
     Urgency,
     UrgencyAssessment,
+    enabled_price_kinds,
+    stated_price_for,
 )
-from brokerage_ai.f3.ports import PositionCardGenerator
+from brokerage_ai.f3.generator import (
+    POSITION_CARD_WORKFLOW_VERSION,
+    LlmPositionCardGenerator,
+)
+from brokerage_ai.f3.ports import PositionCardGenerator, PositionCardGeneratorVersions
+from brokerage_ai.f3.prompts import POSITION_CARD_PROMPT_VERSION
 from brokerage_ai.f3.validation import (
     PositionCardContractError,
     validate_generation_result,
@@ -67,5 +76,13 @@ __all__ = [
     "TimingAssessment",
     "Urgency",
     "UrgencyAssessment",
+    "AnchorContextValue",
+    "LlmPositionCardGenerator",
+    "POSITION_CARD_PROMPT_VERSION",
+    "POSITION_CARD_WORKFLOW_VERSION",
+    "PartyRoleContext",
+    "PositionCardGeneratorVersions",
+    "enabled_price_kinds",
+    "stated_price_for",
     "validate_generation_result",
 ]
