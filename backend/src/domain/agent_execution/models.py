@@ -43,6 +43,10 @@ IN_PROGRESS_STATUSES = (
 # 포지션 카드 생성에 쓸 모델 구성의 capability. 다른 용도의 설정을 끌어다 쓰지 않는다.
 POSITION_CARD_CAPABILITY = "POSITION_CARD"
 
+# 중개 판정에 쓸 모델 구성의 capability. 대리와 판정은 서로 다른 모델을 쓸 수 있어야 하므로
+# (F3-NF-10) 포지션 카드 설정을 억지로 재사용하지 않는다.
+BROKERAGE_JUDGMENT_CAPABILITY = "BROKERAGE_JUDGMENT"
+
 # migration 005 가 컬럼 기본값으로 갖고 있는 판정값. AI 계약의 같은 이름 값과 일치한다.
 UNKNOWN_JUDGEMENT = "UNKNOWN"
 CAUTION_CONTACTABILITY = "CAUTION"

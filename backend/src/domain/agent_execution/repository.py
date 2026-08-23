@@ -15,6 +15,7 @@ from sqlmodel import Session, col, select
 from core.errors import NotFoundError
 from domain.agent_execution.models import (
     ANCHOR_READY_STATUS,
+    BROKERAGE_JUDGMENT_CAPABILITY,
     CROSS_JUDGMENT_RUN_TYPE,
     FAILED_TERMINAL_STATUS,
     POSITION_CARD_CAPABILITY,
@@ -23,6 +24,8 @@ from domain.agent_execution.models import (
     AgentRun,
     AiModelConfig,
     AnchorType,
+    MatchCandidateEvaluation,
+    MatchCandidateEvidence,
     MatchEvaluation,
     NegotiationPositionAnalysis,
     NegotiationPositionEvidence,
@@ -693,21 +696,35 @@ def mark_run_anchor_ready(
 MODEL_SNAPSHOT_FIELDS = ("provider", "model_name", "model_version", "config_key", "config_version")
 
 
-def find_position_card_model_config(
-    session: Session, brokerage_id: int, model_config_id: int
+def find_model_config(
+    session: Session, brokerage_id: int, model_config_id: int, capability: str
 ) -> AiModelConfig | None:
-    """이 사무소의 포지션 카드용 활성 설정만 돌려준다.
+    """이 사무소의 해당 capability 활성 설정만 돌려준다.
 
-    다른 사무소의 설정은 여기서 걸러진다. 호출자는 `None` 을 존재 여부를 드러내지 않는 하나의
-    오류로 바꾼다.
+    다른 사무소의 설정과 다른 용도의 설정은 여기서 걸러진다. 호출자는 `None` 을 존재 여부를
+    드러내지 않는 하나의 오류로 바꾼다.
     """
     statement = select(AiModelConfig).where(
         col(AiModelConfig.brokerage_id) == brokerage_id,
         col(AiModelConfig.id) == model_config_id,
-        col(AiModelConfig.capability) == POSITION_CARD_CAPABILITY,
+        col(AiModelConfig.capability) == capability,
         col(AiModelConfig.is_active).is_(True),
     )
     return session.execute(statement).scalars().first()
+
+
+def find_position_card_model_config(
+    session: Session, brokerage_id: int, model_config_id: int
+) -> AiModelConfig | None:
+    """포지션 카드 생성용 설정."""
+    return find_model_config(session, brokerage_id, model_config_id, POSITION_CARD_CAPABILITY)
+
+
+def find_brokerage_judgment_model_config(
+    session: Session, brokerage_id: int, model_config_id: int
+) -> AiModelConfig | None:
+    """중개 판정용 설정. 대리와 판정은 다른 모델일 수 있다 (F3-NF-10)."""
+    return find_model_config(session, brokerage_id, model_config_id, BROKERAGE_JUDGMENT_CAPABILITY)
 
 
 def safe_model_snapshot(config: AiModelConfig) -> dict[str, object]:
@@ -1125,6 +1142,98 @@ def advance_run_status(
             col(AgentRun.lease_expires_at) > func.now(),
         )
         .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+class CardEvidenceRow(NamedTuple):
+    """카드가 이미 저장해 둔 근거 인용과 그 offset.
+
+    중개 판정의 인용은 새 offset 을 계산하지 않고 이 값을 그대로 옮긴다. 판정 단계에는
+    상담 원문이 없으므로 여기 없는 인용은 카드에 근거가 없는 인용이다.
+    """
+
+    interaction_id: int
+    quote_text: str
+    quote_start_offset: int | None
+    quote_end_offset: int | None
+
+
+def list_card_quote_evidence(
+    session: Session, brokerage_id: int, position_analysis_id: int
+) -> list[CardEvidenceRow]:
+    """카드의 인용 근거만 돌려준다. 추정 근거는 인용 대조에 쓰이지 않는다."""
+    statement = select(
+        col(NegotiationPositionEvidence.interaction_id),
+        col(NegotiationPositionEvidence.quote_text),
+        col(NegotiationPositionEvidence.quote_start_offset),
+        col(NegotiationPositionEvidence.quote_end_offset),
+    ).where(
+        col(NegotiationPositionEvidence.brokerage_id) == brokerage_id,
+        col(NegotiationPositionEvidence.position_analysis_id) == position_analysis_id,
+        col(NegotiationPositionEvidence.interaction_id).is_not(None),
+        col(NegotiationPositionEvidence.quote_text).is_not(None),
+    )
+    return [CardEvidenceRow(*row) for row in session.execute(statement).all()]
+
+
+def list_position_cards(
+    session: Session, brokerage_id: int, position_analysis_ids: Sequence[int]
+) -> list[NegotiationPositionAnalysis]:
+    """활성 카드 여러 건을 한 번에 읽는다. 무효화된 카드는 나오지 않는다."""
+    if not position_analysis_ids:
+        return []
+    statement = select(NegotiationPositionAnalysis).where(
+        col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+        col(NegotiationPositionAnalysis.id).in_(list(position_analysis_ids)),
+        col(NegotiationPositionAnalysis.invalidated_at).is_(None),
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+def count_match_candidate_evaluations(
+    session: Session, brokerage_id: int, match_evaluation_id: int
+) -> int:
+    """이미 저장된 후보 판정 수. 중복 저장을 막는 방어 확인이다."""
+    statement = select(func.count()).where(
+        col(MatchCandidateEvaluation.brokerage_id) == brokerage_id,
+        col(MatchCandidateEvaluation.match_evaluation_id) == match_evaluation_id,
+    )
+    return int(session.execute(statement).scalar_one())
+
+
+def insert_match_candidate_evaluation(
+    session: Session, candidate: MatchCandidateEvaluation
+) -> MatchCandidateEvaluation:
+    session.add(candidate)
+    session.flush()
+    return candidate
+
+
+def insert_match_candidate_evidence(
+    session: Session, evidence: Sequence[MatchCandidateEvidence]
+) -> None:
+    if evidence:
+        session.add_all(list(evidence))
+        session.flush()
+
+
+def finalize_match_evaluation(
+    session: Session,
+    brokerage_id: int,
+    match_evaluation_id: int,
+    *,
+    candidate_count: int,
+) -> int:
+    """판정을 마친 헤더의 후보 수를 확정한다. 바꾼 행 수를 돌려준다."""
+    statement = (
+        update(MatchEvaluation)
+        .where(
+            col(MatchEvaluation.brokerage_id) == brokerage_id,
+            col(MatchEvaluation.id) == match_evaluation_id,
+        )
+        .values(candidate_count=candidate_count, generated_at=func.now())
         .execution_options(synchronize_session=False)
     )
     return cast(CursorResult[Any], session.execute(statement)).rowcount

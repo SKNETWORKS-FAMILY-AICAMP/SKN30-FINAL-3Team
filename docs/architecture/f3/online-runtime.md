@@ -167,7 +167,7 @@ sequenceDiagram
 | `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
 
-현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 후보 카드 전량 확보 시 `CANDIDATE_CARDS_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 여섯 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 후보 카드 전량 확보 시 `CANDIDATE_CARDS_READY`, 판정 호출 중 `JUDGING`, 판정 결과 저장 시 `COMPLETED`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 여덟 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
 `ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
 
@@ -212,6 +212,8 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
 | 후보 포지션 카드 확보와 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
 | 앵커·후보가 공유하는 카드 생성·검증·저장 경로 | `backend/src/domain/agent_execution/anchor_card.py` |
+| 중개 판정 1회 실행, 결과·근거 저장, `JUDGING`·`COMPLETED` 전이 | `backend/src/domain/agent_execution/judgment.py` |
+| 판정 결과와 근거 저장 | `match_evaluation`, `match_candidate_evaluation`, `match_candidate_evidence` (migration 006) |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
@@ -228,7 +230,6 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
 | 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
 | LangGraph production graph 와 checkpoint | 없음. 생성은 구조화 출력 1회다 |
-| `CANDIDATE_CARDS_READY` 이후 상태 전이 | 없음. 중개 판정부터 미구현이다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | `SUPERSEDED` 전이 | 없음 |
@@ -319,6 +320,68 @@ snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, �
 확정하는 값이다. 판정 시점에 cache key를 다시 계산해 되찾는 방식은 비싸고, 그 사이 캐시가
 바뀌면 다른 카드를 가리킨다. 상태를 옮기기 전에 후보 집합이 그대로인지와 각 카드가 아직 그
 대상의 활성 카드인지 다시 확인한다.
+
+## 중개 판정과 완료
+
+정본 코드는 `backend/src/domain/agent_execution/judgment.py`다. 앵커 카드 1장과 후보 카드
+N장을 **한 번의** AI 호출로 판정한다 (F3-BR-01, F3-NF-04). 포지션 카드와 같은 세 단계
+구조를 쓴다.
+
+| 단계 | transaction | 하는 일 |
+|---|---|---|
+| 1. 준비 | 연다 → 닫는다 | lease·앵커 버전 확인, 판정 바인딩 확정·기록, 카드 조립, `JUDGING` 전이 |
+| 2. 판정 | **없음** | `judge_candidates()` await |
+| 3. 저장 | 연다 → commit | 재검증 후 판정·후보·근거를 원자 저장하며 `COMPLETED` 전이 |
+
+판정 입력 카드는 저장된 `analysis_snapshot`을 그대로 되살려 만든다. 컬럼들을 다시 조립하면
+저장 당시 카드와 미묘하게 다른 것이 판정에 들어간다. 어떤 카드를 넣을지는 후보 카드 단계가
+snapshot에 붙여 둔 `candidate_cards`가 정하며, 판정 시점에 cache key를 다시 계산하지 않는다.
+
+저장 직전에 다시 확인하는 것:
+
+- 같은 Worker가 여전히 유효한 lease를 쥐고 있는가
+- 실행의 사무소가 준비 단계와 같은가
+- 판정 바인딩의 안전한 model snapshot이 그대로인가
+- 앵커 `row_version`이 그대로인가
+- 판정 헤더가 같은 행이고 후보 카드 집합이 그대로인가
+- 앵커와 후보 카드가 전부 아직 활성인가
+- 이미 저장된 후보 판정이 없는가
+- `validate_judgment_result()`를 통과하는가
+- 판정 자유 문자열에 개인정보 패턴이 없는가
+- 결과의 prompt·workflow 버전이 바인딩과 같은가
+
+하나라도 어긋나면 아무것도 저장하지 않고 상태도 바꾸지 않는다. 저장과 `COMPLETED` 전이가 한
+transaction 안에 있으므로 **일부 후보만 저장된 채 완료되는 상태는 생기지 않는다.**
+
+후보가 0건이면 `JUDGING`을 거치지 않고 모델도 부르지 않는다. 빈 최종 결과를 원자 저장하고
+곧장 `COMPLETED`로 간다. 판정할 것이 없는데 "판정 중"으로 표시하는 것은 거짓이다.
+
+### 판정 모델 바인딩
+
+대리와 판정은 다른 모델을 쓸 수 있어야 한다 (F3-NF-10). 그래서 포지션 카드용
+`POSITION_CARD` 설정을 억지로 재사용하지 않고 `ai_model_config.capability =
+'BROKERAGE_JUDGMENT'`인 활성 설정을 따로 요구한다. 다른 사무소의 설정과 존재하지 않는 설정은
+**같은 오류**로 거절한다.
+
+`agent_run`에는 모델 바인딩 컬럼이 한 벌뿐이고 그 자리는 이미 포지션 카드 바인딩이 차지하고
+있다. 판정 바인딩은 새 컬럼을 만들지 않고 `redacted_output_snapshot["judgment"]`에 allowlist
+필드(`provider`, `model_name`, `model_version`, `config_key`, `config_version`)와 두 버전만
+기록한다. API key, token, endpoint URL은 들어가지 않는다.
+
+### 근거와 offset
+
+판정 단계에는 상담 원문이 없다. 그래서 인용 근거는 **그 카드가 이미 갖고 있던**
+`(interaction_id, quote_text)` 쌍만 허용하고, `match_candidate_evidence`의
+`quote_start_offset`·`quote_end_offset`은 새로 계산하지 않고
+`negotiation_position_evidence`에 저장된 값을 그대로 옮긴다. 카드에 없는 인용은 거절한다.
+정황 판단은 `INFERENCE`로 명시한다.
+
+### 실행에 남기는 것
+
+`redacted_output_snapshot["judgment_result"]`에는 비식별 요약만 넣는다: 판정 헤더 ID, 앵커
+카드 ID, 후보 수, 계약·prompt·workflow 버전, 안전한 provider·model 이름, 등장한 등급 목록.
+판정 본문과 근거는 `match_candidate_evaluation`과 `match_candidate_evidence`가 소유하며 실행에
+중복 저장하지 않는다. 전체 프롬프트와 전체 모델 응답은 어디에도 남기지 않는다.
 
 ### 후보 카드의 소유 실행
 

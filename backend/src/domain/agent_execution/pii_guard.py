@@ -15,6 +15,7 @@ import re
 from collections.abc import Iterable, Iterator
 
 from brokerage_ai.f3 import (
+    CandidateJudgment,
     Evidence,
     PositionCardAnalysis,
 )
@@ -66,19 +67,15 @@ def _analysis_strings(analysis: PositionCardAnalysis) -> Iterator[tuple[str, str
             yield from from_evidence(f"{label}.{index}", condition.evidence)
 
 
-def assert_no_personal_data(analysis: PositionCardAnalysis, secrets: Iterable[str]) -> None:
-    """모델 자유 문자열에 금지 패턴이나 알려진 식별값이 있으면 거절한다.
-
-    `secrets`는 요청을 조립할 때 가린 값들이다. 마스킹된 본문만 봤는데도 원문 이름이나
-    연락처가 결과에 다시 나타났다면 모델이 그것을 만들어 낸 것이므로 저장하지 않는다.
-    """
+def _assert_clean(fields: Iterable[tuple[str, str]], secrets: Iterable[str]) -> None:
+    """자유 문자열 묶음을 훑는다. 금지 패턴이나 알려진 식별값이 있으면 거절한다."""
     known = {
         secret.strip()
         for secret in secrets
         if secret and len(secret.strip()) >= _MINIMUM_SECRET_LENGTH
     }
 
-    for field, value in _analysis_strings(analysis):
+    for field, value in fields:
         for label, pattern in _FORBIDDEN_PATTERNS:
             if pattern.search(value):
                 # 찾은 값 자체는 메시지에 넣지 않는다. 위치와 종류만 알린다.
@@ -88,3 +85,44 @@ def assert_no_personal_data(analysis: PositionCardAnalysis, secrets: Iterable[st
                 raise ModelOutputPrivacyError(
                     f"model output field {field} repeats a known personal identifier"
                 )
+
+
+def assert_no_personal_data(analysis: PositionCardAnalysis, secrets: Iterable[str]) -> None:
+    """모델 자유 문자열에 금지 패턴이나 알려진 식별값이 있으면 거절한다.
+
+    `secrets`는 요청을 조립할 때 가린 값들이다. 마스킹된 본문만 봤는데도 원문 이름이나
+    연락처가 결과에 다시 나타났다면 모델이 그것을 만들어 낸 것이므로 저장하지 않는다.
+    """
+    _assert_clean(_analysis_strings(analysis), secrets)
+
+
+def _judgment_strings(
+    candidates: Iterable[CandidateJudgment],
+) -> Iterator[tuple[str, str]]:
+    """중개 판정에서 모델이 **새로 만든** 자유 문자열만 훑는다."""
+    for candidate in candidates:
+        prefix = f"candidate.{candidate.card_id}"
+        yield f"{prefix}.comparison_basis", candidate.comparison_basis
+        for name in ("primary_obstacle", "possible_concession", "rejection_reason"):
+            value = getattr(candidate, name)
+            if value is not None:
+                yield f"{prefix}.{name}", value
+        if candidate.recommended_action is not None:
+            yield f"{prefix}.recommended_action.message", candidate.recommended_action.message
+        for index, item in enumerate(candidate.evidence):
+            if item.source.note is not None:
+                yield f"{prefix}.evidence.{index}.note", item.source.note
+
+
+def assert_no_personal_data_in_judgment(candidates: Iterable[CandidateJudgment]) -> None:
+    """중개 판정 자유 문자열에 개인정보 패턴이 있으면 거절한다.
+
+    포지션 카드와 달리 `secrets` 를 받지 않는다. 판정 모델은 이미 마스킹과 개인정보 검사를
+    통과한 카드만 보고, 인용은 그 카드가 이미 갖고 있던 인용과 글자 그대로 같아야만 통과한다
+    (`validate_judgment_result`). 따라서 인용으로는 새 개인정보가 들어올 수 없고, 새로 생기는
+    자유 문자열은 위 목록뿐이라 패턴 검사로 충분하다.
+
+    가려야 할 값 목록을 여기서 다시 만들려면 앵커와 후보 전부의 로그 범위를 재조립해야 하는데,
+    그 비용에 비해 얻는 것이 없다.
+    """
+    _assert_clean(_judgment_strings(candidates), ())
