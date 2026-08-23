@@ -5,9 +5,9 @@ updated: 2026-08-21
 
 # F3 포지션 카드 Backend–AI 계약
 
-이 문서가 F3 포지션 카드의 어휘, 입력, 결과, 근거와 개인정보 경계의 정본이다. 모듈 경계
-자체는 [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)이 소유하며 이 계약은 그
-경계 안의 구체 규격이다. HTTP 계약은 [contracts/api.md](api.md)에 있고 여기서 바꾸지 않는다.
+이 문서가 F3 포지션 카드와 중개 판정의 어휘, 입력, 결과, 근거와 개인정보 경계의 정본이다.
+모듈 경계 자체는 [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)이 소유하며 이 계약은
+그 경계 안의 구체 규격이다. HTTP 계약은 [contracts/api.md](api.md)에 있고 여기서 바꾸지 않는다.
 
 코드 정본:
 
@@ -27,6 +27,12 @@ updated: 2026-08-21
 | Backend 모델 출력 개인정보 검사 | `backend/src/domain/agent_execution/pii_guard.py` |
 | Backend 모델 입력 지문 | `backend/src/domain/agent_execution/fingerprint.py` |
 | Backend 상담 로그 범위 | `backend/src/domain/agent_execution/repository.py` (`InteractionScope`) |
+| 중개 판정 어휘와 DTO | `ai/src/brokerage_ai/f3/judgment_contracts.py` |
+| 중개 판정 생성 Protocol | `ai/src/brokerage_ai/f3/judgment_ports.py` |
+| 중개 판정 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/judgment_validation.py` |
+| 중개 판정 모델 구조화 출력 schema | `ai/src/brokerage_ai/f3/judgment_model_output.py` |
+| 중개 판정 프롬프트와 prompt version | `ai/src/brokerage_ai/f3/judgment_prompts.py` |
+| 중개 판정 생성 구현과 workflow version | `ai/src/brokerage_ai/f3/judgment_generator.py` |
 
 ## 두 버전 축
 
@@ -38,8 +44,12 @@ updated: 2026-08-21
 | Cache key 버전 | `position-card:v3` | 캐시 키 계산 방식의 버전 | Backend |
 | 입력 지문 버전 | `position-card-input:v1` | 모델 입력 정규화 방식의 버전 | Backend |
 | 로그 범위 버전 | `interaction-scope:v2` | 상담 로그 포함 정책의 버전 | Backend |
+| 판정 계약 버전 | `brokerage-judgment:v1` | 중개 판정 DTO와 의미 규격의 버전 | AI |
+| 판정 prompt 버전 | `brokerage-judgment-prompt:v1` | 중개 판정 프롬프트 원문의 버전 | AI |
+| 판정 workflow 버전 | `brokerage-judgment-workflow:v1` | 중개 판정 절차의 버전 | AI |
+| 후보 선정 버전 | `candidate-selection:v1` | 후보 snapshot 구조의 버전 | Backend |
 
-여섯은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
+서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
 
 prompt·workflow 버전은 AI가 소유하지만 Backend가 cache key를 계산할 때 필요하다. 모델을
 부르기 전에 알 수 있어야 하므로 `PositionCardGenerator.versions`가 프레임워크 중립
@@ -708,6 +718,124 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider
 - 재현에 필요한 정보는 구조화·redacted snapshot, 모델·프롬프트·워크플로 버전,
   token/latency metadata로 제한한다.
 - 이 정책을 바꾸려면 별도 개인정보 결정이 필요하다.
+
+## 중개 판정 계약
+
+앵커 포지션 카드 1장과 반대편 후보 카드 N장을 **한 번의 구조화 출력 호출**로 판정한다
+(F3-BR-01, F3-BR-02, F3-NF-04). 후보를 1장씩 개별 호출하지 않고 앵커를 후보 수만큼 반복
+전송하지 않는다. 후보가 0건이면 요청 자체를 만들지 않으며 모델도 부르지 않는다.
+
+### 등급 어휘와 화면 표기
+
+| 계약값 | 화면 한국어 | 의미 |
+|---|---|---|
+| `STRONG` | 강함 | 지금 연결할 만하다 |
+| `WEAK` | 약함 | 조건이 움직이면 가능하다 |
+| `REJECTED` | 기각 | 성사 불가다 |
+
+같은 의미에 동의어를 두지 않는다. `HIGH`, `LOW`, `EXCLUDED`, `강함`, `약함`은 저장값이나
+계약값으로 쓰지 않는다. 화면 한국어는 표시 매핑이며 저장 어휘로 되돌리지 않는다.
+
+행동 제안의 접촉 경로도 하나의 enum으로 고정한다.
+
+| `ContactChannel` | 화면 한국어 |
+|---|---|
+| `CALL` | 통화 |
+| `MESSAGE` | 문자 |
+| `IN_PERSON` | 대면 |
+
+이는 F3 판정 어휘이며 F1의 `client_interaction.interaction_channel`과 다른 축이다. F1은 아직
+채널 값 목록을 확정하지 않았다.
+
+### 왜 brokerage_id와 run_id가 없는가
+
+승인된 개인정보 경계가 실행 제어 값(`run_id`, `brokerage_id`, `requested_by`, lease)을 AI
+공개 계약에 넣지 않는다. 그래서 요청·결과 대조는 tenant 식별자가 아니라 **카드 ID**로 한다.
+결과의 앵커 카드 ID와 후보 카드 ID 집합이 요청과 정확히 같아야 하며, 그것이 "이 결과가 이
+요청에 대한 것인가"를 판정하는 기준이다. tenant 격리와 lease 확인은 Backend가 저장 직전에 DB
+현재 상태로 따로 한다.
+
+### 요청 계약
+
+`BrokerageJudgmentRequest`
+
+| 필드 | 의미 |
+|---|---|
+| `contract_version` | `brokerage-judgment:v1` 고정 |
+| `anchor` | `JudgmentCard` 1장 |
+| `candidates` | `JudgmentCard` N장. 1장 이상이어야 한다 |
+
+`JudgmentCard`는 `card_id`(`negotiation_position_analysis.id`), `negotiation_side`,
+`target_label`, 그리고 **포지션 카드 계약의 `PositionCardAnalysis` 그대로**를 담는다. 판정
+입력은 곧 두 대리의 출력이므로 별도 표현을 만들면 두 규격이 갈라진다.
+
+DTO가 강제하는 것: 후보 카드 ID는 중복될 수 없고, 앵커가 후보로 들어올 수 없으며, 모든 후보는
+앵커의 **반대편** `negotiation_side`여야 한다.
+
+### 결과 계약
+
+`BrokerageJudgmentResult`는 `contract_version`, `target`, `candidates`, `prompt_version`,
+`workflow_version`, `diagnostics`를 담는다. `target`은 모델이 만드는 값이 아니라
+`BrokerageJudgmentTarget.from_request()`가 요청에서 결정적으로 복사한다.
+
+`CandidateJudgment` 1건이 후보 1건에 대응한다.
+
+| 필드 | 의미 | 요구사항 |
+|---|---|---|
+| `card_id` | 후보 카드 ID | — |
+| `grade` | `STRONG`/`WEAK`/`REJECTED` | F3-BR-03 |
+| `rank` | 1 이상 | F3-BR-04 |
+| `comparison_basis` | 후보 간 비교 근거. 필수 | F3-BR-04 |
+| `primary_obstacle` | 결정적 걸림돌 하나 | F3-BR-05 |
+| `possible_concession` | 누가·무엇을·얼마나 움직이면 되는가 | F3-BR-06 |
+| `recommended_action` | `contact_side`·`channel`·`message` | F3-BR-07 |
+| `rejection_reason` | 기각 사유 | F3-BR-10 |
+| `evidence` | `JudgmentEvidence` 1건 이상 | F3-TR-01 |
+
+자유 문자열은 500자 상한이다. 상한을 두면 모델이 근거 대신 장문을 만들어 저장 비용과 개인정보
+노출면을 키우는 것을 막는다.
+
+`JudgmentEvidence`는 `evidence_side`, `field_name`과 포지션 카드의 `Evidence`를 **합성으로
+재사용**한다. 근거 규칙을 두 곳에 복제하지 않기 위해서다.
+
+발송 문안은 여기서 만들지 않는다. `message`는 무슨 말을 꺼낼지에 대한 한 문장 제안이고, 실제
+문안은 사용자가 [문자 보내기]를 누를 때 생성한다 (F3-CR-07).
+
+### 검증 규칙
+
+| 계층 | 위치 | 확인 |
+|---|---|---|
+| 구조 | Pydantic DTO | 어휘, 필수값, 빈 문자열, 순위 하한, 기각 사유 유무, 근거 1건 이상, extra field |
+| 요청·결과 | `validate_judgment_result()` | 계약 버전, 앵커 카드·측면 일치, 후보 집합 정확 일치, 순위 1..N 연속, 근거 출처 |
+| DB 현재 상태 | Backend | lease, tenant, 앵커 입력 버전, 후보 snapshot과 카드 집합, offset |
+
+거절 조건:
+
+- 후보 ID가 누락되거나 요청에 없던 후보가 추가되면 실패
+- 같은 후보가 두 번 나오면 실패
+- 순위가 중복되거나 1부터 연속이 아니면 실패 (구멍이 있으면 "몇 번째로 보여줄 것인가"에 답할 수 없다)
+- 기각 등급인데 기각 사유가 없으면 실패. 기각이 아닌데 사유가 있어도 실패
+- 근거가 하나도 없으면 실패
+- 결과의 앵커 카드 ID·측면·후보 집합이 요청과 다르면 실패
+
+인용 근거에는 한 가지 규칙이 더 있다. **판정 단계에는 상담 원문이 없다.** 그래서 `QUOTE`는
+그 카드가 **이미 갖고 있던** `(interaction_id, quote_text)` 쌍만 허용한다. 카드에 없는 인용은
+모델이 만들어 낸 것이므로 거절한다. 카드 값을 비교해 판단한 것은 `INFERENCE`로 명시한다.
+
+`assemble_candidates()`는 순서만 요청 순서로 되돌리고 등급·순위·근거를 고치거나 채워 넣지
+않는다. 빠진 후보를 조용히 메우면 위 검증이 무의미해진다.
+
+### LangGraph
+
+[AI ADR-0002](../../../ai/references/decisions/ADR-0002-langgraph-adoption.md)는 F3 workflow의
+상태 전이·재개 기반으로 LangGraph를 채택했다. **중개 판정에는 아직 쓰지 않는다.** 판정 자체가
+구조화 출력 1회이고, 노드가 하나뿐인 graph는 상태 전이도 재개 지점도 만들지 않는 이름뿐인
+wrapper가 되기 때문이다.
+
+현재 F3의 단계 경계와 재개는 **Backend DB 상태**가 담당한다. Worker가 저장된 상태를 보고
+이어서 처리하므로 프로세스가 죽어도 진행이 남는다. LangGraph checkpointer는 쓰지 않으며
+checkpoint 저장소 제품도 확정되지 않았다. graph가 실제로 필요해지는 시점은 한 번의 AI 호출
+안에서 도구 호출·재질의·분기가 생길 때이며, 그때 도입하고 `ai/` 안에 가둔다.
 
 ## 오류와 재시도 경계
 
