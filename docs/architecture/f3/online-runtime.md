@@ -217,6 +217,9 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
+| Worker polling loop, `claim_next_run` 연결, AI runtime 조립과 정리 | `backend/src/worker.py` |
+| 저장된 상태 기준 단계 오케스트레이션과 오류 분류 | `backend/src/domain/agent_execution/pipeline.py` |
+| `SUPERSEDED`·`FAILED_TERMINAL` 전이와 재시도 lease 반납 | `backend/src/domain/agent_execution/pipeline.py` |
 
 Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 
@@ -226,15 +229,85 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 
 | 항목 | 현재 상태 |
 |---|---|
-| Worker polling loop | 없음. `WORKER_ENABLED=false` Worker는 stop 이벤트만 기다린다 |
-| Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
-| 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
-| LangGraph production graph 와 checkpoint | 없음. 생성은 구조화 출력 1회다 |
+| LangGraph production graph 와 checkpoint | 없음. 생성과 판정 모두 구조화 출력 1회다 |
+| `WORKER_ENABLED=true` 운영 배포 | 코드는 있으나 운영 Provider·모델이 미확정이라 배포하지 않는다 |
+| `FAILED_RETRYABLE`·`CANCELLED` 상태 | 없음. 재시도는 상태를 바꾸지 않고 lease 만 반납한다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
-| `SUPERSEDED` 전이 | 없음 |
 | SSE 진행 구독과 재연결 | 없음. polling만 제공 |
-| `WORKER_ENABLED=true` 운영 | 허용하지 않는다 |
+
+## Worker 실행 오케스트레이션
+
+정본 코드는 `backend/src/worker.py`(프로세스)와
+`backend/src/domain/agent_execution/pipeline.py`(단계 선택과 오류 분류)다.
+
+`WORKER_ENABLED=false`는 그대로다. readiness만 확인하고 실행을 하나도 claim하지 않는다.
+`WORKER_ENABLED=true`면 DB readiness와 AI 설정을 먼저 확인한 뒤 polling을 시작한다.
+
+- Provider와 모델 ID를 코드에서 고르지 않는다. 기동 시 `load_ai_config`로 LLM Provider가
+  하나라도 설정돼 있는지 확인하고, 없으면 `ConfigurationError`로 기동을 거부한다. 실행별
+  모델은 그 사무소의 활성 `ai_model_config` 행에서 온다.
+- `worker_id`는 호스트·PID·무작위 접미사로 만들고 `agent_run.lease_owner`의 64자 안으로
+  자른다. 겹치면 남의 결과를 덮어쓴다.
+- 큐가 비면 `stop_event.wait(timeout)`으로 기다린다. sleep 반복이나 busy loop를 만들지
+  않으며, 대기 중 정지 신호가 오면 즉시 깨어난다.
+- 프로세스 수명 동안 asyncio loop 하나를 쓴다. 단계마다 `asyncio.run()`을 부르면 매번 새
+  loop가 생겨 `AsyncOpenAI` client가 깨진다.
+- SIGTERM·SIGINT를 받으면 **처리 중인 실행을 지금 단계까지 마치고** 종료한다. 단계 하나가
+  transaction 하나라 저장된 상태가 정본으로 남는다. 종료 시 AI runtime을 닫고 DB 커넥션을
+  정리하며 readiness file을 지운다.
+
+### 저장된 상태에서 이어서 처리
+
+Worker는 어떤 단계를 부를지 정하지 않는다. **DB에 저장된 상태가 정본**이고 pipeline이 그
+상태에 맞는 유스케이스를 고른다.
+
+| 저장된 상태 | 하는 일 | 다음 상태 |
+|---|---|---|
+| `RUNNING` | 앵커 포지션 카드 확보 | `ANCHOR_READY` |
+| `ANCHOR_READY` | 결정적 SQL 후보 추출 | `CANDIDATES_READY` |
+| `CANDIDATES_READY` | 후보 포지션 카드 확보 | `CANDIDATE_CARDS_READY` |
+| `CANDIDATE_CARDS_READY` | 중개 판정 1회와 결과 저장 | `COMPLETED` |
+| `JUDGING` | 저장된 결과가 없으면 되돌려 다시 판정 | `CANDIDATE_CARDS_READY` |
+
+`COMPLETED`와 종료 상태는 다시 처리하지 않는다.
+
+한 번 claim한 실행은 **같은 lease 아래에서** 끝까지 간다. 단계마다 다시 선점하려 하면 lease가
+아직 유효해 아무도 집지 못하고 실행이 5분 동안 멈춘다. `attempt_count`도 이 방식에서 "이
+실행을 몇 번 시도했는가"라는 원래 의미를 유지한다.
+
+`JUDGING`에서 끊긴 실행은 저장된 후보 판정이 하나도 없을 때만 되돌린다. 저장과 `COMPLETED`
+전이가 원자이므로 결과가 남아 있는데 상태가 `JUDGING`인 것은 손상된 상태이며, 덮어쓰지 않고
+종료 처리한다.
+
+선점 대상은 `QUEUED`뿐 아니라 **lease가 만료된 모든 진행 상태**다. Worker가 파이프라인 중간에
+죽으면 그 실행은 lease만 만료된 채 영영 아무도 집지 않는다. 회수해도 진행 상태는 되돌리지
+않는다. `QUEUED`만 `RUNNING`으로 옮긴다.
+
+### 오류 분류와 재시도
+
+| 원인 | 처리 |
+|---|---|
+| 입력 장부·상담 로그가 실행 중 바뀜 | `SUPERSEDED` |
+| 계약 위반, 잘못된 입력, PII 검증 실패, 바인딩 오류, 활성 모델 설정 없음 | `FAILED_TERMINAL` |
+| 일시적인 Provider 오류(`ProviderError.retryable`)와 분류되지 않은 예외 | 재시도 |
+| lease 상실 | 아무것도 쓰지 않고 이 실행을 놓는다 |
+
+재시도에 새 scheduler나 heartbeat를 만들지 않는다. 기존 5분 lease와 3회 상한을 그대로 쓴다.
+재시도 가능한 실패에서는 lease 만료 시각을 지금으로 당겨 다음 선점이 5분을 기다리지 않게 하고
+**상태는 그대로 둔다.** 저장된 단계가 정본이므로 다음 Worker가 그 단계부터 이어서 처리한다.
+3회를 넘기면 기존 `claim_next_run` 정리가 `FAILED_TERMINAL`과
+`LEASE_EXPIRED_MAX_ATTEMPTS`로 끝낸다. `FAILED_RETRYABLE` 상태는 만들지 않는다. 재시도는
+상태 변경이 아니라 lease 반납으로 표현한다.
+
+공개 `failure_message`에는 고정 문구만 저장한다. raw exception, SQL, Provider 응답과
+개인정보는 DB에 들어가지 않고 구조화 운영 로그에도 예외 **타입 이름**까지만 남긴다.
+
+| 저장된 failure_code | 의미 |
+|---|---|
+| `INPUT_SUPERSEDED` | 실행 중 입력 데이터가 변경됨 |
+| `EXECUTION_FAILED` | 그 밖의 영구 실패 |
+| `LEASE_EXPIRED_MAX_ATTEMPTS` | 시도 횟수 초과 |
 
 ## 결정적 후보 검색
 

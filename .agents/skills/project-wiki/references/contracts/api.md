@@ -222,6 +222,7 @@ allowlist 기반으로만 만든다.
 |---|---|---|
 | 없음 | `null` | `null` |
 | `LEASE_EXPIRED_MAX_ATTEMPTS` | `LEASE_EXPIRED_MAX_ATTEMPTS` | 실행이 최대 시도 횟수를 초과해 종료되었습니다 |
+| `INPUT_SUPERSEDED` | `INPUT_SUPERSEDED` | 실행 중 입력 데이터가 변경되어 결과를 반영하지 않았습니다 |
 | 그 밖의 모든 값 | `EXECUTION_FAILED` | 실행에 실패했습니다. 잠시 후 다시 시도해 주세요 |
 
 allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개인정보, 외부 서비스 오류 원문과
@@ -245,9 +246,10 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 | `FAILED_RETRYABLE` | 종료 | 재시도 가능한 일시 오류 | 제안 · 미구현 |
 | `FAILED_TERMINAL` | 종료 | 재시도해도 성공하지 않는 영구 오류 | 구현됨 |
 | `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
-| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
+| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 구현됨 |
 
-Backend가 실제로 기록하는 상태는 여덟 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+Backend가 실제로 기록하는 상태는 아홉 가지다. 아래 여덟에 더해 실행 중 입력 데이터가 바뀌면
+`SUPERSEDED`다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
 앵커 포지션 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`,
 필요한 후보 카드를 전부 확보하면 `CANDIDATE_CARDS_READY`, 중개 판정 호출 중 `JUDGING`, 판정
 결과를 저장하면 `COMPLETED`, lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직
@@ -277,9 +279,16 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
 않는다.
 
-`claim_next_run` 유스케이스와 배포용 Worker 프로세스(`backend/src/worker.py`)는 둘 다 있지만 서로
-연결되어 있지 않다. Worker는 `WORKER_ENABLED=false`로만 뜨고 실행을 하나도 claim하지 않는다.
-polling loop, `claim_next_run` 호출 연결과 실제 F3 handler는 아직 없다. 구현됨·미구현의 정본은
+Worker polling loop, `claim_next_run` 호출 연결과 실제 F3 handler는 구현됐다. Worker는 한 번
+claim한 실행을 **같은 lease 아래에서** 끝까지 진행시키며, 단계마다 다시 선점하지 않는다. 선점
+대상에는 lease가 만료된 모든 진행 상태가 포함되고, 회수해도 진행 상태를 되돌리지 않는다.
+
+재시도는 별도 상태를 만들지 않는다. 일시 오류에서는 lease 만료 시각을 지금으로 당겨 다음
+선점이 이어받게 하고 `status`와 `failure_code`를 바꾸지 않는다. 그래서 `FAILED_RETRYABLE`은
+여전히 미구현이다.
+
+`WORKER_ENABLED=true` 운영 배포는 운영 Provider·모델이 미확정이라 아직 하지 않는다. 구현됨·
+미구현의 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)의 현재 구현 절이고,
 배포 계약은 [백엔드 ADR-0003](../../../backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 

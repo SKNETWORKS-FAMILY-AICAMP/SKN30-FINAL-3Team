@@ -16,8 +16,11 @@ from core.errors import NotFoundError
 from domain.agent_execution.models import (
     ANCHOR_READY_STATUS,
     BROKERAGE_JUDGMENT_CAPABILITY,
+    CANDIDATE_CARDS_READY_STATUS,
     CROSS_JUDGMENT_RUN_TYPE,
     FAILED_TERMINAL_STATUS,
+    IN_PROGRESS_STATUSES,
+    JUDGING_STATUS,
     POSITION_CARD_CAPABILITY,
     QUEUED_STATUS,
     RUNNING_STATUS,
@@ -97,6 +100,13 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
 
     만료 판정은 애플리케이션 시계가 아니라 DB의 now()를 기준으로 한다. Worker 서버끼리
     시간이 어긋나도 같은 기준으로 만료를 보게 된다.
+
+    `RUNNING` 뿐 아니라 `ANCHOR_READY` 이후의 진행 상태도 회수 대상이다. Worker 가 파이프라인
+    중간에 죽으면 그 실행은 lease 만 만료된 채 영영 아무도 집지 않는다.
+
+    ponytail: migration 011 의 부분 인덱스는 `QUEUED`·`RUNNING` 만 덮어 나머지 진행 상태는
+    seq scan 이 된다. 실행 테이블이 커져 선점이 느려지면 인덱스 조건을 넓히는 migration 을
+    추가한다.
     """
     statement = (
         select(AgentRun)
@@ -105,7 +115,7 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
             or_(
                 col(AgentRun.status) == QUEUED_STATUS,
                 and_(
-                    col(AgentRun.status) == RUNNING_STATUS,
+                    col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
                     col(AgentRun.lease_expires_at) < func.now(),
                     col(AgentRun.attempt_count) < max_attempts,
                 ),
@@ -121,12 +131,20 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
 def mark_run_claimed(
     session: Session, run: AgentRun, worker_id: str, lease_seconds: int
 ) -> AgentRun:
-    """잠근 실행에 lease를 건다. started_at은 최초 선점에만 채우고 재선점에서는 보존한다."""
+    """잠근 실행에 lease를 건다. started_at은 최초 선점에만 채우고 재선점에서는 보존한다.
+
+    진행 상태는 **보존한다.** `QUEUED` 만 `RUNNING` 으로 옮긴다. 중간에 회수한 실행을
+    `RUNNING` 으로 되돌리면 이미 끝낸 단계를 다시 밟게 되고, 저장된 상태를 기준으로 이어서
+    처리한다는 계약이 깨진다.
+    """
     session.execute(
         update(AgentRun)
         .where(col(AgentRun.id) == run.id)
         .values(
-            status=RUNNING_STATUS,
+            status=case(
+                (col(AgentRun.status) == QUEUED_STATUS, RUNNING_STATUS),
+                else_=col(AgentRun.status),
+            ),
             lease_owner=worker_id,
             lease_expires_at=func.now() + func.make_interval(0, 0, 0, 0, 0, 0, lease_seconds),
             attempt_count=col(AgentRun.attempt_count) + 1,
@@ -147,7 +165,7 @@ def fail_runs_over_attempt_limit(
         update(AgentRun)
         .where(
             *root_cross_judgment_conditions(),
-            col(AgentRun.status) == RUNNING_STATUS,
+            col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
             col(AgentRun.lease_expires_at) < func.now(),
             col(AgentRun.attempt_count) >= max_attempts,
         )
@@ -1234,6 +1252,125 @@ def finalize_match_evaluation(
             col(MatchEvaluation.id) == match_evaluation_id,
         )
         .values(candidate_count=candidate_count, generated_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def find_active_model_config(
+    session: Session, brokerage_id: int, capability: str
+) -> AiModelConfig | None:
+    """이 사무소의 해당 capability 활성 설정 하나.
+
+    같은 capability 에 여러 활성 설정이 있으면 `config_version` 이 가장 높은 것을 쓴다.
+    Provider 와 모델 이름은 이 행에서 나오며 코드에 하드코딩하지 않는다.
+    """
+    statement = (
+        select(AiModelConfig)
+        .where(
+            col(AiModelConfig.brokerage_id) == brokerage_id,
+            col(AiModelConfig.capability) == capability,
+            col(AiModelConfig.is_active).is_(True),
+        )
+        .order_by(col(AiModelConfig.config_version).desc(), col(AiModelConfig.id).desc())
+        .limit(1)
+    )
+    return session.execute(statement).scalars().first()
+
+
+def rewind_judging_run(
+    session: Session,
+    run_id: int,
+    brokerage_id: int,
+    worker_id: str,
+    attempt_count: int,
+    match_evaluation_id: int,
+) -> int:
+    """결과가 저장되지 않은 `JUDGING` 실행을 `CANDIDATE_CARDS_READY` 로 되돌린다.
+
+    판정 호출 도중 Worker 가 죽으면 실행은 `JUDGING` 에 남지만 아무것도 저장되지 않았다.
+    되돌려 다시 판정하는 것이 손실 없는 재개다. 후보 판정이 이미 하나라도 있으면 되돌리지
+    않는다. 저장과 `COMPLETED` 전이는 한 transaction 이라 그런 행이 있다는 것 자체가
+    손상된 상태이며, 덮어쓰면 감사 추적이 끊긴다.
+    """
+    if count_match_candidate_evaluations(session, brokerage_id, match_evaluation_id):
+        return 0
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.status) == JUDGING_STATUS,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.lease_expires_at) > func.now(),
+        )
+        .values(status=CANDIDATE_CARDS_READY_STATUS, updated_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def fail_run(
+    session: Session,
+    run_id: int,
+    brokerage_id: int,
+    worker_id: str,
+    attempt_count: int,
+    *,
+    status: str,
+    failure_code: str,
+    failure_message: str,
+) -> int:
+    """실행을 종료 상태로 옮기고 lease 를 비운다.
+
+    `failure_message` 는 호출자가 준 **고정 문구**만 저장한다. raw exception, SQL, Provider
+    응답과 개인정보는 여기까지 오지 않는다. 바꾼 행 수를 돌려준다.
+    """
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
+        )
+        .values(
+            status=status,
+            failure_code=failure_code,
+            failure_message=failure_message,
+            completed_at=func.now(),
+            updated_at=func.now(),
+            lease_owner=None,
+            lease_expires_at=None,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def release_lease(
+    session: Session, run_id: int, brokerage_id: int, worker_id: str, attempt_count: int
+) -> int:
+    """재시도 가능한 실패에서 lease 를 즉시 놓아 다음 선점이 기다리지 않게 한다.
+
+    상태는 그대로 둔다. 저장된 진행 단계가 정본이고, 다음 Worker 는 그 단계부터 이어서
+    처리한다. 새 scheduler 나 heartbeat 를 만들지 않고 기존 선점 경로를 그대로 쓴다.
+    """
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
+        )
+        .values(lease_expires_at=func.now(), updated_at=func.now())
         .execution_options(synchronize_session=False)
     )
     return cast(CursorResult[Any], session.execute(statement)).rowcount
