@@ -27,7 +27,7 @@ MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 
 Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 상세 진입에서도 F3 패널만 로딩·실패 상태를 표시한다.
 
-작업 생성 시 사용자 권한, 앵커 종류·식별자, 현재 데이터 버전과 활성 AI 구성을 확인한다. **목표 정책은** 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용하는 것이다. 현재 구현은 요청마다 새 실행을 만든다. 아래 [현재 구현 범위](#현재-구현-범위)를 함께 본다.
+작업 생성 시 사용자 권한, 앵커 종류·식별자, 현재 데이터 버전과 활성 AI 구성을 확인한다. **목표 정책은** 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용하는 것이다. 현재 구현은 `(사무소, 앵커, 입력 버전)`으로 재사용하며 **AI 구성은 키에 없다.** 접수 시점에는 어떤 모델로 돌지 알 수 없기 때문이다. 아래 [현재 구현 범위](#현재-구현-범위)를 함께 본다.
 
 앵커 유효성은 F1 장부 조회 범위를 그대로 따른다. 매물 앵커는 사무소, 매물 삭제 여부와 **부모 세대 삭제 여부**를 모두 만족해야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물 행을 건드리지 않으므로 매물 행의 표시만 보면 화면에 없는 세대의 매물이 앵커로 들어온다.
 
@@ -185,7 +185,7 @@ v3 은 여기에 **모델 입력 전체의 지문**과 **로그 범위 지문**�
 
 **목표 정책은** 5초 안에 `COMPLETED`가 되지 않으면 빈 패널을 유지하지 않고 확보된 마지막 안전 단계를 표시하는 것이다. SSE 후보 연결이 끊기면 작업은 취소되지 않으며 상태 조회로 스냅샷을 복구한 뒤 마지막 이벤트 이후를 다시 구독한다.
 
-SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend가 쓸 수 있는 것은 `GET /api/v1/f3/runs/{run_id}` polling뿐이다.
+SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend가 쓸 수 있는 것은 `GET /api/v1/f3/runs/{run_id}` 상태 polling과 `GET /api/v1/f3/runs/{run_id}/result` 결과 조회다.
 
 ## 현재 구현 범위
 
@@ -216,6 +216,9 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 판정 결과와 근거 저장 | `match_evaluation`, `match_candidate_evaluation`, `match_candidate_evidence` (migration 006) |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
+| 같은 앵커·입력 버전의 실행 재사용과 동시 접수 직렬화 (F3-CR-12) | `backend/src/domain/agent_execution/service.py` |
+| `GET /api/v1/f3/runs/{run_id}/result` 결과 조회 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/results.py` |
+| `POST /api/v1/f3/feedback` 사용자 피드백 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/feedback.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
 | Worker polling loop, `claim_next_run` 연결, AI runtime 조립과 정리 | `backend/src/worker.py` |
 | 저장된 상태 기준 단계 오케스트레이션과 오류 분류 | `backend/src/domain/agent_execution/pipeline.py` |
@@ -232,9 +235,10 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | LangGraph production graph 와 checkpoint | 없음. 생성과 판정 모두 구조화 출력 1회다 |
 | `WORKER_ENABLED=true` 운영 배포 | 코드는 있으나 운영 Provider·모델이 미확정이라 배포하지 않는다 |
 | `FAILED_RETRYABLE`·`CANCELLED` 상태 | 없음. 재시도는 상태를 바꾸지 않고 lease 만 반납한다 |
-| 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
-| 뒤따른 화면의 기존 실행 구독 | 없음 |
 | SSE 진행 구독과 재연결 | 없음. polling만 제공 |
+| AI 구성 변경 시 실행 재사용 무효화 | 없음. 재사용 키에 AI 구성이 들어가지 않는다 |
+| 15건 이후 후보의 추가 카드화와 지연 로딩 | 없음. 남은 건수와 후보 metadata만 조회할 수 있다 |
+| 정정 상담 로그 생성 (F3-TR-02) | 없음. 피드백만 저장한다 |
 
 ## Worker 실행 오케스트레이션
 
@@ -498,7 +502,9 @@ pgvector, PostgreSQL 전문검색과 구체 결합 점수·top-K는 후보 구�
 
 **목표 정책은** 동일 키의 활성 작업을 하나만 실행하고 뒤따른 화면이 그 작업을 구독하는 것이다. 실행 중 F1 데이터가 바뀌면 이전 실행을 강제 성공으로 덮어쓰지 않고 `SUPERSEDED`로 남기며, 새 입력 버전 작업이 현재 화면의 결과 소유권을 가진다.
 
-활성 작업 재사용, 기존 작업 구독과 `SUPERSEDED` 전이는 아직 구현하지 않았다. 현재는 `POST /api/v1/f3/runs` 요청마다 새 `QUEUED` 실행이 생기고, 앵커가 바뀐 실행은 Worker 단계에서 거부될 뿐 `SUPERSEDED`로 기록되지 않는다.
+활성 작업 재사용과 `SUPERSEDED` 전이는 구현했다. `POST /api/v1/f3/runs`는 같은 앵커·입력 버전의 재사용 가능한 실행이 있으면 그것을 돌려주고, 실행 중 입력이 바뀌면 Worker가 `SUPERSEDED`로 기록한다. 동시 접수는 PostgreSQL transaction advisory lock으로 직렬화하며 프로세스 메모리 lock은 쓰지 않는다.
+
+**AI 구성은 재사용 키에 없다.** 어떤 모델·프롬프트로 돌지는 Worker가 선점한 뒤 활성 `ai_model_config`를 읽어 정하므로 접수 시점에는 알 수 없다. AI 구성이 바뀌어도 같은 입력 버전의 완료 결과가 그대로 재사용되며, 구성 변경 시 기존 카드·판정을 무효화하는 경로는 아직 없다. 위 캐시 표의 「AI 구성 변경」 무효화 조건은 여전히 **목표**다.
 
 ## 검증·개인정보와 실행 로그
 

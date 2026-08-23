@@ -89,18 +89,48 @@ def redacted_input_snapshot(anchor: ResolvedAnchor) -> dict[str, object]:
     }
 
 
+@dataclass(frozen=True)
+class QueuedRun:
+    """접수 결과. 새로 만들었는지 기존 실행을 재사용했는지 알려준다."""
+
+    run: AgentRun
+    reused: bool
+
+
 def queue_cross_judgment_run(
     session: Session,
     brokerage_id: int,
     requested_by: int,
     anchor_type: AnchorType,
     anchor_id: int,
-) -> AgentRun:
-    """F3 교차 판정 실행을 QUEUED로 적재한다. 모델 호출은 Worker 단계에서 일어난다."""
+    *,
+    trigger_type: str = USER_REQUEST_TRIGGER_TYPE,
+) -> QueuedRun:
+    """F3 교차 판정 실행을 적재한다. 모델 호출은 Worker 단계에서 일어난다.
+
+    같은 앵커·입력 버전의 재사용 가능한 실행이 있으면 새로 만들지 않고 그것을 돌려준다
+    (F3-CR-12). 활성 실행이면 구독하게 하고, 이미 `COMPLETED` 면 그 결과를 그대로 쓴다.
+
+    ## 재사용 키의 한계
+
+    재사용 키는 `(사무소, 앵커 종류, 앵커 ID, input_data_version)` 이다. **AI 구성은 키에
+    들어가지 않는다.** 어떤 모델·프롬프트로 돌지는 Worker 가 실행을 선점한 뒤 활성
+    `ai_model_config` 를 읽어 정하므로 접수 시점에는 알 수 없다. AI 구성이 바뀌어도 같은
+    입력 버전의 완료 결과가 그대로 재사용된다는 뜻이며, 구성이 바뀌면 기존 카드·판정을
+    무효화하는 별도 경로가 필요하다. 아직 구현하지 않았다.
+    """
     anchor = resolve_anchor(session, brokerage_id, anchor_type, anchor_id)
 
-    # 같은 앵커·입력 버전의 활성 실행 재사용(F3-CR-12)은 아직 구현하지 않는다.
-    # 재사용을 넣을 자리는 resolve_anchor 다음이며 적재 경로는 그대로 둘 수 있다.
+    # 같은 앵커의 동시 접수를 DB 가 직렬화한다. 프로세스 메모리 lock 은 API 인스턴스가
+    # 둘이면 서로를 막지 못한다.
+    repository.lock_run_intake(session, brokerage_id, anchor_type, anchor_id)
+    existing = repository.find_reusable_run(
+        session, brokerage_id, anchor_type, anchor_id, anchor.input_data_version
+    )
+    if existing is not None:
+        session.commit()
+        return QueuedRun(run=existing, reused=True)
+
     run = AgentRun(
         brokerage_id=brokerage_id,
         run_group_id=uuid4(),
@@ -108,7 +138,7 @@ def queue_cross_judgment_run(
         run_type=CROSS_JUDGMENT_RUN_TYPE,
         agent_type=BROKERAGE_WORKFLOW_AGENT_TYPE,
         status=QUEUED_STATUS,
-        trigger_type=USER_REQUEST_TRIGGER_TYPE,
+        trigger_type=trigger_type,
         requested_by=requested_by,
         model_config_id=None,
         target_listing_id=anchor.target_listing_id,
@@ -128,7 +158,7 @@ def queue_cross_judgment_run(
         raise
 
     session.refresh(run)
-    return run
+    return QueuedRun(run=run, reused=False)
 
 
 def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:

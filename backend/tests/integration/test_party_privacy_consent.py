@@ -3,6 +3,7 @@ import os
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 requires_database = pytest.mark.skipif(
@@ -32,7 +33,7 @@ def seed_brokerage_and_user(session: Session) -> tuple[int, int]:
 
 @requires_database
 def test_party_without_consent_is_stored() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         brokerage_id, _ = seed_brokerage_and_user(session)
@@ -52,7 +53,7 @@ def test_party_without_consent_is_stored() -> None:
 
 @requires_database
 def test_party_with_complete_consent_is_stored() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         brokerage_id, user_id = seed_brokerage_and_user(session)
@@ -72,7 +73,7 @@ def test_party_with_complete_consent_is_stored() -> None:
 
 @requires_database
 def test_consent_without_recorder_is_rejected() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         brokerage_id, _ = seed_brokerage_and_user(session)
@@ -93,7 +94,7 @@ def test_consent_without_recorder_is_rejected() -> None:
 
 @requires_database
 def test_recorder_from_another_brokerage_is_rejected() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         _, user_id = seed_brokerage_and_user(session)

@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, col, create_engine, select
 
 from domain.agent_execution import repository, service
@@ -91,7 +92,7 @@ def stored_run(session: Session, run_id: int) -> dict:
 @contextmanager
 def claim_session() -> Iterator[tuple[Session, int, int]]:
     """실제 PostgreSQL에 붙되 종료 시 전부 롤백한다. service의 commit은 savepoint에 걸린다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     connection = engine.connect()
     transaction = connection.begin()
     session = Session(bind=connection, join_transaction_mode="create_savepoint")
@@ -108,7 +109,7 @@ def claim_session() -> Iterator[tuple[Session, int, int]]:
 @contextmanager
 def committed_runs(count: int) -> Iterator[list[int]]:
     """연결이 다른 Worker가 서로 보려면 커밋된 행이 필요하다. 끝나면 반드시 지운다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     brokerage_id: int | None = None
     try:
         with Session(engine) as setup:
@@ -334,8 +335,8 @@ def test_database_error_rolls_back_the_whole_claim_transaction() -> None:
 def test_a_locked_run_is_skipped_by_another_connection() -> None:
     """FOR UPDATE SKIP LOCKED 확인. 커밋하지 않은 채 잠근 행은 다른 연결이 건너뛴다."""
     with committed_runs(1) as run_ids:
-        engine_a = create_engine(os.environ["TEST_DB_URL"])
-        engine_b = create_engine(os.environ["TEST_DB_URL"])
+        engine_a = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
+        engine_b = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         try:
             with Session(engine_a) as session_a, Session(engine_b) as session_b:
                 locked = repository.lock_claimable_run(session_a, service.MAX_CLAIM_ATTEMPTS)
@@ -354,8 +355,8 @@ def test_a_locked_run_is_skipped_by_another_connection() -> None:
 @requires_database
 def test_two_connections_claim_different_runs() -> None:
     with committed_runs(2) as run_ids:
-        engine_a = create_engine(os.environ["TEST_DB_URL"])
-        engine_b = create_engine(os.environ["TEST_DB_URL"])
+        engine_a = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
+        engine_b = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         try:
             with Session(engine_a) as session_a, Session(engine_b) as session_b:
                 first = repository.lock_claimable_run(session_a, service.MAX_CLAIM_ATTEMPTS)
@@ -383,7 +384,7 @@ def test_parallel_workers_never_claim_the_same_run() -> None:
         lock = threading.Lock()
 
         def claim(index: int) -> None:
-            engine = create_engine(os.environ["TEST_DB_URL"])
+            engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
             worker_id = f"worker-{index}"
             try:
                 with Session(engine) as session:
@@ -409,7 +410,7 @@ def test_parallel_workers_never_claim_the_same_run() -> None:
         assert len({run_id for _, run_id in claimed}) == worker_count
         assert {run_id for _, run_id in claimed} == set(run_ids)
 
-        engine = create_engine(os.environ["TEST_DB_URL"])
+        engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         try:
             with Session(engine) as verify:
                 for worker_id, run_id in claimed:

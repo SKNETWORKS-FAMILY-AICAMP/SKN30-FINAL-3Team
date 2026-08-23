@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import inspect
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from domain.property_ledger import models
@@ -46,7 +47,7 @@ def test_module_defines_every_ledger_table() -> None:
 @requires_database
 @pytest.mark.parametrize("table_name", LEDGER_TABLES)
 def test_model_columns_match_migrated_schema(table_name: str) -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     inspector = inspect(engine)
 
     database_columns = {column["name"] for column in inspector.get_columns(table_name)}
@@ -57,7 +58,7 @@ def test_model_columns_match_migrated_schema(table_name: str) -> None:
 
 @requires_database
 def test_numeric_array_json_and_bigint_values_survive_a_round_trip() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         brokerage_id = session.exec(select(PropertyComplex.brokerage_id).limit(1)).first()
@@ -110,7 +111,7 @@ def test_numeric_array_json_and_bigint_values_survive_a_round_trip() -> None:
 
 @requires_database
 def test_server_defaults_fill_required_timestamps_and_received_date() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         complex_row = PropertyComplex(brokerage_id=1, name="기본값 검증 단지")

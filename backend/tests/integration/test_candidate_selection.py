@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 from domain.agent_execution import repository
@@ -73,7 +74,7 @@ def remove_committed_rows() -> Iterator[None]:
     yield
     if not CREATED_BROKERAGES or not os.getenv("TEST_DB_URL"):
         return
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as session:
         for statement in _CLEANUP_ORDER:
             session.execute(text(statement), {"ids": list(CREATED_BROKERAGES)})
@@ -84,7 +85,7 @@ def remove_committed_rows() -> Iterator[None]:
 
 @contextmanager
 def db_session() -> Iterator[Session]:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     session = Session(engine)
     try:
         yield session

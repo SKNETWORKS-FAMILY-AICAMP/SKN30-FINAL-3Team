@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import delete, text
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, col, create_engine, select
 
 from core.errors import RowVersionConflictError, ValidationError
@@ -47,7 +48,7 @@ def clean_up_seeded_complexes() -> Any:
     yield
     if not os.getenv("TEST_DB_URL"):
         return
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as session:
         # 참조하는 쪽부터 지운다. 소프트 삭제된 행도 외래키는 그대로 걸려 있다.
         complex_ids = session.exec(
@@ -113,7 +114,7 @@ def test_deleted_unit_disappears_from_the_listing_but_leaves_its_listings_untouc
     우회한다. 매물이 화면에서 사라지는 것은 조회가 세대를 join하기 때문이지
     매물 행을 건드려서가 아니다.
     """
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         unit_id, listing_id = seeded_unit(session)
@@ -144,7 +145,7 @@ def test_deleted_unit_disappears_from_the_listing_but_leaves_its_listings_untouc
 
 @requires_database
 def test_delete_rejects_a_stale_row_version() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         unit_id, _ = seeded_unit(session)
@@ -160,7 +161,7 @@ def test_delete_rejects_a_stale_row_version() -> None:
 
 @requires_database
 def test_deleted_requirement_disappears_from_the_listing() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         party = Party(brokerage_id=BROKERAGE_ID, party_type="PERSON", name="삭제 검증 손님")
@@ -187,7 +188,7 @@ def test_deleted_requirement_disappears_from_the_listing() -> None:
 
 @requires_database
 def test_listing_page_excludes_deleted_units() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         unit_id, _ = seeded_unit(session)
@@ -202,7 +203,7 @@ def test_listing_page_excludes_deleted_units() -> None:
 @requires_database
 def test_complex_delete_is_refused_while_units_remain() -> None:
     """세대가 남은 단지는 지울 수 없다. 지우면 그 세대들이 이름 없는 상태가 된다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         unit_id, _ = seeded_unit(session)
@@ -283,7 +284,7 @@ def test_complex_delete_waits_for_a_concurrent_unit_insert_and_is_then_refused()
     살아 있는 세대가 남고, 세대 조회는 단지를 inner join하므로 그 세대는 지운 단지 이름을
     달고 목록에 계속 나타난다.
     """
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as setup:
         complex_id = seeded_complex(setup)
 
@@ -326,7 +327,7 @@ def test_complex_delete_waits_for_a_concurrent_unit_insert_and_is_then_refused()
 @requires_database
 def test_unit_creation_is_refused_once_the_complex_delete_commits() -> None:
     """단지 삭제가 잠금을 먼저 쥐면 뒤따르는 세대 등록이 거절된다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as setup:
         complex_id = seeded_complex(setup)
 
@@ -378,7 +379,7 @@ def test_concurrent_unit_creations_in_one_complex_do_not_block_each_other() -> N
     등록 쪽이 배타 잠금을 쓰면 이 흔한 작업이 한 줄로 직렬화된다. 등록이 보장해야 하는 것은
     "단지가 사라지지 않는다"뿐이므로 공유 잠금이면 충분하고, 공유 잠금끼리는 충돌하지 않는다.
     """
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as setup:
         complex_id = seeded_complex(setup)
 
@@ -417,7 +418,7 @@ def test_concurrent_unit_creations_in_one_complex_do_not_block_each_other() -> N
 
 @requires_database
 def test_empty_complex_is_deleted_and_leaves_the_option_list() -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
 
     with Session(engine) as session:
         unit_id, _ = seeded_unit(session)

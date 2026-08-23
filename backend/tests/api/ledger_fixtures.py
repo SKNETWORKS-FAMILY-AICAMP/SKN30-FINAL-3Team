@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 from core.config import Config
@@ -42,7 +43,7 @@ def ledger_client(
     `csrf_token`을 주면 CSRF 검사만 실제 코드로 되돌린다. 그 토큰을 `X-CSRF-Token` 헤더로
     보내면 통과하고, 빠지거나 다르면 403이 된다.
     """
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     connection = engine.connect()
     transaction = connection.begin()
     session = Session(bind=connection, join_transaction_mode="create_savepoint")

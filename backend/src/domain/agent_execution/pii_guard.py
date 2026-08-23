@@ -126,3 +126,12 @@ def assert_no_personal_data_in_judgment(candidates: Iterable[CandidateJudgment])
     그 비용에 비해 얻는 것이 없다.
     """
     _assert_clean(_judgment_strings(candidates), ())
+
+
+def assert_no_personal_data_in_text(field: str, value: str) -> None:
+    """사용자가 직접 쓴 자유문에 개인정보 패턴이 있으면 거절한다.
+
+    모델 출력과 같은 패턴 목록을 쓴다. 사용자가 쓴 글이라도 성명·연락처를 AI 판정 기록에
+    남기면 그 기록의 개인정보 경계가 무너진다. 무엇을 발견했는지는 메시지에 넣지 않는다.
+    """
+    _assert_clean(((field, value),), ())

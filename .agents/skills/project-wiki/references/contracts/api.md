@@ -132,17 +132,18 @@ updated: 2026-08-20
 
 ## F3 실행 계약 (제안)
 
-이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 요청을 검증해
-`agent_run`에 `QUEUED`로 적재하고 그 실행의 현재 상태를 조회하는 것까지다. 결과와 후보 조회, 피드백
-경로는 아직 없다.
+이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 접수와 재사용,
+상태 조회, 결과 조회, 사용자 피드백이다.
 
 이 절은 브라우저와 Backend 사이의 HTTP 계약만 다룬다. Backend와 AI 사이의 포지션 카드 입력·결과,
 어휘와 근거 규칙은 [F3 AI 계약](f3-ai.md)이 소유하며 그 계약은 이 HTTP 경로로 노출되지 않는다.
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
+| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 적재하거나 재사용 가능한 실행을 반환 |
 | GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
+| GET | /api/v1/f3/runs/{run_id}/result | 세션 | 앵커 카드, 후보 조회 조건과 후보별 판정을 조회 |
+| POST | /api/v1/f3/feedback | 세션·CSRF | 포지션 카드 또는 중개 판정 후보에 대한 피드백을 남김 |
 
 요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
 정수다. 선언하지 않은 필드가 있으면 422로 거절한다.
@@ -169,9 +170,25 @@ updated: 2026-08-20
 `input_data_version`은 앵커가 된 매물 또는 구입장의 `row_version`이다. 같은 화면을 다시 열었을 때
 같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
 
-같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)은 아직 구현하지 않았다.
-요청마다 새 `QUEUED` 실행이 생긴다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고
-`agent_run` 적재까지만 하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+`POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만 하므로 F3
+실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+
+### 중복 실행 방지 (F3-CR-12)
+
+같은 앵커·입력 버전의 **재사용 가능한** 실행이 있으면 새로 만들지 않고 그 실행을 반환한다.
+재사용이든 신규든 응답 형태와 상태 코드(`202`)는 같다.
+
+재사용 키는 `(brokerage_id, anchor_type, anchor_id, input_data_version)`이다. 대상 상태는
+`QUEUED`와 진행 중인 상태, 그리고 `COMPLETED`다. `FAILED_TERMINAL`·`SUPERSEDED`는 재사용하지
+않는다. 실패한 실행을 재사용하면 다시 눌러도 영영 같은 실패만 보인다.
+
+**AI 구성은 키에 들어가지 않는다.** 어떤 모델·프롬프트로 돌지는 Worker가 실행을 선점한 뒤
+활성 `ai_model_config`를 읽어 정하므로 접수 시점에는 알 수 없다. AI 구성이 바뀌어도 같은 입력
+버전의 완료 결과가 그대로 재사용된다는 뜻이며, 구성이 바뀌면 기존 카드·판정을 무효화하는 별도
+경로가 필요하다. 아직 구현하지 않았다.
+
+동시 접수는 PostgreSQL transaction advisory lock으로 직렬화한다. 프로세스 메모리 lock은 쓰지
+않는다. API 인스턴스가 둘이면 각자의 lock이 서로를 막지 못해 같은 앵커에 실행이 둘 생긴다.
 
 `LISTING` 앵커는 사무소가 같고 `property_listing.is_deleted = false`이며 **부모 세대도
 `property_unit.is_deleted = false`** 여야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물
@@ -268,6 +285,88 @@ HTTP 계약으로는 아직 노출하지 않는다. 결과 조회 경로는 여�
 상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
 열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
+
+### 결과 조회
+
+`GET /api/v1/f3/runs/{run_id}/result`는 실행 하나의 현재 결과를 돌려준다. 진행 중이면 확보된
+데까지만 채운다. 빈 패널을 유지하지 않고 마지막 안전 단계를 보여주기 위해서다 (F3-CR-09).
+상태를 바꾸지 않는 GET이므로 CSRF 토큰을 요구하지 않는다.
+
+격리는 상태 조회와 같다. 다른 사무소의 실행, 내부 하위 실행과 다른 실행 유형은 모두 404다.
+
+| 필드 | 의미 |
+|---|---|
+| `run_id`, `status`, `anchor_type`, `anchor_id`, `input_data_version` | 실행 헤더 |
+| `created_at`, `started_at`, `completed_at` | 시각 |
+| `failure_code`, `failure_message` | allowlist 변환 결과 |
+| `anchor_card` | 앵커 포지션 카드와 항목별 근거. 확보 전이면 null |
+| `candidate_selection.criteria` | 실제로 적용한 후보 조회 조건 |
+| `candidate_selection.total_count` | 조건에 맞는 전체 후보 수 |
+| `candidate_selection.carded_count` | 카드화·판정한 후보 수 |
+| `candidate_selection.remaining_count` | 남은 후보 수 (F3-BR-14) |
+| `candidates` | 후보 목록 한 페이지 |
+| `candidates_total`, `limit`, `offset` | 페이징 |
+
+후보 목록은 상위 15건이 아니라 **전체** 후보를 대상으로 페이징한다. `limit`(1~100, 기본 20)과
+`offset` 질의 변수를 받는다. 카드화되지 않은 후보도 목록에 남으며 `selected_for_cards`가
+거짓이고 등급·근거가 null이다. **판정하지 않은 후보에 등급을 붙이지 않는다.**
+
+후보 1건에는 SQL 점수(`sql_score`, `price_amount`, `received_at`)와 판정 결과(`match_grade`,
+`rank`, `evaluation_basis`, `primary_obstacle`, `possible_concession`, `recommended_action`,
+`exclusion_reason`, `evidence`)가 함께 실린다. `sql_score`는 카드화 우선순위이며 중개 등급이
+아니다. 기각도 사유와 함께 노출한다 (F3-BR-10). 세대 상세 화면에서 기각을 접는 것은 화면
+정책이며 이 API는 전부 돌려준다.
+
+`evidence`의 `interaction_id`와 `quote_start_offset`·`quote_end_offset`은 근거에서 원본 상담
+로그로 이동하기 위한 값이다 (F3-CR-14).
+
+응답에 싣지 않는 것: `brokerage_id`, `requested_by`, `model_config_id`, `model_snapshot`,
+프롬프트·워크플로 버전, 모델 진단, 실행 입출력 스냅샷 원본, 토큰 수, `run_group_id`,
+`parent_run_id`, lease 세 값, 내부 실패 원문, 다른 사무소 데이터.
+
+**15건 이후 후보의 추가 카드화는 구현하지 않았다.** `remaining_count`와 후보 metadata는
+돌려주지만 그 후보들의 카드를 만들고 판정하는 경로는 없다. 지연 로딩 화면을 만들려면 그
+경로를 먼저 구현해야 한다.
+
+### 사용자 피드백
+
+`POST /api/v1/f3/feedback`는 포지션 카드 또는 중개 판정 후보에 대한 피드백을 저장한다
+(F3-TR-03, F3-CR-17). 저장 위치는 기존 `ai_decision_feedback`(migration 007)이다.
+
+```json
+{
+  "target": "MATCH_CANDIDATE",
+  "target_id": 12,
+  "feedback_type": "NOT_INTERESTED",
+  "reason": "ALREADY_CONTACTED",
+  "field_name": null,
+  "corrected_value": null,
+  "detail": "어제 통화했습니다"
+}
+```
+
+`brokerage_id`와 `created_by`는 **세션에서만** 도출한다. 본문으로 받지 않으며 선언하지 않은
+필드가 있으면 422다. 상태를 바꾸는 요청이므로 `X-CSRF-Token`을 요구한다.
+
+| 항목 | 고정 어휘 |
+|---|---|
+| `target` | `POSITION_ANALYSIS`, `MATCH_CANDIDATE` |
+| `feedback_type` | `NOT_INTERESTED`, `CORRECTION` |
+| `reason` | `CONDITION_MISMATCH`, `ALREADY_CONTACTED`, `WRONG_JUDGMENT`, `OTHER` |
+
+사유를 자유 문자열로 받지 않는다. 「판정이 틀림」을 대상·항목별로 집계하려면 값이 고정돼
+있어야 한다 (F3-TR-07). 화면 한국어는 각각 조건 안 맞음 / 이미 연락함 / 판정이 틀림 / 기타다.
+
+`detail`은 500자 상한이고 저장 전에 개인정보 패턴 검사를 지난다. 전화번호·이메일·생년월일·
+주민등록번호 형태가 있으면 422 `PERSONAL_DATA_NOT_ALLOWED`로 거절하며 발견한 값 자체는 응답에
+담지 않는다.
+
+다른 사무소의 카드나 판정을 대상으로 지정하면 없는 것과 같은 404다. 응답은 작성자와 사무소를
+싣지 않는다. 정정 상담 로그 생성(F3-TR-02)은 이번 범위가 아니라 `correction_interaction_id`는
+항상 비어 있다.
+
+`requested_by`와 `created_by`의 처리 위치, 접근 주체, 보존과 삭제는
+[개인정보 정책](../privacy/policy.md)의 `agent_run.requested_by` 절을 따른다.
 
 ### Worker 선점과 lease
 

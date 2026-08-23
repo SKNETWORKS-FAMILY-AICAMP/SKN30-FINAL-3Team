@@ -17,6 +17,7 @@ from domain.agent_execution.models import (
     ANCHOR_READY_STATUS,
     BROKERAGE_JUDGMENT_CAPABILITY,
     CANDIDATE_CARDS_READY_STATUS,
+    COMPLETED_STATUS,
     CROSS_JUDGMENT_RUN_TYPE,
     FAILED_TERMINAL_STATUS,
     IN_PROGRESS_STATUSES,
@@ -25,6 +26,7 @@ from domain.agent_execution.models import (
     QUEUED_STATUS,
     RUNNING_STATUS,
     AgentRun,
+    AiDecisionFeedback,
     AiModelConfig,
     AnchorType,
     MatchCandidateEvaluation,
@@ -1374,3 +1376,188 @@ def release_lease(
         .execution_options(synchronize_session=False)
     )
     return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+# 같은 앵커를 동시에 접수해도 실행이 하나만 생기게 하는 transaction advisory lock 의 이름공간.
+# 다른 기능이 같은 키 공간을 쓰지 않도록 고정 분류 번호를 앞에 둔다.
+RUN_INTAKE_LOCK_NAMESPACE = 0x46330001
+
+
+def lock_run_intake(
+    session: Session, brokerage_id: int, anchor_type: AnchorType, anchor_id: int
+) -> None:
+    """같은 앵커의 접수를 transaction 안에서 직렬화한다.
+
+    프로세스 메모리 lock 은 쓰지 않는다. API 인스턴스가 둘이면 각자의 lock 이 서로를 막지
+    못해 같은 앵커에 실행이 둘 생긴다. transaction advisory lock 은 DB 가 소유하므로 인스턴스
+    수와 무관하고, transaction 이 끝나면 자동으로 풀려 해제를 잊을 자리가 없다.
+    """
+    key = hash_of_anchor(brokerage_id, anchor_type, anchor_id)
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(:namespace, :key)"),
+        {"namespace": RUN_INTAKE_LOCK_NAMESPACE, "key": key},
+    )
+
+
+def hash_of_anchor(brokerage_id: int, anchor_type: AnchorType, anchor_id: int) -> int:
+    """앵커 하나를 advisory lock 의 32비트 키로 접는다.
+
+    Python `hash()` 는 쓰지 않는다. 프로세스마다 값이 달라 서로 다른 API 인스턴스가 같은
+    앵커에 다른 lock 을 잡는다. 충돌하면 관계없는 두 앵커가 잠깐 직렬화될 뿐 정확성은
+    영향받지 않는다.
+    """
+    canonical = f"{brokerage_id}:{anchor_type.value}:{anchor_id}".encode()
+    digest = hashlib.sha256(canonical).digest()
+    # PostgreSQL advisory lock 의 두 번째 인자는 부호 있는 32비트다.
+    return int.from_bytes(digest[:4], "big", signed=True)
+
+
+# 아직 결과를 낼 수 있거나 이미 낸 실행. 종료 실패 상태는 재사용하지 않는다.
+REUSABLE_STATUSES = (QUEUED_STATUS, *IN_PROGRESS_STATUSES, COMPLETED_STATUS)
+
+
+def find_reusable_run(
+    session: Session,
+    brokerage_id: int,
+    anchor_type: AnchorType,
+    anchor_id: int,
+    input_data_version: int,
+) -> AgentRun | None:
+    """같은 앵커·입력 버전의 재사용 가능한 루트 실행 (F3-CR-12).
+
+    활성 실행이 있으면 그 실행을 구독하게 하고, 이미 `COMPLETED` 면 그 결과를 그대로 쓴다.
+    실패·초과 종료 실행은 재사용하지 않는다. 다시 눌렀을 때 새로 시도할 수 있어야 한다.
+
+    가장 최근 것을 고른다. 과거에 같은 키의 실행이 여러 번 생겼더라도 최신 것이 현재 결과의
+    소유자다.
+    """
+    listing_id = anchor_id if anchor_type is AnchorType.LISTING else None
+    requirement_id = anchor_id if anchor_type is AnchorType.REQUIREMENT else None
+    statement = (
+        select(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.target_listing_id).is_not_distinct_from(listing_id),
+            col(AgentRun.target_requirement_id).is_not_distinct_from(requirement_id),
+            col(AgentRun.input_data_version) == input_data_version,
+            col(AgentRun.status).in_(list(REUSABLE_STATUSES)),
+        )
+        .order_by(col(AgentRun.created_at).desc(), col(AgentRun.id).desc())
+        .limit(1)
+    )
+    return session.execute(statement).scalars().first()
+
+
+def find_anchor_card_for_run(
+    session: Session, brokerage_id: int, run_id: int
+) -> NegotiationPositionAnalysis | None:
+    """실행이 확보한 앵커 카드. 결과 조회가 카드 본문을 싣기 위해 쓴다."""
+    header = find_match_evaluation_for_run(session, brokerage_id, run_id)
+    if header is not None:
+        found = (
+            session.execute(
+                select(NegotiationPositionAnalysis).where(
+                    col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+                    col(NegotiationPositionAnalysis.id) == header.anchor_position_analysis_id,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if found is not None:
+            return found
+    # 후보 단계 이전이면 헤더가 없다. 실행이 기록한 카드 ID 로 되찾는다.
+    run = find_root_cross_judgment_run(session, brokerage_id, run_id)
+    recorded = run.redacted_output_snapshot.get("position_analysis_id") if run else None
+    if not isinstance(recorded, int):
+        return None
+    return (
+        session.execute(
+            select(NegotiationPositionAnalysis).where(
+                col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+                col(NegotiationPositionAnalysis.id) == recorded,
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+def list_card_evidence(
+    session: Session, brokerage_id: int, position_analysis_id: int
+) -> list[NegotiationPositionEvidence]:
+    """카드 항목별 근거 전량. 화면이 근거를 펼쳐 보고 원문으로 이동하는 데 쓴다."""
+    statement = (
+        select(NegotiationPositionEvidence)
+        .where(
+            col(NegotiationPositionEvidence.brokerage_id) == brokerage_id,
+            col(NegotiationPositionEvidence.position_analysis_id) == position_analysis_id,
+        )
+        .order_by(
+            col(NegotiationPositionEvidence.field_name).asc(),
+            col(NegotiationPositionEvidence.display_order).asc(),
+            col(NegotiationPositionEvidence.id).asc(),
+        )
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+def list_candidate_judgments(
+    session: Session, brokerage_id: int, match_evaluation_id: int
+) -> list[MatchCandidateEvaluation]:
+    """판정한 후보 전부를 순위 순으로. 기각도 포함한다 (F3-CR-05, F3-BR-10)."""
+    statement = (
+        select(MatchCandidateEvaluation)
+        .where(
+            col(MatchCandidateEvaluation.brokerage_id) == brokerage_id,
+            col(MatchCandidateEvaluation.match_evaluation_id) == match_evaluation_id,
+        )
+        .order_by(col(MatchCandidateEvaluation.match_rank).asc())
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+def list_candidate_judgment_evidence(
+    session: Session, brokerage_id: int, candidate_ids: Sequence[int]
+) -> list[MatchCandidateEvidence]:
+    """후보 판정의 근거 전량. 한 번에 읽어 후보마다 질의를 보내지 않는다."""
+    if not candidate_ids:
+        return []
+    statement = (
+        select(MatchCandidateEvidence)
+        .where(
+            col(MatchCandidateEvidence.brokerage_id) == brokerage_id,
+            col(MatchCandidateEvidence.match_candidate_evaluation_id).in_(list(candidate_ids)),
+        )
+        .order_by(col(MatchCandidateEvidence.id).asc())
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+def find_position_card(
+    session: Session, brokerage_id: int, position_analysis_id: int
+) -> NegotiationPositionAnalysis | None:
+    """사무소 범위의 카드 한 건. 피드백 대상 검증에 쓴다."""
+    statement = select(NegotiationPositionAnalysis).where(
+        col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+        col(NegotiationPositionAnalysis.id) == position_analysis_id,
+    )
+    return session.execute(statement).scalars().first()
+
+
+def find_candidate_judgment(
+    session: Session, brokerage_id: int, candidate_evaluation_id: int
+) -> MatchCandidateEvaluation | None:
+    """사무소 범위의 후보 판정 한 건. 피드백 대상 검증에 쓴다."""
+    statement = select(MatchCandidateEvaluation).where(
+        col(MatchCandidateEvaluation.brokerage_id) == brokerage_id,
+        col(MatchCandidateEvaluation.id) == candidate_evaluation_id,
+    )
+    return session.execute(statement).scalars().first()
+
+
+def add_decision_feedback(session: Session, feedback: AiDecisionFeedback) -> AiDecisionFeedback:
+    session.add(feedback)
+    session.flush()
+    return feedback

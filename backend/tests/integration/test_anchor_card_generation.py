@@ -41,6 +41,7 @@ from brokerage_ai.f3 import (
 )
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 from domain.agent_execution import repository
@@ -108,7 +109,7 @@ def remove_committed_rows() -> Iterator[None]:
     yield
     if not CREATED_BROKERAGES or not os.getenv("TEST_DB_URL"):
         return
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as session:
         for statement in _CLEANUP_ORDER:
             session.execute(text(statement), {"ids": list(CREATED_BROKERAGES)})
@@ -120,7 +121,7 @@ def remove_committed_rows() -> Iterator[None]:
 @contextmanager
 def db_session() -> Iterator[Session]:
     """실제 커밋을 하는 세션. 이 슬라이스는 transaction 경계 자체가 검증 대상이다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     session = Session(engine)
     try:
         yield session
@@ -650,7 +651,7 @@ def test_no_row_lock_is_held_while_the_model_runs() -> None:
 
         def change_the_ledger() -> None:
             assert released.wait(timeout=10)
-            engine = create_engine(os.environ["TEST_DB_URL"])
+            engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
             with Session(engine) as other:
                 other.execute(
                     text("UPDATE property_listing SET memo = 'touched' WHERE id = :i"),
@@ -687,7 +688,7 @@ def _mutating_generator(fixture: Fixture, sql: str, **params: object) -> FakeGen
 
     def mutate() -> None:
         assert released.wait(timeout=10)
-        engine = create_engine(os.environ["TEST_DB_URL"])
+        engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         with Session(engine) as other:
             other.execute(text(sql), params)
             other.commit()
@@ -1002,7 +1003,7 @@ def test_two_runs_racing_on_the_same_cache_key_leave_exactly_one_card() -> None:
 
         def win_the_race() -> None:
             assert released.wait(timeout=10)
-            engine = create_engine(os.environ["TEST_DB_URL"])
+            engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
             with Session(engine) as other:
                 asyncio.run(
                     generate_and_store_anchor_position_card(
@@ -1487,7 +1488,7 @@ def test_cache_hit_still_rejects_a_changed_consultation_set(change: str) -> None
         assert prepared.cached_analysis_id == before[0]["id"]
         assert prepared.request is None
 
-        engine = create_engine(os.environ["TEST_DB_URL"])
+        engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         with Session(engine) as other:
             if change == "voided_log":
                 other.execute(
@@ -1530,7 +1531,7 @@ def test_cache_hit_still_rejects_a_changed_consultation_set(change: str) -> None
 
 def _add_tenant_relation(fixture: Fixture, party_id: int, *, with_log: bool) -> None:
     """다른 커넥션에서 새 당사자 관계를 추가한다. AI 를 기다리는 사이에 일어나는 일이다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as other:
         other.execute(
             text(
@@ -1621,7 +1622,7 @@ def test_a_removed_party_relation_during_generation_is_rejected() -> None:
         assert prepared.request is not None
         result = asyncio.run(generator.generate_position_card(prepared.request))
 
-        engine = create_engine(os.environ["TEST_DB_URL"])
+        engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         with Session(engine) as other:
             other.execute(
                 text(
@@ -1973,7 +1974,7 @@ def test_a_successful_preparation_leaves_no_open_transaction() -> None:
 
 
 def _mutate_in_another_session(sql: str, **params: object) -> None:
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     with Session(engine) as other:
         other.execute(text(sql), params)
         other.commit()
@@ -2238,7 +2239,7 @@ def test_a_store_lock_serializes_concurrent_cache_invalidation() -> None:
         )
         assert locked is not None and locked.id == first.position_analysis_id
 
-        engine = create_engine(os.environ["TEST_DB_URL"])
+        engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
         with Session(engine) as invalidator:
             invalidator.execute(text("SET LOCAL lock_timeout = '250ms'"))
             with pytest.raises(DBAPIError) as blocked:

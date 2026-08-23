@@ -9,6 +9,7 @@ from uuid import uuid4
 import brokerage_ai
 import pytest
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlmodel import Session, create_engine
 
 from core.errors import NotFoundError
@@ -33,7 +34,7 @@ ATTEMPT = 1
 @contextmanager
 def anchor_session() -> Iterator[Session]:
     """실제 PostgreSQL에 붙되 종료 시 전부 롤백한다."""
-    engine = create_engine(os.environ["TEST_DB_URL"])
+    engine = create_engine(os.environ["TEST_DB_URL"], poolclass=NullPool)
     connection = engine.connect()
     transaction = connection.begin()
     session = Session(bind=connection, join_transaction_mode="create_savepoint")
