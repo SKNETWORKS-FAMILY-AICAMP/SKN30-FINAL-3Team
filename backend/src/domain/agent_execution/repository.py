@@ -885,15 +885,23 @@ def list_requirement_candidates(
             )
         )
     if complex_id is not None:
-        wants_any_complex = ~select(literal(1)).where(
-            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
-            col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
-        ).exists()
-        wants_this_complex = select(literal(1)).where(
-            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
-            col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
-            col(PropertyRequirementComplex.complex_id) == complex_id,
-        ).exists()
+        wants_any_complex = (
+            ~select(literal(1))
+            .where(
+                col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+                col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
+            )
+            .exists()
+        )
+        wants_this_complex = (
+            select(literal(1))
+            .where(
+                col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+                col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
+                col(PropertyRequirementComplex.complex_id) == complex_id,
+            )
+            .exists()
+        )
         conditions.append(or_(wants_any_complex, wants_this_complex))
 
     statement = (

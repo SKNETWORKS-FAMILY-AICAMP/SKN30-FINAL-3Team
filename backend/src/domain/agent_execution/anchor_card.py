@@ -385,9 +385,7 @@ def _card_row(
     listing_side = prepared.negotiation_side is NegotiationSide.LISTING
     # 세대는 실행의 `target_unit_id` 가 아니라 **이 카드가 가리키는 매물**의 세대다.
     # 후보 카드는 실행 앵커와 다른 세대를 가리키므로 실행 컬럼을 쓰면 남의 세대가 붙는다.
-    unit_id = (
-        request.anchor.unit_id if isinstance(request.anchor, ListingAnchorContext) else None
-    )
+    unit_id = request.anchor.unit_id if isinstance(request.anchor, ListingAnchorContext) else None
     # 가격이 정확히 하나일 때만 기존 scalar 컬럼을 호환 projection 으로 채운다. 여러 개일 때
     # 첫 번째를 대표로 고르면 나머지 거래 유형의 금액이 조용히 사라진다.
     single = analysis.price[0] if len(analysis.price) == 1 else None
@@ -532,9 +530,7 @@ def _verify_and_insert_card(
         raise GenerationBindingError("the run binding changed while the card was generated")
 
     if (
-        current_target_version(
-            session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id
-        )
+        current_target_version(session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id)
         != prepared.data_version
     ):
         raise InputVersionChangedError("the target changed while the card was generated")
@@ -679,6 +675,7 @@ def store_generated_card(
         anchor_id=prepared.anchor_id,
         target_label=prepared.target_label,
     )
+
 
 async def generate_and_store_anchor_position_card(
     session: Session,

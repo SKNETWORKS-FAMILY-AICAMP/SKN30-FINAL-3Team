@@ -425,8 +425,10 @@ def test_candidate_cards_use_the_opposite_negotiation_side() -> None:
         assert cards[0]["listing_id"] is None
         # 후보 카드는 루트 실행에 직접 귀속한다. child run 을 만들지 않는다.
         assert cards[0]["agent_run_id"] == run_id
-        assert all(request.negotiation_side is NegotiationSide.REQUIREMENT
-                   for request in generator.requests)
+        assert all(
+            request.negotiation_side is NegotiationSide.REQUIREMENT
+            for request in generator.requests
+        )
 
 
 @requires_database

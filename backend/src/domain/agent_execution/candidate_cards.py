@@ -104,9 +104,7 @@ class CandidateCardsResult:
 
 def _opposite(anchor_type: AnchorType) -> AnchorType:
     """앵커의 반대편. 매물 앵커는 구입장 후보를, 구입장 앵커는 매물 후보를 갖는다."""
-    return (
-        AnchorType.REQUIREMENT if anchor_type is AnchorType.LISTING else AnchorType.LISTING
-    )
+    return AnchorType.REQUIREMENT if anchor_type is AnchorType.LISTING else AnchorType.LISTING
 
 
 def _plan_from_snapshot(run: AgentRun, header: repository.MatchEvaluation) -> CandidateCardPlan:
