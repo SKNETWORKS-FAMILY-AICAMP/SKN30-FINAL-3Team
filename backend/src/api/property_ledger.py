@@ -32,6 +32,7 @@ from api.schemas.property_ledger import (
     UnitPartyRelationResponse,
 )
 from core.errors import ValidationError
+from domain.agent_execution import triggers
 from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser
 from domain.property_ledger import repository, service
@@ -267,6 +268,8 @@ def create_property_listing(
     listing_id = service.create_property_listing(
         db, user.brokerage_id, unit_id, changed_fields(payload)
     )
+    # F1 저장이 끝난 뒤에 부른다. F3 접수가 실패해도 이 저장을 되돌리지 않는다.
+    triggers.after_listing_saved(db, user.brokerage_id, user.id, listing_id)
     listing = repository.find_property_listing(db, user.brokerage_id, listing_id)
     assert listing is not None
     return PropertyListingResponse.from_domain(listing)
@@ -280,7 +283,10 @@ def update_property_listing(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyListingResponse:
-    service.update_property_listing(db, user.brokerage_id, listing_id, changed_fields(payload))
+    changed = changed_fields(payload)
+    service.update_property_listing(db, user.brokerage_id, listing_id, dict(changed))
+    # 가격·조건이 실제로 바뀐 저장만 판정을 다시 돌린다 (F3-CR-02).
+    triggers.after_listing_saved(db, user.brokerage_id, user.id, listing_id, changed)
     listing = repository.find_property_listing(db, user.brokerage_id, listing_id)
     assert listing is not None
     return PropertyListingResponse.from_domain(listing)
@@ -365,6 +371,7 @@ def create_property_requirement(
     requirement_id = service.create_property_requirement(
         db, user.brokerage_id, changed_fields(payload)
     )
+    triggers.after_requirement_saved(db, user.brokerage_id, user.id, requirement_id)
     return get_property_requirement(requirement_id, user, db)
 
 
@@ -379,9 +386,10 @@ def update_property_requirement(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyRequirementDetailResponse:
-    service.update_property_requirement(
-        db, user.brokerage_id, requirement_id, changed_fields(payload)
-    )
+    changed = changed_fields(payload)
+    service.update_property_requirement(db, user.brokerage_id, requirement_id, dict(changed))
+    # 조건이 실제로 바뀐 저장만 판정을 다시 돌린다 (F3-CR-01).
+    triggers.after_requirement_saved(db, user.brokerage_id, user.id, requirement_id, changed)
     return get_property_requirement(requirement_id, user, db)
 
 

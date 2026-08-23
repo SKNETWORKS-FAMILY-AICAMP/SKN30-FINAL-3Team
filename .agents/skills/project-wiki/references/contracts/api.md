@@ -286,6 +286,30 @@ HTTP 계약으로는 아직 노출하지 않는다. 결과 조회 경로는 여�
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
 열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
 
+### F1 저장 후 자동 접수
+
+다음 네 저장이 성공하면 Backend 가 F3 실행을 자동으로 접수한다 (F3-CR-01, F3-CR-02).
+
+| 저장 경로 | 앵커 |
+|---|---|
+| `POST /api/v1/property-units/{unit_id}/listings` | 매물 |
+| `PATCH /api/v1/property-listings/{listing_id}` | 매물 |
+| `POST /api/v1/property-requirements` | 구입장 |
+| `PATCH /api/v1/property-requirements/{requirement_id}` | 구입장 |
+
+자동 접수는 **F1 응답 계약을 바꾸지 않는다.** 실행 식별자를 F1 응답에 싣지 않으며, F3 접수가
+실패해도 F1 저장은 그대로 성공한다 (F3-NF-07, F3-CM-06). 접수한 실행은
+`GET /api/v1/f3/runs/{run_id}` 와 `POST /api/v1/f3/runs` 로 찾는다. 같은 앵커·입력 버전이면
+`POST /api/v1/f3/runs` 가 저장 시점에 만들어진 그 실행을 그대로 돌려준다.
+
+`PATCH` 는 판정 입력을 건드린 저장에서만 접수한다. 메모·담당자처럼 판정과 무관한 필드만
+바뀐 저장은 실행을 만들지 않는다. 매물은 거래 유형·금액·`price_raw_text`·`handover_condition`·
+`status`·`client_party_id`, 구입장은 예산·면적·평형·이사일·만료일·`demand_type`·`status`·
+`classification`·`workflow_stage`·공동중개·희망 단지가 대상이다.
+
+자동 실행의 `trigger_type` 은 `LEDGER_SAVE` 이며 화면에서 직접 누른 `USER_REQUEST` 와
+구분한다. 이 값은 실행 상태·결과 조회 응답에 싣지 않는다.
+
 ### 결과 조회
 
 `GET /api/v1/f3/runs/{run_id}/result`는 실행 하나의 현재 결과를 돌려준다. 진행 중이면 확보된

@@ -18,14 +18,39 @@ updated: 2026-08-21
 
 MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 
-| 트리거 | 앵커 | 실행 시점 |
-|---|---|---|
-| 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 |
-| 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 |
-| 손님 상세 진입 | 손님 | 현재 데이터 버전 확인 후 |
-| 세대 상세 진입 | 매물 | 현재 데이터 버전 확인 후 |
+| 트리거 | 앵커 | 실행 시점 | 현재 |
+|---|---|---|---|
+| 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 | 구현됨 |
+| 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 | 구현됨 |
+| 손님 상세 진입 | 손님 | 현재 데이터 버전 확인 후 | Backend 접수 경계만 구현됨 |
+| 세대 상세 진입 | 매물 | 현재 데이터 버전 확인 후 | Backend 접수 경계만 구현됨 |
+
+상세 진입 트리거의 Backend 경계는 `POST /api/v1/f3/runs`다. Frontend가 화면 진입 시 그
+경로를 부르면 되고, 같은 앵커·입력 버전이면 저장 시점에 만들어진 실행을 그대로 재사용한다.
+Frontend 호출 자체는 이번 범위가 아니다.
 
 Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 상세 진입에서도 F3 패널만 로딩·실패 상태를 표시한다.
+
+### 저장 후 자동 접수의 현재 구현
+
+정본 코드는 `backend/src/domain/agent_execution/triggers.py`이고 호출 지점은
+`backend/src/api/property_ledger.py`의 네 저장 경로다.
+
+- **F1 저장이 commit 을 끝낸 뒤에** 부른다. 두 transaction 을 겹치지 않는다.
+- 어떤 예외도 밖으로 나가지 않는다. F3 접수 실패가 성공한 F1 저장을 되돌리지 않고 응답을
+  바꾸지도 않는다 (F3-NF-07, F3-CM-06).
+- 요청 처리 중 모델을 부르지 않는다. 하는 일은 `agent_run` 적재까지다.
+- 기존 재사용 로직을 그대로 쓴다. 같은 앵커·입력 버전의 실행이 있으면 새로 만들지 않는다.
+- 자동 실행의 `trigger_type`은 `LEDGER_SAVE`이며 화면에서 직접 누른 `USER_REQUEST`와
+  구분한다.
+- 실패 로그에는 앵커 종류·ID와 예외 **타입 이름**만 남긴다. 상담 원문과 개인정보는 넣지
+  않는다.
+
+가격이나 조건이 실제로 바뀌지 않은 수정에서는 부르지 않는다. 담당자 메모만 고친 저장이
+판정을 다시 돌릴 이유는 없다. 어떤 필드가 판정 입력인지는 `LISTING_TRIGGER_FIELDS`와
+`REQUIREMENT_TRIGGER_FIELDS`가 정한다. 그 층을 지나도 행이 실제로 바뀌지 않으면
+`row_version`이 그대로라 재사용 키가 같아 새 실행이 생기지 않는다. 두 층이 같은 결론을
+서로 다른 비용으로 낸다.
 
 작업 생성 시 사용자 권한, 앵커 종류·식별자, 현재 데이터 버전과 활성 AI 구성을 확인한다. **목표 정책은** 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용하는 것이다. 현재 구현은 `(사무소, 앵커, 입력 버전)`으로 재사용하며 **AI 구성은 키에 없다.** 접수 시점에는 어떤 모델로 돌지 알 수 없기 때문이다. 아래 [현재 구현 범위](#현재-구현-범위)를 함께 본다.
 
@@ -219,6 +244,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 같은 앵커·입력 버전의 실행 재사용과 동시 접수 직렬화 (F3-CR-12) | `backend/src/domain/agent_execution/service.py` |
 | `GET /api/v1/f3/runs/{run_id}/result` 결과 조회 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/results.py` |
 | `POST /api/v1/f3/feedback` 사용자 피드백 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/feedback.py` |
+| F1 저장 성공 후 F3 자동 접수 (`LEDGER_SAVE`) | `backend/src/domain/agent_execution/triggers.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
 | Worker polling loop, `claim_next_run` 연결, AI runtime 조립과 정리 | `backend/src/worker.py` |
 | 저장된 상태 기준 단계 오케스트레이션과 오류 분류 | `backend/src/domain/agent_execution/pipeline.py` |
@@ -239,6 +265,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | AI 구성 변경 시 실행 재사용 무효화 | 없음. 재사용 키에 AI 구성이 들어가지 않는다 |
 | 15건 이후 후보의 추가 카드화와 지연 로딩 | 없음. 남은 건수와 후보 metadata만 조회할 수 있다 |
 | 정정 상담 로그 생성 (F3-TR-02) | 없음. 피드백만 저장한다 |
+| 상세 진입 시 Frontend 의 실행 접수 호출 | 없음. Backend 접수 경계(`POST /api/v1/f3/runs`)만 있다 |
 
 ## Worker 실행 오케스트레이션
 

@@ -115,7 +115,8 @@ def test_listing_anchor_queues_a_single_run_for_the_current_user(config: Config)
         assert run["requested_by"] == user_id
         assert run["run_type"] == "CROSS_JUDGMENT"
         assert run["agent_type"] == "BROKERAGE_WORKFLOW"
-        assert run["trigger_type"] == "USER_REQUEST"
+        # F1 매물 저장이 이미 자동 접수했고 (F3-CR-02) 화면 요청은 그 실행을 재사용한다.
+        assert run["trigger_type"] == "LEDGER_SAVE"
         assert run["parent_run_id"] is None
         assert run["model_config_id"] is None
         assert run["target_listing_id"] == listing["id"]
@@ -163,7 +164,10 @@ def test_listing_row_version_becomes_the_input_data_version(config: Config) -> N
         ).json()
 
         assert body["input_data_version"] == updated["row_version"]
-        assert stored_runs(session, brokerage_id)[0]["input_data_version"] == updated["row_version"]
+        # 등록과 가격 변경이 각각 자동 접수를 만든다. 화면 요청은 최신 버전 실행을 재사용한다.
+        latest = stored_runs(session, brokerage_id)[-1]
+        assert latest["id"] == body["run_id"]
+        assert latest["input_data_version"] == updated["row_version"]
 
 
 @requires_database
@@ -190,7 +194,8 @@ def test_requirement_anchor_stores_the_requirement_target_and_row_version(
         assert body["anchor_id"] == requirement["id"]
         assert body["input_data_version"] == updated["row_version"]
 
-        run = stored_runs(session, brokerage_id)[0]
+        run = stored_runs(session, brokerage_id)[-1]
+        assert run["id"] == body["run_id"]
         assert run["target_requirement_id"] == requirement["id"]
         assert run["target_listing_id"] is None
         assert run["target_unit_id"] is None
@@ -205,7 +210,7 @@ def test_redacted_input_snapshot_keeps_only_anchor_and_version(config: Config) -
 
         client.post("/api/v1/f3/runs", json={"anchor_type": "LISTING", "anchor_id": listing["id"]})
 
-        assert stored_runs(session, brokerage_id)[0]["redacted_input_snapshot"] == {
+        assert stored_runs(session, brokerage_id)[-1]["redacted_input_snapshot"] == {
             "anchor_type": "LISTING",
             "anchor_id": listing["id"],
             "input_data_version": listing["row_version"],
@@ -405,6 +410,7 @@ def test_deleted_requirement_is_not_found_and_live_requirement_still_queues(
             ).status_code
             == 202
         )
+        before = len(stored_runs(session, brokerage_id))
         response = client.post(
             "/api/v1/f3/runs",
             json={"anchor_type": "REQUIREMENT", "anchor_id": removed["id"]},
@@ -412,9 +418,11 @@ def test_deleted_requirement_is_not_found_and_live_requirement_still_queues(
 
         assert response.status_code == 404
         assert response.json()["code"] == "NOT_FOUND"
-        assert [run["target_requirement_id"] for run in stored_runs(session, brokerage_id)] == [
-            live["id"]
-        ]
+        # 삭제된 구입장은 새 실행을 만들지 않는다. 저장 시점의 자동 접수는 그대로 남는다.
+        assert len(stored_runs(session, brokerage_id)) == before
+        assert live["id"] in {
+            run["target_requirement_id"] for run in stored_runs(session, brokerage_id)
+        }
 
 
 @requires_database
@@ -423,6 +431,7 @@ def test_request_cannot_override_server_owned_fields(config: Config) -> None:
         complex_id = create_complex(client, session, brokerage_id, "위조단지")
         listing = create_listing(client, complex_id)
 
+        before = stored_runs(session, brokerage_id)
         response = client.post(
             "/api/v1/f3/runs",
             json={
@@ -436,7 +445,10 @@ def test_request_cannot_override_server_owned_fields(config: Config) -> None:
         )
 
         assert response.status_code == 422
-        assert stored_runs(session, brokerage_id) == []
+        # 거절된 요청은 아무것도 바꾸지 않는다. 저장 시점의 자동 접수만 남아 있다.
+        assert stored_runs(session, brokerage_id) == before
+        assert all(run["brokerage_id"] == brokerage_id for run in before)
+        assert all(run["status"] == "QUEUED" for run in before)
 
 
 @requires_database
@@ -521,7 +533,23 @@ def test_failed_insert_leaves_no_partial_run(config: Config) -> None:
     """requested_by가 실재하지 않으면 FK가 거절한다. 실패한 실행이 남으면 Worker가 집어간다."""
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "실패단지")
-        listing = create_listing(client, complex_id)
+        # API 로 만들면 F1 저장이 자동 접수를 하고 그 실행이 재사용된다. 여기서 보려는 것은
+        # 삽입 실패이므로 자동 접수가 붙지 않는 매물을 직접 넣는다.
+        unit_id = session.execute(
+            text(
+                "INSERT INTO property_unit (brokerage_id, complex_id, unit_number)"
+                " VALUES (:b, :c, '9001') RETURNING id"
+            ),
+            {"b": brokerage_id, "c": complex_id},
+        ).scalar_one()
+        listing_id = session.execute(
+            text(
+                "INSERT INTO property_listing (brokerage_id, unit_id, is_sale_available,"
+                " sale_price) VALUES (:b, :u, true, 100) RETURNING id"
+            ),
+            {"b": brokerage_id, "u": unit_id},
+        ).scalar_one()
+        session.commit()
 
         with pytest.raises(IntegrityError):
             service.queue_cross_judgment_run(
@@ -529,7 +557,7 @@ def test_failed_insert_leaves_no_partial_run(config: Config) -> None:
                 brokerage_id,
                 requested_by=987_654_321,
                 anchor_type=AnchorType.LISTING,
-                anchor_id=listing["id"],
+                anchor_id=listing_id,
             )
 
         assert stored_runs(session, brokerage_id) == []
