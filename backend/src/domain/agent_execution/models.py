@@ -23,7 +23,22 @@ USER_REQUEST_TRIGGER_TYPE = "USER_REQUEST"
 QUEUED_STATUS = "QUEUED"
 RUNNING_STATUS = "RUNNING"
 ANCHOR_READY_STATUS = "ANCHOR_READY"
+CANDIDATES_READY_STATUS = "CANDIDATES_READY"
+CANDIDATE_CARDS_READY_STATUS = "CANDIDATE_CARDS_READY"
+JUDGING_STATUS = "JUDGING"
+COMPLETED_STATUS = "COMPLETED"
+FAILED_RETRYABLE_STATUS = "FAILED_RETRYABLE"
 FAILED_TERMINAL_STATUS = "FAILED_TERMINAL"
+SUPERSEDED_STATUS = "SUPERSEDED"
+
+# Worker 가 이어서 처리할 수 있는 진행 상태. 종료 상태는 여기에 없다.
+IN_PROGRESS_STATUSES = (
+    RUNNING_STATUS,
+    ANCHOR_READY_STATUS,
+    CANDIDATES_READY_STATUS,
+    CANDIDATE_CARDS_READY_STATUS,
+    JUDGING_STATUS,
+)
 
 # 포지션 카드 생성에 쓸 모델 구성의 capability. 다른 용도의 설정을 끌어다 쓰지 않는다.
 POSITION_CARD_CAPABILITY = "POSITION_CARD"
@@ -198,6 +213,88 @@ class NegotiationPositionPrice(SQLModel, table=True):
     estimated_amount: int | None = Field(default=None, sa_column=Column(BigInteger))
     estimated_monthly_amount: int | None = Field(default=None, sa_column=Column(BigInteger))
     display_order: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
+    created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+
+
+class MatchEvaluation(SQLModel, table=True):
+    """교차 판정 헤더. `CANDIDATES_READY` 에서 만들고 `COMPLETED` 에서 결과를 채운다.
+
+    후보 조회 조건과 **전체** 후보 집합은 `candidate_selection_snapshot` 이 소유한다.
+    `candidate_count` 는 실제로 카드화·판정한 후보 수이며 전체 후보 수가 아니다.
+    """
+
+    __tablename__: ClassVar[str] = "match_evaluation"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    id: int | None = Field(default=None, sa_column=identity_column())
+    brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    agent_run_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    anchor_position_analysis_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    candidate_count: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
+    data_version: int = Field(sa_column=Column(BigInteger, nullable=False))
+    candidate_selection_snapshot: dict[str, object] = Field(
+        default_factory=dict, sa_column=Column(JSON, nullable=False)
+    )
+    generated_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+    created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+
+
+class MatchCandidateEvaluation(SQLModel, table=True):
+    """후보 1건의 중개 판정. 기각도 사유와 함께 남긴다 (F3-BR-10)."""
+
+    __tablename__: ClassVar[str] = "match_candidate_evaluation"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    id: int | None = Field(default=None, sa_column=identity_column())
+    brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    match_evaluation_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    candidate_position_analysis_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    match_grade: str = Field(max_length=20)
+    match_rank: int = Field(sa_column=Column(Integer, nullable=False))
+    evaluation_basis: str = Field(sa_column=Column(Text, nullable=False))
+    primary_obstacle: str | None = Field(default=None, sa_column=Column(Text))
+    possible_concession: str | None = Field(default=None, sa_column=Column(Text))
+    recommended_action: dict[str, object] = Field(
+        default_factory=dict, sa_column=Column(JSON, nullable=False)
+    )
+    exclusion_reason: str | None = Field(default=None, sa_column=Column(Text))
+    created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+
+
+class MatchCandidateEvidence(SQLModel, table=True):
+    """중개 판정 후보별 근거. 인용은 상담 로그를, 추정은 설명만 가리킨다."""
+
+    __tablename__: ClassVar[str] = "match_candidate_evidence"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    id: int | None = Field(default=None, sa_column=identity_column())
+    brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    match_candidate_evaluation_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    evidence_side: str = Field(max_length=20)
+    field_name: str | None = Field(default=None, max_length=100)
+    evidence_type: str = Field(max_length=20)
+    interaction_id: int | None = Field(default=None, sa_column=Column(BigInteger))
+    quote_text: str | None = Field(default=None, sa_column=Column(Text))
+    quote_start_offset: int | None = Field(default=None, sa_column=Column(Integer))
+    quote_end_offset: int | None = Field(default=None, sa_column=Column(Integer))
+    note: str | None = Field(default=None, sa_column=Column(Text))
+    created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+
+
+class AiDecisionFeedback(SQLModel, table=True):
+    """사용자 피드백. 대상은 포지션 카드 또는 중개 판정 후보다 (F3-TR-03)."""
+
+    __tablename__: ClassVar[str] = "ai_decision_feedback"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    id: int | None = Field(default=None, sa_column=identity_column())
+    brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    position_analysis_id: int | None = Field(default=None, sa_column=Column(BigInteger))
+    match_candidate_evaluation_id: int | None = Field(default=None, sa_column=Column(BigInteger))
+    feedback_type: str = Field(max_length=30)
+    reason: str = Field(max_length=50)
+    field_name: str | None = Field(default=None, max_length=100)
+    original_value: dict[str, object] | None = Field(default=None, sa_column=Column(JSON))
+    corrected_value: dict[str, object] | None = Field(default=None, sa_column=Column(JSON))
+    detail: str | None = Field(default=None, sa_column=Column(Text))
+    correction_interaction_id: int | None = Field(default=None, sa_column=Column(BigInteger))
+    created_by: int = Field(sa_column=Column(BigInteger, nullable=False))
     created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
 
 

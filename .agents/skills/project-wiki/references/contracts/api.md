@@ -238,7 +238,7 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 | `QUEUED` | 실행 제어 | 실행 적재 완료, Worker 대기 | 구현됨 |
 | `RUNNING` | 실행 제어 | Worker가 lease를 걸고 선점함 | 구현됨 |
 | `ANCHOR_READY` | 업무 처리 | 앵커 카드 저장 완료 | 구현됨 |
-| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 제안 · 미구현 |
+| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 구현됨 |
 | `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 제안 · 미구현 |
 | `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 제안 · 미구현 |
 | `COMPLETED` | 업무 처리 | 검증을 통과한 최종 결과 저장 | 제안 · 미구현 |
@@ -247,9 +247,13 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 | `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
 
-Backend가 실제로 기록하는 상태는 네 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
-앵커 포지션 카드 확보 시 `ANCHOR_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는
-아직 만들지 않는다. `ANCHOR_READY`는 중간 상태라 `completed_at`을 채우지 않는다.
+Backend가 실제로 기록하는 상태는 다섯 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+앵커 포지션 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`,
+lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직 만들지 않는다. `ANCHOR_READY`와
+`CANDIDATES_READY`는 중간 상태라 `completed_at`을 채우지 않는다.
+
+후보 조회 조건과 전체 후보 집합은 `match_evaluation.candidate_selection_snapshot`에 저장하며 이
+HTTP 계약으로는 아직 노출하지 않는다. 결과 조회 경로는 여전히 없다.
 
 상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
