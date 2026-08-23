@@ -167,7 +167,7 @@ sequenceDiagram
 | `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
 
-현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 다섯 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 후보 카드 전량 확보 시 `CANDIDATE_CARDS_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 여섯 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
 `ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
 
@@ -210,6 +210,8 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 거래 유형별 금액 테이블 | `docs/db/migrate/012_CREATE_NEGOTIATION_POSITION_PRICE.sql` |
 | 결정적 SQL 후보 추출, 점수와 정렬, `CANDIDATES_READY` 전이 | `backend/src/domain/agent_execution/candidates.py` |
 | 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
+| 후보 포지션 카드 확보와 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
+| 앵커·후보가 공유하는 카드 생성·검증·저장 경로 | `backend/src/domain/agent_execution/anchor_card.py` |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
@@ -226,7 +228,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
 | 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
 | LangGraph production graph 와 checkpoint | 없음. 생성은 구조화 출력 1회다 |
-| `CANDIDATES_READY` 이후 상태 전이 | 없음. 후보 카드 생성부터 미구현이다 |
+| `CANDIDATE_CARDS_READY` 이후 상태 전이 | 없음. 중개 판정부터 미구현이다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | `SUPERSEDED` 전이 | 없음 |
@@ -289,6 +291,42 @@ snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, �
 `match_evaluation`은 `CANDIDATES_READY`에서 헤더로 먼저 만들고 중개 판정 결과는 나중에
 채운다. 재선점으로 이 단계가 다시 돌면 같은 실행의 헤더를 새로 만들지 않고 갱신한다.
 `candidate_count`는 실제로 카드화·판정할 후보 수이며 전체 후보 수가 아니다.
+
+## 후보 포지션 카드
+
+정본 코드는 `backend/src/domain/agent_execution/candidate_cards.py`다. snapshot의
+`selected_for_cards`가 참인 후보에 대해 **반대편** 측면의 포지션 카드를 확보한다.
+
+카드 생성 자체는 앵커 카드와 **같은 코드**를 쓴다. `anchor_card.py`의 `prepare_generation`이
+대상(`CardTarget`)과 기대 실행 상태를 인자로 받고, `store_position_card`가 상태 전이 없이 카드
+하나만 저장한다. snapshot 조립, 마스킹, PII 검사, cache key, cache lookup과 저장 직전 재검증은
+한 벌만 존재한다. 후보용 두 번째 구현을 만들지 않는다.
+
+- 후보 카드의 `negotiation_side`는 앵커의 반대편이다. 매물 앵커면 후보 카드가
+  `REQUIREMENT`, 구입장 앵커면 `LISTING`이다.
+- 후보의 기대 입력 버전은 준비 시점에 읽은 그 후보의 `row_version`이다. 실행의
+  `input_data_version`은 앵커 것이므로 후보에 쓰지 않는다.
+- cache hit이면 모델을 부르지 않는다. 저장 직전 재검증은 hit·miss 모두에서 그대로 돈다.
+- 후보를 **순차로** 처리한다. SQLModel `Session`을 여러 async task가 공유하지 않는다.
+  카드는 대개 캐시에서 나오므로 실제 모델 호출은 평시 1~3회로 수렴한다 (F3-NF-03).
+- 후보 하나가 실패하면 예외가 그대로 올라가고 실행은 `CANDIDATES_READY`에 남는다. 일부만
+  성공한 상태를 `CANDIDATE_CARDS_READY`로 만들지 않는다. 이미 저장된 카드는 유효한 캐시라서
+  재시도가 그대로 재사용한다.
+- 후보가 0건이면 모델을 한 번도 부르지 않고 곧장 다음 단계로 넘어간다.
+
+확보한 카드 ID는 같은 snapshot의 `candidate_cards`(`candidate_id`,
+`position_analysis_id`, `cache_hit`)에 붙인다. 중개 판정 단계가 **어떤 카드를 모델에 넣었는지**
+확정하는 값이다. 판정 시점에 cache key를 다시 계산해 되찾는 방식은 비싸고, 그 사이 캐시가
+바뀌면 다른 카드를 가리킨다. 상태를 옮기기 전에 후보 집합이 그대로인지와 각 카드가 아직 그
+대상의 활성 카드인지 다시 확인한다.
+
+### 후보 카드의 소유 실행
+
+후보 카드는 **루트 실행에 직접 귀속한다.** child `AgentRun`을 만들지 않는다.
+`negotiation_position_analysis.agent_run_id`는 어느 실행이 카드를 만들었는지를 담는 감사
+값이고 루트 실행 하나로 그 질문에 답할 수 있다. child run을 만들면 lease와 결과 소유권이 두
+행으로 갈라져 저장 직전 fencing만 복잡해지고 지금 얻는 것이 없다. 공개 실행 조회는
+`parent_run_id IS NULL`로 격리하므로 노출 문제는 애초에 생기지 않는다.
 
 ## 하이브리드 상담 로그 검색
 
