@@ -94,7 +94,8 @@ DB 기본값(`negotiation_intent = 'UNKNOWN'`, `urgency = 'UNKNOWN'`,
 Backend가 소유한다.
 
 - 인증, brokerage 격리, lease와 attempt fencing
-- F1 장부·상담 로그 조회와 개인정보를 제거한 입력 snapshot 조립
+- F1 장부·상담 로그 조회와 Provider 전달용 입력 snapshot 조립
+- 실사용 데이터의 개인정보 제거와 입력 privacy mode 표시
 - 날짜 신호 계산
 - cache key 계산과 캐시 조회
 - AI 결과의 DB 현재 상태 재검증, 인용 offset 계산, 트랜잭션과 카드 저장
@@ -119,13 +120,14 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
 | 필드 | 의미 |
 |---|---|
 | `contract_version` | `position-card:v1` 고정 |
+| `input_privacy_mode` | `SYNTHETIC_PROTOTYPE` 또는 `MASKED`. Provider 전달 안전성의 근거 |
 | `negotiation_side` | 대리하는 측 |
 | `anchor_id` | 대상 식별자. `anchor`의 대상 ID와 같아야 한다 |
 | `target_label` | Backend가 구조화 장부값으로 만든 비식별 표시 라벨 |
 | `source` | `SourceIdentity`. Backend가 준 입력 snapshot 신원 |
 | `anchor` | `LISTING`/`REQUIREMENT` 중 하나의 context |
 | `date_signals` | Backend가 계산한 날짜 신호 |
-| `consultation_logs` | 개인정보를 제거한 상담 로그. `interaction_id`는 중복될 수 없다 |
+| `consultation_logs` | Provider 전달용 상담 로그. `interaction_id`는 중복될 수 없다 |
 
 `SourceIdentity`는 `data_version`, `interaction_count`, `last_interaction_at`,
 `max_interaction_id`를 담는다. 모델이 판단하는 값이 아니라 Backend가 제공하는 불변 snapshot
@@ -175,7 +177,8 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 
 `memo`, `custom_fields`와 대출 금액은 계약에 넣지 않는다. 자유 메모에는 성명·연락처가 섞일
 수 있고 대출 금액은 판정에 필요한 최소 항목이 아니다 (F3-SE-01). `*_raw_text`는 사용자 입력
-원문이므로 Backend가 상담 내용과 같은 마스킹을 적용한 뒤 전달한다.
+원문이다. `MASKED` 모드에서는 Backend가 상담 내용과 같은 마스킹을 적용한 뒤 전달하고,
+`SYNTHETIC_PROTOTYPE` 모드에서는 실제 인물과 연결되지 않는 합성 원문만 그대로 전달한다.
 
 `demand_type`, `status`, `classification`, `workflow_stage`, `listing_status`,
 `tenancy_status`, `unit_type`, `lifecycle_status`는 F1이 아직 값 목록을 확정하지 않은 장부
@@ -188,9 +191,14 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 `client_interaction`의 `id`, `interaction_at`, `interaction_channel`, `counterparty_role`,
 `interaction_result`, `interaction_content`에서 온다.
 
-`masked_content`는 **DB 원문이 아니다.** Backend가 AI 호출 전에 성명, 전화번호, 이메일,
-로그인 ID, 생년월일을 치환하거나 마스킹한 결과만 전달한다. 치환 대응표는 요청, 결과, 로그와
-DB snapshot 어디에도 넣지 않는다.
+`masked_content`는 **Provider 전달용 본문**이다. `MASKED` 모드에서는 Backend가 AI 호출 전에
+성명, 전화번호, 이메일, 로그인 ID와 생년월일을 치환하거나 마스킹한 결과만 전달한다. 프로토타입의
+`SYNTHETIC_PROTOTYPE` 모드에서는 실제 인물을 나타내지 않는 합성 본문을 변환 없이 전달할 수 있다.
+치환 대응표는 요청, 결과, 로그와 DB snapshot 어디에도 넣지 않는다.
+
+합성 모드는 [ADR-0014](../decisions/ADR-0014-f3-prototype-synthetic-input.md)에 따른 임시
+예외다. 요청에 모드를 표시하는 것만으로는 부족하며 `LlmPositionCardGenerator` 조립 지점에서
+`allow_synthetic_prototype=True`를 명시해야 한다. 기본값은 false다.
 
 ### 날짜 신호
 
@@ -303,7 +311,7 @@ DB snapshot 어디에도 넣지 않는다.
 
 | 구분 | 항목 |
 |---|---|
-| Backend → AI 전달 가능 | 내부 anchor ID, 구조화된 매물·구입 조건, 날짜 신호, 개인정보를 제거한 상담 내용, 내부 `interaction_id`, source identity |
+| Backend → AI 전달 가능 | 내부 anchor ID, 구조화된 매물·구입 조건, 날짜 신호, Provider 전달용 상담 내용, 내부 `interaction_id`, source identity, 입력 privacy mode |
 | 전달 금지 | 성명, 로그인 ID, 전화번호, 이메일, 생년월일, 인증·세션·CSRF 정보, `requested_by`, 치환 대응표, Secret, 프롬프트 원문 전체, 반대편 당사자 데이터 |
 | 저장 | Backend가 검증한 구조화 포지션 카드, 필요한 근거 인용, 안전한 모델 진단, 버전 정보 |
 | 로그 금지 | 전체 프롬프트, 전체 모델 원문 응답, 상담 로그 전체 원문, 성명·연락처, 토큰·인증 헤더 |
@@ -314,8 +322,9 @@ DB snapshot 어디에도 넣지 않는다.
 ### 외부 Provider 전송
 
 이번 작업은 외부 Provider 전송을 승인하지 않는다. 실제 Provider, 리전과 저장 여부는
-AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider를 쓰게 되더라도 Backend가
-개인정보를 제거한 입력만 전달한다는 조건은 유지한다 (F3-SE-02).
+AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로토타입 예외도 외부 Provider 선택을
+승인하지 않는다. 실제 개인정보가 포함될 수 있는 입력에 외부 Provider를 쓰게 되면 Backend가
+개인정보를 제거한 `MASKED` 입력만 전달한다는 조건을 적용한다 (F3-SE-02).
 
 ### 원문 보관 요구와의 충돌
 
@@ -342,6 +351,7 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider
 - 요청·결과 DTO와 LISTING/REQUIREMENT 입력 격리
 - `PositionCardGenerator` Protocol
 - `PositionCardGeneratorVersions`와 실제 prompt·workflow 버전
+- `SYNTHETIC_PROTOTYPE`·`MASKED` 입력 모드와 합성 모드의 명시적 생성기 opt-in
 - `LlmPositionCardGenerator` 구조화 출력 생성 구현
 - 모델 출력에서 서버 소유 대상·source identity·장부 표기 금액을 제거한 내부 schema
 - 대리 측면별 한국어 프롬프트와 전체 상담 로그 시간순 전달
@@ -352,7 +362,8 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider
 
 ### 아직 구현하지 않음 (`계획됨`)
 
-- Backend의 F1 snapshot 조립과 상담 로그 마스킹
+- Backend의 F1 snapshot 조립
+- 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
 - 카드와 근거의 DB 저장, quote offset 계산
 - `ANCHOR_READY` 상태 전이
 - SQL 후보 추출, 후보 카드, 중개 판정

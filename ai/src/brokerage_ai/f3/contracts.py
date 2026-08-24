@@ -30,6 +30,18 @@ class NegotiationSide(StrEnum):
     REQUIREMENT = "REQUIREMENT"
 
 
+class InputPrivacyMode(StrEnum):
+    """Provider에 전달할 입력이 안전하다고 판단한 근거.
+
+    `SYNTHETIC_PROTOTYPE`은 ADR-0014가 승인한 실제 인물과 무관한 합성 케이스 전용이다.
+    문자열만으로 합성 여부를 증명하지 않으므로 호출자가 검토한 입력이라는 명시적 표시이며,
+    생성기의 별도 opt-in 없이는 실행되지 않는다. 실사용 데이터는 `MASKED`만 허용한다.
+    """
+
+    SYNTHETIC_PROTOTYPE = "SYNTHETIC_PROTOTYPE"
+    MASKED = "MASKED"
+
+
 class NegotiationIntent(StrEnum):
     """의향 판정. 판단이 불가하면 비우지 않고 `UNKNOWN`을 쓴다 (F3-PC-01)."""
 
@@ -129,8 +141,9 @@ class SourceIdentity(_Frozen):
 class ConsultationLogInput(_Frozen):
     """AI에 전달하는 상담 로그 1건.
 
-    `content`는 DB 원문이 아니라 Backend가 성명·연락처를 치환한 결과다. 치환 대응표는
-    이 계약에 싣지 않는다.
+    `masked_content`는 Provider 전달용 본문이다. `MASKED` 모드에서는 Backend가 성명·연락처를
+    치환한 결과이며, `SYNTHETIC_PROTOTYPE` 모드에서는 실제 인물을 나타내지 않는 합성 케이스
+    본문을 그대로 담을 수 있다. 치환 대응표는 이 계약에 싣지 않는다.
     """
 
     interaction_id: int = Field(ge=1)
@@ -354,6 +367,7 @@ class PositionCardGenerationRequest(_Frozen):
     """
 
     contract_version: ContractVersion = POSITION_CARD_CONTRACT_VERSION
+    input_privacy_mode: InputPrivacyMode
     negotiation_side: NegotiationSide
     anchor_id: int = Field(ge=1)
     target_label: str = Field(min_length=1, max_length=200)
@@ -398,7 +412,7 @@ class PositionCardGenerationRequest(_Frozen):
         return value.strip()
 
     def log_contents(self) -> dict[int, str]:
-        """근거 검증용 색인. interaction_id에서 마스킹된 본문으로 간다."""
+        """근거 검증용 색인. interaction_id에서 Provider 전달용 본문으로 간다."""
         return {log.interaction_id: log.masked_content for log in self.consultation_logs}
 
 

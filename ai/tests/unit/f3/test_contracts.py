@@ -22,6 +22,7 @@ from brokerage_ai.f3 import (
     DateSignals,
     Evidence,
     EvidenceKind,
+    InputPrivacyMode,
     IntentAssessment,
     ListingAnchorContext,
     NegotiationIntent,
@@ -106,6 +107,7 @@ def signals() -> DateSignals:
 
 def listing_request(**overrides: object) -> PositionCardGenerationRequest:
     values: dict[str, object] = {
+        "input_privacy_mode": InputPrivacyMode.SYNTHETIC_PROTOTYPE,
         "negotiation_side": NegotiationSide.LISTING,
         "anchor_id": 51,
         "target_label": "검증단지 1801호",
@@ -176,6 +178,14 @@ def test_contract_version_is_position_card_v1() -> None:
     assert listing_request().contract_version == "position-card:v1"
 
 
+def test_input_privacy_mode_is_required() -> None:
+    values = listing_request().model_dump()
+    values.pop("input_privacy_mode")
+
+    with pytest.raises(ValidationError):
+        PositionCardGenerationRequest(**values)
+
+
 # --- 입력 격리 -----------------------------------------------------------------
 
 
@@ -187,6 +197,7 @@ def test_listing_request_rejects_a_requirement_context() -> None:
 def test_requirement_request_rejects_a_listing_context() -> None:
     with pytest.raises(ValidationError):
         PositionCardGenerationRequest(
+            input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
             negotiation_side=NegotiationSide.REQUIREMENT,
             anchor_id=51,
             target_label="구입장 #51",
@@ -599,6 +610,7 @@ def test_a_hard_deadline_must_match_the_backend_date_signal() -> None:
 
 def test_the_requirement_side_uses_the_budget_price_kind() -> None:
     request = PositionCardGenerationRequest(
+        input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
         negotiation_side=NegotiationSide.REQUIREMENT,
         anchor_id=91,
         target_label="구입장 #91",

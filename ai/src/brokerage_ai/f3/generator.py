@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from brokerage_ai.core.types import ModelRoute, StructuredGenerationRequest
 from brokerage_ai.f3.contracts import (
+    InputPrivacyMode,
     PositionCardGenerationRequest,
     PositionCardGenerationResult,
     PositionCardTarget,
@@ -19,7 +20,7 @@ from brokerage_ai.f3.prompts import (
     POSITION_CARD_PROMPT_VERSION,
     build_position_card_messages,
 )
-from brokerage_ai.f3.validation import validate_generation_result
+from brokerage_ai.f3.validation import PositionCardContractError, validate_generation_result
 from brokerage_ai.providers.ports import LlmProvider
 
 POSITION_CARD_WORKFLOW_VERSION = "position-card-workflow:v1"
@@ -33,13 +34,23 @@ class LlmPositionCardGenerator:
 
     모델은 판단만 한다. 대상, source identity, 계약 버전과 장부 표기 금액은 요청에서
     결정적으로 복사하며 모델 출력 schema 에 아예 존재하지 않는다.
+
+    `allow_synthetic_prototype`은 ADR-0014의 합성 케이스 실행을 조립 지점에서 명시하는
+    임시 opt-in이다. 기본값은 false이며 실제 개인정보나 외부 Provider 전송을 승인하지 않는다.
     """
 
-    def __init__(self, *, provider: LlmProvider, route: ModelRoute) -> None:
+    def __init__(
+        self,
+        *,
+        provider: LlmProvider,
+        route: ModelRoute,
+        allow_synthetic_prototype: bool = False,
+    ) -> None:
         if provider.kind is not route.provider:
             raise ValueError("provider kind and model route provider must match")
         self._provider = provider
         self._route = route
+        self._allow_synthetic_prototype = allow_synthetic_prototype
 
     @property
     def versions(self) -> PositionCardGeneratorVersions:
@@ -52,6 +63,13 @@ class LlmPositionCardGenerator:
     async def generate_position_card(
         self, request: PositionCardGenerationRequest
     ) -> PositionCardGenerationResult:
+        if (
+            request.input_privacy_mode is InputPrivacyMode.SYNTHETIC_PROTOTYPE
+            and not self._allow_synthetic_prototype
+        ):
+            raise PositionCardContractError(
+                "synthetic prototype input requires an explicit generator opt-in"
+            )
         generation = StructuredGenerationRequest(
             route=self._route,
             messages=build_position_card_messages(request),

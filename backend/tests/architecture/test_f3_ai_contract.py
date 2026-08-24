@@ -15,6 +15,7 @@ from brokerage_ai.f3 import (
     POSITION_CARD_CONTRACT_VERSION,
     ContactabilityStatus,
     EvidenceKind,
+    InputPrivacyMode,
     NegotiationIntent,
     NegotiationSide,
     Urgency,
@@ -49,8 +50,12 @@ def test_contract_version_and_cache_key_version_are_separate_axes() -> None:
     assert POSITION_CARD_CONTRACT_VERSION != CACHE_KEY_SCHEMA_VERSION
 
 
-def test_f3_ai_contract_is_registered_and_oq_012_is_closed() -> None:
-    """공개 계약 변경에서 정본 등록과 미해결 질문 정리를 빠뜨리지 않게 한다."""
+def test_input_privacy_modes_make_the_prototype_exception_explicit() -> None:
+    assert {mode.value for mode in InputPrivacyMode} == {"SYNTHETIC_PROTOTYPE", "MASKED"}
+
+
+def test_f3_ai_project_decisions_are_registered() -> None:
+    """공개 계약의 정본·해결 질문·개인정보 결정을 함께 등록하게 한다."""
     references = REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references"
     contract_path = references / "contracts" / "f3-ai.md"
     assert contract_path.is_file()
@@ -59,6 +64,10 @@ def test_f3_ai_contract_is_registered_and_oq_012_is_closed() -> None:
     index = (references / "index.md").read_text()
     log = (references / "log.md").read_text()
     open_questions = (references / "open-questions.md").read_text()
+    privacy_policy = (references / "privacy" / "policy.md").read_text()
+    prototype_decision = (
+        references / "decisions" / "ADR-0014-f3-prototype-synthetic-input.md"
+    ).read_text()
 
     assert "status: 결정" in contract
     assert "| `LISTING` |" in contract
@@ -66,6 +75,8 @@ def test_f3_ai_contract_is_registered_and_oq_012_is_closed() -> None:
     assert "[contracts/f3-ai.md](contracts/f3-ai.md)" in index
     assert "`contracts/f3-ai.md`" in log
     assert "OQ-012" not in open_questions
+    assert "SYNTHETIC_PROTOTYPE" in privacy_policy
+    assert "상태: 승인됨" in prototype_decision
 
 
 def test_importing_the_contract_has_no_configuration_or_client_side_effect() -> None:

@@ -30,6 +30,7 @@ from brokerage_ai.f3 import (
     DateSignals,
     Evidence,
     EvidenceKind,
+    InputPrivacyMode,
     IntentAssessment,
     ListingAnchorContext,
     LlmPositionCardGenerator,
@@ -156,6 +157,7 @@ def listing_request(**anchor_overrides: object) -> PositionCardGenerationRequest
     }
     values.update(anchor_overrides)
     return PositionCardGenerationRequest(
+        input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
         negotiation_side=NegotiationSide.LISTING,
         anchor_id=51,
         target_label="검증단지 1801호",
@@ -172,6 +174,7 @@ def listing_request(**anchor_overrides: object) -> PositionCardGenerationRequest
 
 def requirement_request() -> PositionCardGenerationRequest:
     return PositionCardGenerationRequest(
+        input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
         negotiation_side=NegotiationSide.REQUIREMENT,
         anchor_id=91,
         target_label="구입장 #91",
@@ -189,7 +192,11 @@ def requirement_request() -> PositionCardGenerationRequest:
 
 
 def generator(provider: FakeProvider) -> LlmPositionCardGenerator:
-    return LlmPositionCardGenerator(provider=provider, route=ROUTE)
+    return LlmPositionCardGenerator(
+        provider=provider,
+        route=ROUTE,
+        allow_synthetic_prototype=True,
+    )
 
 
 # --- 호출 ---------------------------------------------------------------------
@@ -200,6 +207,26 @@ def test_generator_rejects_provider_and_route_mismatch() -> None:
 
     with pytest.raises(ValueError, match="provider kind and model route provider must match"):
         LlmPositionCardGenerator(provider=FakeProvider(), route=route)
+
+
+async def test_synthetic_prototype_input_requires_an_explicit_opt_in() -> None:
+    provider = FakeProvider()
+    subject = LlmPositionCardGenerator(provider=provider, route=ROUTE)
+
+    with pytest.raises(PositionCardContractError, match="explicit generator opt-in"):
+        await subject.generate_position_card(listing_request())
+
+    assert provider.calls == []
+
+
+async def test_masked_input_does_not_require_the_prototype_opt_in() -> None:
+    provider = FakeProvider()
+    subject = LlmPositionCardGenerator(provider=provider, route=ROUTE)
+    request = listing_request().model_copy(update={"input_privacy_mode": InputPrivacyMode.MASKED})
+
+    await subject.generate_position_card(request)
+
+    assert len(provider.calls) == 1
 
 
 async def test_listing_generation_calls_the_provider_exactly_once() -> None:
@@ -356,7 +383,11 @@ async def test_provider_diagnostics_reach_the_result() -> None:
 
 
 async def test_provider_errors_carry_no_prompt_or_raw_response() -> None:
-    subject = LlmPositionCardGenerator(provider=ExplodingProvider(), route=ROUTE)
+    subject = LlmPositionCardGenerator(
+        provider=ExplodingProvider(),
+        route=ROUTE,
+        allow_synthetic_prototype=True,
+    )
 
     with pytest.raises(ProviderRateLimitError) as raised:
         await subject.generate_position_card(listing_request())
@@ -432,6 +463,7 @@ async def test_prompt_does_not_ask_the_model_for_source_identity() -> None:
 
 async def test_an_empty_log_set_still_produces_a_valid_prompt() -> None:
     request = PositionCardGenerationRequest(
+        input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
         negotiation_side=NegotiationSide.REQUIREMENT,
         anchor_id=91,
         target_label="구입장 #91",
