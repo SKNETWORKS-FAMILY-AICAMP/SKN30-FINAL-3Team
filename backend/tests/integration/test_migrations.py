@@ -14,7 +14,7 @@ def migration_files() -> list[Path]:
 def test_migration_names_and_sequence() -> None:
     files = migration_files()
 
-    assert [int(path.name[:3]) for path in files] == list(range(1, 14))
+    assert [int(path.name[:3]) for path in files] == list(range(1, 15))
     assert all(NAME_PATTERN.fullmatch(path.name) for path in files)
 
 
@@ -75,4 +75,4 @@ def test_all_tables_and_columns_have_comments() -> None:
 def test_yoyo_can_parse_all_sql_migrations() -> None:
     migrations = read_migrations(str(MIGRATION_DIRECTORY))
 
-    assert len(migrations) == 13
+    assert len(migrations) == 14
