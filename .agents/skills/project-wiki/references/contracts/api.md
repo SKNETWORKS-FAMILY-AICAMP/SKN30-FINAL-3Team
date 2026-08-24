@@ -52,6 +52,7 @@ updated: 2026-08-24
 - 같은 필터 파라미터를 반복하면 OR로 결합한다.
 - 예약값 `__EMPTY__`는 해당 컬럼이 비어 있는 행을 뜻하며 다른 값과 함께 선택할 수 있다. `column-values` 응답도 같은 예약값과 건수를 목록에 포함한다. 값이 비어 있는 파라미터는 필터로 취급하지 않는다.
 - 부분 수정은 PATCH를 사용하고 본문에 `row_version`을 요구한다. 값이 다르면 409로 거절하며 마지막 저장이 앞 변경을 덮어쓰지 않게 한다.
+- 매물과 구입장 PATCH에서 요청값이 저장값과 모두 같으면 쓰기와 `row_version` 증가를 생략한다. 같은 값이어도 요청 `row_version`이 이미 낡았으면 409로 거절한다. 구입장의 `desired_complex_ids`는 순서가 아닌 단지 집합으로 비교하며 집합이 바뀌면 구입장 `row_version`도 올린다.
 - 다른 중개사무소가 소유한 식별자는 403이 아니라 404로 응답해 존재 여부를 드러내지 않는다.
 
 ### 매물장
@@ -116,6 +117,28 @@ updated: 2026-08-24
 
 상담 로그는 추가 전용이므로 수정과 삭제 경로를 두지 않는다. 로그를 추가하면 서버가 대상 세대 또는 구입장의 최종접촉일을 갱신한다. 무효 처리와 AI 생성 로그의 승인 경로는 현재 범위에 포함하지 않는다.
 
+## F2 음성 분석 계약 (구현됨 · 1차 연동)
+
+| Method | Path | 인증 | 동작 |
+|---|---|---|---|
+| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod Whisper로 전사하고 Qwen으로 분석해 검토용 제안을 동기 반환 |
+
+요청은 `multipart/form-data`이며 `audio`, `ledger_type`, `current_fields`,
+`privacy_confirmed`를 받는다. `audio`는 비어 있지 않은 WAV·MP3·M4A이고 현재 상한은 25 MiB다.
+`ledger_type`은 `매물장` 또는 `구입장`, `current_fields`는 필드명에서 문자열 또는 null로 가는 JSON
+객체다. `privacy_confirmed`가 true가 아니면 422로 거절한다. Backend는 세션에서 사용자 문맥을
+검증하지만 사용자·사무소 식별자는 모델에 보내지 않는다.
+
+응답은 상담 유형, 장부 불일치 여부, 필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
+상담 로그 초안과 서버가 확인한 주의 문구 확인 시각을 반환한다. 전사 전문, 모델 진단, 요청자와
+Provider 오류 원문은 반환하지 않는다. 제안 응답만으로 장부를 저장하지 않으며 Frontend가 선택한 값을
+부모 상세의 미저장 draft에 반영한다.
+
+이 경로는 RunPod base model 연결을 검증하는 1차 동기 수직 슬라이스다. 영속 작업, Worker 재개,
+SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 구현하지 않았으며
+`docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
+음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
+
 ### 오류 코드
 
 | code | HTTP | 발생 조건 |
@@ -127,6 +150,8 @@ updated: 2026-08-24
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
+| F2_UNAVAILABLE | 503 | F2가 비활성화됐거나 RunPod STT·LLM Provider를 사용할 수 없음 |
+| F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
 
@@ -202,6 +227,39 @@ updated: 2026-08-24
 행을 건드리지 않으므로 매물 자신의 삭제 표시만으로는 부족하다. 세 조건 중 하나라도 어긋나면 다른
 사무소의 식별자와 똑같이 404로 답해 삭제 여부와 존재 여부를 구분해서 드러내지 않는다.
 `REQUIREMENT` 앵커는 사무소와 `property_requirement.is_deleted = false`를 본다.
+
+### F1 저장 후 자동 접수
+
+다음 네 저장이 성공하면 Backend가 F3 실행을 자동 접수한다 (F3-CR-01, F3-CR-02).
+
+| 저장 경로 | 앵커 | 접수 조건 |
+|---|---|---|
+| `POST /api/v1/property-units/{unit_id}/listings` | 매물 | 신규 등록 |
+| `PATCH /api/v1/property-listings/{listing_id}` | 매물 | 거래 유형·가격·명도 조건·상태·의뢰인 등 판정 입력의 실제 변경 |
+| `POST /api/v1/property-requirements` | 구입장 | 신규 등록 |
+| `PATCH /api/v1/property-requirements/{requirement_id}` | 구입장 | 거래 유형·예산·면적·평형·이사일·만료일·상태·공동중개·희망 단지 등 판정 입력의 실제 변경 |
+
+자동 접수는 F1 저장 transaction이 commit된 뒤 별도 transaction으로 실행한다. 접수 중 오류가
+발생해도 이미 성공한 F1 저장과 응답을 되돌리거나 실패로 바꾸지 않는다 (F3-CM-06, F3-NF-07).
+요청 처리 중 Worker나 AI를 호출하지 않고 기존 `queue_cross_judgment_run`으로 `agent_run` 적재까지만
+수행한다.
+
+F1 응답 형태에는 실행 ID나 F3 상태를 추가하지 않는다. 화면은 `POST /api/v1/f3/runs`로 실행을
+확인하며, 같은 앵커·입력 버전의 활성 실행이면 저장 시 자동 생성된 실행 ID를 그대로 돌려받는다.
+자동 실행의 `trigger_type`은 `LEDGER_SAVE`이고 직접 실행 요청의 `USER_REQUEST`와 구분한다. 기존
+활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다.
+
+PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 서비스가 저장 직전에 비교한 **실제 변경
+필드**로 판단한다. 메모·담당자 같은 운영 필드만 바꾸거나 가격·예산 등 기존과 같은 값을 다시
+보내면 새 실행을 만들지 않는다. 희망 단지는 순서가 아니라 집합 변경을 판정 입력 변경으로 본다.
+자동 접수 실패 로그에는 앵커 종류·ID와 예외 타입만 남기고 상담 원문·연락처·성명은 남기지 않는다.
+
+자동 접수와 AI 처리는 별도 경계다. 접수된 실행은 검토된 합성 전용 환경에서
+`WORKER_ENABLED=true`와 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 모두 명시한 경우에만 현재 Worker가
+처리한다. 합성 opt-in이 없으면 Worker는 DB·Provider 접근과 작업 선점 전에 기동을 거절한다. 현재
+Infra 기본값은 두 설정 모두 `false`다. `MASKED` 입력 조립은 아직 구현되지 않았으므로 실제 F1
+사용자 데이터를 처리하는 근거로 합성 opt-in을 사용할 수 없다. 실사용 연결 전에는 ADR-0014에 따라
+Backend 마스킹을 구현하고 `input_privacy_mode=MASKED`로 전환해야 한다.
 
 ### 요청자 기록
 

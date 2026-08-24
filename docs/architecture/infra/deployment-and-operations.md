@@ -86,7 +86,7 @@ runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role�
 
 CodeDeploy deployment group은 ASG와 target group을 사용하고 실패 시 마지막 정상 revision으로 자동 rollback한다. rollback은 image와 application revision만 되돌리고 DB down migration을 실행하지 않는다.
 
-Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM cleanup만 수행하며 작업을 claim하지 않는다. F3 handler 코드는 `true`에서 RDS polling을 지원하지만 현재 배포 Parameter 기본값은 `false`다. 운영 Provider 선택과 활성화는 별도 적용하며, 정지 신호를 받으면 현재 application 단계까지 마친 뒤 종료한다.
+Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM cleanup만 수행하며 작업을 claim하지 않는다. F3 handler 코드는 `true`에서 RDS polling을 지원하지만 현재 배포 Parameter는 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`다. 검토된 합성 전용 환경에서 두 값을 모두 `true`로 명시하지 않으면 활성 Worker는 DB·Provider 접근과 claim 전에 기동을 거절한다. 운영 Provider 선택과 실사용 데이터 활성화는 별도 적용하며, 정지 신호를 받으면 현재 application 단계까지 마친 뒤 종료한다.
 
 ## Frontend build와 배포
 
@@ -140,3 +140,5 @@ CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.
 - Terraform은 계속 `preflight → fmt/validate → plan → 승인 → apply → 검증 → drift` 수동 절차를 따른다.
 - RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)의 기존 경계를 유지한다.
+- 로컬 F2 종단 간 검증의 Qwen·Whisper Pod 실행과 SSH tunnel 절차는
+  [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다.

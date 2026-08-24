@@ -36,6 +36,7 @@ locals {
       LOG_LEVEL                             = "INFO"
       WORKER_ENABLED                        = "false"
       WORKER_READY_FILE                     = "/tmp/brokerage-worker-ready"
+      F3_ALLOW_SYNTHETIC_PROTOTYPE          = "false"
     }
     ai = {
       AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"

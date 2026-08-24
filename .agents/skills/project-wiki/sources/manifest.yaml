@@ -2,6 +2,21 @@ version: 1
 updated: "2026-08-24"
 
 sources:
+  - id: "pr-policy-false-positive-reduction-2026-08-24"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-24)"
+    received: "2026-08-24"
+    reflected_in:
+      - ".github/workflows/pr-policy-review.yml"
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".github/scripts/tests/pr-review.test.mjs"
+      - ".github/pr-review-policy.json"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0016-pr-review-cross-chunk-evidence.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+    scope: "partial hunk 부재 추론, 동일 PR 정책 변경의 chunk 격리와 leaf high 강제 보존에서 발생한 PR 리뷰 오탐을 제한된 head 전체 파일 근거와 명시적 최종 기각으로 개선"
+
   - id: "environment-configuration-ownership-2026-08-24"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-24)"

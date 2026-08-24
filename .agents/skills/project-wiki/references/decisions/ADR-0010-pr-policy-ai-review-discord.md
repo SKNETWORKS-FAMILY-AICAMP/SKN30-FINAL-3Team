@@ -1,12 +1,13 @@
 ---
-status: 결정
+status: 부분 대체됨
 updated: 2026-08-24
 ---
 
 # ADR-0010: GitHub Actions 기반 권고형 PR AI 리뷰와 Discord 결과 전달
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
 - 결정일: 2026-08-20
+- 후속 대체: [ADR-0016](ADR-0016-pr-review-cross-chunk-evidence.md)이 PR head 전체 파일 보조 근거, 동일 PR 정책 변경의 교차 chunk 공유와 부분 리뷰 `high` 오탐 기각 규칙을 대체
 - 관련 정책: [브랜치 및 PR 정책](../../../../../.agents-rule/git.md)
 - 운영 가이드: [PR Policy Agent](../../../../../.github/PR_REVIEW_BOT.md)
 
@@ -24,7 +25,7 @@ PR에서 세부 문법보다 프로젝트 위키, 모듈별 스킬, 아키텍처
 
 - PR 정책 리뷰는 별도 서버 없이 `GitHub Actions + OpenAI Responses API + Discord Incoming Webhook`으로 실행한다.
 - 사람의 PR 일반 댓글, 리뷰 제출과 인라인 코드 댓글은 OpenAI를 호출하지 않는 별도 GitHub Actions workflow에서 같은 Discord Incoming Webhook으로 알린다.
-- workflow는 `pull_request_target`에서 base SHA의 검증된 스크립트만 checkout한다. PR head를 checkout하거나 PR 코드를 실행하지 않고 GitHub API의 metadata와 patch를 신뢰할 수 없는 데이터로만 읽는다.
+- workflow는 `pull_request_target`에서 base SHA의 검증된 스크립트만 checkout한다. PR head를 checkout하거나 PR 코드를 실행하지 않고 GitHub API의 metadata·patch와 ADR-0016의 제한된 전체 파일 보조 근거를 신뢰할 수 없는 데이터로만 읽는다.
 - 댓글 알림 workflow는 기본 브랜치의 검증된 스크립트만 checkout하고 이벤트 payload만 읽으며, 저장소 또는 PR에 쓰지 않는다. 봇 댓글과 일반 Issue 댓글은 제외한다.
 - 권한은 `contents: read`, `pull-requests: write`, `checks: write`로 제한하고 필요한 GitHub 공식 Action은 commit SHA로 고정한다.
 - 댓글 알림 workflow 권한은 checkout을 위한 `contents: read`만 사용한다.
@@ -40,8 +41,8 @@ PR에서 세부 문법보다 프로젝트 위키, 모듈별 스킬, 아키텍처
 - 최대 chunk 수는 10개, 기본 동시 실행 수는 3개다. 동시 실행 수는 변수로 조정할 수 있지만 구현상 6개로 상한을 둔다.
 - chunk가 하나이면 기존처럼 Responses API를 한 번 호출한다. 둘 이상이면 Node 리뷰 엔진이 각 chunk의 독립 Responses 호출을 fan-out하고 모든 결과를 받은 뒤 최종 Responses 호출로 fan-in한다.
 - OpenAI의 네이티브 Multi-agent 베타에 workflow를 결합하지 않는다. CI에서 chunk 경계, 호출 수, 실패 상태와 재현성을 직접 통제하기 위해 애플리케이션 수준의 고정 orchestration을 사용한다.
-- 부분 리뷰는 chunk당 finding 최대 3개를 반환한다. 최종 통합은 중복과 충돌을 정리해 최대 5개를 반환하며, 부분 리뷰의 `critical`·`high` finding은 통합 모델이 생략하더라도 우선 보존한다.
-- 최종 통합 입력에는 정책, PR 설명, 변경 파일 inventory와 정제된 부분 리뷰 결과만 포함한다. 원문 diff를 다시 보내지 않는다.
+- 부분 리뷰는 chunk당 일반 finding 최대 3개를 반환하고 최종 통합은 중복과 충돌을 정리해 일반 finding 최대 5개를 반환한다. 다만 `critical`과 ADR-0016에 따라 명시적으로 기각되지 않은 `high`는 게시 상한을 넘어도 보존한다.
+- 최종 통합 입력에는 정책, PR 설명, 변경 파일 inventory, 정제된 부분 리뷰 결과와 ADR-0016의 제한된 PR head 정책·설정 근거만 포함한다. 일반 구현 원문 diff를 다시 보내지 않는다.
 - 일부 chunk 실패, 통합 실패, 읽지 못한 정책 또는 없거나 잘린 GitHub patch가 있으면 최종 상태는 `incomplete`다. 완료된 chunk finding은 보존하되 `clean`으로 판정하지 않는다.
 
 ### 증분 재검토

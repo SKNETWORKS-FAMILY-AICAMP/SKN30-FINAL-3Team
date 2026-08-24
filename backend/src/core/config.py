@@ -100,6 +100,9 @@ class WorkerConfig(BaseModel):
         if not self.ready_file.is_absolute():
             raise ValueError("WORKER_READY_FILE must be an absolute path")
         return self
+class F2Config(BaseModel):
+    enabled: bool = False
+    max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
 
 
 class Config(BaseModel):
@@ -109,6 +112,7 @@ class Config(BaseModel):
     http: HttpConfig
     log: LogConfig
     worker: WorkerConfig
+    f2: F2Config
 
     @model_validator(mode="after")
     def validate_environment_boundaries(self) -> Config:
@@ -237,6 +241,9 @@ def bind_config(source: Mapping[str, str]) -> Config:
             enabled=_boolean(source, "WORKER_ENABLED", False),
             ready_file=Path(source.get("WORKER_READY_FILE", "/tmp/brokerage-worker-ready")),
             worker_id=_optional(source, "WORKER_ID"),
+        f2=F2Config(
+            enabled=_boolean(source, "F2_ENABLED", False),
+            max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
         ),
     )
 
