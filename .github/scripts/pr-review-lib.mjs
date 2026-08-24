@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 export const REVIEW_MARKER = "<!-- pr-policy-agent -->";
 export const CHECK_NAME = "PR Policy Agent";
+export const REVIEW_STATE_VERSION = 1;
+
+const REVIEW_STATE_PATTERN = /\n?<!-- pr-policy-state:v1:([A-Za-z0-9+/=]+) -->/g;
+const MAX_REVIEW_COMMENT_BYTES = 60000;
+const MAX_REVIEW_STATE_JSON_BYTES = 250000;
 
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/i,
@@ -66,6 +72,152 @@ export const REVIEW_SCHEMA = {
     }
   }
 };
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, canonicalize(value[key])])
+  );
+}
+
+export function stableObjectHash(value) {
+  return createHash("sha256").update(JSON.stringify(canonicalize(value))).digest("hex");
+}
+
+export function buildOpenAIRequest({
+  model,
+  instructions,
+  cachePrefixText,
+  dynamicText,
+  taskInstruction,
+  reasoningEffort,
+  verbosity,
+  schemaName,
+  maxOutputTokens,
+  safetyIdentifier
+}) {
+  const stablePrefix = `${instructions}\n\n${cachePrefixText ?? ""}`;
+  const requestText = `${taskInstruction ?? "현재 입력을 검토합니다."}\n\n${dynamicText}`;
+  const explicitCaching = model.startsWith("gpt-5.6");
+  const cacheKey = `pr-review:${stableObjectHash({
+    model,
+    schemaName,
+    stablePrefix
+  }).slice(0, 48)}`;
+  return {
+    model,
+    input: [
+      {
+        role: "developer",
+        content: [
+          {
+            type: "input_text",
+            text: stablePrefix,
+            ...(explicitCaching
+              ? { prompt_cache_breakpoint: { mode: "explicit" } }
+              : {})
+          }
+        ]
+      },
+      {
+        role: "user",
+        content: [{ type: "input_text", text: requestText }]
+      }
+    ],
+    prompt_cache_key: cacheKey,
+    ...(explicitCaching
+      ? { prompt_cache_options: { mode: "explicit", ttl: "30m" } }
+      : {}),
+    reasoning: { effort: reasoningEffort },
+    text: {
+      verbosity: ["low", "medium", "high"].includes(verbosity) ? verbosity : "low",
+      format: {
+        type: "json_schema",
+        name: schemaName,
+        strict: true,
+        schema: REVIEW_SCHEMA
+      }
+    },
+    max_output_tokens: maxOutputTokens,
+    store: false,
+    safety_identifier: safetyIdentifier
+  };
+}
+
+export function reviewChunkFingerprint(chunk) {
+  return stableObjectHash({
+    group: chunk.group,
+    files: (chunk.files ?? []).map((file) => ({
+      filename: file.filename,
+      previous_filename: file.previous_filename ?? null,
+      status: file.status,
+      additions: Number(file.additions ?? 0),
+      deletions: Number(file.deletions ?? 0),
+      fragmentIndex: Number(file.fragmentIndex ?? 0),
+      patchIncomplete: Boolean(file.patchIncomplete),
+      patch: String(file.patch ?? "")
+    }))
+  });
+}
+
+export function hasProjectWideChange(files, policy) {
+  return files.some((file) =>
+    (policy.projectWide?.prefixes ?? []).some((prefix) =>
+      normalizePath(file.filename).startsWith(prefix)
+    )
+  );
+}
+
+export function isReusableReviewState(
+  state,
+  { repository, prNumber, baseSha, configurationHash, projectWideChanged = false }
+) {
+  return Boolean(
+    !projectWideChanged &&
+      state?.version === REVIEW_STATE_VERSION &&
+      state.repository === repository &&
+      Number(state.prNumber) === Number(prNumber) &&
+      state.baseSha === baseSha &&
+      state.configurationHash === configurationHash &&
+      Array.isArray(state.chunks)
+  );
+}
+
+export function stripReviewState(body) {
+  return String(body ?? "").replace(REVIEW_STATE_PATTERN, "").trimEnd();
+}
+
+export function parseReviewState(body) {
+  const text = String(body ?? "");
+  REVIEW_STATE_PATTERN.lastIndex = 0;
+  const match = REVIEW_STATE_PATTERN.exec(text);
+  REVIEW_STATE_PATTERN.lastIndex = 0;
+  if (!match) return null;
+  try {
+    if (match[1].length > MAX_REVIEW_COMMENT_BYTES) return null;
+    const json = inflateRawSync(Buffer.from(match[1], "base64"), {
+      maxOutputLength: MAX_REVIEW_STATE_JSON_BYTES
+    }).toString("utf8");
+    const state = JSON.parse(json);
+    return state?.version === REVIEW_STATE_VERSION ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+export function attachReviewState(body, state, maxBytes = MAX_REVIEW_COMMENT_BYTES) {
+  const cleanBody = stripReviewState(body);
+  if (!state) return { body: cleanBody, persisted: false };
+  const encoded = deflateRawSync(Buffer.from(JSON.stringify(state), "utf8")).toString("base64");
+  const candidate = `${cleanBody}\n\n<!-- pr-policy-state:v1:${encoded} -->`;
+  if (Buffer.byteLength(candidate, "utf8") > maxBytes) {
+    return { body: cleanBody, persisted: false };
+  }
+  return { body: candidate, persisted: true };
+}
 
 export function isInternalPullRequest(pr, repository) {
   return pr?.head?.repo?.full_name === repository;
@@ -341,12 +493,24 @@ export async function mapWithConcurrency(items, concurrency, worker) {
 
 export function sumUsage(usages) {
   return usages.reduce(
-    (total, usage) => ({
-      input_tokens: total.input_tokens + Number(usage?.input_tokens ?? 0),
-      output_tokens: total.output_tokens + Number(usage?.output_tokens ?? 0),
-      total_tokens: total.total_tokens + Number(usage?.total_tokens ?? 0)
-    }),
-    { input_tokens: 0, output_tokens: 0, total_tokens: 0 }
+    (total, usage) => {
+      total.input_tokens += Number(usage?.input_tokens ?? 0);
+      total.output_tokens += Number(usage?.output_tokens ?? 0);
+      total.total_tokens += Number(usage?.total_tokens ?? 0);
+      total.input_tokens_details.cached_tokens += Number(
+        usage?.input_tokens_details?.cached_tokens ?? 0
+      );
+      total.input_tokens_details.cache_write_tokens += Number(
+        usage?.input_tokens_details?.cache_write_tokens ?? 0
+      );
+      return total;
+    },
+    {
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 }
+    }
   );
 }
 
@@ -462,16 +626,18 @@ export async function buildReviewContext({ rootDir, pr, files, policy, limits })
     "</pull_request>"
   ].join("\n");
 
-  const sections = [
+  const cachePrefixText = `<accepted_policy>\n${policyParts.join("\n\n")}\n</accepted_policy>`;
+  const dynamicText = [
     header,
-    `<accepted_policy>\n${policyParts.join("\n\n")}\n</accepted_policy>`,
     `<untrusted_pr_changes>\n${patchParts.join("\n\n")}\n</untrusted_pr_changes>`
-  ];
-  const text = sections.join("\n\n");
+  ].join("\n\n");
+  const text = `${cachePrefixText}\n\n${dynamicText}`;
   const contextTooLarge = text.length > limits.maxContextChars;
 
   return {
     text,
+    cachePrefixText,
+    dynamicText,
     modules: selected.modules,
     policyPaths: selected.paths,
     missingPolicyPaths,
@@ -548,11 +714,13 @@ export async function buildMergeContext({ rootDir, pr, files, policy, limits, ch
     additions: Number(file.additions ?? 0),
     deletions: Number(file.deletions ?? 0)
   }));
-  const text = `${base.text}\n\n<changed_file_inventory>\n${JSON.stringify(inventory)}\n</changed_file_inventory>\n\n<chunk_reviews>\n${JSON.stringify(chunkResults)}\n</chunk_reviews>`;
+  const dynamicText = `${base.dynamicText}\n\n<changed_file_inventory>\n${JSON.stringify(inventory)}\n</changed_file_inventory>\n\n<chunk_reviews>\n${JSON.stringify(chunkResults)}\n</chunk_reviews>`;
+  const text = `${base.cachePrefixText}\n\n${dynamicText}`;
   const accepted = base.accepted && text.length <= limits.maxMergeContextChars;
   return {
     ...base,
     text,
+    dynamicText,
     accepted,
     contextChars: text.length,
     reasons: accepted
@@ -676,6 +844,18 @@ function truncate(value, maxLength) {
   return `${text.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
+function usageLabel(usage) {
+  const cached = Number(usage?.input_tokens_details?.cached_tokens ?? 0);
+  const written = Number(usage?.input_tokens_details?.cache_write_tokens ?? 0);
+  return `input ${usage?.input_tokens ?? 0} (cache read ${cached} / write ${written}), output ${usage?.output_tokens ?? 0}, total ${usage?.total_tokens ?? 0}`;
+}
+
+function incrementalLabel(context) {
+  const reused = Number(context?.reusedChunkCount ?? 0);
+  const reviewed = Number(context?.reviewedChunkCount ?? context?.chunkCount ?? 0);
+  return reused > 0 ? ` · 증분 재사용 ${reused}개 / 신규 검토 ${reviewed}개` : "";
+}
+
 export function renderGitHubComment({ pr, review, model, usage, durationMs, context }) {
   const counts = severityCounts(review.findings);
   const rows = review.findings.map((finding) => {
@@ -702,9 +882,9 @@ export function renderGitHubComment({ pr, review, model, usage, durationMs, cont
 - 검토 SHA: \`${pr.head.sha}\`
 - 상태: **${review.status}**
 - 영향 모듈: ${context.modules.join(", ") || "없음"}
-- 리뷰 방식: ${context.reviewMode === "multi" ? `분할 ${context.chunkCount ?? 0}개 + 최종 통합` : "단일 리뷰"}
+- 리뷰 방식: ${context.reviewMode === "multi" ? `분할 ${context.chunkCount ?? 0}개 + 최종 통합` : "단일 리뷰"}${incrementalLabel(context)}
 - 모델: \`${model}\`
-- 사용량: input ${usage.input_tokens ?? 0}, output ${usage.output_tokens ?? 0}, total ${usage.total_tokens ?? 0}
+- 사용량: ${usageLabel(usage)}
 - 소요 시간: ${(durationMs / 1000).toFixed(1)}초
 - Finding: critical ${counts.critical}, high ${counts.high}, medium ${counts.medium}, low ${counts.low}
 
@@ -762,6 +942,8 @@ export function renderDiscordReviewMessages({
   modules,
   reviewMode = "single",
   chunkCount = 1,
+  reusedChunkCount = 0,
+  reviewedChunkCount = chunkCount,
   runUrl
 }) {
   const counts = severityCounts(review.findings);
@@ -769,12 +951,12 @@ export function renderDiscordReviewMessages({
 PR #${pr.number} ${truncate(pr.title, 180)}
 작성자: ${pr.user?.login ?? "unknown"} · SHA: \`${pr.head.sha.slice(0, 12)}\`
 영향 모듈: ${modules.join(", ") || "없음"}
-리뷰 방식: ${reviewMode === "multi" ? `분할 ${chunkCount}개 + 최종 통합` : "단일 리뷰"}
+리뷰 방식: ${reviewMode === "multi" ? `분할 ${chunkCount}개 + 최종 통합` : "단일 리뷰"}${incrementalLabel({ reusedChunkCount, reviewedChunkCount, chunkCount })}
 상태: **${review.status}**
 Finding: critical ${counts.critical} / high ${counts.high} / medium ${counts.medium} / low ${counts.low}
 ${truncate(review.summary, 700)}
 
-🏁 **리뷰 기록**: 모델 \`${model}\` · 방식: ${reviewMode === "multi" ? `분할 ${chunkCount}개` : "단일"} · 시간: ${(durationMs / 1000).toFixed(1)}초 · Token: total ${usage.total_tokens ?? 0} (in ${usage.input_tokens ?? 0} / out ${usage.output_tokens ?? 0})
+🏁 **리뷰 기록**: 모델 \`${model}\` · 방식: ${reviewMode === "multi" ? `분할 ${chunkCount}개` : "단일"} · 시간: ${(durationMs / 1000).toFixed(1)}초 · Token: ${usageLabel(usage)}
 PR: ${pr.html_url}`;
   const detailText = review.findings.length
     ? review.findings.map(discordFinding).join("\n\n")
