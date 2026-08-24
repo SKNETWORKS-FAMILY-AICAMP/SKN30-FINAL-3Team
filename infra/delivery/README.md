@@ -4,17 +4,19 @@
 
 ## 적용 전 gate
 
-- 현재 dev 변경을 저장소 Git 정책에 맞는 PR로 `main`에 병합한다.
+- 현재 변경을 저장소 Git 정책에 맞는 PR로 개발 통합 브랜치 `dev`에 병합한다.
 - `.github/workflows/pr-policy-review.yml`의 별도 사용자 변경은 이 delivery 변경과 섞지 않는다.
 - `pipeline_operator_user_names`가 승인된 기존 IAM 사용자만 포함하고 `student` 외 추가 사용자가 없는지 확인한다.
 - `SKN30_FINAL` Connection이 `AVAILABLE`이고 승인된 repository만 접근하는지 확인한다.
-- Discord secret container에 `{"webhook_url":"..."}` 값을 저장소와 Terraform 밖에서 주입한다.
+- ignored `infra/environments/dev/secrets.auto.tfvars`에 AI provider key와 Discord webhook을 입력하고 각 version counter가 실제 값과 함께 증가했는지 확인한다.
 - Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다.
 
 ## 로컬 CodeBuild 동등 검증
 
 전체 검증은 CodeBuild와 같은 Node.js 22, Python 3.13, `uv 0.11.2`, Docker와
-Compose plugin이 설치된 Linux 환경에서 저장소 루트 기준으로 실행한다.
+Compose plugin `v2.30.0` 이상이 설치된 Linux 환경에서 저장소 루트 기준으로 실행한다.
+Compose 최소 버전은 process별 env 파일의 `format: raw` 계약에 필요하며 배포 host는
+Terraform Launch Template에서 `v2.35.1`로 고정한다.
 
 ```bash
 infra/delivery/scripts/verify_local_delivery.sh
@@ -27,7 +29,7 @@ disposable DB를 시작한 뒤 다음을 순서대로 검증한다. Docker Hub i
 1. AI와 Backend의 frozen lock 설치, format, lint, type, 전체 테스트
 2. 빈 DB migration과 두 번째 no-op migration
 3. CodeDeploy lifecycle shell 구문과 image metadata 전달 계약 테스트
-4. Frontend Verify: clean install, typecheck, 원장 테스트
+4. Frontend Verify: clean install, env 우선순위 테스트, typecheck, 원장 테스트
 5. Frontend Build: 별도 clean install, release build와 release 계약 테스트
 6. Backend root-context image build와 UID 10001 실행
 7. Compose config
@@ -66,8 +68,8 @@ Backend·Frontend 독립 Pipeline을 모두 통과시킨다.
 - CodeBuild는 로컬과 같은 component script를 호출한다. 검증 명령을 바꿀 때 buildspec에
   명령을 복제하지 않고 component script 한 곳만 수정한다.
 - `infra.tests.test_delivery_pipeline_contract`가 Verify/Build 명령·artifact·DB 경계와 세
-  Pipeline의 `main` source를 검사한다. buildspec이나 stage를 바꾸면 이 계약 테스트도 함께 갱신한다.
-- `main` 통합 Pipeline은 merge 이후 배포 gate다. merge 이전 강제 gate가 필요하면 같은
+  Pipeline의 `dev` source를 검사한다. buildspec이나 stage를 바꾸면 이 계약 테스트도 함께 갱신한다.
+- `dev` 통합 Pipeline은 merge 이후 배포 gate다. merge 이전 강제 gate가 필요하면 같은
   component script를 호출하는 PR CI를 별도로 연결한 뒤 성공 check를 branch protection의
   required check로 지정한다.
 - Node, Python, `uv`, base image 또는 lockfile을 올리는 PR은 clean install과 `--no-cache`
@@ -88,10 +90,12 @@ app_asg_health_check_type          = "EC2"
 cd infra/environments/dev
 terraform fmt -recursive
 terraform validate
-terraform plan -var-file=dev.tfvars
+terraform plan -var-file=dev.tfvars -out=dev.tfplan
 # plan 승인 후에만
-terraform apply -var-file=dev.tfvars
+terraform apply dev.tfplan
 ```
+
+`secrets.auto.tfvars`는 두 명령 모두 같은 directory에서 자동으로 읽힌다. 이 파일은 비어 있지 않은 일반 파일이어야 하고 group/other 권한 bit가 모두 꺼져 있어야 한다(`chmod 600`). Ephemeral 값은 saved plan에 포함되지 않으므로 plan과 apply 사이에 파일을 수정하지 않는다. AI provider key와 Discord webhook을 바꿀 때는 해당 `*_secret_version`도 증가시킨다. plan JSON과 state에 비밀 평문이 보이면 적용을 중단한다.
 
 구성의 import block이 기존 Connection ARN을 state로 가져온다. plan에서 Connection replacement 또는 destroy가 보이면 적용하지 않는다.
 
@@ -105,7 +109,7 @@ terraform apply -var-file=dev.tfvars
 | Backend | `skn30-final-3team-dev-backend` |
 | Frontend | `skn30-final-3team-dev-frontend` |
 
-최신 `main`은 Console의 Release change 또는 다음 명령으로 시작한다.
+최신 `dev`는 Console의 Release change 또는 다음 명령으로 시작한다.
 
 ```bash
 aws codepipeline start-pipeline-execution \
@@ -143,12 +147,13 @@ Pipeline과 CodeDeploy에서는 다음 순서로 확인한다.
 
 1. CodePipeline의 Source revision이 요청한 40자리 SHA인지 확인한다.
 2. Backend Build artifact의 image가 `repository@sha256:...` 형식인지 확인한다.
-3. CodeDeploy `AfterInstall`에서 설정 조립과 migration이 성공했는지 확인한다.
-4. `ApplicationStart`, `ValidateService`가 성공하고 deployment 상태가 `Succeeded`인지 확인한다.
-5. Target Group의 유일한 target이 `healthy`인지 확인한다.
-6. CloudFront `https://<distribution-domain>/health/ready`가 200을 반환하는지 확인한다.
-7. API·Worker CloudWatch log에 revision 전환 이후 지속적인 error가 없는지 확인한다.
-8. `/opt/brokerage/deploy-record.json`의 revision, image digest와 Pipeline execution ID가
+3. `backend-image.env`에 image digest와 비민감 parameter prefix·secret ARN·port·health/log 메타데이터만 있는지 확인한다.
+4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 AI provider key는 Worker 파일에만 있어야 한다.
+5. `ApplicationStart`, `ValidateService`가 성공하고 deployment 상태가 `Succeeded`인지 확인한다.
+6. Target Group의 유일한 target이 `healthy`인지 확인한다.
+7. CloudFront `https://<distribution-domain><APP_READINESS_PATH>`가 200을 반환하는지 확인한다.
+8. API·Worker CloudWatch log에 revision 전환 이후 지속적인 error가 없는지 확인한다.
+9. `/opt/brokerage/deploy-record.json`의 revision, image digest와 Pipeline execution ID가
    실행 이력과 같은지 확인한다. 파일에는 비밀값이 없어야 한다.
 
 실패한 deployment의 상세 상태는 값을 노출하지 않는 다음 조회로 확인한다.
@@ -189,7 +194,7 @@ integrated_pipeline_detect_changes = true
 app_asg_health_check_type          = "ELB"
 ```
 
-안전한 `main` 변경으로 통합 Pipeline 자동 실행을 확인한다.
+안전한 `dev` 변경으로 통합 Pipeline 자동 실행을 확인한다.
 
 ## Rollback
 

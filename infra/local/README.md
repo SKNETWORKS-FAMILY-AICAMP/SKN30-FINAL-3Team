@@ -42,23 +42,26 @@ uv run yoyo apply --batch
 uv run python src/manage.py create-development-user \
   --brokerage-name "개발 중개사무소" --login-id developer \
   --display-name "Developer" --role OWNER
-uv run uvicorn main:app --app-dir src --port 8000
+uv run python src/server.py
 ```
 
-출력된 `brokerage_id`, `login_id`를 `backend/.env.local`의 `AUTH_DEVELOPMENT_*`에 넣고
-`AUTH_DEVELOPMENT_ENABLED=true`로 두면 프론트의 "개발용 로그인" 버튼이 동작한다.
+출력된 `brokerage_id`, `login_id`와 `AUTH_DEVELOPMENT_ENABLED=true`를 Git에서 제외된
+`backend/.env`의 `AUTH_DEVELOPMENT_*`에 넣으면 프론트의 "개발용 로그인" 버튼이 동작한다.
+팀 공통 공개값이 있는 추적 파일 `backend/.env.local`은 개인 계정 때문에 수정하지 않는다.
 
 ## 프론트 연결
 
-`frontend/.env.local`(git 추적 안 함):
+Git에서 제외된 `frontend/.env`에는 공통값 중 개인적으로 덮을 항목만 둔다. 실제 API를 사용할
+때는 다음 한 줄이면 된다.
 
 ```dotenv
 VITE_LEDGER_SOURCE=api
-VITE_API_BASE_URL=/api/v1
-VITE_BACKEND_ORIGIN=http://127.0.0.1:8000
 ```
 
-`VITE_LEDGER_SOURCE=mock`으로 되돌리면 백엔드 없이 화면만 볼 수 있다.
+Backend port를 바꾼 경우에만 같은 파일에
+`FRONTEND_BACKEND_ORIGIN=http://127.0.0.1:<port>`를 추가한다. `VITE_API_BASE_URL=/api/v1`과
+mock 기본값은 추적된 `frontend/.env.local`에서 공유된다. 개인 `.env`의 override를 지우면
+`VITE_LEDGER_SOURCE=mock`으로 돌아가 백엔드 없이 화면만 볼 수 있다.
 
 ## 알려진 공백
 

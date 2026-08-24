@@ -1,7 +1,8 @@
 /**
  * 사용할 transport 결정.
  *
- * DB·백엔드가 준비되면 `frontend/.env.local`의 `VITE_LEDGER_SOURCE`를 `api`로 바꾸는 것으로 전환한다.
+ * 개인 로컬에서 API를 연결할 때는 `frontend/.env`의 `VITE_LEDGER_SOURCE`를 `api`로
+ * override한다. 공유 기본값은 `frontend/.env.local`이 소유한다.
  * 화면과 훅은 이 선택을 알지 못한다.
  */
 

@@ -217,7 +217,7 @@ resource "aws_lb" "app" {
 
 resource "aws_lb_target_group" "app" {
   name        = "${local.name_prefix}-app"
-  port        = 8000
+  port        = local.application_port
   protocol    = "HTTP"
   target_type = "instance"
   vpc_id      = aws_vpc.dev.id
@@ -229,7 +229,7 @@ resource "aws_lb_target_group" "app" {
     healthy_threshold   = 2
     interval            = 30
     matcher             = "200"
-    path                = "/health/ready"
+    path                = local.application_ready_path
     port                = "traffic-port"
     protocol            = "HTTP"
     timeout             = 5
@@ -457,9 +457,9 @@ output "application_load_balancer" {
     arn_suffix     = aws_lb.app.arn_suffix
     dns_name       = aws_lb.app.dns_name
     listener_arn   = aws_lb_listener.http.arn
-    readiness_path = "/health/ready"
+    readiness_path = local.application_ready_path
     readiness_prerequisites = [
-      "Delivery must install and start the application artifact on port 8000.",
+      "Delivery must install and start the application artifact on the Terraform-managed application port.",
       "Delivery must materialize DB_URL and non-secret config; Backend API and worker startup must not require DB_MIGRATION_URL.",
       "A separate delivery identity must prepare database roles, schema, pgvector, and migrations.",
       "Backend must handle the dynamic ALB target-IP Host header without weakening the public origin boundary.",

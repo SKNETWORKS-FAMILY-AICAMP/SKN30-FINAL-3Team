@@ -5,7 +5,6 @@ env:
     DB_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
     DB_MIGRATION_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
     TEST_DB_URL: "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/brokerage"
-    APP_PROFILE: "test"
     APP_ENV: "test"
     DB_TARGET: "test"
     HTTP_CORS_ALLOWED_ORIGINS: "[]"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 from pathlib import Path
 from typing import Any, cast
@@ -100,22 +101,49 @@ def test_disabled_worker_checks_readiness_without_claiming(tmp_path: Path) -> No
 
 
 def test_worker_ids_are_unique_and_fit_the_lease_column() -> None:
-    first = build_worker_id({})
-    second = build_worker_id({})
+    first = build_worker_id()
+    second = build_worker_id()
 
     assert first != second
     assert len(first) <= WORKER_ID_MAX_LENGTH
-    assert build_worker_id({"WORKER_ID": "x" * 200}) == "x" * WORKER_ID_MAX_LENGTH
+    assert build_worker_id("x" * 200) == "x" * WORKER_ID_MAX_LENGTH
 
 
 def test_enabled_worker_requires_an_explicit_llm_provider() -> None:
     with pytest.raises(ConfigurationError, match="LLM provider"):
         require_ai_provider("test", {})
 
-    configured = require_ai_provider(
-        "test", {"AI_VLLM_LLM_BASE_URL": "http://localhost:8000/v1"}
-    )
+    configured = require_ai_provider("test", {"AI_VLLM_LLM_BASE_URL": "http://localhost:8000/v1"})
     assert configured.vllm.llm is not None
+
+
+def test_enabled_worker_merges_ai_local_files_without_mutating_process_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import brokerage_ai.core.config as ai_config_module
+
+    (tmp_path / ".env.local").write_text(
+        "AI_REQUEST_TIMEOUT_SECONDS=10\nAI_VLLM_LLM_BASE_URL=http://localhost:8000/v1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".env").write_text(
+        "AI_VLLM_LLM_API_KEY=personal-secret\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ai_config_module, "AI_ROOT", tmp_path)
+    monkeypatch.delenv("AI_VLLM_LLM_API_KEY", raising=False)
+
+    config = require_ai_provider(
+        "local",
+        {"AI_REQUEST_TIMEOUT_SECONDS": "30"},
+    )
+
+    assert config.request_timeout_seconds == 30
+    assert config.vllm.llm is not None
+    assert config.vllm.llm.api_key is not None
+    assert config.vllm.llm.api_key.get_secret_value() == "personal-secret"
+    assert "AI_VLLM_LLM_API_KEY" not in os.environ
 
 
 class FakeSession:
@@ -294,9 +322,7 @@ def test_zero_candidates_do_not_look_up_a_judgment_model(
         requested_by=1,
     )
 
-    bindings = build_bindings(
-        cast(Session, object()), cast(AiRuntime, FakeRuntime()), run
-    )
+    bindings = build_bindings(cast(Session, object()), cast(AiRuntime, FakeRuntime()), run)
 
     assert bindings.card is None
     assert bindings.judgment is None

@@ -1,13 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-14
+updated: 2026-08-24
 owner: frontend
 implementation: 계획됨
 ---
 
 # Frontend Design Guide
 
-관리자 대시보드의 제품 UI 정본이다. UI 작업자는 이 문서와 작업에 해당하는 세부 가이드를 구현 전에 확인한다. 이 결정은 main 병합 후 팀 공유 기준이 되며 implementation은 실제 코드와 의존성이 반영된 뒤 구현됨으로 변경한다.
+관리자 대시보드의 제품 UI 정본이다. UI 작업자는 이 문서와 작업에 해당하는 세부 가이드를 구현 전에 확인한다. 이 결정은 팀 검토를 거쳐 dev에 병합되면 공유 기준이 되며 main은 릴리스 기준으로 갱신한다. implementation은 실제 코드와 의존성이 반영된 뒤 구현됨으로 변경한다.
 
 ## 기준과 정본
 

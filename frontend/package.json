@@ -3,13 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "node --env-file=.env.local --env-file-if-exists=.env ./node_modules/vite/bin/vite.js",
+    "build": "node --env-file=.env.local --env-file-if-exists=.env ./node_modules/vite/bin/vite.js build",
+    "preview": "node --env-file=.env.local --env-file-if-exists=.env ./node_modules/vite/bin/vite.js preview",
     "test:ledger": "node --test tests/ledger-mappers.test.ts tests/ledger-fixtures.test.ts",
+    "test:env": "node --test tests/env-cli.test.mjs tests/env-schema.test.ts tests/vite-config.test.mjs",
     "typecheck": "tsc --noEmit",
-    "test:release": "node --test tests/release-build.test.mjs"
+    "test:release": "node --env-file=.env.local --env-file-if-exists=.env --test tests/release-build.test.mjs"
   },
   "dependencies": {
     "@patternfly/react-core": "^6.6.1",

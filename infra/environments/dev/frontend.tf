@@ -102,7 +102,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   ordered_cache_behavior {
-    path_pattern               = "/api/*"
+    path_pattern               = local.frontend_api_path_pattern
     target_origin_id           = local.frontend_api_origin_id
     viewer_protocol_policy     = "redirect-to-https"
     allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]

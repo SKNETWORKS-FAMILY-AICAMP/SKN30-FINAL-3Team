@@ -6,6 +6,7 @@ container_name="brokerage-delivery-local-${$}"
 database_port="${LOCAL_TEST_DB_PORT:-55432}"
 validation_dir="$(mktemp -d /tmp/brokerage-delivery-verify.XXXXXX)"
 ci_database_image="brokerage-pgvector-ci:pg15.18-pgvector0.8.6"
+minimum_compose_version="2.30.0"
 
 cleanup() {
   docker stop "${container_name}" >/dev/null 2>&1 || true
@@ -17,7 +18,17 @@ python3 --version | grep -Eq '^Python 3\.13\.'
 uv --version | grep -Eq '^uv 0\.11\.2 '
 node --version | grep -Eq '^v22\.'
 docker version >/dev/null
-docker compose version >/dev/null
+compose_version="$(docker compose version --short)"
+if [[ ! "${compose_version}" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+  echo "Docker Compose version을 해석할 수 없습니다: ${compose_version}" >&2
+  exit 1
+fi
+compose_major="${BASH_REMATCH[1]}"
+compose_minor="${BASH_REMATCH[2]}"
+if ((compose_major < 2 || (compose_major == 2 && compose_minor < 30))); then
+  echo "Docker Compose ${minimum_compose_version} 이상이 필요합니다(format: raw 계약). 현재: ${compose_version}" >&2
+  exit 1
+fi
 
 cd "${repo_root}"
 docker build \
@@ -44,12 +55,13 @@ test_database_url="postgresql+psycopg://postgres:postgres@127.0.0.1:${database_p
 export DB_URL="${test_database_url}"
 export DB_MIGRATION_URL="${test_database_url}"
 export TEST_DB_URL="${test_database_url}"
-export APP_PROFILE=test
 export APP_ENV=test
 export DB_TARGET=test
 export HTTP_CORS_ALLOWED_ORIGINS='[]'
 export HTTP_ALLOWED_HOSTS='["localhost","127.0.0.1"]'
 export AUTH_DEVELOPMENT_ENABLED=false
+export VITE_LEDGER_SOURCE=api
+export VITE_API_BASE_URL=/api/v1
 
 "${repo_root}/infra/delivery/scripts/verify_backend_ai.sh"
 "${repo_root}/infra/delivery/scripts/verify_frontend.sh"
@@ -61,16 +73,20 @@ docker run --rm --entrypoint sh brokerage-backend:local -c 'test "$(id -u)" = "1
 
 mkdir -p "${validation_dir}/config"
 touch \
-  "${validation_dir}/runtime.env" \
+  "${validation_dir}/api.env" \
+  "${validation_dir}/worker.env" \
   "${validation_dir}/migration.env" \
   "${validation_dir}/config/global-bundle.pem"
 export BACKEND_IMAGE=brokerage-backend:local
-export RUNTIME_ENV_FILE="${validation_dir}/runtime.env"
+export API_ENV_FILE="${validation_dir}/api.env"
+export WORKER_ENV_FILE="${validation_dir}/worker.env"
 export MIGRATION_ENV_FILE="${validation_dir}/migration.env"
 export CONFIG_DIR="${validation_dir}/config"
 export RDS_CA_FILE="${validation_dir}/config/global-bundle.pem"
 export RDS_CA_CONTAINER_FILE=/etc/ssl/certs/aws-rds-global-bundle.pem
 export AWS_REGION=ap-northeast-2
+export APP_PORT=8000
+export APP_READINESS_PATH=/health/ready
 export API_LOG_GROUP=local-api
 export WORKER_LOG_GROUP=local-worker
 export INSTANCE_ID=local

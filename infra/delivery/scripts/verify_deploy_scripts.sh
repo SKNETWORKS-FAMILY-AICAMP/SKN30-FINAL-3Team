@@ -14,4 +14,5 @@ bash -n \
 python3 -m unittest \
   infra.tests.test_delivery_common \
   infra.tests.test_delivery_pipeline_contract \
+  infra.tests.test_render_env \
   -v

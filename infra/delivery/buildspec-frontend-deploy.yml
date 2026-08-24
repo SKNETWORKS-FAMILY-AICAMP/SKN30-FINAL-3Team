@@ -4,7 +4,8 @@ env:
 phases:
   pre_build:
     commands:
-      - curl -fsS --retry 3 "https://${CLOUDFRONT_DOMAIN}/health/ready"
+      - ': "${APP_READINESS_PATH:?APP_READINESS_PATH is required}"'
+      - curl -fsS --retry 3 "https://${CLOUDFRONT_DOMAIN}${APP_READINESS_PATH}"
   build:
     commands:
       - chmod +x deploy_frontend.sh
