@@ -31,6 +31,8 @@ updated: 2026-08-24
 | 중개 판정 모델 출력 schema | `ai/src/brokerage_ai/f3/judgment_model_output.py` |
 | 중개 판정 프롬프트 | `ai/src/brokerage_ai/f3/judgment_prompts.py` |
 | 중개 판정 생성 구현 | `ai/src/brokerage_ai/f3/judgment_generator.py` |
+| Backend 중개 판정 조립·저장 유스케이스 | `backend/src/domain/agent_execution/judgment.py` |
+| Backend 후보 판정·근거 ORM | `backend/src/domain/agent_execution/models.py` |
 
 ## 버전 축
 
@@ -369,8 +371,9 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로�
 
 앵커 포지션 카드 1장과 반대편 후보 카드 N장을 **한 번의 구조화 출력 호출**로 판정한다
 (F3-BR-01, F3-BR-02, F3-NF-04). 후보를 개별 호출하지 않고 앵커를 후보 수만큼 반복 전송하지
-않는다. 후보가 0건이면 요청을 만들지 않으며 모델도 부르지 않는다. 이 PR은 AI 계약과 생성기만
-구현하며 Backend의 입력 조립·저장과 `JUDGING`·`COMPLETED` 상태 전이는 후속 범위다.
+않는다. 후보가 0건이면 요청을 만들지 않으며 모델도 부르지 않는다. Backend는 저장된 앵커·후보
+카드에서 요청을 조립하고, 판정 호출 전 `JUDGING`, 검증된 결과의 원자 저장 뒤 `COMPLETED`를
+기록한다.
 
 ### 등급과 행동 어휘
 
@@ -442,8 +445,8 @@ prompt·workflow 버전과 안전한 diagnostics를 담는다. 모델 출력 sch
 - 인용이 해당 카드가 가진 근거 범위 안에 존재
 
 `LlmBrokerageJudgmentGenerator`는 이 검증을 **결과를 반환하기 전에 직접 호출**한다. 호출자가
-검증을 빠뜨려도 잘못된 모델 결과가 공개 생성 경계 밖으로 나가지 않는다. Backend는 후속 저장
-단계에서 tenant, lease, 후보 snapshot과 카드의 현재 유효성을 별도로 재검증한다.
+검증을 빠뜨려도 잘못된 모델 결과가 공개 생성 경계 밖으로 나가지 않는다. Backend도 저장 직전에
+tenant, lease, 판정 바인딩, 앵커 버전, 후보 snapshot과 카드의 현재 유효성을 별도로 재검증한다.
 
 ### LangGraph 적용 범위
 
@@ -487,12 +490,15 @@ checkpoint 저장 계약은 AI-OQ-004로 계속 미확정이다.
 - 중개 판정 계약 `brokerage-judgment:v1`, 등급·행동·근거 어휘와 프레임워크 중립 Protocol
 - 앵커 1장과 후보 1~15장을 한 번에 보내는 Provider 중립 구조화 출력 생성기
 - 합성 입력 이중 opt-in과 생성 결과 반환 전 후보 집합·순위·근거 교차 검증
+- 저장된 앵커·후보 카드의 판정 요청 조립과 `SYNTHETIC_PROTOTYPE` privacy mode 고정
+- AI 호출 전후 transaction 분리와 lease·attempt·바인딩·앵커·후보 장부 버전·후보 집합 재검증
+- 후보별 등급·순위·걸림돌·양보·행동·기각 사유·근거의 원자 저장
+- `JUDGING`·`COMPLETED` 상태 전이와 만료된 `JUDGING` lease 재선점·재실행
+- 후보 0건의 AI 호출 없는 빈 결과 완료
 
 ### 아직 구현하지 않음 (`계획됨`)
 
 - 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
-- Backend 중개 판정 입력 조립, DB 현재 상태 fencing과 최종 결과 저장
-- `JUDGING`·`COMPLETED` 상태 전이
 - Worker polling과 `WORKER_ENABLED=true`
 - F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
   덧씌우지 않는다

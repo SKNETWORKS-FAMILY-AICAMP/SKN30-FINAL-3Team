@@ -167,7 +167,7 @@ sequenceDiagram
 | `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
 
-현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 상위 후보 카드 ID 저장 시 `CANDIDATE_CARDS_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 여섯 가지다. 후보 카드 유스케이스까지 구현됐지만 Worker polling·handler에는 아직 연결되지 않았다. 나머지는 아직 `제안`이며 구현되지 않았다.
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 상위 후보 카드 ID 저장 시 `CANDIDATE_CARDS_READY`, 판정 호출 중 `JUDGING`, 검증된 결과 저장 시 `COMPLETED`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 여덟 가지다. 유스케이스는 구현됐지만 Worker polling·handler에는 아직 연결되지 않았다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
 `ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
 
@@ -196,13 +196,15 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `POST /api/v1/f3/runs`. 요청마다 새 `QUEUED` 실행 생성 | `backend/src/api/f3_runs.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
-| `claim_next_run` 작업 선점, `RUNNING`·`ANCHOR_READY`·`CANDIDATES_READY`·`CANDIDATE_CARDS_READY` 재선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
+| `claim_next_run` 작업 선점, `RUNNING`·`ANCHOR_READY`·`CANDIDATES_READY`·`CANDIDATE_CARDS_READY`·`JUDGING` 재선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py`, migration 016 |
 | 합성 F1 앵커 snapshot과 측면별 상담 로그 범위·날짜 신호 조립 | `backend/src/domain/agent_execution/snapshot.py` |
 | 입력 fingerprint·상담 범위 identity를 포함한 `position-card:v3` cache key와 재사용 | `backend/src/domain/agent_execution/fingerprint.py`, `cache_key.py` |
 | 주입된 생성기 호출, 저장 직전 fencing, 카드·가격·근거 원자 저장과 `ANCHOR_READY` 전이 | `backend/src/domain/agent_execution/anchor_card.py` |
 | 포지션 카드 Backend–AI 공개 계약. 어휘, 요청·결과 DTO, 생성 Protocol, 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/` |
 | 포지션 카드 프롬프트와 구조화 출력 생성 (`position-card-prompt:v1`, `position-card-workflow:v1`) | `ai/src/brokerage_ai/f3/prompts.py`, `generator.py` |
 | 중개 판정 Backend–AI 공개 계약과 구조화 출력 생성 (`brokerage-judgment:v1`, `brokerage-judgment-workflow:v1`) | `ai/src/brokerage_ai/f3/judgment_contracts.py`, `judgment_generator.py` |
+| 중개 판정 요청 조립, 결과·근거 저장과 `JUDGING`·`COMPLETED` 전이 | `backend/src/domain/agent_execution/judgment.py` |
+| 판정 결과와 근거 저장 | `match_evaluation`, `match_candidate_evaluation`, `match_candidate_evidence` (migration 006) |
 | 결정적 SQL 후보 추출, 점수와 정렬, `CANDIDATES_READY` 전이 | `backend/src/domain/agent_execution/candidates.py` |
 | 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
 | 상위 15건 후보 카드 순차 생성·재사용, 카드 ID 기록과 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
@@ -221,10 +223,9 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker polling loop | 없음. `WORKER_ENABLED=false` Worker는 stop 이벤트만 기다린다 |
 | Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
 | 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
-| Worker에서 AI 호출 | 앵커 카드 유스케이스의 주입 생성기 호출 경계는 있으나 F3 handler가 아직 호출하지 않는다 |
+| Worker에서 AI 호출 | 카드·판정 유스케이스의 주입 생성기 호출 경계는 있으나 F3 handler가 아직 호출하지 않는다 |
 | LangGraph production graph와 checkpoint | 없음. 포지션 카드 생성은 구조화 출력 1회이며 이름뿐인 graph를 두지 않는다 |
 | 실사용 F1 snapshot 마스킹 | 없음. 현재 조립은 ADR-0014의 명시적 `SYNTHETIC_PROTOTYPE`만 허용하며 `MASKED`는 거절한다 |
-| `CANDIDATE_CARDS_READY` 이후 상태 전이 | 없음. AI 중개 판정 계약·생성기는 구현됐지만 Backend 입력 조립·저장과 `JUDGING`·`COMPLETED` 전이는 미구현이다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | `SUPERSEDED` 전이 | 없음 |
@@ -306,8 +307,54 @@ snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, �
 확보되기 전에는 실행 상태와 후보 카드 ID 목록을 완료 처리하지 않는다. 최종 카드 ID는
 `match_evaluation.candidate_selection_snapshot.candidate_cards`에 기록한다.
 
-현재 상태 조회 API는 `CANDIDATE_CARDS_READY` 문자열만 공개하고 후보 카드 본문이나 ID 목록은
-공개하지 않는다. 결과·후보 카드 조회 API는 후속 범위다.
+현재 상태 조회 API는 진행·완료 상태 문자열만 공개하고 후보 카드 본문이나 ID 목록은 공개하지
+않는다. 판정 결과·후보 카드 조회 API는 후속 범위다.
+
+## 중개 판정과 완료
+
+정본 코드는 `backend/src/domain/agent_execution/judgment.py`다. 저장된 앵커 카드 1장과 후보 카드
+1~15장을 `brokerage-judgment:v1` 요청으로 조립해 **한 번의** AI 호출로 판정한다
+(F3-BR-01, F3-NF-04). 흐름은 세 단계다.
+
+| 단계 | transaction | 하는 일 |
+|---|---|---|
+| 1. 준비 | 연다 → 닫는다 | lease·앵커 버전·판정 바인딩·카드 집합 확인, 요청 조립, `JUDGING` 전이 |
+| 2. 판정 | **없음** | `judge_candidates()` 1회 호출 |
+| 3. 저장 | 연다 → commit | 현재 상태 재검증, 판정·후보·근거 원자 저장, `COMPLETED` 전이 |
+
+판정 입력은 `negotiation_position_analysis.analysis_snapshot`에 저장된 공개 카드 결과를 그대로
+복원한다. 어떤 후보 카드를 넣을지는 후보 카드 단계가
+`match_evaluation.candidate_selection_snapshot.candidate_cards`에 기록한 ID가 정한다. 판정
+시점에 cache key를 다시 계산하거나 상담 원문을 다시 읽지 않는다.
+
+현재 Backend 조립은 ADR-0014의 `SYNTHETIC_PROTOTYPE`만 허용한다. `JudgmentBinding`과 AI 요청에
+같은 privacy mode를 명시하며 `MASKED`는 실사용 F1 마스킹이 구현될 때까지 Provider 호출 전에
+거절한다. 합성 입력 예외가 외부 Provider·리전·저장 여부를 승인하는 것은 아니다.
+
+저장 직전에 다음을 다시 확인한다.
+
+- 같은 Worker의 lease·attempt와 같은 사무소 실행인가
+- `BROKERAGE_JUDGMENT` capability의 안전한 model snapshot과 prompt·workflow 버전이 같은가
+- 앵커와 각 후보 장부의 `row_version`, 판정 헤더와 후보 카드 ID 집합이 준비 시점과 같은가
+- 앵커와 후보 카드가 모두 유효하고 같은 tenant에 속하는가
+- 후보 판정이 아직 저장되지 않았는가
+- 요청·결과 후보 집합, 순위, 기각 사유와 카드 근거가 계약 검증을 통과하는가
+
+후보별 판정과 근거, 헤더 확정, `COMPLETED` 전이는 하나의 transaction에 있다. 하나라도 실패하면
+모두 rollback하므로 일부 후보만 저장된 완료 실행은 생기지 않는다. 카드의 `QUOTE` 근거 offset은
+새로 계산하지 않고 `negotiation_position_evidence`에 저장된 값을 그대로 옮긴다.
+
+후보가 0건이면 판정 모델 설정도 조회하지 않고 AI 호출과 `JUDGING`을 생략한다. 빈 최종 결과를
+확정하고 `CANDIDATE_CARDS_READY`에서 바로 `COMPLETED`로 간다.
+
+Provider 호출 중 Worker가 중단되면 상태는 `JUDGING`에 남는다. migration 016은 이 상태를 lease
+선점 인덱스에 추가한다. 다음 Worker는 최초 시도의 모델·prompt·workflow·privacy 바인딩과 후보
+집합을 다시 대조한 뒤 판정 호출부터 재실행한다. 저장은 lease attempt fencing을 통과한 결과만
+허용하므로 이전 Worker의 늦은 응답은 반영되지 않는다.
+
+`redacted_output_snapshot`에는 판정 헤더·앵커 카드 ID, 후보 수, 계약·prompt·workflow 버전,
+안전한 provider·model 이름과 등장한 등급 목록만 남긴다. 판정 본문과 근거는 매칭 판정 테이블이
+소유하며 전체 프롬프트와 전체 모델 원문은 저장하지 않는다.
 
 ## 하이브리드 상담 로그 검색
 

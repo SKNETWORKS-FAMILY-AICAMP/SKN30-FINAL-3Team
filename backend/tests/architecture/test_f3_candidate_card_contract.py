@@ -35,9 +35,9 @@ def test_candidate_card_implementation_and_project_wiki_stay_aligned() -> None:
         "| `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 구현됨 |"
         in api_contract
     )
-    assert "`CANDIDATE_CARDS_READY`)다" in api_contract
+    assert "`CANDIDATE_CARDS_READY`, `JUDGING`)다" in api_contract
     assert "후보 카드 재사용 경계" in ai_contract
     assert "`SYNTHETIC_PROTOTYPE` 입력만 허용" in ai_contract
-    assert "`CANDIDATE_CARDS_READY` 이후 상태 전이 | 없음" in online_runtime
+    assert "중개 판정 요청 조립, 결과·근거 저장" in online_runtime
     assert "후보 포지션 카드 확보" in online_runtime
     assert "F3 결정적 후보 snapshot의 상위 15건" in log

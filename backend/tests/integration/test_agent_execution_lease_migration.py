@@ -432,3 +432,41 @@ def test_migration_015_extends_the_claim_index_for_candidate_cards_ready_recover
                     assert expected in after
         finally:
             engine.dispose()
+
+
+@requires_database
+def test_migration_016_extends_the_claim_index_for_judging_recovery() -> None:
+    with isolated_migration_database() as url:
+        apply_through(url, "015")
+        engine = create_engine(url)
+        try:
+            with engine.connect() as connection:
+                before = connection.execute(
+                    text(
+                        "SELECT indexdef FROM pg_indexes"
+                        " WHERE indexname = 'idx_agent_run_claim_queue'"
+                    )
+                ).scalar_one()
+                assert "CANDIDATE_CARDS_READY" in before
+                assert "JUDGING" not in before
+
+            apply_through(url, "016")
+
+            with engine.connect() as connection:
+                after = connection.execute(
+                    text(
+                        "SELECT indexdef FROM pg_indexes"
+                        " WHERE indexname = 'idx_agent_run_claim_queue'"
+                    )
+                ).scalar_one()
+                for expected in (
+                    "QUEUED",
+                    "RUNNING",
+                    "ANCHOR_READY",
+                    "CANDIDATES_READY",
+                    "CANDIDATE_CARDS_READY",
+                    "JUDGING",
+                ):
+                    assert expected in after
+        finally:
+            engine.dispose()

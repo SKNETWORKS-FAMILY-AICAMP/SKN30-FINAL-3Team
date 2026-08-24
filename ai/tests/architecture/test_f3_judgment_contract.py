@@ -19,9 +19,10 @@ def test_judgment_contract_and_project_wiki_stay_aligned() -> None:
     assert "`brokerage-judgment:v1`" in contract
     assert "결과를 반환하기 전에 직접 호출" in contract
     assert "`SYNTHETIC_PROTOTYPE` 요청은 생성기 조립 지점" in contract
-    assert "Backend 중개 판정 입력 조립" in contract
-    assert "| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 제안 · 미구현 |" in api_contract
+    assert "저장된 앵커·후보 카드의 판정 요청 조립" in contract
+    assert "| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 구현됨 |" in api_contract
+    assert "| `COMPLETED` | 업무 처리 | 검증을 통과한 최종 결과 저장 | 구현됨 |" in api_contract
     assert "포지션 카드·중개 판정" in index
     assert "F3 중개 판정 Backend–AI 계약" in log
     assert "중개 판정 Backend–AI 공개 계약과 구조화 출력 생성" in online_runtime
-    assert "Backend 입력 조립·저장과 `JUDGING`·`COMPLETED` 전이는 미구현" in online_runtime
+    assert "중개 판정 요청 조립, 결과·근거 저장과 `JUDGING`·`COMPLETED` 전이" in online_runtime
