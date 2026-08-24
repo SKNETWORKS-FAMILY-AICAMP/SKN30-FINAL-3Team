@@ -23,6 +23,7 @@ updated: 2026-08-24
 | Backend cache key | `backend/src/domain/agent_execution/cache_key.py` |
 | Backend 합성 입력 조립 | `backend/src/domain/agent_execution/snapshot.py` |
 | Backend 생성·저장 유스케이스 | `backend/src/domain/agent_execution/anchor_card.py` |
+| Backend 후보 카드 단계 | `backend/src/domain/agent_execution/candidate_cards.py` |
 | 카드·가격·근거 ORM | `backend/src/domain/agent_execution/models.py` |
 
 ## 버전 축
@@ -115,6 +116,23 @@ AI가 소유한다.
 Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 않으며 Provider나 모델 ID를
 직접 고르지 않는다. AI는 DB, SQLAlchemy, SQLModel, Session, Repository, FastAPI와 Backend의
 `AgentRun` ORM 모델을 알지 않는다.
+
+### 후보 카드 재사용 경계
+
+후보 포지션 카드는 별도 AI 계약이나 생성기를 만들지 않고 앵커 카드와 같은
+`PositionCardGenerator`와 검증·저장 경로를 쓴다. 다른 것은 실행의 앵커가 아닌 결정적 SQL
+후보 snapshot의 상위 15건을 대상으로 하고, 앵커와 반대인 `negotiation_side`를 쓴다는 점뿐이다.
+
+- 각 후보의 현재 `row_version`, 상담 범위 identity와 입력 fingerprint를 준비·저장 시점에
+  다시 확인한다.
+- 같은 대상·입력·모델·프롬프트·워크플로의 유효한 캐시가 있으면 모델을 호출하지 않는다.
+- 후보 카드는 child 실행을 만들지 않고 루트 `agent_run`에 귀속한다.
+- 후보를 순차 처리하고 전부 확보한 뒤에만 `CANDIDATE_CARDS_READY`로 전이한다. 중간에 실패하면
+  이미 저장된 카드는 유효한 캐시로 남지만 상태는 `CANDIDATES_READY`를 유지한다.
+- 후보가 0건이면 모델을 호출하지 않고 빈 카드 목록을 기록한 뒤 상태를 전이한다.
+
+이 단계도 ADR-0014의 `SYNTHETIC_PROTOTYPE` 입력만 허용한다. 실사용 F1 마스킹이나 외부
+Provider 전송을 새로 승인하지 않는다.
 
 ## 요청 계약
 
@@ -367,11 +385,13 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로�
 - AI 호출 전후 transaction 분리와 lease·attempt·입력 버전·상담 범위·source identity 재검증
 - 검증된 카드·거래 유형별 가격·근거 인용과 quote offset 저장
 - cache hit 재사용과 저장 경합 단일화, `ANCHOR_READY` 상태 전이
+- 결정적 SQL 후보 snapshot의 상위 15건에 대한 반대편 카드 순차 생성·캐시 재사용
+- 후보 카드 ID snapshot 기록과 전건 성공 후 `CANDIDATE_CARDS_READY` 상태 전이
 
 ### 아직 구현하지 않음 (`계획됨`)
 
 - 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
-- SQL 후보 추출, 후보 카드, 중개 판정
+- 중개 판정과 최종 결과 저장
 - Worker polling과 `WORKER_ENABLED=true`
 - F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
   덧씌우지 않는다

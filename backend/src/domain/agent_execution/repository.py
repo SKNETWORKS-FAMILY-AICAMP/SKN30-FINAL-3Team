@@ -690,6 +690,7 @@ def bind_run_execution_configuration(
     model_snapshot: dict[str, object],
     prompt_version: str,
     workflow_version: str,
+    expected_status: str = RUNNING_STATUS,
 ) -> int:
     """실행에 모델·프롬프트·워크플로 바인딩을 처음 기록한다.
 
@@ -703,7 +704,7 @@ def bind_run_execution_configuration(
             *root_cross_judgment_conditions(),
             col(AgentRun.id) == run_id,
             col(AgentRun.brokerage_id) == brokerage_id,
-            col(AgentRun.status) == RUNNING_STATUS,
+            col(AgentRun.status) == expected_status,
             col(AgentRun.lease_owner) == worker_id,
             col(AgentRun.attempt_count) == attempt_count,
             col(AgentRun.lease_expires_at) > func.now(),
@@ -883,15 +884,23 @@ def list_requirement_candidates(
             )
         )
     if complex_id is not None:
-        wants_any_complex = ~select(literal(1)).where(
-            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
-            col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
-        ).exists()
-        wants_this_complex = select(literal(1)).where(
-            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
-            col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
-            col(PropertyRequirementComplex.complex_id) == complex_id,
-        ).exists()
+        wants_any_complex = (
+            ~select(literal(1))
+            .where(
+                col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+                col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
+            )
+            .exists()
+        )
+        wants_this_complex = (
+            select(literal(1))
+            .where(
+                col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+                col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
+                col(PropertyRequirementComplex.complex_id) == complex_id,
+            )
+            .exists()
+        )
         conditions.append(or_(wants_any_complex, wants_this_complex))
 
     statement = (
@@ -1076,6 +1085,26 @@ def update_match_evaluation_selection(
     return cast(CursorResult[Any], session.execute(statement)).rowcount
 
 
+def update_match_evaluation_snapshot(
+    session: Session,
+    brokerage_id: int,
+    match_evaluation_id: int,
+    *,
+    candidate_selection_snapshot: dict[str, Any],
+) -> int:
+    """후보 snapshot 만 갱신한다. 후보 카드 ID 를 붙일 때 쓴다. 바꾼 행 수를 돌려준다."""
+    statement = (
+        update(MatchEvaluation)
+        .where(
+            col(MatchEvaluation.brokerage_id) == brokerage_id,
+            col(MatchEvaluation.id) == match_evaluation_id,
+        )
+        .values(candidate_selection_snapshot=candidate_selection_snapshot)
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
 def advance_run_status(
     session: Session,
     run_id: int,
@@ -1087,6 +1116,9 @@ def advance_run_status(
     next_status: str,
     output_snapshot: dict[str, Any] | None = None,
     completed: bool = False,
+    add_input_tokens: int = 0,
+    add_output_tokens: int = 0,
+    add_latency_ms: int = 0,
 ) -> int:
     """lease 를 아직 쥐고 있고 상태가 기대값일 때만 다음 단계로 옮긴다.
 
@@ -1098,6 +1130,13 @@ def advance_run_status(
         values["redacted_output_snapshot"] = output_snapshot
     if completed:
         values["completed_at"] = func.now()
+    # 토큰과 지연은 단계마다 더한다. 실행 하나의 총량이라야 비용 추적이 성립한다.
+    if add_input_tokens:
+        values["input_tokens"] = col(AgentRun.input_tokens) + add_input_tokens
+    if add_output_tokens:
+        values["output_tokens"] = col(AgentRun.output_tokens) + add_output_tokens
+    if add_latency_ms:
+        values["latency_ms"] = func.coalesce(col(AgentRun.latency_ms), 0) + add_latency_ms
     statement = (
         update(AgentRun)
         .where(

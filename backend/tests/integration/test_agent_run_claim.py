@@ -243,7 +243,9 @@ def test_expired_lease_is_reclaimed_and_keeps_the_original_started_at() -> None:
 
 
 @requires_database
-@pytest.mark.parametrize("progress_status", ["ANCHOR_READY", "CANDIDATES_READY"])
+@pytest.mark.parametrize(
+    "progress_status", ["ANCHOR_READY", "CANDIDATES_READY", "CANDIDATE_CARDS_READY"]
+)
 def test_expired_intermediate_run_is_reclaimed_without_losing_its_progress(
     progress_status: str,
 ) -> None:
@@ -269,7 +271,10 @@ def test_expired_intermediate_run_is_reclaimed_without_losing_its_progress(
 
 
 @requires_database
-@pytest.mark.parametrize("progress_status", ["RUNNING", "ANCHOR_READY", "CANDIDATES_READY"])
+@pytest.mark.parametrize(
+    "progress_status",
+    ["RUNNING", "ANCHOR_READY", "CANDIDATES_READY", "CANDIDATE_CARDS_READY"],
+)
 def test_expired_run_over_the_attempt_limit_is_terminated_and_not_claimed(
     progress_status: str,
 ) -> None:
