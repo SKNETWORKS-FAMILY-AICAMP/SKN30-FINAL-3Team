@@ -198,3 +198,169 @@ def test_migration_011_upgrades_a_database_that_already_holds_agent_runs() -> No
                 assert "ck_agent_run_attempt_count_not_negative" in str(negative.value)
         finally:
             engine.dispose()
+
+
+@requires_database
+def test_migration_012_adds_the_price_table_to_a_database_that_already_holds_cards() -> None:
+    """011 까지 올라간 DB 에 카드가 이미 있어도 012 가 전진 적용되고 데이터가 보존된다."""
+    with isolated_migration_database() as url:
+        apply_through(url, "011")
+        engine = create_engine(url)
+        try:
+            with engine.begin() as connection:
+                run_id = seed_existing_run(connection)
+                brokerage_id = connection.execute(
+                    text("SELECT brokerage_id FROM agent_run WHERE id = :i"), {"i": run_id}
+                ).scalar_one()
+                complex_id = connection.execute(
+                    text(
+                        "INSERT INTO property_complex (brokerage_id, name)"
+                        " VALUES (:b, '이관 검증 단지') RETURNING id"
+                    ),
+                    {"b": brokerage_id},
+                ).scalar_one()
+                unit_id = connection.execute(
+                    text(
+                        "INSERT INTO property_unit (brokerage_id, complex_id, unit_number)"
+                        " VALUES (:b, :c, '101') RETURNING id"
+                    ),
+                    {"b": brokerage_id, "c": complex_id},
+                ).scalar_one()
+                listing_id = connection.execute(
+                    text(
+                        "INSERT INTO property_listing (brokerage_id, unit_id)"
+                        " VALUES (:b, :u) RETURNING id"
+                    ),
+                    {"b": brokerage_id, "u": unit_id},
+                ).scalar_one()
+                analysis_id = connection.execute(
+                    text(
+                        "INSERT INTO negotiation_position_analysis (brokerage_id, agent_run_id,"
+                        " negotiation_side, cache_key, data_version, unit_id, listing_id)"
+                        " VALUES (:b, :r, 'LISTING', 'position-card:v2:existing', 1, :u, :l)"
+                        " RETURNING id"
+                    ),
+                    {"b": brokerage_id, "r": run_id, "u": unit_id, "l": listing_id},
+                ).scalar_one()
+                assert (
+                    connection.execute(
+                        text(
+                            "SELECT count(*) FROM information_schema.tables"
+                            " WHERE table_name = 'negotiation_position_price'"
+                        )
+                    ).scalar_one()
+                    == 0
+                )
+
+            apply_through(url, "012")
+
+            with engine.connect() as connection:
+                # 기존 카드가 살아남아야 한다.
+                assert (
+                    connection.execute(
+                        text("SELECT cache_key FROM negotiation_position_analysis WHERE id = :i"),
+                        {"i": analysis_id},
+                    ).scalar_one()
+                    == "position-card:v2:existing"
+                )
+                comments = connection.execute(
+                    text(
+                        "SELECT count(*) FROM pg_description d"
+                        " JOIN pg_class c ON c.oid = d.objoid"
+                        " WHERE c.relname = 'negotiation_position_price'"
+                    )
+                ).scalar_one()
+                # 테이블 1개 + 컬럼 10개.
+                assert comments == 11
+                constraints = set(
+                    connection.execute(
+                        text(
+                            "SELECT conname FROM pg_constraint"
+                            " WHERE conrelid = 'negotiation_position_price'::regclass"
+                        )
+                    ).scalars()
+                )
+                assert {
+                    "fk_position_price_analysis",
+                    "uq_position_price_kind",
+                    "ck_position_price_amounts_not_negative",
+                    "ck_position_price_monthly_requires_monthly_rent",
+                } <= constraints
+                assert (
+                    connection.execute(
+                        text(
+                            "SELECT count(*) FROM pg_indexes"
+                            " WHERE indexname = 'idx_position_price_analysis'"
+                        )
+                    ).scalar_one()
+                    == 1
+                )
+
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO negotiation_position_price (brokerage_id,"
+                        " position_analysis_id, price_kind, stated_amount)"
+                        " SELECT brokerage_id, id, 'SALE', 2880000000"
+                        " FROM negotiation_position_analysis WHERE id = :i"
+                    ),
+                    {"i": analysis_id},
+                )
+
+            for sql, violated in (
+                (
+                    "INSERT INTO negotiation_position_price (brokerage_id, position_analysis_id,"
+                    " price_kind, stated_amount) SELECT brokerage_id, id, 'SALE', 1"
+                    " FROM negotiation_position_analysis WHERE id = :i",
+                    "uq_position_price_kind",
+                ),
+                (
+                    "INSERT INTO negotiation_position_price (brokerage_id, position_analysis_id,"
+                    " price_kind, stated_amount) SELECT brokerage_id, id, 'JEONSE', -1"
+                    " FROM negotiation_position_analysis WHERE id = :i",
+                    "ck_position_price_amounts_not_negative",
+                ),
+                (
+                    "INSERT INTO negotiation_position_price (brokerage_id, position_analysis_id,"
+                    " price_kind, stated_monthly_amount) SELECT brokerage_id, id, 'JEONSE', 1"
+                    " FROM negotiation_position_analysis WHERE id = :i",
+                    "ck_position_price_monthly_requires_monthly_rent",
+                ),
+            ):
+                with engine.begin() as connection:  # noqa: SIM117 - 제약마다 새 transaction 이 필요하다
+                    with pytest.raises(IntegrityError) as rejected:
+                        connection.execute(text(sql), {"i": analysis_id})
+                    assert violated in str(rejected.value)
+        finally:
+            engine.dispose()
+
+
+@requires_database
+def test_migration_013_extends_the_claim_index_for_anchor_ready_recovery() -> None:
+    with isolated_migration_database() as url:
+        apply_through(url, "012")
+        engine = create_engine(url)
+        try:
+            with engine.connect() as connection:
+                before = connection.execute(
+                    text(
+                        "SELECT indexdef FROM pg_indexes"
+                        " WHERE indexname = 'idx_agent_run_claim_queue'"
+                    )
+                ).scalar_one()
+                assert "ANCHOR_READY" not in before
+
+            apply_through(url, "013")
+
+            with engine.connect() as connection:
+                after = connection.execute(
+                    text(
+                        "SELECT indexdef FROM pg_indexes"
+                        " WHERE indexname = 'idx_agent_run_claim_queue'"
+                    )
+                ).scalar_one()
+                assert "ANCHOR_READY" in after
+                assert "QUEUED" in after
+                assert "RUNNING" in after
+        finally:
+            engine.dispose()

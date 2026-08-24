@@ -5,6 +5,7 @@ updated: 2026-08-24
 
 # 위키 변경 로그
 
+- 2026-08-24: F3 앵커 포지션 카드의 합성 F1 snapshot 조립, 측면별 상담 범위, 입력 fingerprint 기반 `position-card:v3` 캐시, 주입 생성기 호출 전후 transaction 분리, 저장 직전 lease·입력 fencing, 카드·거래 유형별 가격·근거 저장과 `ANCHOR_READY` 전이를 구현했다. 만료된 `ANCHOR_READY` lease는 진행 상태를 보존해 재선점하도록 선점 인덱스까지 확장했다. ADR-0014에 따라 `SYNTHETIC_PROTOTYPE`만 명시적으로 허용하며 실사용 F1 마스킹, Worker polling·handler, 운영 Provider 선택과 후보 이후 단계는 후속 범위로 유지했다.
 - 2026-08-24: F3 프로토타입은 실제 인물과 연결되지 않는 합성 케이스에 한해 마스킹 변환을 생략하고 `SYNTHETIC_PROTOTYPE` 요청과 생성기 opt-in을 모두 요구하기로 ADR-0014에서 승인했다. 실제 F1 사용자 데이터 연결 전에는 마스킹과 `MASKED` 모드로 전환하며 외부 Provider 선택은 별도 결정으로 유지한다.
 - 2026-08-24: F3 포지션 카드 생성기가 모델 결과를 반환하기 전에 요청·결과 교차 검증을 강제하도록 계약을 명확히 하고, F3 AI 정본 등록과 `negotiation_side` OQ-012 종료를 아키텍처 테스트로 고정했다.
 - 2026-08-24: F3 포지션 카드의 Provider 중립 구조화 출력 생성기를 구현했다. 서버 소유 대상·source identity·장부 표기 금액은 모델 schema에서 제외하고 요청으로부터 결정적으로 조립하며, prompt·workflow 버전을 모델 호출 전에 공개한다. Backend 입력 조립·저장과 운영 Provider 선택은 후속 범위로 유지했다.
@@ -13,7 +14,7 @@ updated: 2026-08-24
 - 2026-08-24: 일반 개발 PR을 `dev`에 통합하고 `dev → main` 릴리스 PR로 배포 기준을 갱신하며, `Hong1008`을 기본 사람 승인 책임자로 두는 Git 흐름을 ADR-0013과 정책 정본에 승인함. 작업 PR은 squash, 릴리스 PR은 조상 관계 보존을 위해 merge commit을 사용함.
 - 2026-08-20: Backend·Frontend CI를 artifact 없는 Verify와 테스트 DB 없는 Build로 분리하고, Backend 검증 DB image를 ECR Public 기반으로 만들어 전용 private ECR에 캐시해 Docker Hub pull limit에 의존하지 않도록 delivery 계약을 보완함.
 - 2026-08-20: CodeBuild false-green 방지를 위해 Backend `TEST_DB_URL` 필수 통합 검사와 Frontend typecheck·현재 Vite release 검사를 공통 로컬/CodeBuild 진입점으로 고정함.
-- 2026-08-20: F3 포지션 카드의 Backend–AI 계약을 `contracts/f3-ai.md`로 확정했다. `negotiation_side`를 `LISTING`·`REQUIREMENT`로 고정해 OQ-012를 종료하고, 계약 버전 `position-card:v1`을 cache key 버전 `position-card:v2`와 별개 축으로 분리했으며, intent·urgency·contactability·evidence·price_kind 어휘와 화면 한국어 매핑, LISTING/REQUIREMENT 입력 격리와 근거 규칙을 정의했다. 이 계약을 정의한 당시에는 프롬프트와 모델 호출이 미구현이었고 2026-08-24 후속 항목에서 구현했다. 카드 저장과 `ANCHOR_READY` 전환은 아직 미구현이며 운영 Provider·모델은 미확정이다.
+- 2026-08-20: F3 포지션 카드의 Backend–AI 계약을 `contracts/f3-ai.md`로 확정했다. `negotiation_side`를 `LISTING`·`REQUIREMENT`로 고정해 OQ-012를 종료하고, 계약 버전 `position-card:v1`을 당시 cache key 버전 `position-card:v2`와 별개 축으로 분리했으며, intent·urgency·contactability·evidence·price_kind 어휘와 화면 한국어 매핑, LISTING/REQUIREMENT 입력 격리와 근거 규칙을 정의했다. 이 항목을 기록한 당시에는 프롬프트·모델 호출·카드 저장·`ANCHOR_READY` 전환이 미구현이었고 2026-08-24 후속 항목들에서 구현했다. 운영 Provider·모델은 계속 미확정이다.
 - 2026-08-20: F3 매물 앵커가 F1 세대 소프트 삭제를 따르도록 매물 단건 조회 범위에 부모 세대 삭제 여부를 포함하고, `agent_run.requested_by`의 보존·삭제를 개인정보 정책 정본에서 `agent_run` 감사 이력과 같은 생명주기로 확정해 OQ-007 범위를 미확정 항목만으로 좁힘. 배포용 Worker 프로세스는 있으나 polling loop·handler는 없다는 구현 상태와 활성 실행 재사용·`SUPERSEDED`·SSE 미구현을 F3 아키텍처와 API 계약에 같은 사실로 반영함.
 - 2026-08-20: 세션 발급 시 CSRF 원문을 별도 HttpOnly Cookie에 보관하고 `/auth/me`는 Cookie와 DB 해시를 검증해 같은 값을 반환만 하도록 인증 계약을 변경하여, GET의 CSRF 해시 변경과 다중 탭 토큰 무효화를 제거함.
 - 2026-08-20: Identity Center 전환을 폐기하고 2026-09-23까지 기존 개인 IAM 사용자·MFA·`aws login`·`TerraformOperatorRole`을 유지하며, 승인된 `student` 사용자에게 세 dev Pipeline 최소 운영 policy를 직접 연결하기로 ADR-0012에서 확정함. INFRA-OQ-001과 delivery 적용 차단 조건을 제거함.

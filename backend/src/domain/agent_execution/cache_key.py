@@ -5,8 +5,10 @@ import json
 from datetime import UTC, datetime
 
 # v1 은 상담 로그 집합을 MAX(interaction_at) 하나로만 대표해서, 과거 시각 로그를 추가하거나
-# 로그를 무효화해도 키가 그대로였다. v2 는 건수와 최대 로그 ID 를 함께 넣어 집합 변화를 잡는다.
-CACHE_KEY_SCHEMA_VERSION = "position-card:v2"
+# 로그를 무효화해도 키가 그대로였다. v2 는 건수와 최대 로그 ID 를 함께 넣어 집합 변화를 잡았다.
+# v3 은 여기에 모델 입력 전체의 지문과 범위 지문을 더한다. 앵커 `row_version` 은 세대 스펙,
+# 단지명, 당사자 역할, 날짜 신호가 바뀌어도 그대로여서 그것만으로는 캐시를 못 믿는다.
+CACHE_KEY_SCHEMA_VERSION = "position-card:v3"
 
 
 def _utc(moment: datetime | None) -> str | None:
@@ -33,6 +35,8 @@ def position_card_cache_key(
     model_config_id: int | None,
     prompt_version: str | None,
     workflow_version: str | None,
+    input_fingerprint: str,
+    scope_identity: str,
 ) -> str:
     """포지션 카드 캐시 키. DB 와 전역 상태에 의존하지 않는 순수 함수다.
 
@@ -53,6 +57,9 @@ def position_card_cache_key(
         "model_config_id": model_config_id,
         "prompt_version": prompt_version,
         "workflow_version": workflow_version,
+        # 지문은 이미 digest 라 원문이 키에 들어가지 않는다.
+        "input_fingerprint": input_fingerprint,
+        "scope_identity": scope_identity,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()

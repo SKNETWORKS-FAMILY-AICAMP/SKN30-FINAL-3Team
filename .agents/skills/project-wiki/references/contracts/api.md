@@ -237,7 +237,7 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 |---|---|---|---|
 | `QUEUED` | 실행 제어 | 실행 적재 완료, Worker 대기 | 구현됨 |
 | `RUNNING` | 실행 제어 | Worker가 lease를 걸고 선점함 | 구현됨 |
-| `ANCHOR_READY` | 업무 처리 | 앵커 카드 저장 완료 | 제안 · 미구현 |
+| `ANCHOR_READY` | 업무 처리 | 앵커 카드 검증·저장 완료 | 구현됨 |
 | `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 제안 · 미구현 |
 | `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 제안 · 미구현 |
 | `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 제안 · 미구현 |
@@ -247,8 +247,10 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 | `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
 
-Backend가 실제로 기록하는 상태는 세 가지뿐이다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
-lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직 만들지 않는다.
+Backend가 실제로 기록하는 상태는 네 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+검증된 앵커 카드 확보 시 `ANCHOR_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL`이다.
+`ANCHOR_READY` 유스케이스는 구현됐지만 Worker polling·handler에는 아직 연결되지 않았다.
+그 밖의 상태는 아직 만들지 않는다.
 
 상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
@@ -257,9 +259,10 @@ lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직 만�
 ### Worker 선점과 lease
 
 Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
-`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 `RUNNING`이다.
-선점하면 `RUNNING`으로 바꾸고 5분짜리 lease와 시도 횟수를 기록하며, 만료됐는데 시도 횟수가 3회
-이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
+`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 구현된 진행
+상태(`RUNNING`, `ANCHOR_READY`)다. 최초 `QUEUED`만 `RUNNING`으로 바꾸고 재선점한 진행 상태는
+보존한다. 5분짜리 lease와 시도 횟수를 기록하며, 만료됐는데 시도 횟수가 3회 이상이면
+`FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
 
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
 않는다.
