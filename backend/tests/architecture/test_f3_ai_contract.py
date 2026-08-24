@@ -93,7 +93,10 @@ def test_anchor_card_storage_is_registered_in_the_current_project_contracts() ->
     assert "카드·거래 유형별 가격·근거 인용과 quote offset 저장" in contract
     assert "| `ANCHOR_READY` | 업무 처리 | 앵커 카드 검증·저장 완료 | 구현됨 |" in api_contract
     assert "`position-card:v3`" in online_runtime
-    assert "Worker polling·handler" in online_runtime
+    assert "`backend/src/domain/agent_execution/pipeline.py`" in online_runtime
+    assert "| Worker polling loop | 없음" not in online_runtime
+    assert "| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 구현됨 |" in api_contract
+    assert "- Worker polling과 `WORKER_ENABLED=true`" not in contract
     assert "F3 앵커 포지션 카드의 합성 F1 snapshot 조립" in log
 
 

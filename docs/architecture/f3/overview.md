@@ -141,19 +141,19 @@ pgvector 유사도는 거래 후보를 포함·제외하거나 SQL 후보 점수
 | Frontend·Backend·AI·Data·Infra 루트 경계 | 결정 | [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md) |
 | Backend만 DB·권한·트랜잭션을 소유하고 AI는 DB를 모름 | 결정 | [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md) |
 | 핵심 교차 판정 중심 MVP | 결정 | [현재 MVP 범위](../../requirements/common/mvp-scope-and-evaluation.md) |
-| 영속 작업+Worker, 단계 공개+최종 원자 반영 | 제안 | 비차단 실행·재시작 복구·전체 후보 비교를 함께 보장 |
+| 영속 작업+Worker, 단계 공개+최종 원자 반영 | 구현됨 | RDS polling·lease 재선점·상태 기반 handler와 결과 원자 저장. SSE는 후속 범위 |
 | 전문검색+pgvector 하이브리드 로그 검색 | 제안 | 표현 다양성을 보완하되 원본 근거와 시간 문맥을 유지 |
 | AI가 워크플로를 지휘하고 Backend capability를 주입 | 제안 | Agent 구조를 AI에 가두고 DB 접근을 Backend가 통제 |
 | F3 AI workflow의 LangGraph 사용 | 결정 | [AI ADR-0002](../../../.agents/skills/ai/references/decisions/ADR-0002-langgraph-adoption.md); F2에는 강제하지 않음 |
 | 포지션 카드 `negotiation_side` 어휘 `LISTING`·`REQUIREMENT` | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md); Backend `AnchorType`과 값이 같고 OQ-012를 종료함 |
 | 포지션 카드 Backend–AI 요청·결과 DTO와 근거 규칙 (`position-card:v1`) | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md) |
-| 포지션 카드 생성·저장 수직 슬라이스 | 구현됨 | 합성 snapshot, 주입 생성기 호출, fencing, 카드·가격·근거 저장과 `ANCHOR_READY` 전이. Worker handler 연결은 후속 범위 |
-| 중개 판정 생성·저장 수직 슬라이스 | 구현됨 | 앵커 1장과 후보 1~15장 일괄 판정, 저장 직전 fencing, 결과·근거 원자 저장과 `JUDGING`·`COMPLETED` 전이. Worker handler 연결은 후속 범위 |
+| 포지션 카드 생성·저장 수직 슬라이스 | 구현됨 | 합성 snapshot, 주입 생성기 호출, fencing, 카드·가격·근거 저장과 `ANCHOR_READY` 전이. Worker handler 연결 포함 |
+| 중개 판정 생성·저장 수직 슬라이스 | 구현됨 | 앵커 1장과 후보 1~15장 일괄 판정, 저장 직전 fencing, 결과·근거 원자 저장과 `JUDGING`·`COMPLETED` 전이. Worker handler 연결 포함 |
 | FastAPI·SQLAlchemy 계열·PostgreSQL·pgvector·SSE | 후보 | 팀 승인 전에는 제품 채택으로 간주하지 않음 |
 | 로컬/외부 모델 제공자와 구체 임베딩 모델 | 미확정 | 지연·비용·개인정보 전송 조건에 영향 |
 
-포지션 카드와 중개 판정의 공개 계약·생성기, 합성 입력의 Backend 조립·저장은 구현됐다. Worker
-polling·handler, 실사용 F1 마스킹과 F3 production graph는 아직 없다. 계약의 정본은
+포지션 카드와 중개 판정의 공개 계약·생성기, 합성 입력의 Backend 조립·저장과 Worker
+polling·handler는 구현됐다. 실사용 F1 마스킹과 F3 production graph는 아직 없다. 계약의 정본은
 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이며 구현 여부는
 [온라인 실행](online-runtime.md)의 현재 구현 범위를 본다. 팀이 다른 제안을 승인해 프로젝트 공통
 결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.

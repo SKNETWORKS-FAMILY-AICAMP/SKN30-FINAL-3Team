@@ -23,6 +23,8 @@ from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
     LEASE_EXPIRED_FAILURE_CODE,
     LEASE_EXPIRED_FAILURE_MESSAGE,
+    SUPERSEDED_FAILURE_CODE,
+    SUPERSEDED_FAILURE_MESSAGE,
     AgentRun,
     AgentRunAnchorError,
 )
@@ -216,16 +218,25 @@ def test_status_reflects_stored_lifecycle_columns(config: Config) -> None:
 
 
 @requires_database
-def test_allowlisted_failure_code_is_returned_with_its_fixed_message(config: Config) -> None:
-    """lease 상한 초과는 공개 가능한 코드다. 문구는 DB 원문이 아니라 고정 문구를 쓴다."""
+@pytest.mark.parametrize(
+    ("failure_code", "expected_message"),
+    [
+        (LEASE_EXPIRED_FAILURE_CODE, LEASE_EXPIRED_FAILURE_MESSAGE),
+        (SUPERSEDED_FAILURE_CODE, SUPERSEDED_FAILURE_MESSAGE),
+    ],
+)
+def test_allowlisted_failure_code_is_returned_with_its_fixed_message(
+    config: Config, failure_code: str, expected_message: str
+) -> None:
+    """공개 가능한 코드는 DB 원문 대신 정해진 문구만 반환한다."""
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         queued = queue_listing_run(client, session, brokerage_id)
-        set_failure(session, queued["run_id"], LEASE_EXPIRED_FAILURE_CODE, "내부 운영 원문")
+        set_failure(session, queued["run_id"], failure_code, "내부 운영 원문")
 
         body = client.get(f"/api/v1/f3/runs/{queued['run_id']}").json()
 
-        assert body["failure_code"] == LEASE_EXPIRED_FAILURE_CODE
-        assert body["failure_message"] == LEASE_EXPIRED_FAILURE_MESSAGE
+        assert body["failure_code"] == failure_code
+        assert body["failure_message"] == expected_message
         assert "내부 운영 원문" not in body["failure_message"]
 
 
@@ -246,6 +257,7 @@ def test_unknown_failure_code_is_generalized(config: Config) -> None:
     ("failure_code", "stored_message"),
     [
         (LEASE_EXPIRED_FAILURE_CODE, "의뢰인 010-1234-5678 확인 필요"),
+        (SUPERSEDED_FAILURE_CODE, "매도인 010-9999-0000 입력 변경"),
         ("MODEL_TIMEOUT", "kim.buyer@example.com 상담 로그 처리 중 실패"),
         ("UPSTREAM_ERROR", "openai.BadRequestError: invalid_request_error - context length"),
         (
@@ -254,7 +266,7 @@ def test_unknown_failure_code_is_generalized(config: Config) -> None:
             " in run\n    raise RuntimeError('db password rotated')",
         ),
     ],
-    ids=["전화번호", "이메일", "외부_오류_원문", "stack_trace"],
+    ids=["lease_전화번호", "superseded_전화번호", "이메일", "외부_오류_원문", "stack_trace"],
 )
 def test_stored_failure_message_is_never_exposed(
     config: Config, failure_code: str, stored_message: str
@@ -269,6 +281,7 @@ def test_stored_failure_message_is_never_exposed(
         assert stored_message not in response.text
         assert response.json()["failure_message"] in {
             LEASE_EXPIRED_FAILURE_MESSAGE,
+            SUPERSEDED_FAILURE_MESSAGE,
             GENERIC_FAILURE_MESSAGE,
         }
 

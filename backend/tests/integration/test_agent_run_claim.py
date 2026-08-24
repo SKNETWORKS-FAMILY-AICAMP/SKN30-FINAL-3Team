@@ -481,3 +481,82 @@ def test_longest_documented_status_round_trips_through_the_model() -> None:
 
         assert reloaded.status == "CANDIDATE_CARDS_READY"
         assert stored_run(session, run_id)["status"] == "CANDIDATE_CARDS_READY"
+
+
+@requires_database
+def test_retry_release_makes_the_same_stage_immediately_claimable() -> None:
+    with claim_session() as (session, brokerage_id, user_id):
+        run_id = insert_run(session, brokerage_id, user_id)
+        claimed = service.claim_next_run(session, WORKER_A)
+        assert claimed is not None
+
+        changed = repository.release_lease(
+            session, run_id, brokerage_id, WORKER_A, claimed.attempt_count
+        )
+        session.commit()
+        reclaimed = service.claim_next_run(session, WORKER_B)
+
+        assert changed == 1
+        assert reclaimed is not None and reclaimed.id == run_id
+        stored = stored_run(session, run_id)
+        assert stored["status"] == "RUNNING"
+        assert stored["lease_owner"] == WORKER_B
+        assert stored["attempt_count"] == 2
+
+
+@requires_database
+def test_worker_failure_uses_fencing_and_clears_the_lease() -> None:
+    with claim_session() as (session, brokerage_id, user_id):
+        run_id = insert_run(session, brokerage_id, user_id)
+        claimed = service.claim_next_run(session, WORKER_A)
+        assert claimed is not None
+
+        changed = repository.fail_run(
+            session,
+            run_id,
+            brokerage_id,
+            WORKER_A,
+            claimed.attempt_count,
+            status="SUPERSEDED",
+            failure_code="INPUT_SUPERSEDED",
+            failure_message="실행 중 입력 데이터가 변경되어 결과를 반영하지 않았습니다",
+        )
+        session.commit()
+
+        assert changed == 1
+        stored = stored_run(session, run_id)
+        assert stored["status"] == "SUPERSEDED"
+        assert stored["failure_code"] == "INPUT_SUPERSEDED"
+        assert stored["completed_at"] is not None
+        assert stored["lease_owner"] is None
+        assert stored["lease_expires_at"] is None
+        assert service.claim_next_run(session, WORKER_B) is None
+
+
+@requires_database
+def test_wrong_worker_cannot_release_or_fail_a_run() -> None:
+    with claim_session() as (session, brokerage_id, user_id):
+        run_id = insert_run(session, brokerage_id, user_id)
+        claimed = service.claim_next_run(session, WORKER_A)
+        assert claimed is not None
+
+        released = repository.release_lease(
+            session, run_id, brokerage_id, WORKER_B, claimed.attempt_count
+        )
+        failed = repository.fail_run(
+            session,
+            run_id,
+            brokerage_id,
+            WORKER_B,
+            claimed.attempt_count,
+            status="FAILED_TERMINAL",
+            failure_code="EXECUTION_FAILED",
+            failure_message="실행에 실패했습니다. 잠시 후 다시 시도해 주세요",
+        )
+        session.commit()
+
+        assert released == 0
+        assert failed == 0
+        stored = stored_run(session, run_id)
+        assert stored["status"] == "RUNNING"
+        assert stored["lease_owner"] == WORKER_A
