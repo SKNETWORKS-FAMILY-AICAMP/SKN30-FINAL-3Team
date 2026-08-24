@@ -48,6 +48,7 @@ def create_f3_run(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> F3RunResponse:
+    """동일 앵커·입력 버전의 활성 실행이 있으면 새 실행 대신 그 식별자를 반환한다."""
     run = service.queue_cross_judgment_run(
         db, user.brokerage_id, user.id, payload.anchor_type, payload.anchor_id
     )

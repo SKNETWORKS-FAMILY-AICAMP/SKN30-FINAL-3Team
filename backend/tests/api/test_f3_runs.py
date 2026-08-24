@@ -460,6 +460,96 @@ def test_queueing_does_not_touch_the_ai_runtime(config: Config, monkeypatch) -> 
         assert len(stored_runs(session, brokerage_id)) == 1
 
 
+@requires_database
+@pytest.mark.parametrize(
+    "status",
+    [
+        "QUEUED",
+        "RUNNING",
+        "ANCHOR_READY",
+        "CANDIDATES_READY",
+        "CANDIDATE_CARDS_READY",
+        "JUDGING",
+    ],
+)
+def test_same_anchor_and_version_reuses_an_active_run(config: Config, status: str) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, f"재사용{status}")
+        listing = create_listing(client, complex_id)
+        first = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        )
+        assert first.status_code == 202, first.text
+        run_id = first.json()["run_id"]
+        session.execute(
+            text("UPDATE agent_run SET status = :status WHERE id = :id"),
+            {"status": status, "id": run_id},
+        )
+        session.commit()
+
+        second = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        )
+
+        assert second.status_code == 202, second.text
+        assert second.json()["run_id"] == run_id
+        assert len(stored_runs(session, brokerage_id)) == 1
+
+
+@requires_database
+@pytest.mark.parametrize("status", ["COMPLETED", "FAILED_TERMINAL", "SUPERSEDED"])
+def test_terminal_run_is_not_reused(config: Config, status: str) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, f"종료{status}")
+        listing = create_listing(client, complex_id)
+        first = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        )
+        run_id = first.json()["run_id"]
+        session.execute(
+            text("UPDATE agent_run SET status = :status WHERE id = :id"),
+            {"status": status, "id": run_id},
+        )
+        session.commit()
+
+        second = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        )
+
+        assert second.status_code == 202, second.text
+        assert second.json()["run_id"] != run_id
+        assert len(stored_runs(session, brokerage_id)) == 2
+
+
+@requires_database
+def test_a_new_anchor_version_gets_a_new_run(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, "새입력버전")
+        listing = create_listing(client, complex_id)
+        first = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        ).json()
+        updated = client.patch(
+            f"/api/v1/property-listings/{listing['id']}",
+            json={"row_version": listing["row_version"], "sale_price": 2_700_000_000},
+        )
+        assert updated.status_code == 200, updated.text
+
+        second = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        ).json()
+
+        assert second["run_id"] != first["run_id"]
+        assert second["input_data_version"] == first["input_data_version"] + 1
+        assert len(stored_runs(session, brokerage_id)) == 2
+
+
 def test_unauthenticated_request_is_rejected(config: Config) -> None:
     app = create_app(config=config, readiness_probe=lambda request: True)
 
