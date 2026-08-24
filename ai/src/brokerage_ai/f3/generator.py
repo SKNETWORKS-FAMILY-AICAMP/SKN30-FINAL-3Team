@@ -35,6 +35,8 @@ class LlmPositionCardGenerator:
     """
 
     def __init__(self, *, provider: LlmProvider, route: ModelRoute) -> None:
+        if provider.kind is not route.provider:
+            raise ValueError("provider kind and model route provider must match")
         self._provider = provider
         self._route = route
 

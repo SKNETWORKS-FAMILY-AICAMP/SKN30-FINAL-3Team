@@ -1,7 +1,7 @@
-"""F3 포지션 카드의 Backend–AI 공개 계약.
+"""F3 포지션 카드의 Backend–AI 공개 계약과 구조화 출력 생성기.
 
-현재 범위는 어휘, DTO, Protocol 과 요청·결과 교차 검증까지다. 프롬프트, 모델 호출,
-LangGraph workflow 와 카드 저장은 아직 없다.
+어휘·DTO·Protocol·교차 검증, 프롬프트와 Provider 중립 생성기까지 제공한다.
+Backend 입력 조립·저장, 운영 Provider 선택과 상태 전이는 후속 범위다.
 """
 
 from brokerage_ai.f3.contracts import (

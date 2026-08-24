@@ -194,6 +194,13 @@ def generator(provider: FakeProvider) -> LlmPositionCardGenerator:
 # --- 호출 ---------------------------------------------------------------------
 
 
+def test_generator_rejects_provider_and_route_mismatch() -> None:
+    route = ModelRoute(provider=ProviderKind.OPENAI, model="test-model")
+
+    with pytest.raises(ValueError, match="provider kind and model route provider must match"):
+        LlmPositionCardGenerator(provider=FakeProvider(), route=route)
+
+
 async def test_listing_generation_calls_the_provider_exactly_once() -> None:
     provider = FakeProvider()
     request = listing_request()
