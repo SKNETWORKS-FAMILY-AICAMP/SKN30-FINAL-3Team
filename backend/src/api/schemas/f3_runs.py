@@ -6,12 +6,20 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from domain.agent_execution.feedback import (
+    NOT_INTERESTED_FEEDBACK_TYPE,
+    FeedbackField,
+    FeedbackReason,
+    FeedbackTarget,
+    feedback_target_of,
+)
 from domain.agent_execution.models import (
     LEASE_EXPIRED_FAILURE_CODE,
     LEASE_EXPIRED_FAILURE_MESSAGE,
     SUPERSEDED_FAILURE_CODE,
     SUPERSEDED_FAILURE_MESSAGE,
     AgentRun,
+    AiDecisionFeedback,
     AnchorType,
     anchor_of,
 )
@@ -25,6 +33,42 @@ PUBLIC_FAILURE_MESSAGES = {
 }
 GENERIC_FAILURE_CODE = "EXECUTION_FAILED"
 GENERIC_FAILURE_MESSAGE = "실행에 실패했습니다. 잠시 후 다시 시도해 주세요"
+
+
+class F3FeedbackCreateRequest(BaseModel):
+    """자유문자와 정정값을 받지 않는 관심없음 피드백 요청."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: FeedbackTarget
+    target_id: int = Field(ge=1)
+    reason: FeedbackReason
+    field_name: FeedbackField | None = None
+
+
+class F3FeedbackResponse(BaseModel):
+    feedback_id: int
+    target: FeedbackTarget
+    target_id: int
+    feedback_type: str
+    reason: FeedbackReason
+    field_name: FeedbackField | None
+    created_at: datetime | None
+
+    @classmethod
+    def from_domain(
+        cls, stored: AiDecisionFeedback
+    ) -> F3FeedbackResponse:
+        target, target_id = feedback_target_of(stored)
+        return cls(
+            feedback_id=stored.id or 0,
+            target=target,
+            target_id=target_id,
+            feedback_type=NOT_INTERESTED_FEEDBACK_TYPE,
+            reason=FeedbackReason(stored.reason),
+            field_name=FeedbackField(stored.field_name) if stored.field_name else None,
+            created_at=stored.created_at,
+        )
 
 
 def public_failure(failure_code: str | None) -> tuple[str | None, str | None]:

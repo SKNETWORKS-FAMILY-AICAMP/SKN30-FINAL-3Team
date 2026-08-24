@@ -283,6 +283,28 @@ class MatchCandidateEvidence(SQLModel, table=True):
     created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
 
 
+class AiDecisionFeedback(SQLModel, table=True):
+    """포지션 카드 또는 후보 판정에 남긴 구조화 피드백."""
+
+    __tablename__: ClassVar[str] = "ai_decision_feedback"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    id: int | None = Field(default=None, sa_column=identity_column())
+    brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    position_analysis_id: int | None = Field(default=None, sa_column=Column(BigInteger))
+    match_candidate_evaluation_id: int | None = Field(
+        default=None, sa_column=Column(BigInteger)
+    )
+    feedback_type: str = Field(max_length=30)
+    reason: str = Field(max_length=50)
+    field_name: str | None = Field(default=None, max_length=100)
+    original_value: object | None = Field(default=None, sa_column=Column(JSON))
+    corrected_value: object | None = Field(default=None, sa_column=Column(JSON))
+    detail: str | None = Field(default=None, sa_column=Column(Text))
+    correction_interaction_id: int | None = Field(default=None, sa_column=Column(BigInteger))
+    created_by: int = Field(sa_column=Column(BigInteger, nullable=False))
+    created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+
+
 class NegotiationPositionEvidence(SQLModel, table=True):
     """카드 항목별 근거. 인용은 상담 로그를 가리키고 추정은 설명만 남긴다."""
 
