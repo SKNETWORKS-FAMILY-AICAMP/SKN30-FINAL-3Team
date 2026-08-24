@@ -146,10 +146,7 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
             ),
             f2=F2Config(
                 llm_model=_optional(source, "AI_F2_LLM_MODEL") or "Qwen/Qwen3-4B",
-                stt_model=(
-                    _optional(source, "AI_F2_STT_MODEL")
-                    or "openai/whisper-large-v3-turbo"
-                ),
+                stt_model=(_optional(source, "AI_F2_STT_MODEL") or "openai/whisper-large-v3-turbo"),
                 stt_language=_optional(source, "AI_F2_STT_LANGUAGE") or "ko",
             ),
         )
