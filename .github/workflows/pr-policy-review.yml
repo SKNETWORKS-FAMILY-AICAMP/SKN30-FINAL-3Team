@@ -55,6 +55,7 @@ jobs:
       - name: Review and notify
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PR_REVIEW_TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
           OPENAI_REVIEW_API_KEY: ${{ secrets.OPENAI_REVIEW_API_KEY }}
           DISCORD_PR_WEBHOOK_URL: ${{ secrets.DISCORD_PR_WEBHOOK_URL }}
           OPENAI_REVIEW_MODEL: ${{ vars.OPENAI_REVIEW_MODEL }}
@@ -66,6 +67,10 @@ jobs:
           AI_REVIEW_MAX_FILES: ${{ vars.AI_REVIEW_MAX_FILES }}
           AI_REVIEW_MAX_CHANGED_LINES: ${{ vars.AI_REVIEW_MAX_CHANGED_LINES }}
           AI_REVIEW_MAX_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_CONTEXT_CHARS }}
+          AI_REVIEW_HEAD_FILE_MAX_CHARS: ${{ vars.AI_REVIEW_HEAD_FILE_MAX_CHARS }}
+          AI_REVIEW_HEAD_FILE_MAX_BYTES: ${{ vars.AI_REVIEW_HEAD_FILE_MAX_BYTES }}
+          AI_REVIEW_HEAD_EVIDENCE_MAX_CHARS: ${{ vars.AI_REVIEW_HEAD_EVIDENCE_MAX_CHARS }}
+          AI_REVIEW_HEAD_EVIDENCE_MAX_FILES: ${{ vars.AI_REVIEW_HEAD_EVIDENCE_MAX_FILES }}
           AI_REVIEW_CHUNK_CHANGED_LINES: ${{ vars.AI_REVIEW_CHUNK_CHANGED_LINES }}
           AI_REVIEW_CHUNK_PATCH_CHARS: ${{ vars.AI_REVIEW_CHUNK_PATCH_CHARS }}
           AI_REVIEW_MAX_CHUNKS: ${{ vars.AI_REVIEW_MAX_CHUNKS }}
