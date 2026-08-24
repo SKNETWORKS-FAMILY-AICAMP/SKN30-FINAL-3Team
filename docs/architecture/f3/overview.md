@@ -148,8 +148,12 @@ pgvector 유사도는 거래 후보를 포함·제외하거나 SQL 후보 점수
 | 포지션 카드 `negotiation_side` 어휘 `LISTING`·`REQUIREMENT` | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md); Backend `AnchorType`과 값이 같고 OQ-012를 종료함 |
 | 포지션 카드 Backend–AI 요청·결과 DTO와 근거 규칙 (`position-card:v1`) | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md) |
 | 포지션 카드 생성·저장 수직 슬라이스 | 구현됨 | 합성 snapshot, 주입 생성기 호출, fencing, 카드·가격·근거 저장과 `ANCHOR_READY` 전이. Worker handler 연결은 후속 범위 |
+| 중개 판정 생성·저장 수직 슬라이스 | 구현됨 | 앵커 1장과 후보 1~15장 일괄 판정, 저장 직전 fencing, 결과·근거 원자 저장과 `JUDGING`·`COMPLETED` 전이. Worker handler 연결은 후속 범위 |
 | FastAPI·SQLAlchemy 계열·PostgreSQL·pgvector·SSE | 후보 | 팀 승인 전에는 제품 채택으로 간주하지 않음 |
 | 로컬/외부 모델 제공자와 구체 임베딩 모델 | 미확정 | 지연·비용·개인정보 전송 조건에 영향 |
 
-포지션 카드 공개 계약·생성기와 합성 입력의 Backend 조립·저장은 구현됐다. Worker polling·handler,
-실사용 F1 마스킹과 F3 production graph는 아직 없다. 계약의 정본은 [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이며 구현 여부는 [온라인 실행](online-runtime.md)의 현재 구현 범위를 본다. 팀이 다른 제안을 승인해 프로젝트 공통 결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.
+포지션 카드와 중개 판정의 공개 계약·생성기, 합성 입력의 Backend 조립·저장은 구현됐다. Worker
+polling·handler, 실사용 F1 마스킹과 F3 production graph는 아직 없다. 계약의 정본은
+[F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md)이며 구현 여부는
+[온라인 실행](online-runtime.md)의 현재 구현 범위를 본다. 팀이 다른 제안을 승인해 프로젝트 공통
+결정을 바꾸면 관련 ADR과 계약 정본을 별도로 갱신한다.
