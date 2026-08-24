@@ -96,6 +96,8 @@ def queue_cross_judgment_run(
     requested_by: int,
     anchor_type: AnchorType,
     anchor_id: int,
+    *,
+    trigger_type: str = USER_REQUEST_TRIGGER_TYPE,
 ) -> AgentRun:
     """F3 실행을 적재하거나 같은 앵커·입력 버전의 활성 실행을 반환한다.
 
@@ -127,7 +129,7 @@ def queue_cross_judgment_run(
             run_type=CROSS_JUDGMENT_RUN_TYPE,
             agent_type=BROKERAGE_WORKFLOW_AGENT_TYPE,
             status=QUEUED_STATUS,
-            trigger_type=USER_REQUEST_TRIGGER_TYPE,
+            trigger_type=trigger_type,
             requested_by=requested_by,
             model_config_id=None,
             target_listing_id=anchor.target_listing_id,

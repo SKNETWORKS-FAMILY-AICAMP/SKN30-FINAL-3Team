@@ -186,14 +186,31 @@ def create_property_listing(
     return listing.id or 0
 
 
+def changed_columns(current: Any, payload: dict[str, Any]) -> set[str]:
+    """부분 수정 요청 중 저장된 값과 실제로 다른 컬럼 이름만 돌려준다."""
+    return {key for key, value in payload.items() if getattr(current, key) != value}
+
+
 def update_property_listing(
     session: Session, brokerage_id: int, listing_id: int, payload: dict[str, Any]
-) -> None:
+) -> frozenset[str]:
+    """매물을 수정하고 실제 변경 필드를 반환한다.
+
+    같은 값을 다시 저장하면 쓰기와 ``row_version`` 증가를 생략한다. 값이 같더라도 요청
+    버전이 낡았으면 낙관적 잠금 계약에 따라 충돌로 처리한다.
+    """
     expected_row_version = int(payload.pop("row_version"))
-    if repository.find_property_listing(session, brokerage_id, listing_id) is None:
+    current = repository.find_property_listing(session, brokerage_id, listing_id)
+    if current is None:
         raise NotFoundError("property listing is not found")
-    if not payload:
-        return
+    if current.row_version != expected_row_version:
+        session.rollback()
+        raise RowVersionConflictError()
+
+    changed = changed_columns(current, payload)
+    if not changed:
+        session.commit()
+        return frozenset()
 
     updated = repository.bump_row_version(
         session, PropertyListing, brokerage_id, listing_id, expected_row_version, payload
@@ -202,6 +219,7 @@ def update_property_listing(
         session.rollback()
         raise RowVersionConflictError()
     session.commit()
+    return frozenset(changed)
 
 
 def require_privacy_consent(session: Session, brokerage_id: int, party_id: int) -> None:
@@ -238,33 +256,54 @@ def create_property_requirement(
 
 def update_property_requirement(
     session: Session, brokerage_id: int, requirement_id: int, payload: dict[str, Any]
-) -> None:
+) -> frozenset[str]:
+    """구입장을 수정하고 실제 변경 필드를 반환한다.
+
+    희망 단지는 순서가 아닌 집합으로 비교한다. 단지 집합만 바뀌어도 구입장
+    ``row_version``을 올려 낙관적 잠금과 F3 입력 버전을 함께 갱신한다.
+    """
     expected_row_version = int(payload.pop("row_version"))
-    require_property_requirement(session, brokerage_id, requirement_id)
+    current, _party = require_property_requirement(session, brokerage_id, requirement_id)
+    if current.row_version != expected_row_version:
+        session.rollback()
+        raise RowVersionConflictError()
 
     has_complex_change = "desired_complex_ids" in payload
     desired_complex_ids = payload.pop("desired_complex_ids", None)
+    changed = changed_columns(current, payload)
     if has_complex_change:
         validate_complex_ids(session, brokerage_id, desired_complex_ids or [])
+        stored_complex_ids = {
+            link.complex_id
+            for link, _ in repository.list_requirement_complexes(
+                session, brokerage_id, requirement_id
+            )
+        }
+        if stored_complex_ids != set(desired_complex_ids or []):
+            changed.add("desired_complex_ids")
 
-    if payload:
-        updated = repository.bump_row_version(
-            session,
-            PropertyRequirement,
-            brokerage_id,
-            requirement_id,
-            expected_row_version,
-            payload,
-        )
-        if not updated:
-            session.rollback()
-            raise RowVersionConflictError()
+    if not changed:
+        session.commit()
+        return frozenset()
 
-    if has_complex_change:
+    updated = repository.bump_row_version(
+        session,
+        PropertyRequirement,
+        brokerage_id,
+        requirement_id,
+        expected_row_version,
+        payload,
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+
+    if "desired_complex_ids" in changed:
         repository.replace_requirement_complexes(
             session, brokerage_id, requirement_id, desired_complex_ids or []
         )
     session.commit()
+    return frozenset(changed)
 
 
 def validate_complex_ids(session: Session, brokerage_id: int, complex_ids: list[int]) -> None:

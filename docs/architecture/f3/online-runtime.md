@@ -18,14 +18,24 @@ updated: 2026-08-24
 
 MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 
-| 트리거 | 앵커 | 실행 시점 |
-|---|---|---|
-| 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 |
-| 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 |
-| 손님 상세 진입 | 손님 | 현재 데이터 버전 확인 후 |
-| 세대 상세 진입 | 매물 | 현재 데이터 버전 확인 후 |
+| 트리거 | 앵커 | 실행 시점 | 현재 |
+|---|---|---|---|
+| 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 | Backend 자동 접수 구현됨 |
+| 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 | Backend 자동 접수 구현됨 |
+| 손님 상세 진입 | 손님 | 현재 데이터 버전 확인 후 | Backend 접수 경계만 구현됨 |
+| 세대 상세 진입 | 매물 | 현재 데이터 버전 확인 후 | Backend 접수 경계만 구현됨 |
 
 Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 상세 진입에서도 F3 패널만 로딩·실패 상태를 표시한다.
+
+자동 접수는 `backend/src/domain/agent_execution/triggers.py`가 소유한다. 매물·구입장 신규 등록은
+항상 접수하고, 수정은 F1 서비스가 기존 저장값과 비교해 반환한 실제 변경 필드 중 판정 입력이 있을
+때만 접수한다. 같은 가격·예산 재저장, 희망 단지 순서만 변경, 메모·담당자 변경은 새 실행을 만들지
+않는다. 희망 단지 집합이 실제로 바뀌면 구입장 `row_version`도 함께 올라간다.
+
+F1 commit 뒤 기존 실행 접수 유스케이스를 호출하므로 요청 중 모델 호출은 없고, 같은 앵커·입력
+버전의 활성 실행은 재사용한다. 자동 실행은 `trigger_type=LEDGER_SAVE`로 기록한다. 접수 예외는 F1
+응답 밖으로 전파하지 않고 앵커 종류·ID·예외 타입만 로그에 남긴다. 상세 진입의 Frontend 호출은
+아직 없으며 화면이 `POST /api/v1/f3/runs`를 호출하면 저장 시 생성된 활성 실행을 재사용할 수 있다.
 
 작업 생성 시 사용자 권한, 앵커 종류·식별자와 현재 데이터 버전을 확인한다. **목표 정책은** 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용하는 것이다. 현재는 같은 사무소·앵커·`row_version`의 활성 실행만 재사용한다. 완료 결과는 전체 입력 identity와 AI 구성이 같음을 접수 시점에 증명할 수 없어 재사용하지 않는다. 아래 [현재 구현 범위](#현재-구현-범위)를 함께 본다.
 
@@ -196,6 +206,8 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `POST /api/v1/f3/runs`. 활성 실행이 없으면 `QUEUED` 생성, 있으면 같은 실행 반환 | `backend/src/api/f3_runs.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | 사무소·앵커·입력 버전의 활성 실행 재사용과 PostgreSQL 동시 접수 직렬화 | `backend/src/domain/agent_execution/service.py`, `repository.py` |
+| F1 매물·구입장 저장 성공 후 `LEDGER_SAVE` 자동 접수와 F3 실패 격리 | `backend/src/domain/agent_execution/triggers.py`, `backend/src/api/property_ledger.py` |
+| 매물·구입장 PATCH의 실제 변경 감지, 동일 값 `row_version` 유지와 희망 단지 변경 버전 증가 | `backend/src/domain/property_ledger/service.py` |
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
 | `GET /api/v1/f3/runs/{run_id}/result` 진행 단계별 앵커 카드·전체 SQL 후보·후보 판정 페이지 조회 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/results.py` |
 | `POST /api/v1/f3/feedback` 카드·후보 판정의 구조화 관심없음 사유 기록 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/feedback.py` |
