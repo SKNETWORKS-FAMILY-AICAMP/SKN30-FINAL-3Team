@@ -200,17 +200,22 @@ def update_property_listing(
 ) -> frozenset[str]:
     """매물 건을 부분 수정하고 **실제로 바뀐 필드 집합**을 돌려준다.
 
-    `row_version` 은 payload 에 값이 있으면 그대로 올린다. 낙관적 잠금 통화의 의미를 여기서
-    바꾸지 않는다. 돌려주는 집합은 그와 별개로 "값이 정말 달라졌는가"만 답한다.
+    같은 값을 다시 보낸 저장은 쓰기가 아니므로 `row_version`도 올리지 않는다. 단, 요청의
+    버전이 이미 낡았다면 값이 같더라도 낙관적 잠금 계약대로 충돌을 돌려준다.
     """
     expected_row_version = int(payload.pop("row_version"))
     current = repository.find_property_listing(session, brokerage_id, listing_id)
     if current is None:
         raise NotFoundError("property listing is not found")
-    if not payload:
-        return frozenset()
 
     changed = changed_columns(current, payload)
+    if current.row_version != expected_row_version:
+        session.rollback()
+        raise RowVersionConflictError()
+    if not changed:
+        session.commit()
+        return frozenset()
+
     updated = repository.bump_row_version(
         session, PropertyListing, brokerage_id, listing_id, expected_row_version, payload
     )
@@ -259,8 +264,8 @@ def update_property_requirement(
     """구입장을 부분 수정하고 **실제로 바뀐 필드 집합**을 돌려준다.
 
     희망 단지는 **집합으로** 비교한다. 순서만 다르고 같은 단지를 다시 보낸 저장은 변경이
-    아니다. `preference_order` 는 선호 순서라 저장은 그대로 다시 쓰지만, 후속 동작을 걸
-    만한 변경으로 보지는 않는다.
+    아니므로 자식 테이블과 `row_version`도 건드리지 않는다. 실제 변경이 없어도 요청 버전이
+    낡았다면 낙관적 잠금 계약대로 충돌을 돌려준다.
     """
     expected_row_version = int(payload.pop("row_version"))
     # 장부 단건 조회는 인물을 함께 돌려준다. 비교 대상은 구입장 행이다.
@@ -280,25 +285,31 @@ def update_property_requirement(
         if stored != set(desired_complex_ids or []):
             changed.add("desired_complex_ids")
 
+    if current.row_version != expected_row_version:
+        session.rollback()
+        raise RowVersionConflictError()
+    if not changed:
+        session.commit()
+        return frozenset()
+
     # 희망 단지가 실제로 바뀌었으면 스칼라 필드가 없어도 버전을 올린다.
     #
     # 희망 단지는 자식 테이블에 있어 구입장 행을 건드리지 않는다. 그대로 두면 단지만 바꾼
     # 저장이 `row_version` 을 올리지 않아, 클라이언트의 낡은 상세 화면이 충돌로 잡히지 않고
     # 같은 버전을 키로 쓰는 F3 실행 재사용도 바뀐 조건을 보지 못한다.
-    if payload or "desired_complex_ids" in changed:
-        updated = repository.bump_row_version(
-            session,
-            PropertyRequirement,
-            brokerage_id,
-            requirement_id,
-            expected_row_version,
-            payload,
-        )
-        if not updated:
-            session.rollback()
-            raise RowVersionConflictError()
+    updated = repository.bump_row_version(
+        session,
+        PropertyRequirement,
+        brokerage_id,
+        requirement_id,
+        expected_row_version,
+        payload,
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
 
-    if has_complex_change:
+    if "desired_complex_ids" in changed:
         repository.replace_requirement_complexes(
             session, brokerage_id, requirement_id, desired_complex_ids or []
         )

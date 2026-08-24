@@ -334,6 +334,40 @@ def test_reordering_the_same_desired_complexes_queues_nothing(config: Config) ->
         assert response.status_code == 200, response.text
 
         assert len(runs(session, brokerage_id)) == before
+        assert response.json()["requirement"]["row_version"] == requirement["row_version"]
+
+
+@requires_database
+def test_resaving_the_same_complexes_rejects_a_stale_row_version(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        party_id = create_party(session, brokerage_id, "낡은버전 손님", user_id)
+        wanted = create_complex(client, session, brokerage_id, "낡은버전단지")
+        created = client.post(
+            "/api/v1/property-requirements",
+            json={
+                "party_id": party_id,
+                "demand_type": "매수",
+                "desired_complex_ids": [wanted],
+            },
+        )
+        assert created.status_code == 201, created.text
+        requirement = created.json()["requirement"]
+
+        updated = client.patch(
+            f"/api/v1/property-requirements/{requirement['id']}",
+            json={"row_version": requirement["row_version"], "memo": "먼저 저장된 변경"},
+        )
+        assert updated.status_code == 200, updated.text
+
+        stale = client.patch(
+            f"/api/v1/property-requirements/{requirement['id']}",
+            json={
+                "row_version": requirement["row_version"],
+                "desired_complex_ids": [wanted],
+            },
+        )
+        assert stale.status_code == 409, stale.text
+        assert stale.json()["code"] == "ROW_VERSION_CONFLICT"
 
 
 @requires_database
@@ -351,6 +385,7 @@ def test_resaving_the_same_price_queues_nothing(config: Config) -> None:
         assert response.status_code == 200, response.text
 
         assert len(runs(session, brokerage_id)) == before
+        assert response.json()["row_version"] == listing["row_version"]
 
 
 @requires_database
@@ -370,6 +405,7 @@ def test_resaving_the_same_budget_queues_nothing(config: Config) -> None:
         assert response.status_code == 200, response.text
 
         assert len(runs(session, brokerage_id)) == before
+        assert response.json()["requirement"]["row_version"] == requirement["row_version"]
 
 
 @requires_database
