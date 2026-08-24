@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from brokerage_ai.f3 import InputPrivacyMode
 from sqlmodel import Session
 
 from domain.agent_execution import repository
@@ -105,6 +106,27 @@ def _selection_entries(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
 
+def _empty_result(run: AgentRun, limit: int, offset: int) -> RunResult:
+    """실행 상태만 공개하고 카드·후보 내용은 비운다."""
+    return RunResult(
+        run=run,
+        anchor_card=None,
+        criteria=None,
+        total_count=0,
+        carded_count=0,
+        remaining_count=0,
+        candidates=CandidatePage(items=(), total=0, limit=limit, offset=offset),
+    )
+
+
+def _may_expose_prototype_content(run: AgentRun) -> bool:
+    """저장 단계에서 확인된 합성 프로토타입 실행만 카드·근거를 공개한다."""
+    return (
+        run.redacted_output_snapshot.get("input_privacy_mode")
+        == InputPrivacyMode.SYNTHETIC_PROTOTYPE.value
+    )
+
+
 def load_run_result(
     session: Session,
     brokerage_id: int,
@@ -120,19 +142,25 @@ def load_run_result(
     """
     run = require_cross_judgment_run(session, brokerage_id, run_id)
 
+    # queued/running 실행과 이 표식이 생기기 전의 과거·수동 실행은 상태 자체는 조회할 수
+    # 있지만 개인정보가 섞일 수 있는 카드와 근거는 반환하지 않는다.
+    if not _may_expose_prototype_content(run):
+        return _empty_result(run, limit, offset)
+
     card = repository.find_anchor_card_for_run(session, brokerage_id, run_id)
     anchor_card = _card_view(session, card) if card is not None else None
 
     header = repository.find_match_evaluation_for_run(session, brokerage_id, run_id)
     if header is None:
+        empty = _empty_result(run, limit, offset)
         return RunResult(
-            run=run,
+            run=empty.run,
             anchor_card=anchor_card,
-            criteria=None,
-            total_count=0,
-            carded_count=0,
-            remaining_count=0,
-            candidates=CandidatePage(items=(), total=0, limit=limit, offset=offset),
+            criteria=empty.criteria,
+            total_count=empty.total_count,
+            carded_count=empty.carded_count,
+            remaining_count=empty.remaining_count,
+            candidates=empty.candidates,
         )
 
     snapshot = header.candidate_selection_snapshot

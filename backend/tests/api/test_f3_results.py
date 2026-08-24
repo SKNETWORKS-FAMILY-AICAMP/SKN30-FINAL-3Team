@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from ledger_fixtures import create_complex, create_unit, ledger_client, requires_database
 from sqlalchemy import text
@@ -32,7 +33,14 @@ def _queue_listing_run(
     return run_response.json(), listing
 
 
-def _store_anchor_card(session: Session, brokerage_id: int, run_id: int, listing_id: int) -> int:
+def _store_anchor_card(
+    session: Session,
+    brokerage_id: int,
+    run_id: int,
+    listing_id: int,
+    *,
+    privacy_mode: str | None = "SYNTHETIC_PROTOTYPE",
+) -> int:
     unit_id = session.execute(
         text("SELECT unit_id FROM property_listing WHERE id = :id"), {"id": listing_id}
     ).scalar_one()
@@ -73,12 +81,15 @@ def _store_anchor_card(session: Session, brokerage_id: int, run_id: int, listing
         ),
         {"b": brokerage_id, "card": card_id},
     )
+    output_snapshot = {"position_analysis_id": card_id}
+    if privacy_mode is not None:
+        output_snapshot["input_privacy_mode"] = privacy_mode
     session.execute(
         text(
             "UPDATE agent_run SET status = 'ANCHOR_READY', redacted_output_snapshot ="
-            " jsonb_build_object('position_analysis_id', :card) WHERE id = :run"
+            " CAST(:snapshot AS jsonb) WHERE id = :run"
         ),
-        {"card": card_id, "run": run_id},
+        {"snapshot": json.dumps(output_snapshot), "run": run_id},
     )
     session.commit()
     return card_id
@@ -233,6 +244,32 @@ def test_anchor_card_is_available_before_candidate_selection(config: Config) -> 
         assert body["anchor_card"]["analysis"]["intent"]["value"] == "PRESENT"
         assert body["anchor_card"]["evidence"][0]["evidence_type"] == "INFERENCE"
         assert body["candidates"] == []
+
+
+@requires_database
+@pytest.mark.parametrize("privacy_mode", [None, "MASKED"])
+def test_unverified_privacy_mode_returns_status_without_card_content(
+    config: Config, privacy_mode: str | None
+) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        _store_anchor_card(
+            session,
+            brokerage_id,
+            run["run_id"],
+            listing["id"],
+            privacy_mode=privacy_mode,
+        )
+
+        response = client.get(f"/api/v1/f3/runs/{run['run_id']}/result")
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["status"] == "ANCHOR_READY"
+        assert body["anchor_card"] is None
+        assert body["candidate_selection"]["criteria"] is None
+        assert body["candidates"] == []
+        assert "private-model" not in response.text
 
 
 @requires_database

@@ -290,7 +290,9 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 `run_group_id`, `parent_run_id`, lease 값과 내부 실패 원문도 싣지 않는다. 실패 정보는 상태 조회와
 같은 allowlist 변환을 적용한다. 카드·판정 근거의 `quote_text`는 현재 승인된
 `SYNTHETIC_PROTOTYPE` 입력에서 저장된 공개 근거만 반환하며 실제 F1 데이터 연결은 마스킹 구현 전까지
-허용하지 않는다.
+허용하지 않는다. 카드 저장 단계가 실행 snapshot에 기록한 `input_privacy_mode`가
+`SYNTHETIC_PROTOTYPE`인 실행만 카드·후보·근거 내용을 공개한다. 표식이 없거나 다른 값이면 실행
+상태와 안전한 실패 정보만 반환하고 나머지 결과는 빈 값으로 둔다.
 
 응답 최상위는 실행·앵커 정보와 `anchor_card`, `candidate_selection`, `candidates`,
 `candidates_total`, `limit`, `offset`이다. `candidate_selection`은 `criteria`, `total_count`,

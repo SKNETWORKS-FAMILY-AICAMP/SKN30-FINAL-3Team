@@ -883,6 +883,7 @@ def test_no_personal_data_reaches_the_stored_snapshots() -> None:
             "input_data_version",
             "position_analysis_id",
             "cache_hit",
+            "input_privacy_mode",
             "contract_version",
             "prompt_version",
             "workflow_version",
@@ -1024,6 +1025,7 @@ def test_a_provider_failure_leaves_no_card_and_no_state_change() -> None:
         assert stored["status"] == "RUNNING"
         assert stored["failure_code"] is None
         assert stored["failure_message"] is None
+
 
 @requires_database
 def test_masked_mode_is_rejected_until_real_f1_masking_is_implemented() -> None:
