@@ -140,7 +140,7 @@ updated: 2026-08-24
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
+| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 적재하거나 같은 입력의 활성 실행 식별자를 반환 |
 | GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
 | GET | /api/v1/f3/runs/{run_id}/result | 세션 | 실행의 앵커 카드·후보 조회 조건·후보별 판정 결과를 현재 저장 단계까지 조회 |
 | POST | /api/v1/f3/feedback | 세션·CSRF | 포지션 카드 또는 후보 판정에 구조화된 관심없음 사유를 기록 |
@@ -173,9 +173,29 @@ updated: 2026-08-24
 `input_data_version`은 앵커가 된 매물 또는 구입장의 `row_version`이다. 같은 화면을 다시 열었을 때
 같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
 
-같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)은 아직 구현하지 않았다.
-요청마다 새 `QUEUED` 실행이 생긴다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고
-`agent_run` 적재까지만 하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+`POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만 하므로 F3
+실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+
+### 활성 실행 중복 방지
+
+같은 `(brokerage_id, anchor_type, anchor_id, input_data_version)`의 활성 루트
+`CROSS_JUDGMENT` 실행이 있으면 새 행을 만들지 않고 기존 실행을 반환한다. 재사용 대상 상태는
+`QUEUED`, `RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`이다.
+재사용과 신규 접수 모두 `202 Accepted`와 같은 응답 형태를 사용하며 별도 `reused` 필드는 공개하지
+않는다.
+
+동시 요청은 PostgreSQL transaction advisory lock으로 사무소·앵커 단위 직렬화한다. 프로세스
+메모리 lock은 여러 API 인스턴스 사이의 중복 생성을 막지 못하므로 사용하지 않는다. 잠금을 잡은 뒤
+앵커와 최신 `row_version`을 다시 읽고 재사용 조회와 신규 적재를 같은 transaction에서 수행한다.
+
+재사용할 때 기존 실행의 `requested_by`와 `trigger_type`은 바꾸지 않는다. 두 값은 실행 행을 최초로
+만든 요청자와 접수 계기를 나타내며 이후 같은 실행을 조회한 사용자 목록이 아니다. 후속 재사용 호출
+이력은 현재 별도로 저장하지 않는다.
+
+`COMPLETED`, `FAILED_TERMINAL`, `SUPERSEDED` 실행은 재사용하지 않는다. 특히 완료 결과는 앵커
+`row_version`만 같다고 재사용하지 않는다. 상담 로그 집합, 세대·단지·당사자 관계와 AI 구성이
+그대로인지 접수 시점에 증명할 identity가 아직 없기 때문이다. 따라서 F3-CR-12 중 **활성 실행
+중복 방지**만 구현됐고, 변경 없는 완료 판정 결과 재사용은 후속 범위다.
 
 `LISTING` 앵커는 사무소가 같고 `property_listing.is_deleted = false`이며 **부모 세대도
 `property_unit.is_deleted = false`** 여야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물

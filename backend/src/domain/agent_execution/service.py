@@ -97,34 +97,51 @@ def queue_cross_judgment_run(
     anchor_type: AnchorType,
     anchor_id: int,
 ) -> AgentRun:
-    """F3 교차 판정 실행을 QUEUED로 적재한다. 모델 호출은 Worker 단계에서 일어난다."""
-    anchor = resolve_anchor(session, brokerage_id, anchor_type, anchor_id)
+    """F3 실행을 적재하거나 같은 앵커·입력 버전의 활성 실행을 반환한다.
 
-    # 같은 앵커·입력 버전의 활성 실행 재사용(F3-CR-12)은 아직 구현하지 않는다.
-    # 재사용을 넣을 자리는 resolve_anchor 다음이며 적재 경로는 그대로 둘 수 있다.
-    run = AgentRun(
-        brokerage_id=brokerage_id,
-        run_group_id=uuid4(),
-        parent_run_id=None,
-        run_type=CROSS_JUDGMENT_RUN_TYPE,
-        agent_type=BROKERAGE_WORKFLOW_AGENT_TYPE,
-        status=QUEUED_STATUS,
-        trigger_type=USER_REQUEST_TRIGGER_TYPE,
-        requested_by=requested_by,
-        model_config_id=None,
-        target_listing_id=anchor.target_listing_id,
-        target_unit_id=anchor.target_unit_id,
-        target_requirement_id=anchor.target_requirement_id,
-        input_data_version=anchor.input_data_version,
-        redacted_input_snapshot=redacted_input_snapshot(anchor),
-        redacted_output_snapshot={},
-    )
+    완료 결과는 여기서 재사용하지 않는다. 앵커 ``row_version``만으로는 상담 로그·세대·단지·
+    당사자 관계와 AI 구성이 그대로인지 증명할 수 없기 때문이다. 완료 결과 재사용은 그 입력
+    identity를 접수 시점에 검증할 수 있을 때 별도로 연다.
+    """
 
     try:
+        # 프로세스 메모리 lock은 API 인스턴스 사이의 동시 접수를 막지 못한다. 앵커 조회보다
+        # 먼저 DB lock을 잡아 기다리는 동안 입력 버전이 바뀌어도 잠금 뒤의 최신 값을 읽는다.
+        repository.lock_run_intake(session, brokerage_id, anchor_type, anchor_id)
+        anchor = resolve_anchor(session, brokerage_id, anchor_type, anchor_id)
+        existing = repository.find_reusable_active_run(
+            session,
+            brokerage_id,
+            anchor_type,
+            anchor_id,
+            anchor.input_data_version,
+        )
+        if existing is not None:
+            session.commit()
+            return existing
+
+        run = AgentRun(
+            brokerage_id=brokerage_id,
+            run_group_id=uuid4(),
+            parent_run_id=None,
+            run_type=CROSS_JUDGMENT_RUN_TYPE,
+            agent_type=BROKERAGE_WORKFLOW_AGENT_TYPE,
+            status=QUEUED_STATUS,
+            trigger_type=USER_REQUEST_TRIGGER_TYPE,
+            requested_by=requested_by,
+            model_config_id=None,
+            target_listing_id=anchor.target_listing_id,
+            target_unit_id=anchor.target_unit_id,
+            target_requirement_id=anchor.target_requirement_id,
+            input_data_version=anchor.input_data_version,
+            redacted_input_snapshot=redacted_input_snapshot(anchor),
+            redacted_output_snapshot={},
+        )
         repository.add_agent_run(session, run)
         session.commit()
-    except SQLAlchemyError:
-        # 실행 레코드가 반쯤 남으면 Worker가 대상 없는 작업을 집어간다.
+    except BaseException:
+        # 도메인 오류와 DB 오류 모두 transaction을 닫는다. 실행 레코드가 반쯤 남으면 Worker가
+        # 대상 없는 작업을 집어가고 advisory lock도 transaction 종료까지 유지된다.
         session.rollback()
         raise
 

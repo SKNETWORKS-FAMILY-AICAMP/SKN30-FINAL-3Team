@@ -52,6 +52,55 @@ def add_agent_run(session: Session, run: AgentRun) -> AgentRun:
     return run
 
 
+# 같은 앵커를 동시에 접수해도 실행이 하나만 생기게 하는 transaction advisory lock 이름공간.
+# 다른 기능의 advisory lock과 키 공간이 겹치지 않게 고정 분류 번호를 앞에 둔다.
+RUN_INTAKE_LOCK_NAMESPACE = 0x46330001
+
+
+def lock_run_intake(
+    session: Session, brokerage_id: int, anchor_type: AnchorType, anchor_id: int
+) -> None:
+    """같은 사무소·앵커의 실행 접수를 PostgreSQL transaction 범위에서 직렬화한다."""
+    canonical = f"{brokerage_id}:{anchor_type.value}:{anchor_id}".encode()
+    digest = hashlib.sha256(canonical).digest()
+    # 2-인자 advisory lock의 두 키는 signed int32다. 해시 충돌은 관계없는 접수를 잠깐
+    # 직렬화할 뿐 실행 재사용의 정확성을 깨뜨리지 않는다.
+    anchor_key = int.from_bytes(digest[:4], "big", signed=True)
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(:namespace, :anchor_key)"),
+        {"namespace": RUN_INTAKE_LOCK_NAMESPACE, "anchor_key": anchor_key},
+    )
+
+
+REUSABLE_ACTIVE_STATUSES = (QUEUED_STATUS, *IN_PROGRESS_STATUSES)
+
+
+def find_reusable_active_run(
+    session: Session,
+    brokerage_id: int,
+    anchor_type: AnchorType,
+    anchor_id: int,
+    input_data_version: int,
+) -> AgentRun | None:
+    """같은 앵커·입력 버전으로 아직 진행 중인 최신 루트 실행을 찾는다."""
+    listing_id = anchor_id if anchor_type is AnchorType.LISTING else None
+    requirement_id = anchor_id if anchor_type is AnchorType.REQUIREMENT else None
+    statement = (
+        select(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.target_listing_id).is_not_distinct_from(listing_id),
+            col(AgentRun.target_requirement_id).is_not_distinct_from(requirement_id),
+            col(AgentRun.input_data_version) == input_data_version,
+            col(AgentRun.status).in_(list(REUSABLE_ACTIVE_STATUSES)),
+        )
+        .order_by(col(AgentRun.created_at).desc(), col(AgentRun.id).desc())
+        .limit(1)
+    )
+    return session.execute(statement).scalars().first()
+
+
 def find_root_cross_judgment_run(
     session: Session, brokerage_id: int, run_id: int
 ) -> AgentRun | None:
