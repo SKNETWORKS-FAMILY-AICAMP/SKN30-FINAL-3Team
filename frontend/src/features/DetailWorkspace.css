@@ -1009,6 +1009,63 @@
   margin: -8px 0 18px;
 }
 
+/*
+ * 덮어쓸 칸 목록.
+ *
+ * 무엇이 사라지는지가 결정의 근거라, 현재값과 제안값을 화살표 대신 이름표로 나란히 둔다.
+ * 화면 낭독에서도 "현재 X, 음성 메모 Y"로 그대로 읽힌다.
+ */
+.decision-card__replacements {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  margin: -6px 0 18px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.decision-card__replacements li {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--dw-border-subtle);
+  background: var(--dw-surface-subtle);
+}
+
+.decision-card__replacements strong {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+
+.decision-card__replacements span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.decision-card__replacements em {
+  color: var(--dw-text-subtle);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* 현재값은 사라지는 쪽이므로 제안값보다 뒤로 물린다. */
+.decision-card__replacements li > span:first-of-type {
+  color: var(--dw-text-subtle);
+}
+
+.detail-workspace__decision-card p.decision-card__kept {
+  margin: -8px 0 18px;
+  color: var(--dw-text-subtle);
+  font-size: 13px;
+}
+
 .detail-workspace__delete-modal-body > p:first-child {
   margin: 0 0 22px;
   color: var(--dw-text-subtle);
