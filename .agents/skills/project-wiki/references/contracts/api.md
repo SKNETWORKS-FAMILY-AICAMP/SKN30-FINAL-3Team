@@ -222,6 +222,7 @@ allowlist 기반으로만 만든다.
 |---|---|---|
 | 없음 | `null` | `null` |
 | `LEASE_EXPIRED_MAX_ATTEMPTS` | `LEASE_EXPIRED_MAX_ATTEMPTS` | 실행이 최대 시도 횟수를 초과해 종료되었습니다 |
+| `INPUT_SUPERSEDED` | `INPUT_SUPERSEDED` | 실행 중 입력 데이터가 변경되어 결과를 반영하지 않았습니다 |
 | 그 밖의 모든 값 | `EXECUTION_FAILED` | 실행에 실패했습니다. 잠시 후 다시 시도해 주세요 |
 
 allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개인정보, 외부 서비스 오류 원문과
@@ -245,16 +246,17 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 | `FAILED_RETRYABLE` | 종료 | 재시도 가능한 일시 오류 | 제안 · 미구현 |
 | `FAILED_TERMINAL` | 종료 | 재시도해도 성공하지 않는 영구 오류 | 구현됨 |
 | `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
-| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
+| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 구현됨 |
 
-Backend가 실제로 기록하는 상태는 여덟 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
 검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`,
 상위 후보 카드 ID 저장 시 `CANDIDATE_CARDS_READY`, 중개 판정 호출 중 `JUDGING`, 검증된 결과를
-원자 저장하면 `COMPLETED`, lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. `ANCHOR_READY`,
+원자 저장하면 `COMPLETED`, 입력 버전·상담 범위가 실행 중 바뀌면 `SUPERSEDED`, lease 최대 시도
+초과나 영구 오류이면 `FAILED_TERMINAL`이다. `ANCHOR_READY`,
 `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`은 중간 상태라 `completed_at`을 채우지
 않고 `COMPLETED`에서 채운다. 후보가 0건이면 모델 호출과 `JUDGING` 없이 빈 결과를 확정하고
-`CANDIDATE_CARDS_READY`에서 바로 `COMPLETED`로 간다. 유스케이스는 구현됐지만 Worker
-polling·handler에는 아직 연결되지 않았다. 그 밖의 상태는 아직 만들지 않는다.
+`CANDIDATE_CARDS_READY`에서 바로 `COMPLETED`로 간다. Worker polling·handler가 이 유스케이스를
+상태 순서대로 호출한다. 그 밖의 상태는 아직 만들지 않는다.
 
 후보 조회 조건, 전체 후보 집합과 상위 후보의 `position_analysis_id`는
 `match_evaluation.candidate_selection_snapshot`에 저장하며 이 HTTP 계약으로는 아직 노출하지
@@ -278,9 +280,17 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
 않는다.
 
-`claim_next_run` 유스케이스와 배포용 Worker 프로세스(`backend/src/worker.py`)는 둘 다 있지만 서로
-연결되어 있지 않다. Worker는 `WORKER_ENABLED=false`로만 뜨고 실행을 하나도 claim하지 않는다.
-polling loop, `claim_next_run` 호출 연결과 실제 F3 handler는 아직 없다. 구현됨·미구현의 정본은
+배포용 Worker 프로세스(`backend/src/worker.py`)는 `claim_next_run`을 RDS polling으로 호출하고,
+저장된 상태를 기준으로 앵커 카드 → 후보 SQL → 후보 카드 → 중개 판정 유스케이스를 같은 lease
+아래에서 진행한다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
+일시 Provider 오류는 상태를 보존하고 lease를 즉시 만료시켜 다음 선점이 재시도하며, 영구 계약·
+설정 오류는 `FAILED_TERMINAL`, 입력 변경은 `SUPERSEDED`로 기록한다. raw 예외와 Provider 원문은
+failure 컬럼에 저장하지 않는다.
+
+`WORKER_ENABLED=false`는 기존처럼 readiness만 제공하고 실행을 claim하지 않는다. `true`는 DB와
+LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코드가 Provider·모델 기본값을 정하지
+않고 사무소별 `ai_model_config`의 capability별 최신 활성 설정을 사용한다. 실제 배포 설정 기본값은
+계속 `false`이며 운영 Provider 선택과 활성화는 별도 운영 결정이다. 구현됨·미구현의 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)의 현재 구현 절이고,
 배포 계약은 [백엔드 ADR-0003](../../../backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 

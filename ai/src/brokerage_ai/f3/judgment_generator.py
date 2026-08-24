@@ -13,8 +13,8 @@ LangGraph 인 wrapper 가 된다.
 
 목표 F3 단계 경계(`ANCHOR_READY` → `CANDIDATES_READY` → `CANDIDATE_CARDS_READY` →
 `JUDGING` → `COMPLETED`)와 재개는 **Backend DB 상태**가 담당한다. 이 모듈은 AI 생성기만
-소유하고, Backend의 `judgment.py`가 입력 조립·저장과 두 상태 전이를 수행한다. Worker
-polling·handler 연결은 아직 후속 범위다. LangGraph checkpointer 는 아직 쓰지 않으며
+소유하고, Backend의 `judgment.py`가 입력 조립·저장과 두 상태 전이를 수행한다. Backend Worker는
+저장된 상태를 기준으로 이 생성 경계를 호출한다. LangGraph checkpointer 는 아직 쓰지 않으며
 checkpoint 저장소 제품도 확정되지 않았다 (AI ADR-0002).
 
 graph 가 실제로 필요해지는 시점은 한 번의 AI 호출 안에서 도구 호출·재질의·분기가 생길

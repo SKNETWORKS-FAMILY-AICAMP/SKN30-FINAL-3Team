@@ -236,7 +236,7 @@ def prepare_judgment(
     run_id: int,
     worker_id: str,
     attempt_count: int,
-    binding: JudgmentBinding,
+    binding: JudgmentBinding | None,
 ) -> PreparedJudgment:
     """1단계. 바인딩을 기록하고 카드를 조립한 뒤 `JUDGING` 으로 옮기고 transaction 을 닫는다.
 
@@ -244,7 +244,6 @@ def prepare_judgment(
     거치지 않고 저장 단계가 곧장 빈 결과를 확정한다.
     """
     try:
-        _require_supported_privacy_mode(binding.input_privacy_mode)
         run = repository.find_leased_run(
             session,
             run_id,
@@ -273,6 +272,9 @@ def prepare_judgment(
         model_snapshot: dict[str, object] | None = None
         request: BrokerageJudgmentRequest | None = None
         if candidate_card_ids:
+            if binding is None:
+                raise GenerationBindingError("the judgment binding is unavailable")
+            _require_supported_privacy_mode(binding.input_privacy_mode)
             model_snapshot = _expected_model_snapshot(session, run.brokerage_id, binding)
             anchor_card, candidate_cards = _load_cards(
                 session, run.brokerage_id, header.anchor_position_analysis_id, candidate_card_ids
@@ -418,7 +420,7 @@ def store_judgment(
     run_id: int,
     worker_id: str,
     attempt_count: int,
-    binding: JudgmentBinding,
+    binding: JudgmentBinding | None,
     prepared: PreparedJudgment,
     result: BrokerageJudgmentResult | None,
 ) -> BrokerageJudgmentStored:
@@ -444,6 +446,8 @@ def store_judgment(
             raise LeaseNotHeldError("the run belongs to a different brokerage")
 
         if not empty:
+            if binding is None:
+                raise GenerationBindingError("the judgment binding is unavailable")
             _require_supported_privacy_mode(binding.input_privacy_mode)
             if prepared.request is None or prepared.model_snapshot is None:
                 raise GenerationBindingError("the prepared judgment binding is incomplete")
@@ -475,6 +479,8 @@ def store_judgment(
 
         stored_count = 0
         if not empty and result is not None and prepared.request is not None:
+            if binding is None:  # 앞선 검사의 type narrowing을 transaction 뒤에도 고정한다.
+                raise GenerationBindingError("the judgment binding is unavailable")
             request = prepared.request
             if (
                 result.prompt_version != binding.prompt_version
@@ -583,7 +589,7 @@ async def judge_and_store(
     run_id: int,
     worker_id: str,
     attempt_count: int,
-    binding: JudgmentBinding,
+    binding: JudgmentBinding | None,
 ) -> BrokerageJudgmentStored:
     """중개 판정을 **1회** 실행하고 결과를 저장한 뒤 `COMPLETED` 로 옮긴다 (F3-NF-04).
 
@@ -594,6 +600,8 @@ async def judge_and_store(
 
     result: BrokerageJudgmentResult | None = None
     if prepared.request is not None:
+        if binding is None:
+            raise GenerationBindingError("the judgment binding is unavailable")
         result = await binding.generator.judge_candidates(prepared.request)
 
     return store_judgment(session, run_id, worker_id, attempt_count, binding, prepared, result)

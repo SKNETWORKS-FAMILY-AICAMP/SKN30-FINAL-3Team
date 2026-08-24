@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from domain.agent_execution.models import (
     LEASE_EXPIRED_FAILURE_CODE,
     LEASE_EXPIRED_FAILURE_MESSAGE,
+    SUPERSEDED_FAILURE_CODE,
+    SUPERSEDED_FAILURE_MESSAGE,
     AgentRun,
     AnchorType,
     anchor_of,
@@ -17,6 +19,7 @@ from domain.agent_execution.models import (
 # 정보다. 공개 응답은 원문을 쓰지 않고 아래 allowlist에 있는 코드만 고정 문구로 변환한다.
 PUBLIC_FAILURE_MESSAGES = {
     LEASE_EXPIRED_FAILURE_CODE: LEASE_EXPIRED_FAILURE_MESSAGE,
+    SUPERSEDED_FAILURE_CODE: SUPERSEDED_FAILURE_MESSAGE,
 }
 GENERIC_FAILURE_CODE = "EXECUTION_FAILED"
 GENERIC_FAILURE_MESSAGE = "실행에 실패했습니다. 잠시 후 다시 시도해 주세요"

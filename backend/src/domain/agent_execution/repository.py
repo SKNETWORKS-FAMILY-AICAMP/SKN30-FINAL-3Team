@@ -686,6 +686,27 @@ def find_model_config(
     return session.execute(statement).scalars().first()
 
 
+def find_active_model_config(
+    session: Session, brokerage_id: int, capability: str
+) -> AiModelConfig | None:
+    """사무소와 capability가 같은 최신 활성 모델 설정을 돌려준다.
+
+    Provider와 모델 이름은 환경이나 Worker 코드의 기본값이 아니라 이 설정 행에서 결정한다.
+    같은 capability의 활성 설정이 여러 개면 가장 높은 config version을 사용한다.
+    """
+    statement = (
+        select(AiModelConfig)
+        .where(
+            col(AiModelConfig.brokerage_id) == brokerage_id,
+            col(AiModelConfig.capability) == capability,
+            col(AiModelConfig.is_active).is_(True),
+        )
+        .order_by(col(AiModelConfig.config_version).desc(), col(AiModelConfig.id).desc())
+        .limit(1)
+    )
+    return session.execute(statement).scalars().first()
+
+
 def find_position_card_model_config(
     session: Session, brokerage_id: int, model_config_id: int
 ) -> AiModelConfig | None:
@@ -1267,6 +1288,73 @@ def finalize_match_evaluation(
             col(MatchEvaluation.id) == match_evaluation_id,
         )
         .values(candidate_count=candidate_count, generated_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def fail_run(
+    session: Session,
+    run_id: int,
+    brokerage_id: int,
+    worker_id: str,
+    attempt_count: int,
+    *,
+    status: str,
+    failure_code: str,
+    failure_message: str,
+) -> int:
+    """현재 lease를 가진 실행을 종료하고 공개 가능한 고정 실패 정보만 저장한다."""
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.lease_expires_at) > func.now(),
+        )
+        .values(
+            status=status,
+            failure_code=failure_code,
+            failure_message=failure_message,
+            completed_at=func.now(),
+            updated_at=func.now(),
+            lease_owner=None,
+            lease_expires_at=None,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def release_lease(
+    session: Session,
+    run_id: int,
+    brokerage_id: int,
+    worker_id: str,
+    attempt_count: int,
+) -> int:
+    """재시도 가능한 실패에서 상태를 보존하고 lease 만 DB 현재 시각으로 만료시킨다."""
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.lease_expires_at) > func.now(),
+        )
+        # claim 조건이 `< now()` 이므로 같은 timestamp를 쓰면 빠른 다음 transaction에서
+        # 경계값이 같아 한 번 건너뛸 수 있다. 확실히 과거로 보내 즉시 재선점 가능하게 한다.
+        .values(
+            lease_expires_at=func.now() - func.make_interval(0, 0, 0, 0, 0, 0, 1),
+            updated_at=func.now(),
+        )
         .execution_options(synchronize_session=False)
     )
     return cast(CursorResult[Any], session.execute(statement)).rowcount

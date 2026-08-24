@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # ADR-0011: 개발환경 통합·Backend·Frontend CI/CD 모드
@@ -29,7 +29,7 @@ updated: 2026-08-20
 ## 안전 조건
 
 - Breaking API 변경은 호환되는 단계적 변경 또는 통합 Pipeline으로만 배포한다.
-- Worker는 `WORKER_ENABLED=false`에서 DB readiness와 graceful shutdown만 제공하고 작업을 claim하지 않는다. 전체 F3 handler 전에는 `true` 시작을 거부한다.
+- Worker는 `WORKER_ENABLED=false`에서 DB readiness와 graceful shutdown만 제공하고 작업을 claim하지 않는다. F3 handler 코드는 `true` polling을 지원하지만 현재 배포 Parameter 기본값은 `false`로 유지하며, 운영 Provider 선택과 활성화는 별도 적용한다.
 - Backend Verify는 disposable PostgreSQL의 `TEST_DB_URL`을 필수로 주입해 DB 통합 검사를 skip 없이 실행한다. Frontend Verify는 typecheck와 원장 테스트를 수행하고, 별도 Frontend Build가 Vite release와 release 계약 테스트를 수행한다.
 - 통합 자동 감지는 독립 Pipeline, rollback, Frontend 복원과 알림 실패 주입 검증 후에만 켠다.
 - Pipeline 수동 운영 권한은 [ADR-0012](ADR-0012-retain-iam-access.md)에 따라 승인된 기존 IAM 사용자에게 최소 권한 policy로 연결한다.

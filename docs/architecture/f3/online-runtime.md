@@ -167,13 +167,13 @@ sequenceDiagram
 | `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
 
-현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 상위 후보 카드 ID 저장 시 `CANDIDATE_CARDS_READY`, 판정 호출 중 `JUDGING`, 검증된 결과 저장 시 `COMPLETED`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 여덟 가지다. 유스케이스는 구현됐지만 Worker polling·handler에는 아직 연결되지 않았다. 나머지는 아직 `제안`이며 구현되지 않았다.
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, 상위 후보 카드 ID 저장 시 `CANDIDATE_CARDS_READY`, 판정 호출 중 `JUDGING`, 검증된 결과 저장 시 `COMPLETED`, 입력 변경 시 `SUPERSEDED`, lease 최대 시도 초과나 영구 오류 시 `FAILED_TERMINAL` 아홉 가지다. Worker polling·handler가 저장 상태에 맞는 유스케이스를 호출한다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
 `ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
 
-현재 구현된 앵커 카드 유스케이스는 lease·attempt와 앵커 입력을 확인하고, cache hit이면 검증된 카드를 재사용하며, cache miss이면 주입된 AI 생성기를 호출한 뒤 카드·가격·근거를 저장하고 `ANCHOR_READY`로 전이한다. Worker polling·handler가 이 유스케이스를 호출하는 연결은 아직 없다.
+현재 구현된 앵커 카드 유스케이스는 lease·attempt와 앵커 입력을 확인하고, cache hit이면 검증된 카드를 재사용하며, cache miss이면 주입된 AI 생성기를 호출한 뒤 카드·가격·근거를 저장하고 `ANCHOR_READY`로 전이한다. Worker handler가 `RUNNING` 상태에서 이 유스케이스를 호출한다.
 
-후보 카드 유스케이스는 `candidate-selection:v2` snapshot에서 `selected_for_cards`인 상위 15건을 순서대로 읽고 앵커의 반대편 포지션 카드를 확보한다. 앵커 카드와 같은 snapshot·privacy mode·cache key·저장 직전 fencing 경로를 재사용하며 후보의 현재 `row_version`을 고정한다. 후보를 순차 처리해 전부 확보한 경우에만 카드 ID를 snapshot에 기록하고 `CANDIDATE_CARDS_READY`로 전이한다. 후보가 0건이면 모델 호출 없이 전이하고, 하나라도 실패하면 상태는 `CANDIDATES_READY`에 남는다. 이 유스케이스도 Worker polling·handler와 아직 연결되지 않았다.
+후보 카드 유스케이스는 `candidate-selection:v2` snapshot에서 `selected_for_cards`인 상위 15건을 순서대로 읽고 앵커의 반대편 포지션 카드를 확보한다. 앵커 카드와 같은 snapshot·privacy mode·cache key·저장 직전 fencing 경로를 재사용하며 후보의 현재 `row_version`을 고정한다. 후보를 순차 처리해 전부 확보한 경우에만 카드 ID를 snapshot에 기록하고 `CANDIDATE_CARDS_READY`로 전이한다. 후보가 0건이면 모델 호출 없이 전이하고, 하나라도 실패하면 상태는 `CANDIDATES_READY`에 남는다. Worker handler가 `CANDIDATES_READY` 상태에서 이 유스케이스를 호출한다.
 
 포지션 카드 cache key의 현재 schema version은 `position-card:v3`이다. `v2`의 상담 로그 건수·마지막 시각·최대 ID에 더해, AI 요청 전체의 비식별 SHA-256 fingerprint와 측면별 상담 범위 identity를 넣는다. 매물·구입장 `row_version`만으로는 세대 스펙, 단지명, 당사자 역할, 날짜 bucket 변화를 잡을 수 없기 때문이다. 지문에는 원문을 저장하지 않는다.
 
@@ -211,6 +211,9 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
+| RDS polling, `claim_next_run` 연결과 저장 상태 기반 F3 handler | `backend/src/worker.py`, `backend/src/domain/agent_execution/pipeline.py` |
+| capability별 lazy 모델 binding, 합성 모드 명시적 opt-in과 하나의 asyncio loop | `backend/src/worker.py` |
+| 일시 Provider 오류의 즉시 lease release·3회 상한 재시도, 입력 변경 `SUPERSEDED`, 영구 오류 `FAILED_TERMINAL` | `backend/src/domain/agent_execution/pipeline.py` |
 
 Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 
@@ -220,17 +223,12 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 
 | 항목 | 현재 상태 |
 |---|---|
-| Worker polling loop | 없음. `WORKER_ENABLED=false` Worker는 stop 이벤트만 기다린다 |
-| Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
-| 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
-| Worker에서 AI 호출 | 카드·판정 유스케이스의 주입 생성기 호출 경계는 있으나 F3 handler가 아직 호출하지 않는다 |
 | LangGraph production graph와 checkpoint | 없음. 포지션 카드 생성은 구조화 출력 1회이며 이름뿐인 graph를 두지 않는다 |
 | 실사용 F1 snapshot 마스킹 | 없음. 현재 조립은 ADR-0014의 명시적 `SYNTHETIC_PROTOTYPE`만 허용하며 `MASKED`는 거절한다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
-| `SUPERSEDED` 전이 | 없음 |
 | SSE 진행 구독과 재연결 | 없음. polling만 제공 |
-| `WORKER_ENABLED=true` 운영 | 허용하지 않는다 |
+| 배포 환경의 `WORKER_ENABLED=true` 전환 | 실행 코드는 지원하지만 현재 Infra 기본값은 `false`. 운영 Provider 선택과 함께 별도 적용 |
 
 ## 결정적 후보 검색
 
@@ -390,7 +388,7 @@ pgvector, PostgreSQL 전문검색과 구체 결합 점수·top-K는 후보 구�
 
 **목표 정책은** 동일 키의 활성 작업을 하나만 실행하고 뒤따른 화면이 그 작업을 구독하는 것이다. 실행 중 F1 데이터가 바뀌면 이전 실행을 강제 성공으로 덮어쓰지 않고 `SUPERSEDED`로 남기며, 새 입력 버전 작업이 현재 화면의 결과 소유권을 가진다.
 
-활성 작업 재사용, 기존 작업 구독과 `SUPERSEDED` 전이는 아직 구현하지 않았다. 현재는 `POST /api/v1/f3/runs` 요청마다 새 `QUEUED` 실행이 생기고, 앵커가 바뀐 실행은 Worker 단계에서 거부될 뿐 `SUPERSEDED`로 기록되지 않는다.
+입력 변경을 감지한 기존 실행의 `SUPERSEDED` 전이는 구현됐다. 다만 활성 작업 재사용, 기존 작업 구독과 새 입력 버전 실행의 자동 생성은 아직 없다. 현재 `POST /api/v1/f3/runs` 요청마다 새 `QUEUED` 실행이 생기므로 사용자가 최신 입력으로 다시 요청해야 한다.
 
 ## 검증·개인정보와 실행 로그
 
