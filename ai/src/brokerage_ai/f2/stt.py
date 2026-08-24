@@ -4,8 +4,47 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+from openai import OpenAI, OpenAIError
+
+from brokerage_ai.core.errors import translate_openai_error
 from brokerage_ai.f2.errors import AudioInputError, EmptyTranscriptionError, F2DependencyError
 from brokerage_ai.f2.types import Transcription
+
+
+class VllmWhisperTranscriber:
+    """vLLM의 OpenAI 호환 전사 API를 통해 RunPod Whisper를 호출한다."""
+
+    def __init__(
+        self,
+        client: OpenAI,
+        *,
+        model_id: str = "openai/whisper-large-v3-turbo",
+        language: str = "ko",
+    ) -> None:
+        self._client = client
+        self._model_id = model_id
+        self._language = language
+
+    def transcribe(self, audio_path: Path) -> Transcription:
+        path = audio_path.expanduser().resolve()
+        if not path.is_file():
+            raise AudioInputError(f"음성 파일을 찾을 수 없습니다: {path}")
+
+        try:
+            with path.open("rb") as audio_file:
+                response = self._client.audio.transcriptions.create(
+                    model=self._model_id,
+                    file=audio_file,
+                    language=self._language,
+                    response_format="json",
+                )
+        except OpenAIError as error:
+            raise translate_openai_error(error) from None
+
+        text = response.text.strip()
+        if not text:
+            raise EmptyTranscriptionError("STT 결과가 비어 있어 sLLM 분석을 중단했습니다.")
+        return Transcription(text=text, model=self._model_id)
 
 
 class FasterWhisperTranscriber:

@@ -44,3 +44,17 @@ class ValidationError(ApplicationError):
 class PrivacyConsentRequiredError(ValidationError):
     def __init__(self, message: str = "privacy consent is required") -> None:
         super().__init__(message, code="PRIVACY_CONSENT_REQUIRED")
+
+
+class F2UnavailableError(ApplicationError):
+    status_code = 503
+
+    def __init__(self, message: str = "voice analysis is temporarily unavailable") -> None:
+        super().__init__("F2_UNAVAILABLE", message)
+
+
+class F2ProcessingError(ApplicationError):
+    status_code = 502
+
+    def __init__(self, message: str = "voice analysis failed") -> None:
+        super().__init__("F2_PROCESSING_FAILED", message)

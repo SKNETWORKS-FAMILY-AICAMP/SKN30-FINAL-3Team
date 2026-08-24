@@ -13,7 +13,7 @@
 services:
   postgres:
     # docs/db/README.md의 기준선이 PostgreSQL 15다.
-    image: postgres:15-alpine
+    image: postgres:15.19-alpine
     container_name: brokerage-local-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?infra/local/.env에 POSTGRES_USER를 설정한다}

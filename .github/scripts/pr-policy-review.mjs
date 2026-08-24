@@ -5,6 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import {
   CHECK_NAME,
+  MERGED_REVIEW_SCHEMA,
   REVIEW_SCHEMA,
   addRedactionFinding,
   applyLimits,
@@ -14,6 +15,7 @@ import {
   buildMergeInstructions,
   buildOpenAIRequest,
   buildReviewContext,
+  collectHeadFileEvidence,
   discordPayload,
   extractResponseText,
   fetchWithRetry,
@@ -23,8 +25,10 @@ import {
   incompleteReview,
   isReusableReviewState,
   isInternalPullRequest,
+  isSamePullRequestSnapshot,
   mapWithConcurrency,
   mergeReviewsFallback,
+  normalizeMergedReview,
   normalizeReview,
   parseReviewState,
   planForEvent,
@@ -47,6 +51,7 @@ const githubToken = requiredEnv("GITHUB_TOKEN");
 const githubApiUrl = process.env.GITHUB_API_URL || "https://api.github.com";
 const eventName = process.env.GITHUB_EVENT_NAME || "workflow_dispatch";
 const eventPath = requiredEnv("GITHUB_EVENT_PATH");
+const trustedBaseSha = process.env.PR_REVIEW_TRUSTED_BASE_SHA || process.env.GITHUB_SHA || "";
 const dryRun = parseBoolean(process.env.PR_REVIEW_DRY_RUN, eventName === "workflow_dispatch");
 const invokeOpenAI = parseBoolean(process.env.PR_REVIEW_INVOKE_OPENAI, eventName !== "workflow_dispatch");
 const skipDiscord = parseBoolean(process.env.PR_REVIEW_SKIP_DISCORD, false);
@@ -113,6 +118,12 @@ try {
     );
     process.exit(0);
   }
+  if (!trustedBaseSha || pr.base?.sha !== trustedBaseSha) {
+    await writeSummary(
+      `## PR Policy Agent\n\ncheckout한 trusted base SHA와 PR #${pr.number}의 현재 base SHA가 달라 stale 실행을 종료했습니다. 최신 base에서 workflow를 다시 실행해 주세요.`
+    );
+    process.exit(0);
+  }
 
   // 변경: action이 "opened"가 아닐 때만 시작 알림 전송
   if (action !== "opened") {
@@ -125,6 +136,13 @@ try {
     action === "synchronize" ? findReviewComment(await listIssueComments(pr.number)) : null;
   const previousReviewState = parseReviewState(previousReviewComment?.body);
   const files = await listPullRequestFiles(pr.number);
+  const prAfterFileCollection = await githubJson(`/repos/${repository}/pulls/${pr.number}`);
+  if (!isSamePullRequestSnapshot(pr, prAfterFileCollection)) {
+    await writeSummary(
+      `## PR Policy Agent\n\nPR #${pr.number}의 head 또는 base가 입력 수집 중 변경되어 stale 실행을 종료했습니다. 최신 workflow 실행이 현재 SHA를 검토합니다.`
+    );
+    process.exit(0);
+  }
   const reviewableFiles = files.filter((file) => !shouldIgnoreFile(file.filename, policyFile));
   const limits = effectiveLimits(policyFile.limits ?? {});
   const configurationHash = stableObjectHash({
@@ -134,6 +152,7 @@ try {
     leaf: { model, reasoningEffort, reviewVerbosity },
     merge: { model: mergeModel, reasoningEffort: mergeReasoningEffort, verbosity: mergeVerbosity },
     schema: REVIEW_SCHEMA,
+    mergeSchema: MERGED_REVIEW_SCHEMA,
     leafInstructions: buildInstructions(limits.chunkMaxFindings),
     singleInstructions: buildInstructions(limits.maxFindings),
     mergeInstructions: buildMergeInstructions(limits.maxFindings)
@@ -160,6 +179,16 @@ try {
   let usage = sumUsage([]);
   let effectiveModel = model;
   let reviewState = null;
+  let headEvidence = {
+    files: [],
+    unavailable: [],
+    candidateCount: 0,
+    sourceChars: 0,
+    contextChars: 0,
+    redactionCount: 0,
+    redactedFiles: [],
+    fingerprint: stableObjectHash({ candidates: [] })
+  };
 
   if (reviewableFiles.length === 0) {
     review = {
@@ -173,6 +202,15 @@ try {
   } else if (!chunkPlan.accepted) {
     review = incompleteReview(chunkPlan.reasons);
   } else {
+    headEvidence = await collectHeadFileEvidence({
+      files: reviewableFiles,
+      policy: policyFile,
+      limits,
+      loadFile: (file) =>
+        githubJson(
+          `/repos/${repository}/contents/${encodeRepositoryPath(file.filename)}?ref=${encodeURIComponent(pr.head.sha)}`
+        )
+    });
     const chunkContexts = await Promise.all(
       chunkPlan.chunks.map((chunk) =>
         buildReviewContext({
@@ -180,11 +218,20 @@ try {
           pr,
           files: chunk.files,
           policy: policyFile,
-          limits
+          limits,
+          headEvidence
         })
       )
     );
     context = combineChunkContexts(chunkPlan, chunkContexts);
+    context.headEvidenceCandidateCount = headEvidence.candidateCount;
+    context.headEvidenceFileCount = headEvidence.files.length;
+    context.headEvidenceChars = headEvidence.contextChars;
+    context.unavailableHeadEvidencePaths = headEvidence.unavailable.map(
+      (item) => item.filename
+    );
+    context.redactionCount += headEvidence.redactionCount;
+    context.headEvidenceRedactionCount = headEvidence.redactionCount;
     const rejectedChunks = chunkContexts.flatMap((chunkContext, index) =>
       chunkContext.accepted
         ? []
@@ -198,9 +245,16 @@ try {
         `Dry-run에서 OpenAI 호출 없이 ${chunkPlan.chunks.length}개 리뷰 chunk 구성까지만 검증했습니다.`
       ]);
     } else {
-      const chunkFingerprints = chunkPlan.chunks.map(reviewChunkFingerprint);
+      const prMetadataFingerprint = stableObjectHash({
+        title: pr.title ?? "",
+        body: pr.body ?? ""
+      });
+      const chunkFingerprints = chunkPlan.chunks.map((chunk) =>
+        reviewChunkFingerprint(chunk, headEvidence.fingerprint, prMetadataFingerprint)
+      );
       const aggregateFingerprint = stableObjectHash({
         chunks: chunkFingerprints,
+        headEvidenceFingerprint: headEvidence.fingerprint,
         title: pr.title ?? "",
         body: pr.body ?? "",
         inventory: reviewableFiles.map((file) => ({
@@ -365,7 +419,11 @@ try {
         previousReviewState?.finalReview
       ) {
         try {
-          review = normalizeReview(previousReviewState.finalReview, limits.maxFindings);
+          review = reconcileMergedReview(
+            normalizeMergedReview(previousReviewState.finalReview, limits.maxFindings),
+            leafReviews,
+            limits.maxFindings
+          );
           context.finalReviewReused = true;
           finalReviewComplete = true;
           finalModelUsed = previousReviewState.finalModel || mergeModel;
@@ -390,7 +448,8 @@ try {
           files: reviewableFiles,
           policy: policyFile,
           limits,
-          chunkResults: mergeInput
+          chunkResults: mergeInput,
+          headEvidence
         });
         context.mergeContextChars = mergeContext.contextChars;
         if (!mergeContext.accepted) {
@@ -413,7 +472,8 @@ try {
               requestReasoningEffort: mergeReasoningEffort,
               requestMaxOutputTokens: limits.mergeMaxOutputTokens,
               requestVerbosity: mergeVerbosity,
-              schemaName: "pr_policy_merged_review"
+              schemaName: "pr_policy_merged_review",
+              schema: MERGED_REVIEW_SCHEMA
             });
             assertCompletedResponse(response);
             usage = sumUsage([usage, response.usage]);
@@ -421,7 +481,7 @@ try {
             finalModelUsed = responseModel;
             effectiveModel = responseModel === model ? model : `${effectiveModel} + ${responseModel}`;
             review = reconcileMergedReview(
-              normalizeReview(
+              normalizeMergedReview(
                 JSON.parse(extractResponseText(response)),
                 limits.maxFindings
               ),
@@ -461,6 +521,14 @@ try {
         finalReview: finalReviewComplete ? review : null
       };
     }
+  }
+
+  const prBeforePublication = await githubJson(`/repos/${repository}/pulls/${pr.number}`);
+  if (!isSamePullRequestSnapshot(pr, prBeforePublication)) {
+    await writeSummary(
+      `## PR Policy Agent\n\nPR #${pr.number}의 head, base 또는 상태가 리뷰 중 변경되어 stale 결과를 게시하지 않았습니다. 최신 workflow 실행이 현재 SHA를 검토합니다.`
+    );
+    process.exit(0);
   }
 
   review = withContextEvidence(review, context);
@@ -515,8 +583,10 @@ try {
 - 증분 리뷰: 신규 ${context.reviewedChunkCount ?? context.chunkCount ?? 0}개 / 재사용 ${context.reusedChunkCount ?? 0}개 / 최종 통합 재사용 ${context.finalReviewReused ? "예" : "아니오"}
 - 파일: ${reviewableFiles.length} reviewable / ${files.length} total, 변경 줄: ${sizeCheck.changedLines}
 - 부분 컨텍스트 합: ${context.contextChars ?? 0}자, 통합 컨텍스트: ${context.mergeContextChars ?? 0}자
+- PR head 전체 파일 근거: ${context.headEvidenceFileCount ?? 0}/${context.headEvidenceCandidateCount ?? 0}개, ${context.headEvidenceChars ?? 0}자
 - 비밀 의심 redaction: ${context.redactionCount ?? 0}
 - Finding: ${review.findings.length}
+- 교차 검증 제외: ${(review.dismissed_findings ?? []).length}
 - Token cache: read ${usage.input_tokens_details?.cached_tokens ?? 0} / write ${usage.input_tokens_details?.cache_write_tokens ?? 0}
 - 증분 상태 저장: ${context.reviewStatePersisted ? "예" : "아니오"}
 - Discord 실패: ${discordFailures}
@@ -585,7 +655,8 @@ async function callOpenAI({
   requestReasoningEffort = reasoningEffort,
   requestMaxOutputTokens = limits.leafMaxOutputTokens,
   requestVerbosity = reviewVerbosity,
-  schemaName = "pr_policy_review"
+  schemaName = "pr_policy_review",
+  schema = REVIEW_SCHEMA
 }) {
   if (!openAiKey) throw new Error("OPENAI_REVIEW_API_KEY is not configured");
   const requestBody = buildOpenAIRequest({
@@ -597,6 +668,7 @@ async function callOpenAI({
     reasoningEffort: requestReasoningEffort,
     verbosity: requestVerbosity,
     schemaName,
+    schema,
     maxOutputTokens: requestMaxOutputTokens,
     safetyIdentifier: stableSafetyIdentifier(repository, pr.user?.login ?? "unknown")
   });
@@ -743,6 +815,22 @@ function effectiveLimits(configured) {
       process.env.AI_REVIEW_MAX_CONTEXT_CHARS,
       configured.maxContextChars ?? 200000
     ),
+    headFileMaxChars: positiveInteger(
+      process.env.AI_REVIEW_HEAD_FILE_MAX_CHARS,
+      configured.headFileMaxChars ?? 20000
+    ),
+    headFileMaxBytes: positiveInteger(
+      process.env.AI_REVIEW_HEAD_FILE_MAX_BYTES,
+      configured.headFileMaxBytes ?? 80000
+    ),
+    headEvidenceMaxChars: positiveInteger(
+      process.env.AI_REVIEW_HEAD_EVIDENCE_MAX_CHARS,
+      configured.headEvidenceMaxChars ?? 60000
+    ),
+    headEvidenceMaxFiles: positiveInteger(
+      process.env.AI_REVIEW_HEAD_EVIDENCE_MAX_FILES,
+      configured.headEvidenceMaxFiles ?? 20
+    ),
     chunkChangedLines: positiveInteger(
       process.env.AI_REVIEW_CHUNK_CHANGED_LINES,
       configured.chunkChangedLines ?? 2000
@@ -788,7 +876,7 @@ function checkTitle(review, failed) {
 }
 
 function checkSummary(review, context, actionsUrl) {
-  return `${review.summary}\n\nFinding: ${review.findings.length}\n영향 모듈: ${(context.modules ?? []).join(", ") || "없음"}\nActions: ${actionsUrl}\n\n이 검토는 권고형이며 사람 승인을 대체하지 않습니다.`;
+  return `${review.summary}\n\nFinding: ${review.findings.length}\n교차 검증 제외: ${(review.dismissed_findings ?? []).length}\n영향 모듈: ${(context.modules ?? []).join(", ") || "없음"}\nActions: ${actionsUrl}\n\n이 검토는 권고형이며 사람 승인을 대체하지 않습니다.`;
 }
 
 function parseBoolean(value, fallback) {
@@ -828,6 +916,13 @@ function withQuery(url, key, value) {
   const parsed = new URL(url);
   parsed.searchParams.set(key, value);
   return parsed.toString();
+}
+
+function encodeRepositoryPath(filename) {
+  return String(filename)
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }
 
 async function readJson(filePath) {

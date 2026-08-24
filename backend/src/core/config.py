@@ -90,12 +90,18 @@ class LogConfig(BaseModel):
     format: str = "console"
 
 
+class F2Config(BaseModel):
+    enabled: bool = False
+    max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
+
+
 class Config(BaseModel):
     app: AppConfig
     db: DbConfig
     auth: AuthConfig
     http: HttpConfig
     log: LogConfig
+    f2: F2Config
 
     @model_validator(mode="after")
     def validate_environment_boundaries(self) -> Config:
@@ -219,6 +225,10 @@ def bind_config(source: Mapping[str, str]) -> Config:
         log=LogConfig(
             level=source.get("LOG_LEVEL", "INFO").upper(),
             format=source.get("LOG_FORMAT", "console").lower(),
+        ),
+        f2=F2Config(
+            enabled=_boolean(source, "F2_ENABLED", False),
+            max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
         ),
     )
 

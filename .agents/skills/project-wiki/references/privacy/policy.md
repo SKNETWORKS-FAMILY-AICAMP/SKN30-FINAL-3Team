@@ -32,6 +32,23 @@ updated: 2026-08-24
 - OpenAI API, RunPod 또는 다른 외부 처리자에게 전송되는 데이터를 별도로 검토한다.
 - 개인정보가 포함된 실패 메시지를 DLQ에 장기간 방치하지 않는다.
 
+### PR Policy Agent 외부 전송
+
+권고형 PR 정책 리뷰는 내부 non-Draft PR에 한해 OpenAI Responses API를 사용한다.
+
+| 항목 | 결정 |
+|---|---|
+| 목적 | 저장소 정책·아키텍처·문서 일관성 검토와 오탐 교차 검증 |
+| OpenAI 전송 | PR 번호·제목·작성자명·본문, 변경 파일 metadata와 patch, base SHA에서 선택한 정책, 변경된 허용 정책·설정 파일의 제한된 PR head 전체 내용, 정제된 부분 리뷰 결과 |
+| 전체 파일 허용 범위 | `.gitignore`, `.gitattributes`, `AGENTS.md`, `CLAUDE.md`, `.github/pr-review-policy.json`, `.agents-rule/**/*.md`, 모듈 `SKILL.md`와 `references/**/*.md`; 허용 경로의 `.env*`, `*.tfvars*`, private-key·certificate 확장자와 script·asset·일반 구현 파일 전체 내용은 제외 |
+| 최소화 | 전체 파일당 20,000자·80,000바이트, PR당 20개·60,000자, UTF-8·Contents/PR/content Git blob SHA 일치·NUL 없음 확인, symlink target 제외, private-key block을 포함한 secret-like redaction |
+| 저장 | Responses API `store: false`; diff·전체 파일 원문·전체 프롬프트·모델 원문 응답을 Actions log, artifact, GitHub sticky state와 Discord에 저장하지 않음 |
+| Discord 전송 | 정제된 요약·finding, PR·Check·Actions 링크와 실행 metadata만 전송; 전체 diff·전체 파일·프롬프트는 전송하지 않음 |
+| 실행 통제 | 외부 fork와 Draft 제외, base SHA 코드만 실행, PR head는 GitHub API의 신뢰할 수 없는 텍스트로만 읽고 checkout·실행하지 않음 |
+| 보존 | OpenAI 기본 abuse monitoring 데이터가 서비스 정책의 제한 기간 보존될 수 있음; prompt cache는 서비스 TTL 30분 사용 |
+
+PR에 개인정보나 비밀이 포함되어서는 안 된다. redaction은 우발 노출의 방어선이며 저장소에 비밀을 커밋해도 된다는 허용이 아니다. 감지 시 원문을 결과에 재현하지 않고 자격 증명 폐기·회전과 Git 이력 제거를 요구한다.
+
 ## 필드별 확정 처리
 
 아직 확정되지 않은 개인정보는 [OQ-007](../open-questions.md)에 남긴다. 이 표에 있는 항목은 결정됐다.
