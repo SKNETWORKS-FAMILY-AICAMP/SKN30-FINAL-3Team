@@ -93,11 +93,14 @@ def _selection(count: int) -> CandidateSelection:
         candidate_side=AnchorType.REQUIREMENT,
         price_kind="SALE",
         price_amount=1_000_000_000,
+        monthly_amount=None,
         price_is_estimated=True,
         price_floor_amount=900_000_000,
         price_ceiling_amount=None,
         anchor_pyeong=None,
         complex_id=None,
+        demand_types=("매수",),
+        active_statuses=("ACTIVE",),
         as_of=AS_OF,
     )
     scores = [_make(index + 1, amount=1_000_000_000, received=AS_OF) for index in range(count)]

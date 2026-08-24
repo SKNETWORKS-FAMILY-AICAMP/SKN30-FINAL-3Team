@@ -47,7 +47,7 @@ updated: 2026-08-21
 | 판정 계약 버전 | `brokerage-judgment:v1` | 중개 판정 DTO와 의미 규격의 버전 | AI |
 | 판정 prompt 버전 | `brokerage-judgment-prompt:v1` | 중개 판정 프롬프트 원문의 버전 | AI |
 | 판정 workflow 버전 | `brokerage-judgment-workflow:v1` | 중개 판정 절차의 버전 | AI |
-| 후보 선정 버전 | `candidate-selection:v1` | 후보 snapshot 구조의 버전 | Backend |
+| 후보 선정 버전 | `candidate-selection:v2` | 후보 snapshot 구조의 버전 | Backend |
 
 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
 
@@ -538,7 +538,8 @@ AI를 기다리는 동안 DB transaction이나 row lock을 쥐고 있지 않는�
 `InputVersionChangedError`, 상담 로그 집합이 바뀌었으면 `SourceChangedError`, lease를 잃었으면
 `LeaseNotHeldError`, 바인딩이 어긋나면 `GenerationBindingError`, 재사용하려던 카드가 더 이상
 유효하지 않으면 `CachedCardUnavailableError`다. 마지막 것은 다시 준비해서 생성하면 되는
-재시도 가능한 오류다. `SUPERSEDED`는 아직 구현하지 않았다.
+재시도 가능한 오류다. 입력이 바뀐 오류(`InputVersionChangedError`, `SourceChangedError`)는
+Worker가 `SUPERSEDED`로 기록한다.
 
 `PreparedGeneration`은 cache hit에서도 `source`, 범위 지문, 입력 지문, 날짜 bucket을 항상 들고
 있다. 마스킹 본문은 cache hit일 때 들고 다니지 않지만 이 값들은 남겨야 재사용 경로에도 fencing이
@@ -867,14 +868,24 @@ checkpoint 저장소 제품도 확정되지 않았다. graph가 실제로 필요
 - `ANCHOR_READY` 상태 전이
 - 같은 cache key 저장 경합 처리
 - Backend `AnchorType`과의 값 일치 계약 테스트
+- Worker polling loop와 `claim_next_run` 연결, 저장된 상태 기준 단계 오케스트레이션
+- Worker composition. DB `ai_model_config`에서 Provider·모델을 읽어 두 generator를 조립
+- 같은 앵커·입력 버전의 활성·완료 실행 재사용과 `SUPERSEDED` 전이
+- 결정적 SQL 후보 추출과 `CANDIDATES_READY`
+- 후보 포지션 카드와 `CANDIDATE_CARDS_READY`
+- 중개 판정 계약·생성기, `JUDGING`, 판정 결과 저장과 `COMPLETED`
+- 결과 조회 API와 사용자 피드백 API
+- F1 저장 후 자동 접수
 
 ### 아직 구현하지 않음 (`계획됨`)
 
-- Worker polling loop와 `claim_next_run` 연결, `WORKER_ENABLED=true`
-- LangGraph production graph와 checkpoint
-- 활성 실행 재사용과 `SUPERSEDED` 전이
-- SQL 후보 추출, `CANDIDATES_READY`, 후보 카드, 중개 판정, `COMPLETED`
-- 결과 조회 API, SSE, Frontend, 피드백·평가
+- LangGraph production graph와 checkpointer. 카드 생성과 중개 판정 모두 구조화 출력 1회다
+- SSE 진행 구독과 Frontend 후보 패널
+- 15건 이후 후보의 추가 카드화. 남은 건수와 후보 metadata 조회까지만 있다
+- AI 구성 변경 시 완료 결과 무효화. 재사용 키에 AI 구성이 들어가지 않는다
+- 정정 상담 로그 생성 (F3-TR-02). 피드백만 저장한다
+- `FAILED_RETRYABLE` 상태. 재시도는 상태 변경이 아니라 lease 반납으로 표현한다
+- AI 판정 품질 평가
 
 ### 미확정
 
@@ -883,4 +894,10 @@ checkpoint 저장소 제품도 확정되지 않았다. graph가 실제로 필요
 
 Provider와 모델은 Backend가 고르지 않는다. 호출 조립 지점이 `GenerationBinding`으로 주입한
 generator, `model_config_id`와 비밀이 제거된 model snapshot을 Backend가 기록해 cache key에
-사용할 뿐이다. 아직 Worker composition이 없으므로 운영 기본 binding은 만들지 않았다.
+사용할 뿐이다.
+
+Worker composition은 구현됐다. Worker가 그 사무소의 활성 `ai_model_config`에서 Provider와
+모델 이름을 읽어 두 generator를 조립한다. 코드에 기본 Provider나 기본 모델을 두지 않으며,
+지원하지 않는 provider 문자열이나 이 프로세스에 구성되지 않은 Provider는 그 실행 하나만
+`FAILED_TERMINAL`로 끝내고 Worker loop는 계속 돈다. **운영 Provider와 모델 ID 자체는 여전히
+미확정**이라 `WORKER_ENABLED=true` 운영 배포는 하지 않는다.

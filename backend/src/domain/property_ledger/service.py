@@ -186,15 +186,31 @@ def create_property_listing(
     return listing.id or 0
 
 
+def changed_columns(current: Any, payload: dict[str, Any]) -> set[str]:
+    """실제로 값이 달라지는 컬럼만 고른다.
+
+    같은 값을 다시 보낸 저장은 변경이 아니다. 호출자가 저장 뒤에 후속 동작을 걸 때 이
+    구분이 필요하다. 비교는 저장 직전의 행 값으로 한다.
+    """
+    return {key for key, value in payload.items() if getattr(current, key, None) != value}
+
+
 def update_property_listing(
     session: Session, brokerage_id: int, listing_id: int, payload: dict[str, Any]
-) -> None:
+) -> frozenset[str]:
+    """매물 건을 부분 수정하고 **실제로 바뀐 필드 집합**을 돌려준다.
+
+    `row_version` 은 payload 에 값이 있으면 그대로 올린다. 낙관적 잠금 통화의 의미를 여기서
+    바꾸지 않는다. 돌려주는 집합은 그와 별개로 "값이 정말 달라졌는가"만 답한다.
+    """
     expected_row_version = int(payload.pop("row_version"))
-    if repository.find_property_listing(session, brokerage_id, listing_id) is None:
+    current = repository.find_property_listing(session, brokerage_id, listing_id)
+    if current is None:
         raise NotFoundError("property listing is not found")
     if not payload:
-        return
+        return frozenset()
 
+    changed = changed_columns(current, payload)
     updated = repository.bump_row_version(
         session, PropertyListing, brokerage_id, listing_id, expected_row_version, payload
     )
@@ -202,6 +218,7 @@ def update_property_listing(
         session.rollback()
         raise RowVersionConflictError()
     session.commit()
+    return frozenset(changed)
 
 
 def require_privacy_consent(session: Session, brokerage_id: int, party_id: int) -> None:
@@ -238,16 +255,37 @@ def create_property_requirement(
 
 def update_property_requirement(
     session: Session, brokerage_id: int, requirement_id: int, payload: dict[str, Any]
-) -> None:
+) -> frozenset[str]:
+    """구입장을 부분 수정하고 **실제로 바뀐 필드 집합**을 돌려준다.
+
+    희망 단지는 **집합으로** 비교한다. 순서만 다르고 같은 단지를 다시 보낸 저장은 변경이
+    아니다. `preference_order` 는 선호 순서라 저장은 그대로 다시 쓰지만, 후속 동작을 걸
+    만한 변경으로 보지는 않는다.
+    """
     expected_row_version = int(payload.pop("row_version"))
-    require_property_requirement(session, brokerage_id, requirement_id)
+    # 장부 단건 조회는 인물을 함께 돌려준다. 비교 대상은 구입장 행이다.
+    current, _party = require_property_requirement(session, brokerage_id, requirement_id)
 
     has_complex_change = "desired_complex_ids" in payload
     desired_complex_ids = payload.pop("desired_complex_ids", None)
+    changed = changed_columns(current, payload)
     if has_complex_change:
         validate_complex_ids(session, brokerage_id, desired_complex_ids or [])
+        stored = {
+            link.complex_id
+            for link, _ in repository.list_requirement_complexes(
+                session, brokerage_id, requirement_id
+            )
+        }
+        if stored != set(desired_complex_ids or []):
+            changed.add("desired_complex_ids")
 
-    if payload:
+    # 희망 단지가 실제로 바뀌었으면 스칼라 필드가 없어도 버전을 올린다.
+    #
+    # 희망 단지는 자식 테이블에 있어 구입장 행을 건드리지 않는다. 그대로 두면 단지만 바꾼
+    # 저장이 `row_version` 을 올리지 않아, 클라이언트의 낡은 상세 화면이 충돌로 잡히지 않고
+    # 같은 버전을 키로 쓰는 F3 실행 재사용도 바뀐 조건을 보지 못한다.
+    if payload or "desired_complex_ids" in changed:
         updated = repository.bump_row_version(
             session,
             PropertyRequirement,
@@ -265,6 +303,7 @@ def update_property_requirement(
             session, brokerage_id, requirement_id, desired_complex_ids or []
         )
     session.commit()
+    return frozenset(changed)
 
 
 def validate_complex_ids(session: Session, brokerage_id: int, complex_ids: list[int]) -> None:

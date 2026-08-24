@@ -16,12 +16,14 @@
 
 ## 언제 부르지 않는가
 
-가격이나 조건이 실제로 바뀌지 않은 수정에서는 부르지 않는다. 담당자 메모만 고친 저장이
-판정을 다시 돌릴 이유는 없다. 어떤 필드가 판정 입력인지는 아래 두 집합이 정한다.
+가격이나 조건이 실제로 바뀌지 않은 수정에서는 부르지 않는다. 담당자 메모만 고친 저장이나
+같은 가격을 그대로 다시 보낸 저장이 판정을 다시 돌릴 이유는 없다.
 
-행이 실제로 바뀌면 `row_version` 이 오르고, 그 값이 재사용 키에 들어간다. 그래서 값이 그대로인
-저장은 여기까지 와도 새 실행을 만들지 않고 기존 실행을 돌려준다. 필드 집합은 그보다 앞에서
-불필요한 조회 자체를 줄이는 층이다.
+판정 여부는 **payload 에 무엇이 실려 왔는가**가 아니라 **F1 service 가 계산한 실제 변경
+집합**으로 정한다. 현재값 비교를 API route 나 여기서 다시 구현하면 저장하는 곳과 판단하는
+곳이 조용히 갈라진다. 어떤 필드가 판정 입력인지는 아래 두 집합이 정한다.
+
+희망 단지는 집합으로 비교한다. 순서만 바꿔 같은 단지를 다시 보낸 저장은 변경이 아니다.
 """
 
 from __future__ import annotations
@@ -75,13 +77,16 @@ REQUIREMENT_TRIGGER_FIELDS = frozenset(
         "request_expiry_date",
         "current_tenancy_expiry_date",
         "co_broker_party_id",
-        "complex_ids",
+        "desired_complex_ids",
     }
 )
 
 
 def touches_judgment_input(changed: Iterable[str], relevant: frozenset[str]) -> bool:
-    """이번 저장이 판정 입력을 건드렸는가.
+    """이번 저장이 판정 입력을 **실제로** 바꿨는가.
+
+    `changed` 는 payload 에 실려 온 필드가 아니라 F1 service 가 계산한 **실제 변경 집합**이다.
+    같은 가격을 그대로 다시 보낸 저장은 여기까지 오지 않는다.
 
     `row_version` 은 항상 실려 오므로 판정 대상에서 뺀다. 그것만 보고 판단하면 모든 수정이
     판정 입력을 바꾼 것이 된다.

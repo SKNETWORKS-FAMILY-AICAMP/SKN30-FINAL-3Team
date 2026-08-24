@@ -276,11 +276,9 @@ Backend가 실제로 기록하는 상태는 아홉 가지다. 아래 여덟에 �
 후보가 0건인 실행은 `JUDGING`을 거치지 않는다. 모델을 부르지 않고 빈 최종 결과를 저장한 뒤
 `CANDIDATE_CARDS_READY`에서 곧장 `COMPLETED`로 간다.
 
-판정 결과와 후보별 등급·순위·근거는 아직 이 HTTP 계약으로 노출하지 않는다. 결과 조회 경로는
-여전히 없다.
-
-후보 조회 조건과 전체 후보 집합은 `match_evaluation.candidate_selection_snapshot`에 저장하며 이
-HTTP 계약으로는 아직 노출하지 않는다. 결과 조회 경로는 여전히 없다.
+판정 결과와 후보별 등급·순위·근거는 아래 [결과 조회](#결과-조회)가 노출한다. 후보 조회 조건과
+전체 후보 집합은 `match_evaluation.candidate_selection_snapshot`에 저장하고 같은 경로가 조회
+조건·건수와 후보 metadata를 함께 돌려준다.
 
 상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
@@ -385,6 +383,47 @@ HTTP 계약으로는 아직 노출하지 않는다. 결과 조회 경로는 여�
 주민등록번호 형태가 있으면 422 `PERSONAL_DATA_NOT_ALLOWED`로 거절하며 발견한 값 자체는 응답에
 담지 않는다.
 
+#### 정정과 관심없음의 형태
+
+`feedback_type`에 따라 실을 수 있는 것이 다르다.
+
+| `feedback_type` | `field_name` | `corrected_value` |
+|---|---|---|
+| `CORRECTION` | 필수 | 필수 |
+| `NOT_INTERESTED` | 불가 | 불가 |
+
+정정인데 무엇을 어떻게 고칠지가 없으면 다음 판정의 입력이 되지 못한다 (F3-TR-02). 관심없음은
+사유만 남기는 피드백이라 정정 대상과 정정값을 받지 않는다. 어기면 422다.
+
+`field_name`은 공백일 수 없고 **공개 계약에 실제로 노출되는 항목**만 받는다. 임의의 DB 컬럼
+이름과 내부 필드는 정정 대상이 아니다.
+
+| `target` | 정정 가능한 `field_name` |
+|---|---|
+| `POSITION_ANALYSIS` | `intent`, `price`, `urgency`, `timing`, `flexible`, `inflexible`, `contactability` |
+| `MATCH_CANDIDATE` | `match_grade`, `evaluation_basis`, `primary_obstacle`, `possible_concession`, `recommended_action`, `exclusion_reason` |
+
+#### corrected_value 검증
+
+`corrected_value`는 구조화 JSON 객체다. 저장 전에 다음을 확인한다.
+
+| 항목 | 상한·규칙 |
+|---|---|
+| 직렬화 크기 | 4,096 바이트 |
+| 중첩 깊이 | 4 |
+| 노드 수 | 50 |
+| leaf 타입 | 문자열·정수·실수·불리언·null과 객체·배열만 |
+| 객체 키 | 공백이 아닌 문자열 |
+
+**모든 문자열 leaf**가 `detail`과 같은 개인정보 패턴 검사를 지난다. 최상위만 보면 중첩 객체나
+배열 안에 연락처를 숨길 수 있다. 위반하면 422 `PERSONAL_DATA_NOT_ALLOWED`이고 발견한 값은
+응답에 담지 않는다.
+
+패턴 검사는 전화번호·이메일·생년월일·주민등록번호 형태를 잡는다. **성명은 잡지 못한다.**
+가려야 할 식별값 목록은 앵커별로 상담 로그 범위를 다시 조립해야 얻는데, 사용자가 직접 쓴 짧은
+정정값에 그 비용을 들이지 않았다. 이 한계는
+[개인정보 정책](../privacy/policy.md)의 사용자 자유 입력 절에 함께 적는다.
+
 다른 사무소의 카드나 판정을 대상으로 지정하면 없는 것과 같은 404다. 응답은 작성자와 사무소를
 싣지 않는다. 정정 상담 로그 생성(F3-TR-02)은 이번 범위가 아니라 `correction_interaction_id`는
 항상 비어 있다.
@@ -395,8 +434,13 @@ HTTP 계약으로는 아직 노출하지 않는다. 결과 조회 경로는 여�
 ### Worker 선점과 lease
 
 Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
-`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 `RUNNING`이다.
-선점하면 `RUNNING`으로 바꾸고 5분짜리 lease와 시도 횟수를 기록하며, 만료됐는데 시도 횟수가 3회
+`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, **lease가 만료됐고 시도 횟수가 상한 미만인 모든 진행
+상태**(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다.
+Worker가 파이프라인 중간에 죽으면 그 실행은 lease만 만료된 채 남으므로, `RUNNING`만 회수하면
+영영 아무도 집지 않는다.
+
+선점하면 5분짜리 lease와 시도 횟수를 기록한다. 상태는 **보존한다.** `QUEUED`만 `RUNNING`으로
+옮기고 진행 상태는 그대로 두어 저장된 단계부터 이어서 처리한다. 만료됐는데 시도 횟수가 3회
 이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
 
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지

@@ -801,11 +801,17 @@ def bind_run_execution_configuration(
 
 
 class CandidatePriceRow(NamedTuple):
-    """카드에 실린 거래 유형별 금액. `display_order` 순서를 그대로 유지한다."""
+    """카드에 실린 거래 유형별 금액. `display_order` 순서를 그대로 유지한다.
+
+    월세는 보증금과 월 차임이 **별도 축**이라 네 값을 모두 들고 온다. 하나로 접으면 어느
+    금액을 비교했는지 알 수 없게 된다.
+    """
 
     price_kind: str
     stated_amount: int | None
     estimated_amount: int | None
+    stated_monthly_amount: int | None
+    estimated_monthly_amount: int | None
 
 
 def list_position_card_prices(
@@ -813,11 +819,7 @@ def list_position_card_prices(
 ) -> list[CandidatePriceRow]:
     """카드의 금액을 원래 순서로 읽는다. 첫 행이 후보 조회의 가격 축이 된다."""
     statement = (
-        select(
-            col(NegotiationPositionPrice.price_kind),
-            col(NegotiationPositionPrice.stated_amount),
-            col(NegotiationPositionPrice.estimated_amount),
-        )
+        select(NegotiationPositionPrice)
         .where(
             col(NegotiationPositionPrice.brokerage_id) == brokerage_id,
             col(NegotiationPositionPrice.position_analysis_id) == position_analysis_id,
@@ -827,7 +829,16 @@ def list_position_card_prices(
             col(NegotiationPositionPrice.price_kind).asc(),
         )
     )
-    return [CandidatePriceRow(*row) for row in session.execute(statement).all()]
+    return [
+        CandidatePriceRow(
+            price_kind=row.price_kind,
+            stated_amount=row.stated_amount,
+            estimated_amount=row.estimated_amount,
+            stated_monthly_amount=row.stated_monthly_amount,
+            estimated_monthly_amount=row.estimated_monthly_amount,
+        )
+        for row in session.execute(statement).scalars().all()
+    ]
 
 
 class UnitSpecification(NamedTuple):
@@ -835,6 +846,32 @@ class UnitSpecification(NamedTuple):
 
     complex_id: int
     pyeong: Decimal | None
+
+
+class RequirementSpecification(NamedTuple):
+    """구입장 앵커가 어떤 거래를 원하는지. 후보 매물의 거래 유형을 여기서 정한다."""
+
+    demand_type: str
+    desired_pyeongs: tuple[Decimal, ...]
+
+
+def find_requirement_specification(
+    session: Session, brokerage_id: int, requirement_id: int
+) -> RequirementSpecification | None:
+    """구입장의 거래 구분과 희망 평형.
+
+    `demand_type` 은 매물장과 어휘가 다르다. 매물장이 `매매`라고 부르는 것을 구입장은
+    `매수`라고 부른다 (F1 데이터 항목 13.1·13.2).
+    """
+    statement = select(
+        col(PropertyRequirement.demand_type), col(PropertyRequirement.desired_pyeongs)
+    ).where(
+        col(PropertyRequirement.brokerage_id) == brokerage_id,
+        col(PropertyRequirement.id) == requirement_id,
+        col(PropertyRequirement.is_deleted).is_(False),
+    )
+    row = session.execute(statement).first()
+    return RequirementSpecification(row[0], tuple(row[1] or ())) if row else None
 
 
 def find_unit_specification(
@@ -897,22 +934,33 @@ def list_requirement_candidates(
     session: Session,
     brokerage_id: int,
     *,
+    demand_types: Sequence[str],
+    active_statuses: Sequence[str],
     budget_floor_amount: int | None,
     complex_id: int | None,
 ) -> list[RequirementCandidateRow]:
     """매물 앵커의 반대편 후보. 조건에 맞는 구입장만 돌려준다 (F3-SQ-01).
 
-    포함·제외는 전부 SQL 조건이다. 사무소, 구입장 삭제, 인물 삭제와 예산 하한, 희망 단지가
-    조건이며 평형과 최신성은 점수로만 반영한다. 희망 단지를 하나도 지정하지 않은 구입장은
-    단지를 가리지 않는 손님이므로 포함한다.
+    포함·제외는 전부 SQL 조건이다. 사무소, 구입장 삭제, 인물 삭제, **거래 구분**, **활성
+    업무 상태**, 예산 하한과 희망 단지가 조건이며 평형과 최신성은 점수로만 반영한다.
 
+    `demand_types` 는 앵커 매물의 거래 유형과 호환되는 구입장 구분이다. 매매 매물에 전세
+    손님이 붙거나 월세 매물에 매수 손님이 붙으면 안 된다. 비어 있으면 호환되는 구분이
+    없다는 뜻이므로 후보도 없다.
+
+    희망 단지를 하나도 지정하지 않은 구입장은 단지를 가리지 않는 손님이므로 포함한다.
     예산이 비어 있는 구입장도 포함한다. 예산 미기재는 "못 산다"가 아니라 "아직 모른다"이며,
     금액을 모르는 후보는 가격 근접도 0 으로 뒤에 밀린다.
     """
+    if not demand_types:
+        return []
+
     conditions: list[Any] = [
         col(PropertyRequirement.brokerage_id) == brokerage_id,
         col(PropertyRequirement.is_deleted).is_(False),
         col(Party.is_deleted).is_(False),
+        col(PropertyRequirement.demand_type).in_(sorted(demand_types)),
+        col(PropertyRequirement.status).in_(sorted(active_statuses)),
     ]
     if budget_floor_amount is not None:
         conditions.append(
@@ -963,41 +1011,51 @@ def list_requirement_candidates(
 
 
 class ListingCandidateRow(NamedTuple):
-    """매물 후보 1건의 점수 계산 입력."""
+    """매물 후보 1건의 점수 계산 입력.
+
+    `price_amount` 는 요청한 거래 유형의 주 금액이다. 월세는 보증금이고 월 차임은
+    `monthly_amount` 에 따로 담는다. 두 축을 하나로 접지 않는다.
+    """
 
     listing_id: int
     price_amount: int | None
+    monthly_amount: int | None
     pyeong: Decimal | None
     received_at: date | None
 
 
-# 매물의 대표 금액. 카드가 첫 번째 거래 유형을 가격 축으로 쓰는 것과 같은 순서를 따른다.
-def _listing_price_expression() -> Any:
-    return func.coalesce(
-        case((col(PropertyListing.is_sale_available), col(PropertyListing.sale_price))),
-        case(
-            (
-                col(PropertyListing.is_jeonse_available),
-                col(PropertyListing.jeonse_deposit_amount),
-            )
-        ),
-        case(
-            (
-                col(PropertyListing.is_monthly_rent_available),
-                col(PropertyListing.monthly_rent_deposit_amount),
-            )
-        ),
-    )
+# 거래 유형별로 어떤 플래그와 어떤 금액 컬럼을 보는지. 여기 한 곳에만 둔다.
+# 매매가가 있다고 전세 손님의 후보가 되면 안 되므로 유형을 섞어 coalesce 하지 않는다.
+_LISTING_TRADE_COLUMNS: dict[str, tuple[Any, Any, Any]] = {
+    "SALE": (PropertyListing.is_sale_available, PropertyListing.sale_price, None),
+    "JEONSE": (
+        PropertyListing.is_jeonse_available,
+        PropertyListing.jeonse_deposit_amount,
+        None,
+    ),
+    "MONTHLY_RENT": (
+        PropertyListing.is_monthly_rent_available,
+        PropertyListing.monthly_rent_deposit_amount,
+        PropertyListing.monthly_rent_amount,
+    ),
+}
 
 
 def list_listing_candidates(
     session: Session,
     brokerage_id: int,
     *,
+    price_kind: str | None,
+    active_statuses: Sequence[str],
     price_ceiling_amount: int | None,
     complex_ids: Sequence[int],
 ) -> list[ListingCandidateRow]:
     """구입장 앵커의 반대편 후보. 조건에 맞는 매물만 돌려준다 (F3-SQ-01).
+
+    `price_kind` 는 앵커 구입장의 `demand_type` 과 호환되는 매물 거래 유형이다. 그 유형의
+    **거래 가능 플래그가 참인 매물만** 후보이며 금액도 그 유형의 컬럼만 본다. 플래그가
+    거짓인 채 남아 있는 과거 금액을 후보 가격으로 쓰지 않는다. 호환되는 유형이 없으면
+    후보도 없다.
 
     F1 매물 조회와 같은 범위를 본다. **부모 세대 삭제 여부까지** 본다. 세대 소프트 삭제는
     딸린 매물 행을 건드리지 않아 매물 행만 보면 화면에 없는 세대의 매물이 후보로 올라온다.
@@ -1005,24 +1063,27 @@ def list_listing_candidates(
     희망 단지를 지정한 구입장이면 그 단지의 매물만 본다. 지정하지 않았으면 단지를 가리지
     않는다.
     """
-    price = _listing_price_expression()
+    trade = _LISTING_TRADE_COLUMNS.get(price_kind or "")
+    if trade is None:
+        return []
+    available, amount_column, monthly_column = trade
+
+    price = col(amount_column)
     conditions: list[Any] = [
         col(PropertyListing.brokerage_id) == brokerage_id,
         col(PropertyListing.is_deleted).is_(False),
         col(PropertyUnit.is_deleted).is_(False),
+        col(available).is_(True),
+        col(PropertyListing.status).in_(sorted(active_statuses)),
     ]
     if price_ceiling_amount is not None:
+        # 보증금·매매가 축만 비교한다. 구입장에는 월 차임에 대응하는 예산 축이 없다.
         conditions.append(or_(price.is_(None), price <= price_ceiling_amount))
     if complex_ids:
         conditions.append(col(PropertyUnit.complex_id).in_(list(complex_ids)))
 
     statement = (
-        select(
-            col(PropertyListing.id),
-            price,
-            col(PropertyUnit.pyeong),
-            col(PropertyListing.received_at),
-        )
+        select(PropertyListing, col(PropertyUnit.pyeong))
         .join(
             PropertyUnit,
             (col(PropertyUnit.brokerage_id) == PropertyListing.brokerage_id)
@@ -1031,7 +1092,19 @@ def list_listing_candidates(
         .where(*conditions)
         .order_by(col(PropertyListing.id).asc())
     )
-    return [ListingCandidateRow(*row) for row in session.execute(statement).all()]
+    # 금액은 위 매핑이 정한 컬럼에서만 읽는다. 조회 조건과 같은 한 곳을 쓴다.
+    return [
+        ListingCandidateRow(
+            listing_id=listing.id or 0,
+            price_amount=getattr(listing, amount_column.key),
+            monthly_amount=(
+                getattr(listing, monthly_column.key) if monthly_column is not None else None
+            ),
+            pyeong=pyeong,
+            received_at=listing.received_at,
+        )
+        for listing, pyeong in session.execute(statement).all()
+    ]
 
 
 def find_position_card_for_target(

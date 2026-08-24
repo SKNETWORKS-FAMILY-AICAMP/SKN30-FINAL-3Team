@@ -161,18 +161,32 @@ class Fixture:
         self,
         unit_id: int,
         *,
-        sale_price: int | None,
+        sale_price: int | None = None,
+        jeonse_deposit: int | None = None,
+        monthly_deposit: int | None = None,
+        monthly_rent: int | None = None,
         deleted: bool = False,
         received_at: date | None = None,
+        status: str = "RECEIVED",
     ) -> int:
+        """거래 유형 플래그는 해당 금액을 준 유형만 켠다."""
         stored = self._scalar(
             "INSERT INTO property_listing (brokerage_id, unit_id, is_sale_available, sale_price,"
-            " is_deleted, received_at) VALUES (:b, :u, true, :s, :d, :r) RETURNING id",
+            " is_jeonse_available, jeonse_deposit_amount, is_monthly_rent_available,"
+            " monthly_rent_deposit_amount, monthly_rent_amount, is_deleted, received_at, status)"
+            " VALUES (:b, :u, :sa, :s, :ja, :j, :ma, :md, :mr, :d, :r, :st) RETURNING id",
             b=self.brokerage_id,
             u=unit_id,
+            sa=sale_price is not None,
             s=sale_price,
+            ja=jeonse_deposit is not None,
+            j=jeonse_deposit,
+            ma=monthly_deposit is not None,
+            md=monthly_deposit,
+            mr=monthly_rent,
             d=deleted,
             r=received_at or date(2026, 8, 1),
+            st=status,
         )
         self.session.commit()
         return stored
@@ -186,17 +200,21 @@ class Fixture:
         deleted: bool = False,
         received_at: date | None = None,
         complex_ids: list[int] | None = None,
+        demand_type: str = "매수",
+        status: str = "ACTIVE",
     ) -> int:
         stored = self._scalar(
             "INSERT INTO property_requirement (brokerage_id, party_id, demand_type,"
-            " max_budget_amount, desired_pyeongs, is_deleted, received_at)"
-            " VALUES (:b, :p, '매수', :m, :y, :d, :r) RETURNING id",
+            " max_budget_amount, desired_pyeongs, is_deleted, received_at, status)"
+            " VALUES (:b, :p, :t, :m, :y, :d, :r, :s) RETURNING id",
             b=self.brokerage_id,
             p=party_id,
+            t=demand_type,
             m=budget,
             y=pyeongs,
             d=deleted,
             r=received_at or date(2026, 8, 1),
+            s=status,
         )
         for order, complex_id in enumerate(complex_ids or []):
             self.session.execute(
@@ -217,6 +235,8 @@ class Fixture:
         stated_amount: int,
         estimated_amount: int | None,
         price_kind: str = "SALE",
+        stated_monthly_amount: int | None = None,
+        estimated_monthly_amount: int | None = None,
     ) -> int:
         """앵커 카드와 그 카드의 거래 유형별 금액. 후보 조회는 이 추정값을 쓴다."""
         card_id = self._scalar(
@@ -233,13 +253,16 @@ class Fixture:
         )
         self._scalar(
             "INSERT INTO negotiation_position_price (brokerage_id, position_analysis_id,"
-            " price_kind, stated_amount, estimated_amount, display_order)"
-            " VALUES (:b, :p, :k, :s, :e, 0) RETURNING id",
+            " price_kind, stated_amount, estimated_amount, stated_monthly_amount,"
+            " estimated_monthly_amount, display_order)"
+            " VALUES (:b, :p, :k, :s, :e, :sm, :em, 0) RETURNING id",
             b=self.brokerage_id,
             p=card_id,
             k=price_kind,
             s=stated_amount,
             e=estimated_amount,
+            sm=stated_monthly_amount,
+            em=estimated_monthly_amount,
         )
         self.session.execute(
             text(
@@ -580,3 +603,292 @@ def test_an_invalidated_anchor_card_is_not_used() -> None:
             store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
 
         assert fixture.stored_run(run_id)["status"] == ANCHOR_READY_STATUS
+
+
+# ── 거래 유형 격리 ─────────────────────────────────────────────────────────────
+#
+# 매물장과 구입장은 같은 거래를 다른 말로 부른다. 매매 매물의 반대편은 `매수` 구입장이다.
+
+
+@requires_database
+@pytest.mark.parametrize(
+    ("price_kind", "matching", "other"),
+    [("SALE", "매수", "전세"), ("JEONSE", "전세", "매수"), ("MONTHLY_RENT", "월세", "매수")],
+)
+def test_a_listing_anchor_only_matches_the_compatible_demand_type(
+    price_kind: str, matching: str, other: str
+) -> None:
+    with db_session() as session:
+        fixture = Fixture(session)
+        wanted = fixture.requirement(
+            fixture.party(f"{matching}손님"), budget=3_000_000_000, demand_type=matching
+        )
+        unwanted = fixture.requirement(
+            fixture.party(f"{other}손님"), budget=3_000_000_000, demand_type=other
+        )
+        seller = fixture.requirement(
+            fixture.party("매도손님"), budget=3_000_000_000, demand_type="매도"
+        )
+
+        run_id = fixture.run(listing=True)
+        fixture.anchor_card(
+            run_id,
+            listing=True,
+            stated_amount=2_880_000_000,
+            estimated_amount=2_800_000_000,
+            price_kind=price_kind,
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        found = {item.candidate_id for item in selection.ordered}
+        assert wanted in found
+        assert unwanted not in found, "다른 거래 유형의 손님이 후보가 되면 안 된다"
+        # 매도는 파는 쪽 수요라 매물의 반대편이 아니다.
+        assert seller not in found
+        assert selection.criteria.demand_types == (matching,)
+
+
+@requires_database
+@pytest.mark.parametrize(
+    ("demand_type", "kind"), [("매수", "SALE"), ("전세", "JEONSE"), ("월세", "MONTHLY_RENT")]
+)
+def test_a_requirement_anchor_only_matches_the_compatible_listing_trade(
+    demand_type: str, kind: str
+) -> None:
+    """매수 손님에게 월세 매물을 붙이지 않는다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        session.execute(
+            text("UPDATE property_requirement SET demand_type = :t WHERE id = :i"),
+            {"t": demand_type, "i": fixture.requirement_id},
+        )
+        session.commit()
+
+        def listing_of(trade: str) -> int:
+            """그 거래 유형 하나만 연 매물. 플래그는 금액을 준 유형만 켜진다."""
+            unit_id = fixture.unit()
+            if trade == "SALE":
+                return fixture.listing(unit_id, sale_price=1_000_000_000)
+            if trade == "JEONSE":
+                return fixture.listing(unit_id, jeonse_deposit=1_000_000_000)
+            return fixture.listing(unit_id, monthly_deposit=1_000_000_000, monthly_rent=3_000_000)
+
+        wanted = listing_of(kind)
+        others = {
+            listing_of(trade) for trade in ("SALE", "JEONSE", "MONTHLY_RENT") if trade != kind
+        }
+
+        run_id = fixture.run(listing=False)
+        fixture.anchor_card(
+            run_id,
+            listing=False,
+            stated_amount=2_850_000_000,
+            estimated_amount=3_000_000_000,
+            price_kind="BUDGET",
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        found = {item.candidate_id for item in selection.ordered}
+        assert wanted in found
+        assert not (found & others), "다른 거래 유형의 매물이 후보가 되면 안 된다"
+        # 후보 거래 유형은 앵커 카드의 price_kind(BUDGET)가 아니라 demand_type 이 정한다.
+        assert selection.criteria.price_kind == kind
+
+
+@requires_database
+def test_a_seller_requirement_anchor_finds_no_listing() -> None:
+    """`매도` 는 대응하는 매물 거래 유형이 없다. 후보 0건이 정상 결과다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        session.execute(
+            text("UPDATE property_requirement SET demand_type = '매도' WHERE id = :i"),
+            {"i": fixture.requirement_id},
+        )
+        session.commit()
+        fixture.listing(fixture.unit(), sale_price=1_000_000_000)
+
+        run_id = fixture.run(listing=False)
+        fixture.anchor_card(
+            run_id,
+            listing=False,
+            stated_amount=2_850_000_000,
+            estimated_amount=3_000_000_000,
+            price_kind="BUDGET",
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        assert selection.total_count == 0
+        assert selection.criteria.price_kind is None
+        assert fixture.stored_run(run_id)["status"] == CANDIDATES_READY_STATUS
+
+
+@requires_database
+def test_a_multi_trade_listing_uses_the_requested_kind_amount() -> None:
+    """매매가가 있다고 전세 손님의 후보가 되면 안 된다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        session.execute(
+            text("UPDATE property_requirement SET demand_type = '전세' WHERE id = :i"),
+            {"i": fixture.requirement_id},
+        )
+        session.commit()
+        # 매매 30억 · 전세 5억을 동시에 연 매물. 전세 손님의 예산으로는 전세만 닿는다.
+        both = fixture.listing(fixture.unit(), sale_price=3_000_000_000, jeonse_deposit=500_000_000)
+
+        run_id = fixture.run(listing=False)
+        fixture.anchor_card(
+            run_id,
+            listing=False,
+            stated_amount=600_000_000,
+            estimated_amount=600_000_000,
+            price_kind="BUDGET",
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        scored = {item.candidate_id: item for item in selection.ordered}
+        assert both in scored
+        assert scored[both].price_amount == 500_000_000, "전세 보증금을 비교해야 한다"
+
+
+@requires_database
+def test_a_disabled_trade_price_is_not_used() -> None:
+    """거래 가능 플래그가 꺼진 채 남은 과거 금액을 후보 가격으로 쓰지 않는다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        session.execute(
+            text("UPDATE property_requirement SET demand_type = '전세' WHERE id = :i"),
+            {"i": fixture.requirement_id},
+        )
+        session.commit()
+        stale = fixture.listing(fixture.unit(), jeonse_deposit=500_000_000)
+        session.execute(
+            text("UPDATE property_listing SET is_jeonse_available = false WHERE id = :i"),
+            {"i": stale},
+        )
+        session.commit()
+
+        run_id = fixture.run(listing=False)
+        fixture.anchor_card(
+            run_id,
+            listing=False,
+            stated_amount=600_000_000,
+            estimated_amount=600_000_000,
+            price_kind="BUDGET",
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        assert stale not in {item.candidate_id for item in selection.ordered}
+
+
+@requires_database
+def test_the_monthly_rent_amount_is_preserved_beside_the_deposit() -> None:
+    """월세는 보증금과 월 차임이 별도 축이다. 하나로 접지 않는다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        session.execute(
+            text("UPDATE property_requirement SET demand_type = '월세' WHERE id = :i"),
+            {"i": fixture.requirement_id},
+        )
+        session.commit()
+        monthly = fixture.listing(
+            fixture.unit(), monthly_deposit=100_000_000, monthly_rent=3_000_000
+        )
+
+        run_id = fixture.run(listing=False)
+        fixture.anchor_card(
+            run_id,
+            listing=False,
+            stated_amount=120_000_000,
+            estimated_amount=120_000_000,
+            price_kind="BUDGET",
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        scored = {item.candidate_id: item for item in selection.ordered}
+        assert scored[monthly].price_amount == 100_000_000, "보증금을 비교 축으로 쓴다"
+        assert scored[monthly].monthly_amount == 3_000_000, "월 차임은 버리지 않고 보존한다"
+
+        snapshot = fixture.header()["candidate_selection_snapshot"]
+        entry = next(item for item in snapshot["candidates"] if item["candidate_id"] == monthly)
+        assert entry["monthly_amount"] == 3_000_000
+        # 무엇을 비교했는지 snapshot 이 남긴다.
+        assert snapshot["criteria"]["compared_amount_axis"] == "MONTHLY_RENT_DEPOSIT"
+
+
+@requires_database
+def test_the_anchor_monthly_rent_is_recorded_in_the_criteria() -> None:
+    with db_session() as session:
+        fixture = Fixture(session)
+        fixture.requirement(fixture.party("월세손님"), budget=3_000_000_000, demand_type="월세")
+        run_id = fixture.run(listing=True)
+        fixture.anchor_card(
+            run_id,
+            listing=True,
+            stated_amount=100_000_000,
+            estimated_amount=None,
+            price_kind="MONTHLY_RENT",
+            stated_monthly_amount=3_000_000,
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        assert selection.criteria.monthly_amount == 3_000_000
+        assert fixture.header()["candidate_selection_snapshot"]["criteria"]["monthly_amount"] == (
+            3_000_000
+        )
+
+
+# ── 활성 업무 상태 ─────────────────────────────────────────────────────────────
+
+
+@requires_database
+def test_an_inactive_requirement_is_not_a_candidate() -> None:
+    """종료된 구입장이 후보로 올라오면 이미 끝난 거래에 연락하자는 제안이 나온다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        active = fixture.requirement(fixture.party("진행손님"), budget=3_000_000_000)
+        done = fixture.requirement(
+            fixture.party("완료손님"), budget=3_000_000_000, status="COMPLETED"
+        )
+
+        run_id = fixture.run(listing=True)
+        fixture.anchor_card(
+            run_id, listing=True, stated_amount=2_880_000_000, estimated_amount=2_800_000_000
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        found = {item.candidate_id for item in selection.ordered}
+        assert active in found
+        assert done not in found
+        assert selection.criteria.active_statuses == ("ACTIVE",)
+
+
+@requires_database
+def test_an_inactive_listing_is_not_a_candidate() -> None:
+    with db_session() as session:
+        fixture = Fixture(session)
+        active = fixture.listing(fixture.unit(), sale_price=1_000_000_000)
+        closed = fixture.listing(fixture.unit(), sale_price=1_000_000_000, status="CONTRACTED")
+
+        run_id = fixture.run(listing=False)
+        fixture.anchor_card(
+            run_id,
+            listing=False,
+            stated_amount=2_850_000_000,
+            estimated_amount=3_000_000_000,
+            price_kind="BUDGET",
+        )
+
+        selection = store_candidate_selection(session, run_id, WORKER, ATTEMPT, as_of=AS_OF)
+
+        found = {item.candidate_id for item in selection.ordered}
+        assert active in found
+        assert closed not in found
+        assert selection.criteria.active_statuses == ("RECEIVED",)

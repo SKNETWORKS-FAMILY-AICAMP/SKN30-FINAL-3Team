@@ -283,8 +283,11 @@ def update_property_listing(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyListingResponse:
-    changed = changed_fields(payload)
-    service.update_property_listing(db, user.brokerage_id, listing_id, dict(changed))
+    # 무엇이 실제로 바뀌었는지는 service 가 저장하며 계산한다. route 가 현재값 비교를
+    # 다시 구현하면 두 곳이 조용히 갈라진다.
+    changed = service.update_property_listing(
+        db, user.brokerage_id, listing_id, changed_fields(payload)
+    )
     # 가격·조건이 실제로 바뀐 저장만 판정을 다시 돌린다 (F3-CR-02).
     triggers.after_listing_saved(db, user.brokerage_id, user.id, listing_id, changed)
     listing = repository.find_property_listing(db, user.brokerage_id, listing_id)
@@ -386,8 +389,9 @@ def update_property_requirement(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyRequirementDetailResponse:
-    changed = changed_fields(payload)
-    service.update_property_requirement(db, user.brokerage_id, requirement_id, dict(changed))
+    changed = service.update_property_requirement(
+        db, user.brokerage_id, requirement_id, changed_fields(payload)
+    )
     # 조건이 실제로 바뀐 저장만 판정을 다시 돌린다 (F3-CR-01).
     triggers.after_requirement_saved(db, user.brokerage_id, user.id, requirement_id, changed)
     return get_property_requirement(requirement_id, user, db)

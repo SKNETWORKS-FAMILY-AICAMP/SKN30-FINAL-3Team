@@ -35,7 +35,41 @@ from domain.agent_execution.models import (
 from domain.agent_execution.service import current_anchor_version
 
 # snapshot 구조가 바뀌면 올린다. 저장된 예전 snapshot 을 새 구조로 읽지 않기 위해서다.
-CANDIDATE_SELECTION_SCHEMA_VERSION = "candidate-selection:v1"
+# v2 는 거래 유형·활성 상태 조건과 월세 두 축을 조회 조건에 함께 담는다.
+CANDIDATE_SELECTION_SCHEMA_VERSION = "candidate-selection:v2"
+
+# ── 거래 유형 어휘 ─────────────────────────────────────────────────────────────
+#
+# 매물장과 구입장은 **같은 거래를 다른 말로 부른다** (F1 데이터 항목 13.1·13.2).
+# 매물장은 거래 가능 플래그를 `매매`·`전세`·`월세` 로 두고, 구입장 `구분` 은
+# `매수`·`매도`·`전세`·`월세` 다. 이 표가 그 대응의 유일한 정본이다.
+#
+# `매도` 는 팔려는 수요라 매물의 반대편이 아니다. 어느 방향으로도 매핑하지 않으므로
+# 매도 구입장은 매물 앵커의 후보가 되지 않고, 매도 구입장을 앵커로 잡으면 호환되는 매물
+# 거래 유형이 없어 후보가 0건이 된다.
+
+PRICE_KIND_TO_DEMAND_TYPES: dict[str, frozenset[str]] = {
+    "SALE": frozenset({"매수"}),
+    "JEONSE": frozenset({"전세"}),
+    "MONTHLY_RENT": frozenset({"월세"}),
+}
+
+DEMAND_TYPE_TO_PRICE_KIND: dict[str, str] = {
+    "매수": "SALE",
+    "전세": "JEONSE",
+    "월세": "MONTHLY_RENT",
+}
+
+# ── 활성 업무 상태 ─────────────────────────────────────────────────────────────
+#
+# F1 은 아직 매물·구입장 상태 값 목록을 확정하지 않았다 (API 계약). 확정 전까지는 서버가
+# 신규 저장에 쓰는 기본값을 "아직 진행 중" 으로 본다. 종료된 건이 후보로 올라오면 이미 끝난
+# 거래에 연락하자는 제안이 나온다.
+#
+# 값 목록이 확정되면 이 두 집합을 먼저 고치고 project-wiki 를 함께 갱신한다.
+
+ACTIVE_LISTING_STATUSES = frozenset({"RECEIVED"})
+ACTIVE_REQUIREMENT_STATUSES = frozenset({"ACTIVE"})
 
 # 우선 카드화하는 상위 건수 (F3-BR-13). 나머지는 snapshot 에 그대로 남는다.
 CANDIDATE_CARD_LIMIT = 15
@@ -80,6 +114,7 @@ class CandidateScore:
     recency: Decimal
     total: Decimal
     price_amount: int | None
+    monthly_amount: int | None
     received_at: date | None
 
     def as_snapshot(self, rank: int, selected: bool) -> dict[str, object]:
@@ -92,6 +127,8 @@ class CandidateScore:
             "area_match": str(self.area_match),
             "recency": str(self.recency),
             "price_amount": self.price_amount,
+            # 월세 후보의 월 차임. 비교 축이 아니라 보존값이다.
+            "monthly_amount": self.monthly_amount,
             "received_at": self.received_at.isoformat() if self.received_at else None,
         }
 
@@ -103,11 +140,14 @@ class CandidateCriteria:
     candidate_side: AnchorType
     price_kind: str | None
     price_amount: int | None
+    monthly_amount: int | None
     price_is_estimated: bool
     price_floor_amount: int | None
     price_ceiling_amount: int | None
     anchor_pyeong: Decimal | None
     complex_id: int | None
+    demand_types: tuple[str, ...]
+    active_statuses: tuple[str, ...]
     as_of: date
 
     def as_snapshot(self) -> dict[str, object]:
@@ -115,15 +155,32 @@ class CandidateCriteria:
             "candidate_side": self.candidate_side.value,
             "price_kind": self.price_kind,
             "price_amount": self.price_amount,
+            # 월세 앵커의 월 차임. 구입장에 대응하는 예산 축이 없어 비교에는 쓰지 않는다.
+            "monthly_amount": self.monthly_amount,
             "price_source": "ESTIMATED" if self.price_is_estimated else "STATED",
             "price_tolerance_ratio": str(PRICE_TOLERANCE_RATIO),
             "price_floor_amount": self.price_floor_amount,
             "price_ceiling_amount": self.price_ceiling_amount,
+            "compared_amount_axis": _compared_axis(self.price_kind),
             "anchor_pyeong": str(self.anchor_pyeong) if self.anchor_pyeong is not None else None,
             "pyeong_tolerance": str(PYEONG_TOLERANCE),
             "complex_id": self.complex_id,
+            "demand_types": list(self.demand_types),
+            "active_statuses": list(self.active_statuses),
             "as_of": self.as_of.isoformat(),
         }
+
+
+def _compared_axis(price_kind: str | None) -> str | None:
+    """무엇을 비교했는지 snapshot 에 남긴다.
+
+    월세는 보증금과 월 차임이 별도 축인데 구입장에는 월 차임에 대응하는 예산 축이 없다.
+    그래서 보증금만 비교한다. 이 사실을 저장해 두지 않으면 나중에 결과를 보고 무엇을
+    비교한 것인지 알 수 없다.
+    """
+    if price_kind is None:
+        return None
+    return "MONTHLY_RENT_DEPOSIT" if price_kind == "MONTHLY_RENT" else price_kind
 
 
 @dataclass(frozen=True)
@@ -217,11 +274,17 @@ def _score(
     *,
     anchor_amount: int | None,
     candidate_amount: int | None,
+    candidate_monthly_amount: int | None = None,
     anchor_pyeong: Decimal | None,
     candidate_pyeongs: tuple[Decimal, ...],
     received_at: date | None,
     as_of: date,
 ) -> CandidateScore:
+    """가격 근접도는 **주 금액 축 하나**만 비교한다.
+
+    월세의 월 차임은 구입장에 대응하는 예산 축이 없어 점수에 넣지 않는다. 값은 버리지 않고
+    snapshot 에 그대로 보존해 화면이 보증금과 차임을 함께 보여줄 수 있게 한다.
+    """
     price = _price_proximity(anchor_amount, candidate_amount)
     area = _area_match(anchor_pyeong, candidate_pyeongs)
     recency = _recency(received_at, as_of)
@@ -233,6 +296,7 @@ def _score(
         recency=recency,
         total=total,
         price_amount=candidate_amount,
+        monthly_amount=candidate_monthly_amount,
         received_at=received_at,
     )
 
@@ -257,29 +321,39 @@ def _order(scores: list[CandidateScore]) -> tuple[CandidateScore, ...]:
 
 def _anchor_price(
     prices: list[repository.CandidatePriceRow],
-) -> tuple[str | None, int | None, bool]:
-    """후보 조회의 가격 축.
+) -> tuple[str | None, int | None, int | None, bool]:
+    """후보 조회의 가격 축. `(price_kind, 주 금액, 월 차임, 추정가 여부)` 다.
 
     카드는 매매·전세·월세를 동시에 담을 수 있다. MVP 는 카드에 실린 **첫 번째** 거래
     유형(`display_order` 최소)을 축으로 쓴다. 이 순서는 카드 생성 시 `PriceKind` 열거 순서로
     결정적으로 정해지므로 같은 카드에서 항상 같은 축이 나온다.
 
-    추정가가 있으면 추정가를 쓴다 (F3-SQ-03). 없으면 장부 표기가로 내려간다.
+    추정가가 있으면 추정가를 쓴다 (F3-SQ-03). 없으면 장부 표기가로 내려간다. 월세는 보증금과
+    월 차임을 각각 같은 규칙으로 고른다.
     """
     if not prices:
-        return None, None, False
+        return None, None, None, False
     primary = prices[0]
-    if primary.estimated_amount is not None:
-        return primary.price_kind, primary.estimated_amount, True
-    return primary.price_kind, primary.stated_amount, False
+    estimated = primary.estimated_amount is not None
+    amount = primary.estimated_amount if estimated else primary.stated_amount
+    monthly = (
+        primary.estimated_monthly_amount
+        if primary.estimated_monthly_amount is not None
+        else primary.stated_monthly_amount
+    )
+    return primary.price_kind, amount, monthly, estimated
 
 
 def _listing_anchor_criteria(
     session: Session, brokerage_id: int, anchor: NegotiationPositionAnalysis, as_of: date
 ) -> CandidateCriteria:
-    """매물 앵커는 구입장 후보를 찾는다. 예산이 앵커 추정가에 닿는 손님이 대상이다."""
+    """매물 앵커는 구입장 후보를 찾는다. 예산이 앵커 추정가에 닿는 손님이 대상이다.
+
+    거래 유형이 맞는 손님만 본다. 매매 매물에 전세 손님이 붙거나 월세 매물에 매수 손님이
+    붙으면 안 된다. 카드에 금액이 하나도 없으면 거래 유형을 정할 수 없어 후보도 없다.
+    """
     prices = repository.list_position_card_prices(session, brokerage_id, anchor.id or 0)
-    price_kind, amount, estimated = _anchor_price(prices)
+    price_kind, amount, monthly, estimated = _anchor_price(prices)
     unit = repository.find_unit_specification(session, brokerage_id, anchor.unit_id or 0)
     floor = (
         int(Decimal(amount) * (Decimal(1) - PRICE_TOLERANCE_RATIO)) if amount is not None else None
@@ -288,35 +362,50 @@ def _listing_anchor_criteria(
         candidate_side=AnchorType.REQUIREMENT,
         price_kind=price_kind,
         price_amount=amount,
+        monthly_amount=monthly,
         price_is_estimated=estimated,
         # 예산 하한만 건다. 앵커보다 예산이 큰 손님은 언제나 후보다.
         price_floor_amount=floor,
         price_ceiling_amount=None,
         anchor_pyeong=unit.pyeong if unit else None,
         complex_id=unit.complex_id if unit else None,
+        demand_types=tuple(sorted(PRICE_KIND_TO_DEMAND_TYPES.get(price_kind or "", frozenset()))),
+        active_statuses=tuple(sorted(ACTIVE_REQUIREMENT_STATUSES)),
         as_of=as_of,
     )
 
 
 def _requirement_anchor_criteria(
-    session: Session, brokerage_id: int, anchor: NegotiationPositionAnalysis, as_of: date
+    session: Session,
+    brokerage_id: int,
+    anchor: NegotiationPositionAnalysis,
+    demand_type: str | None,
+    as_of: date,
 ) -> CandidateCriteria:
-    """구입장 앵커는 매물 후보를 찾는다. 추정 예산 상한에 닿는 매물이 대상이다."""
+    """구입장 앵커는 매물 후보를 찾는다. 추정 예산 상한에 닿는 매물이 대상이다.
+
+    후보 매물의 거래 유형은 앵커 카드의 `price_kind`(항상 `BUDGET`)가 아니라 구입장의
+    **`demand_type`** 이 정한다. 매수 손님에게 월세 매물을 붙이지 않는다. 대응하는 거래
+    유형이 없는 구분(`매도` 등)은 후보가 0건이다.
+    """
     prices = repository.list_position_card_prices(session, brokerage_id, anchor.id or 0)
-    price_kind, amount, estimated = _anchor_price(prices)
+    _, amount, _, estimated = _anchor_price(prices)
     ceiling = (
         int(Decimal(amount) * (Decimal(1) + PRICE_TOLERANCE_RATIO)) if amount is not None else None
     )
     return CandidateCriteria(
         candidate_side=AnchorType.LISTING,
-        price_kind=price_kind,
+        price_kind=DEMAND_TYPE_TO_PRICE_KIND.get(demand_type or ""),
         price_amount=amount,
+        monthly_amount=None,
         price_is_estimated=estimated,
         price_floor_amount=None,
         # 예산 상한만 건다. 싼 매물은 언제나 후보다.
         price_ceiling_amount=ceiling,
         anchor_pyeong=None,
         complex_id=None,
+        demand_types=(demand_type,) if demand_type else (),
+        active_statuses=tuple(sorted(ACTIVE_LISTING_STATUSES)),
         as_of=as_of,
     )
 
@@ -339,6 +428,8 @@ def select_candidates(
         rows = repository.list_requirement_candidates(
             session,
             brokerage_id,
+            demand_types=criteria.demand_types,
+            active_statuses=criteria.active_statuses,
             budget_floor_amount=criteria.price_floor_amount,
             complex_id=criteria.complex_id,
         )
@@ -355,16 +446,25 @@ def select_candidates(
             for row in rows
         ]
     else:
-        criteria = _requirement_anchor_criteria(session, brokerage_id, anchor, as_of)
+        specification = repository.find_requirement_specification(
+            session, brokerage_id, anchor.requirement_id or 0
+        )
+        criteria = _requirement_anchor_criteria(
+            session,
+            brokerage_id,
+            anchor,
+            specification.demand_type if specification else None,
+            as_of,
+        )
         preferred = repository.list_requirement_complex_ids(
             session, brokerage_id, anchor.requirement_id or 0
         )
-        desired = repository.find_requirement_desired_pyeongs(
-            session, brokerage_id, anchor.requirement_id or 0
-        )
+        desired = specification.desired_pyeongs if specification else ()
         rows = repository.list_listing_candidates(
             session,
             brokerage_id,
+            price_kind=criteria.price_kind,
+            active_statuses=criteria.active_statuses,
             price_ceiling_amount=criteria.price_ceiling_amount,
             complex_ids=preferred,
         )
@@ -373,6 +473,7 @@ def select_candidates(
                 row.listing_id,
                 anchor_amount=criteria.price_amount,
                 candidate_amount=row.price_amount,
+                candidate_monthly_amount=row.monthly_amount,
                 # 매물 후보는 세대 평형 하나를 갖고, 앵커 구입장이 희망 평형 목록을 갖는다.
                 # 비교 방향만 뒤집고 판정 규칙은 같게 둔다.
                 anchor_pyeong=row.pyeong,

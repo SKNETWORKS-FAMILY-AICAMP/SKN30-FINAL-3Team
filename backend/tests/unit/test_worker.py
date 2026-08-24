@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from brokerage_ai.core.errors import ProviderConfigurationError
+from brokerage_ai.core.types import ProviderKind
 
 from core.errors import ConfigurationError
 from worker import (
@@ -99,8 +101,9 @@ class FakeSession:
 
 
 class FakeRun:
-    def __init__(self, run_id: int) -> None:
+    def __init__(self, run_id: int, brokerage_id: int = 1) -> None:
         self.id = run_id
+        self.brokerage_id = brokerage_id
 
 
 def loop_with(
@@ -108,6 +111,7 @@ def loop_with(
     *,
     stop_event: threading.Event | None = None,
     on_handle=None,
+    handle_override=None,
 ) -> tuple[int, list[Any], FakeSession, list[float]]:
     """`claim_next_run` 이 정해진 순서로 돌려주도록 바꿔 loop 를 돌린다."""
     import worker
@@ -121,8 +125,10 @@ def loop_with(
     def claim(_session: object, _worker_id: str) -> Any:
         return remaining.pop(0) if remaining else None
 
-    def handle(_session: object, run: Any) -> None:
+    def handle(session: object, run: Any) -> None:
         handled.append(run)
+        if handle_override is not None:
+            handle_override(session, run)
         if on_handle is not None:
             on_handle(run)
 
@@ -199,3 +205,180 @@ def test_a_stop_request_before_the_first_claim_handles_nothing() -> None:
     assert count == 0
     assert handled == []
     assert session.closed
+
+
+# ── Provider 설정 오류 격리 ────────────────────────────────────────────────────
+#
+# 설정 오류가 build_bindings 밖으로 새면 run_worker_loop 까지 올라가 Worker 프로세스가
+# 통째로 죽는다. 실행 하나의 설정 문제로 큐 전체가 멈추면 안 된다.
+
+
+class FakeRegistry:
+    """구성된 Provider 만 돌려주는 대역. 없으면 AI 와 같은 오류를 낸다."""
+
+    def __init__(self, *kinds: ProviderKind) -> None:
+        self._kinds = set(kinds)
+
+    def get_llm(self, kind: ProviderKind) -> object:
+        if kind not in self._kinds:
+            raise ProviderConfigurationError(f"{kind.value} LLM provider is not configured")
+        return object()
+
+
+class FakeRuntime:
+    def __init__(self, *kinds: ProviderKind) -> None:
+        self.providers = FakeRegistry(*kinds)
+
+
+class FakeModelConfig:
+    def __init__(self, provider: str, model_name: str = "some-model", config_id: int = 1) -> None:
+        self.provider = provider
+        self.model_name = model_name
+        self.id = config_id
+
+
+def bindings_with(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    card: FakeModelConfig | None,
+    judgment: FakeModelConfig | None,
+    runtime: FakeRuntime,
+):
+    import worker
+
+    def find(_session: object, _brokerage_id: int, capability: str) -> object | None:
+        return card if capability == "POSITION_CARD" else judgment
+
+    monkeypatch.setattr(worker.repository, "find_active_model_config", find)
+    return worker.build_bindings(None, runtime, 1)  # type: ignore[arg-type]
+
+
+def test_an_unsupported_provider_string_becomes_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ConfigurationError, match="provider is not supported"):
+        bindings_with(
+            monkeypatch,
+            card=FakeModelConfig("bedrock"),
+            judgment=FakeModelConfig("vllm"),
+            runtime=FakeRuntime(ProviderKind.VLLM),
+        )
+
+
+def test_a_blank_model_name_becomes_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ConfigurationError, match="model route is invalid"):
+        bindings_with(
+            monkeypatch,
+            card=FakeModelConfig("vllm", model_name="   "),
+            judgment=FakeModelConfig("vllm"),
+            runtime=FakeRuntime(ProviderKind.VLLM),
+        )
+
+
+def test_a_provider_the_runtime_lacks_becomes_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DB 는 openai 를 가리키는데 이 프로세스에는 vllm 만 구성돼 있다."""
+    with pytest.raises(ConfigurationError, match="provider is not available"):
+        bindings_with(
+            monkeypatch,
+            card=FakeModelConfig("openai"),
+            judgment=FakeModelConfig("vllm"),
+            runtime=FakeRuntime(ProviderKind.VLLM),
+        )
+
+
+def test_the_reverse_provider_mismatch_is_also_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ConfigurationError, match="provider is not available"):
+        bindings_with(
+            monkeypatch,
+            card=FakeModelConfig("vllm"),
+            judgment=FakeModelConfig("vllm"),
+            runtime=FakeRuntime(ProviderKind.OPENAI),
+        )
+
+
+def test_a_judgment_provider_mismatch_is_caught_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """대리 설정만 맞아도 판정 설정이 어긋나면 실행을 진행할 수 없다."""
+    with pytest.raises(ConfigurationError, match="provider is not available"):
+        bindings_with(
+            monkeypatch,
+            card=FakeModelConfig("vllm"),
+            judgment=FakeModelConfig("openai"),
+            runtime=FakeRuntime(ProviderKind.VLLM),
+        )
+
+
+def test_a_missing_judgment_config_is_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """POSITION_CARD 만 있고 BROKERAGE_JUDGMENT 가 없다."""
+    with pytest.raises(ConfigurationError, match="no active AI model configuration"):
+        bindings_with(
+            monkeypatch,
+            card=FakeModelConfig("vllm"),
+            judgment=None,
+            runtime=FakeRuntime(ProviderKind.VLLM),
+        )
+
+
+def test_a_usable_configuration_builds_both_bindings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bindings = bindings_with(
+        monkeypatch,
+        card=FakeModelConfig("vllm", config_id=7),
+        judgment=FakeModelConfig("vllm", config_id=9),
+        runtime=FakeRuntime(ProviderKind.VLLM),
+    )
+
+    assert bindings.card.model_config_id == 7
+    assert bindings.judgment.model_config_id == 9
+
+
+def test_a_configuration_error_does_not_escape_the_worker_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """설정이 깨진 실행 하나가 큐 전체를 멈추지 않는다."""
+    import worker
+
+    failed: list[int] = []
+
+    def explode(_session: object, _brokerage_id: int, _capability: str) -> object | None:
+        raise ConfigurationError("the configured AI provider is not supported")
+
+    def record(_session: object, run: object, _worker_id: str, _outcome: object) -> None:
+        failed.append(run.id)  # type: ignore[attr-defined]
+
+    monkeypatch.setattr(worker.repository, "find_active_model_config", explode)
+    monkeypatch.setattr(worker.pipeline, "record_failure", record)
+
+    broken = FakeRun(1)
+    healthy = FakeRun(2)
+    handled: list[Any] = []
+
+    def handle(session: object, run: object) -> None:
+        outcome = worker.process_run(
+            session,  # type: ignore[arg-type]
+            run,  # type: ignore[arg-type]
+            "worker-test",
+            FakeRuntime(ProviderKind.VLLM),  # type: ignore[arg-type]
+            None,  # type: ignore[arg-type]
+        )
+        handled.append(outcome)
+
+    count, _, _, _ = loop_with([broken, healthy], handle_override=handle)
+
+    # 두 실행 모두 처리됐고 loop 가 예외로 끊기지 않았다.
+    assert count == 2
+    assert handled == [
+        worker.pipeline.StepOutcome.FAILED_TERMINAL,
+        worker.pipeline.StepOutcome.FAILED_TERMINAL,
+    ]
+    assert failed == [1, 2]

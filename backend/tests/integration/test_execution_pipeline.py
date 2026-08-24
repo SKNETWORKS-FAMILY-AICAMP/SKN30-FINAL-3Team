@@ -643,7 +643,12 @@ def test_a_run_without_an_active_model_config_fails_terminally() -> None:
             loop.close()
 
         assert outcome is StepOutcome.FAILED_TERMINAL
-        assert fixture.status(run_id) == FAILED_TERMINAL_STATUS
+        stored = fixture.stored_run(run_id)
+        assert stored["status"] == FAILED_TERMINAL_STATUS
+        # 공개 문구만 저장한다. provider·모델 이름·endpoint 는 들어가지 않는다.
+        assert stored["failure_message"] == pipeline.TERMINAL_FAILURE_MESSAGE
+        assert "vllm" not in str(stored["failure_message"])
+        assert "fake-delegate" not in str(stored["failure_message"])
 
 
 @requires_database

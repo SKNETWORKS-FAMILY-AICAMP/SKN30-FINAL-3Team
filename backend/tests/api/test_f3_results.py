@@ -40,6 +40,13 @@ def queue(client: TestClient, listing_id: int) -> dict:
     return response.json()
 
 
+def stored_feedback_count(session: Session, brokerage_id: int) -> int:
+    return session.execute(
+        text("SELECT count(*) FROM ai_decision_feedback WHERE brokerage_id = :b"),
+        {"b": brokerage_id},
+    ).scalar_one()
+
+
 def run_count(session: Session, brokerage_id: int) -> int:
     return session.execute(
         text("SELECT count(*) FROM agent_run WHERE brokerage_id = :b"), {"b": brokerage_id}
@@ -128,7 +135,7 @@ def store_judgment(
     ).scalar_one()
     selection = json.dumps(
         {
-            "schema": "candidate-selection:v1",
+            "schema": "candidate-selection:v2",
             "criteria": {
                 "candidate_side": "REQUIREMENT",
                 "price_kind": "SALE",
@@ -571,7 +578,7 @@ def test_feedback_requires_the_csrf_token(config: Config) -> None:
         payload = {
             "target": "POSITION_ANALYSIS",
             "target_id": card_id,
-            "feedback_type": "CORRECTION",
+            "feedback_type": "NOT_INTERESTED",
             "reason": "OTHER",
         }
 
@@ -598,7 +605,7 @@ def test_feedback_on_another_brokerage_result_is_not_found(config: Config) -> No
             json={
                 "target": "POSITION_ANALYSIS",
                 "target_id": stranger,
-                "feedback_type": "CORRECTION",
+                "feedback_type": "NOT_INTERESTED",
                 "reason": "OTHER",
             },
         )
@@ -624,7 +631,7 @@ def test_personal_data_in_the_free_text_is_refused(config: Config, detail: str) 
             json={
                 "target": "POSITION_ANALYSIS",
                 "target_id": card_id,
-                "feedback_type": "CORRECTION",
+                "feedback_type": "NOT_INTERESTED",
                 "reason": "OTHER",
                 "detail": detail,
             },
@@ -659,7 +666,7 @@ def test_an_unknown_reason_is_refused(config: Config) -> None:
             json={
                 "target": "POSITION_ANALYSIS",
                 "target_id": card_id,
-                "feedback_type": "CORRECTION",
+                "feedback_type": "NOT_INTERESTED",
                 "reason": "그냥 별로",
             },
         )
@@ -680,7 +687,7 @@ def test_the_body_cannot_carry_a_tenant_or_author(config: Config) -> None:
             json={
                 "target": "POSITION_ANALYSIS",
                 "target_id": card_id,
-                "feedback_type": "CORRECTION",
+                "feedback_type": "NOT_INTERESTED",
                 "reason": "OTHER",
                 "brokerage_id": 1,
                 "created_by": 1,
@@ -688,3 +695,211 @@ def test_the_body_cannot_carry_a_tenant_or_author(config: Config) -> None:
         )
 
         assert response.status_code == 422, "선언하지 않은 필드는 거절한다"
+
+
+# ── 정정값 검증 ────────────────────────────────────────────────────────────────
+
+
+def correction(card_id: int, **overrides: object) -> dict:
+    payload: dict = {
+        "target": "POSITION_ANALYSIS",
+        "target_id": card_id,
+        "feedback_type": "CORRECTION",
+        "reason": "WRONG_JUDGMENT",
+        "field_name": "intent",
+        "corrected_value": {"value": "WITHDRAWN"},
+    }
+    payload.update(overrides)
+    return payload
+
+
+@requires_database
+def test_a_structured_correction_without_personal_data_is_accepted(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, "정정단지")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+
+        response = client.post(
+            "/api/v1/f3/feedback",
+            json=correction(
+                card_id,
+                corrected_value={
+                    "value": "WITHDRAWN",
+                    "evidence": [{"kind": "INFERENCE", "note": "직접 들었다"}],
+                    "confident": True,
+                },
+            ),
+        )
+
+        assert response.status_code == 201, response.text
+
+
+@requires_database
+def test_a_phone_number_at_the_top_of_the_correction_is_refused(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, "정정전화단지")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+
+        response = client.post(
+            "/api/v1/f3/feedback",
+            json=correction(card_id, corrected_value={"note": "010-1234-5678 로 확인"}),
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == "PERSONAL_DATA_NOT_ALLOWED"
+        assert "010-1234-5678" not in response.text
+        assert stored_feedback_count(session, brokerage_id) == 0
+
+
+@requires_database
+def test_an_email_nested_in_the_correction_is_refused(config: Config) -> None:
+    """최상위만 보면 중첩 객체나 배열 안에 연락처를 숨길 수 있다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, "정정중첩단지")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+
+        response = client.post(
+            "/api/v1/f3/feedback",
+            json=correction(
+                card_id,
+                corrected_value={"evidence": [{"note": "buyer@example.com 으로 회신"}]},
+            ),
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == "PERSONAL_DATA_NOT_ALLOWED"
+        assert "buyer@example.com" not in response.text
+        assert stored_feedback_count(session, brokerage_id) == 0
+
+
+@requires_database
+def test_an_oversized_correction_is_refused(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, "정정크기단지")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+
+        response = client.post(
+            "/api/v1/f3/feedback",
+            json=correction(card_id, corrected_value={"value": "가" * 5000}),
+        )
+
+        assert response.status_code == 422, response.text
+        assert stored_feedback_count(session, brokerage_id) == 0
+
+
+@requires_database
+def test_a_deeply_nested_correction_is_refused(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, "정정깊이단지")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+
+        deep: dict = {"value": "끝"}
+        for _ in range(8):
+            deep = {"nested": deep}
+
+        response = client.post(
+            "/api/v1/f3/feedback", json=correction(card_id, corrected_value=deep)
+        )
+
+        assert response.status_code == 422, response.text
+        assert stored_feedback_count(session, brokerage_id) == 0
+
+
+@requires_database
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"field_name": None},
+        {"corrected_value": None},
+        {"field_name": "  "},
+        # 내부 컬럼 이름은 정정 대상이 아니다.
+        {"field_name": "cache_key"},
+        {"field_name": "analysis_snapshot"},
+    ],
+)
+def test_an_incomplete_or_unknown_correction_is_refused(config: Config, overrides: dict) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, f"정정형식{uuid4().hex[:4]}")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+
+        response = client.post("/api/v1/f3/feedback", json=correction(card_id, **overrides))
+
+        assert response.status_code == 422, response.text
+        assert stored_feedback_count(session, brokerage_id) == 0
+
+
+@requires_database
+@pytest.mark.parametrize(
+    "overrides",
+    [{"field_name": "intent"}, {"corrected_value": {"value": "WITHDRAWN"}}],
+)
+def test_a_not_interested_feedback_cannot_carry_a_correction(
+    config: Config, overrides: dict
+) -> None:
+    """관심없음은 사유만 남기는 피드백이다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, f"관심없음{uuid4().hex[:4]}")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+        payload = {
+            "target": "POSITION_ANALYSIS",
+            "target_id": card_id,
+            "feedback_type": "NOT_INTERESTED",
+            "reason": "ALREADY_CONTACTED",
+        }
+        payload.update(overrides)
+
+        response = client.post("/api/v1/f3/feedback", json=payload)
+
+        assert response.status_code == 422, response.text
+        assert stored_feedback_count(session, brokerage_id) == 0
+
+
+@requires_database
+def test_a_match_candidate_correction_uses_its_own_field_allowlist(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user):
+        complex_id = create_complex(client, session, brokerage_id, "판정정정단지")
+        listing = create_listing(client, complex_id)
+        run = queue(client, listing["id"])
+        card_id = store_card(session, brokerage_id, run["run_id"], listing["id"])
+        candidate_id, _ = store_judgment(session, brokerage_id, run["run_id"], card_id)
+
+        allowed = client.post(
+            "/api/v1/f3/feedback",
+            json={
+                "target": "MATCH_CANDIDATE",
+                "target_id": candidate_id,
+                "feedback_type": "CORRECTION",
+                "reason": "WRONG_JUDGMENT",
+                "field_name": "match_grade",
+                "corrected_value": {"value": "REJECTED"},
+            },
+        )
+        # 카드 항목은 판정 후보의 정정 대상이 아니다.
+        rejected = client.post(
+            "/api/v1/f3/feedback",
+            json={
+                "target": "MATCH_CANDIDATE",
+                "target_id": candidate_id,
+                "feedback_type": "CORRECTION",
+                "reason": "WRONG_JUDGMENT",
+                "field_name": "intent",
+                "corrected_value": {"value": "WITHDRAWN"},
+            },
+        )
+
+        assert allowed.status_code == 201, allowed.text
+        assert rejected.status_code == 422, rejected.text

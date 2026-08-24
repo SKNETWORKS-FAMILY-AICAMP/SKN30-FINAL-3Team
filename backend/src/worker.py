@@ -32,9 +32,12 @@ from uuid import uuid4
 
 import structlog
 from brokerage_ai.core.config import AiConfig, load_ai_config
+from brokerage_ai.core.errors import ProviderConfigurationError
 from brokerage_ai.core.types import ModelRoute, ProviderKind
 from brokerage_ai.f3 import LlmBrokerageJudgmentGenerator, LlmPositionCardGenerator
+from brokerage_ai.providers.ports import LlmProvider
 from brokerage_ai.runtime import AiRuntime, create_ai_runtime
+from pydantic import ValidationError
 from sqlalchemy import text
 from sqlmodel import Session
 
@@ -125,12 +128,35 @@ def require_ai_provider(profile: str, environ: Mapping[str, str] | None = None) 
 
 
 def _route(config: AiModelConfig) -> ModelRoute:
-    """DB 설정을 AI 모델 경로로 옮긴다. Provider 와 모델 이름은 설정 행에서 나온다."""
+    """DB 설정을 AI 모델 경로로 옮긴다. Provider 와 모델 이름은 설정 행에서 나온다.
+
+    지원하지 않는 provider 문자열과 빈 모델 이름을 Backend `ConfigurationError` 로 바꾼다.
+    그대로 두면 `ValueError` 나 Pydantic `ValidationError` 가 Worker loop 까지 올라가 프로세스
+    전체를 죽인다. 오류 메시지에 provider·모델 이름을 넣지 않는다.
+    """
     try:
         provider = ProviderKind(config.provider)
     except ValueError as error:
         raise ConfigurationError("the configured AI provider is not supported") from error
-    return ModelRoute(provider=provider, model=config.model_name)
+    try:
+        return ModelRoute(provider=provider, model=config.model_name)
+    except ValidationError as error:
+        raise ConfigurationError("the configured AI model route is invalid") from error
+
+
+def _generator_inputs(runtime: AiRuntime, config: AiModelConfig) -> tuple[LlmProvider, ModelRoute]:
+    """설정이 가리키는 Provider 를 runtime 에서 찾는다.
+
+    DB 설정이 요구하는 Provider 가 이 프로세스에 구성돼 있지 않을 수 있다. 설정은 openai
+    인데 runtime 에는 vllm 만 있는 경우다. 이것도 설정 불일치이므로 같은
+    `ConfigurationError` 로 바꿔 해당 실행만 종료 처리한다.
+    """
+    route = _route(config)
+    try:
+        provider = runtime.providers.get_llm(route.provider)
+    except ProviderConfigurationError as error:
+        raise ConfigurationError("the configured AI provider is not available") from error
+    return provider, route
 
 
 def build_bindings(
@@ -138,8 +164,9 @@ def build_bindings(
 ) -> pipeline.ExecutionBindings:
     """이 실행의 사무소에 활성화된 두 모델 설정으로 생성기를 조립한다.
 
-    대리와 판정은 서로 다른 capability 설정을 쓴다 (F3-NF-10). 어느 것이든 없으면 이 실행은
-    진행할 수 없으므로 `ConfigurationError` 로 올린다.
+    대리와 판정은 서로 다른 capability 설정을 쓴다 (F3-NF-10). 설정이 없거나, 지원하지 않는
+    provider 이거나, 그 Provider 가 이 프로세스에 구성돼 있지 않으면 모두
+    `ConfigurationError` 다. 호출자가 그 실행 하나만 종료 처리하고 loop 는 계속 돈다.
     """
     card_config = repository.find_active_model_config(
         session, brokerage_id, POSITION_CARD_CAPABILITY
@@ -150,18 +177,17 @@ def build_bindings(
     if card_config is None or judgment_config is None:
         raise ConfigurationError("the brokerage has no active AI model configuration")
 
+    card_provider, card_route = _generator_inputs(runtime, card_config)
+    judgment_provider, judgment_route = _generator_inputs(runtime, judgment_config)
+
     return pipeline.ExecutionBindings(
         card=GenerationBinding(
-            generator=LlmPositionCardGenerator(
-                provider=runtime.providers.get_llm(ProviderKind(card_config.provider)),
-                route=_route(card_config),
-            ),
+            generator=LlmPositionCardGenerator(provider=card_provider, route=card_route),
             model_config_id=card_config.id or 0,
         ),
         judgment=JudgmentBinding(
             generator=LlmBrokerageJudgmentGenerator(
-                provider=runtime.providers.get_llm(ProviderKind(judgment_config.provider)),
-                route=_route(judgment_config),
+                provider=judgment_provider, route=judgment_route
             ),
             model_config_id=judgment_config.id or 0,
         ),
@@ -179,9 +205,15 @@ def process_run(
     """선점한 실행 하나를 같은 lease 아래에서 진행시킨다. 예외를 밖으로 던지지 않는다."""
     try:
         bindings = build_bindings(session, runtime, run.brokerage_id)
-    except ConfigurationError:
+    except ConfigurationError as error:
         # 설정 문제는 재시도해도 풀리지 않는다. 이 실행만 종료 처리하고 loop 는 계속 돈다.
-        logger.warning("f3_model_config_missing", run_id=run.id, brokerage_id=run.brokerage_id)
+        # provider·모델 이름·endpoint 는 남기지 않는다. 예외 타입 이름까지만 남긴다.
+        logger.warning(
+            "f3_model_config_unusable",
+            run_id=run.id,
+            brokerage_id=run.brokerage_id,
+            error_type=type(error).__name__,
+        )
         pipeline.record_failure(session, run, worker_id, pipeline.StepOutcome.FAILED_TERMINAL)
         return pipeline.StepOutcome.FAILED_TERMINAL
     return pipeline.drive_run(session, run, worker_id, bindings, loop, should_stop)

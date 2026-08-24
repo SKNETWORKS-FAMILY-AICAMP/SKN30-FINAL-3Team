@@ -220,7 +220,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 
 | 항목 | 위치 |
 |---|---|
-| `POST /api/v1/f3/runs`. 요청마다 새 `QUEUED` 실행 생성 | `backend/src/api/f3_runs.py` |
+| `POST /api/v1/f3/runs`. 재사용 가능한 실행이 있으면 반환하고 없으면 `QUEUED` 생성 | `backend/src/api/f3_runs.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
 | `claim_next_run` 작업 선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
@@ -353,25 +353,73 @@ Worker는 어떤 단계를 부를지 정하지 않는다. **DB에 저장된 상�
 ### 현재 구현 규칙
 
 정본 코드는 `backend/src/domain/agent_execution/candidates.py`이고 저장 위치는
-`match_evaluation.candidate_selection_snapshot`(schema `candidate-selection:v1`)이다.
+`match_evaluation.candidate_selection_snapshot`(schema `candidate-selection:v2`)이다.
 
 가격 축은 앵커 **카드**의 첫 번째 거래 유형(`negotiation_position_price.display_order` 최소)
 하나다. 카드 생성이 `PriceKind` 열거 순서로 금액을 채우므로 같은 카드에서 항상 같은 축이
 나온다. 그 축의 `estimated_amount`가 있으면 추정가를, 없으면 장부 표기가를 쓴다 (F3-SQ-03).
 
+### 거래 유형 대응
+
+매물장과 구입장은 **같은 거래를 다른 말로 부른다** (F1 데이터 항목 13.1·13.2). 이 표가
+대응의 유일한 정본이며 코드 정본은
+`backend/src/domain/agent_execution/candidates.py`의 두 매핑 상수다.
+
+| 매물 거래 유형 | 매물 플래그·금액 | 구입장 `demand_type` |
+|---|---|---|
+| `SALE` (매매) | `is_sale_available` · `sale_price` | `매수` |
+| `JEONSE` (전세) | `is_jeonse_available` · `jeonse_deposit_amount` | `전세` |
+| `MONTHLY_RENT` (월세) | `is_monthly_rent_available` · `monthly_rent_deposit_amount` + `monthly_rent_amount` | `월세` |
+
+`매도`는 파는 쪽 수요라 매물의 반대편이 아니다. 어느 방향으로도 대응하지 않으므로 매도
+구입장은 매물 앵커의 후보가 되지 않고, 매도 구입장을 앵커로 잡으면 호환되는 매물 거래
+유형이 없어 후보가 0건이다.
+
+- `LISTING` 앵커는 카드의 대표 `price_kind`와 대응하는 `demand_type`만 후보로 고른다.
+- `REQUIREMENT` 앵커의 후보 거래 유형은 카드의 `price_kind`(항상 `BUDGET`)가 아니라
+  구입장의 **`demand_type`**이 정한다.
+- 매매가가 있다고 전세 손님의 후보가 되거나 월세 매물이 매수 손님의 후보가 되지 않는다.
+- 거래 가능 플래그가 거짓인 채 남아 있는 과거 금액은 후보 가격으로 쓰지 않는다.
+
+### 활성 업무 상태
+
+종료된 건이 후보로 올라오면 이미 끝난 거래에 연락하자는 제안이 나온다.
+
+| 장부 | 활성으로 보는 값 |
+|---|---|
+| `property_listing.status` | `RECEIVED` |
+| `property_requirement.status` | `ACTIVE` |
+
+F1은 아직 두 상태의 값 목록을 확정하지 않았다 (API 계약). 확정 전까지는 **서버가 신규
+저장에 쓰는 기본값**을 "아직 진행 중"으로 보는 것이 현재 운영 규칙이다. 값 목록이 확정되면
+`candidates.py`의 `ACTIVE_LISTING_STATUSES`·`ACTIVE_REQUIREMENT_STATUSES`를 먼저 고치고 이
+표를 함께 갱신한다.
+
+### SQL 조건
+
 | 앵커 | 후보 장부 | SQL 조건 |
 |---|---|---|
-| `LISTING` | `property_requirement` | 사무소 · 구입장 `is_deleted = false` · 인물 `is_deleted = false` · `max_budget_amount IS NULL OR >= 추정가 × 0.9` · 희망 단지 미지정이거나 앵커 단지 포함 |
-| `REQUIREMENT` | `property_listing` | 사무소 · 매물 `is_deleted = false` · **부모 세대 `is_deleted = false`** · 대표 금액 `IS NULL OR <= 추정 예산 × 1.1` · 앵커가 희망 단지를 밝혔으면 그 단지 |
-
-매물 후보의 대표 금액은 `is_sale_available → sale_price`, `is_jeonse_available →
-jeonse_deposit_amount`, `is_monthly_rent_available → monthly_rent_deposit_amount` 순서의 첫
-값이다. 카드가 가격 축을 고르는 순서와 같다.
+| `LISTING` | `property_requirement` | 사무소 · 구입장 `is_deleted = false` · 인물 `is_deleted = false` · **`demand_type` 대응** · **`status` 활성** · `max_budget_amount IS NULL OR >= 추정가 × 0.9` · 희망 단지 미지정이거나 앵커 단지 포함 |
+| `REQUIREMENT` | `property_listing` | 사무소 · 매물 `is_deleted = false` · **부모 세대 `is_deleted = false`** · **해당 거래 가능 플래그 참** · **`status` 활성** · 해당 유형 금액 `IS NULL OR <= 추정 예산 × 1.1` · 앵커가 희망 단지를 밝혔으면 그 단지 |
 
 금액이나 예산이 비어 있는 행은 조건에서 빼지 않는다. 미기재는 "맞지 않는다"가 아니라 "아직
 모른다"이며, 금액을 모르는 후보는 가격 근접도 0으로 뒤로 밀린다. 평형은 조건이 아니라
-점수다. `demand_type`, `status`, `listing_status`는 F1이 값 목록을 확정하지 않아 조건으로
-쓰지 않는다.
+점수다. `classification`, `workflow_stage`는 사무소가 정의하는 자유 값이라 조건으로 쓰지
+않는다.
+
+### 월세의 두 축
+
+월세는 **보증금과 월 차임이 별도 축**이다. 구입장의 금액 필드는 하나뿐이라 월 차임에
+대응하는 예산 축이 없다.
+
+- 포함 조건과 가격 근접도 점수는 **보증금 축 하나만** 비교한다.
+- 월 차임은 버리지 않고 앵커는 `criteria.monthly_amount`, 후보는 각 항목의 `monthly_amount`로
+  snapshot에 보존한다. 화면이 보증금과 차임을 함께 보여줄 수 있다.
+- 무엇을 비교했는지는 `criteria.compared_amount_axis`가 남긴다. 월세면
+  `MONTHLY_RENT_DEPOSIT`이다.
+
+월 차임까지 조건으로 쓰려면 구입장에 대응하는 예산 축이 먼저 있어야 한다. 없는 축을
+추측해서 만들지 않는다.
 
 점수는 세 성분의 가중합이며 Python에서 `Decimal` 6자리로 계산한다. SQL 부동소수 정렬은
 동점 순서가 흔들릴 수 있어 정렬까지 애플리케이션에서 한다.
