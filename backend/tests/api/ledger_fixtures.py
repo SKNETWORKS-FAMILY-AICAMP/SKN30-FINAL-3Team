@@ -88,6 +88,9 @@ def ledger_client(
         session.close()
         transaction.rollback()
         connection.close()
+        # 테스트마다 만든 engine의 pool을 즉시 닫는다. GC에 맡기면 전체 suite 후반에 idle
+        # connection이 누적되어 PostgreSQL max_connections를 소진할 수 있다.
+        engine.dispose()
 
 
 def create_complex(client: TestClient, session: Session, brokerage_id: int, name: str) -> int:
