@@ -85,7 +85,7 @@ def require_synthetic_prototype_opt_in(source: Mapping[str, str]) -> None:
         )
 
 
-def build_worker_id(source: Mapping[str, str] | None = None) -> str:
+def build_worker_id(configured: str | None = None) -> str:
     """재시작과 병렬 인스턴스 사이에 겹치지 않는 64자 이하 lease owner를 만든다."""
     if configured and configured.strip():
         return configured.strip()[:WORKER_ID_MAX_LENGTH]

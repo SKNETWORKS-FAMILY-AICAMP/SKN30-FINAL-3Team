@@ -28,6 +28,7 @@ from worker import (
     run_disabled_worker,
     run_enabled_worker,
     run_worker_loop,
+    worker_enabled,
 )
 
 
