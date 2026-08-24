@@ -291,9 +291,7 @@ class AiDecisionFeedback(SQLModel, table=True):
     id: int | None = Field(default=None, sa_column=identity_column())
     brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
     position_analysis_id: int | None = Field(default=None, sa_column=Column(BigInteger))
-    match_candidate_evaluation_id: int | None = Field(
-        default=None, sa_column=Column(BigInteger)
-    )
+    match_candidate_evaluation_id: int | None = Field(default=None, sa_column=Column(BigInteger))
     feedback_type: str = Field(max_length=30)
     reason: str = Field(max_length=50)
     field_name: str | None = Field(default=None, max_length=100)

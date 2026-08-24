@@ -912,8 +912,7 @@ def test_an_expired_judging_run_is_reclaimed_and_completed() -> None:
 
         session.execute(
             text(
-                "UPDATE agent_run SET lease_expires_at = now() - interval '1 second'"
-                " WHERE id = :i"
+                "UPDATE agent_run SET lease_expires_at = now() - interval '1 second' WHERE id = :i"
             ),
             {"i": run_id},
         )
@@ -953,8 +952,7 @@ def test_a_late_result_from_the_previous_attempt_is_fenced_out() -> None:
 
         session.execute(
             text(
-                "UPDATE agent_run SET lease_expires_at = now() - interval '1 second'"
-                " WHERE id = :i"
+                "UPDATE agent_run SET lease_expires_at = now() - interval '1 second' WHERE id = :i"
             ),
             {"i": run_id},
         )

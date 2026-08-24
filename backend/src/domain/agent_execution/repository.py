@@ -1523,9 +1523,7 @@ def find_candidate_judgment(
     return session.execute(statement).scalars().first()
 
 
-def add_decision_feedback(
-    session: Session, feedback: AiDecisionFeedback
-) -> AiDecisionFeedback:
+def add_decision_feedback(session: Session, feedback: AiDecisionFeedback) -> AiDecisionFeedback:
     session.add(feedback)
     session.flush()
     return feedback
