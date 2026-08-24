@@ -86,6 +86,16 @@ resource "aws_ssm_parameter" "application" {
 }
 
 moved {
+  from = aws_ssm_parameter.application["ai_openai_base_url"]
+  to   = aws_ssm_parameter.application["ai_ai_openai_base_url"]
+}
+
+moved {
+  from = aws_ssm_parameter.application["ai_request_timeout_seconds"]
+  to   = aws_ssm_parameter.application["ai_ai_request_timeout_seconds"]
+}
+
+moved {
   from = aws_ssm_parameter.application["backend_auth_session_absolute_minutes"]
   to   = aws_ssm_parameter.application["backend_auth_session_absolute_timeout_minutes"]
 }
