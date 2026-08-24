@@ -5,7 +5,9 @@
 ## 구성
 
 - [workflow](workflows/pr-policy-review.yml): `pull_request_target` 이벤트, 권한, concurrency와 base SHA checkout을 정의한다.
+- [comment workflow](workflows/pr-comment-discord.yml): 사람의 PR 댓글·리뷰 이벤트를 읽기 전용으로 받아 Discord에 알린다.
 - [review engine](scripts/pr-policy-review.mjs): GitHub API로 PR metadata와 patch를 읽고 Responses API 부분 리뷰를 병렬 실행한 뒤 결과를 통합하며 sticky comment, Check와 Discord 알림을 갱신한다.
+- [comment notifier](scripts/pr-comment-discord.mjs): 이벤트 payload를 신뢰할 수 없는 텍스트로 처리하고 비밀 의심 행 redaction·길이 제한 후 Discord로 전송한다.
 - [policy router](pr-review-policy.json): 전체 PR·부분 리뷰·통합 컨텍스트 한도와 변경 경로별로 읽을 스킬·위키·ADR을 선택한다.
 - [pure library and fixtures](scripts/pr-review-lib.mjs): 결정적 chunk 계획, redaction, strict schema, retry, 결과 병합, 메시지 포맷과 fixture 테스트를 제공한다.
 
@@ -18,11 +20,23 @@ PR head를 checkout하거나 실행하지 않는다. workflow는 base branch의 
 | 일반 PR opened/reopened/ready_for_review | Discord 생성 또는 시작 알림 후 AI 리뷰 |
 | synchronize | 이전 SHA 만료 알림 후 최신 SHA 리뷰; PR별 이전 실행 취소 |
 | closed/merged | 최종 Discord 상태 알림 |
+| PR Conversation 일반 댓글 생성 | 사람 댓글만 Discord 알림; 봇과 일반 Issue 댓글 제외 |
+| PR review 제출 | 승인·변경 요청·일반 리뷰를 Discord 알림 |
+| PR inline review 댓글 생성 | 파일·줄 위치와 함께 Discord 알림 |
 | Draft | secret을 사용하는 job과 AI·Discord 호출 모두 생략 |
 | 외부 fork | secret을 사용하는 job과 AI·Discord 호출 모두 생략 |
 | workflow_dispatch | 기본 dry-run; 실제 PR을 읽되 쓰기와 Discord를 비활성화 |
 
 Discord는 Incoming Webhook 단방향 알림만 사용한다. 병합 승인 버튼, Discord 대화형 Bot, Forum thread 자동 생성은 구현하지 않는다.
+
+### 댓글 알림 범위
+
+- `issue_comment.created`, `pull_request_review.submitted`, `pull_request_review_comment.created`를 서로 다른 GitHub 이벤트 payload 형태에 맞게 정규화한다.
+- GitHub 사용자명, PR 번호·제목, 이벤트 유형, 댓글 앞 240자, 인라인 파일·줄 위치와 원문 링크만 전송한다.
+- `github-actions[bot]`을 포함한 Bot 사용자는 제외해 PR Policy Agent 알림이 중복 전송되지 않게 한다.
+- secret-like line은 미리 가리고 HTML comment와 제어 문자를 제거한다. 댓글 내용은 셸 명령, 환경 변수 또는 코드로 평가하지 않는다.
+- Discord의 mention parsing은 비활성화한다. 알림 workflow는 `contents: read`만 사용하고 PR head를 checkout하지 않는다.
+- 댓글 알림 전송은 429·5xx에 최대 3회 재시도한다. 실패한 알림 job은 Actions에서 확인하되 PR 병합이나 AI 리뷰 결과를 변경하지 않는다.
 
 ## 리뷰 방식
 
@@ -88,6 +102,9 @@ AI Check는 Required Check로 지정하지 않는다. 안정화된 결정적 CI�
 node --check .github/scripts/pr-review-lib.mjs
 node --check .github/scripts/pr-policy-review.mjs
 node --test .github/scripts/tests/pr-review.test.mjs
+node --check .github/scripts/pr-comment-discord-lib.mjs
+node --check .github/scripts/pr-comment-discord.mjs
+node --test .github/scripts/tests/pr-comment-discord.test.mjs
 ```
 
 관리자는 Actions의 `PR Policy Review`에서 PR 번호를 입력해 `dry_run=true`, `invoke_openai=false`로 정책 선택, redaction, chunk 계획과 컨텍스트 한도를 먼저 확인한다. OpenAI까지 검증할 때만 `invoke_openai=true`를 사용하며 dry-run에서는 GitHub 쓰기와 Discord 전송이 계속 비활성화된다.

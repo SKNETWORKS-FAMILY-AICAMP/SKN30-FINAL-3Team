@@ -1,10 +1,13 @@
 ---
 status: 구현됨
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # 위키 변경 로그
 
+- 2026-08-24: 사람의 PR 일반 댓글·리뷰 제출·인라인 코드 댓글을 봇 제외, secret-like line redaction, 240자 미리보기와 멘션 비활성화 조건으로 Discord에 전달하는 읽기 전용 알림 workflow를 추가하고 ADR-0010·개인정보 정책·운영 가이드에 반영함.
+- 2026-08-24: PR Policy Agent의 실제 코드·설정·운영 가이드와 일치하도록 ADR-0010의 finding 상한을 부분 리뷰당 3건, 최종 통합 5건으로 정정함.
+- 2026-08-24: 일반 개발 PR을 `dev`에 통합하고 `dev → main` 릴리스 PR로 배포 기준을 갱신하며, `Hong1008`을 기본 사람 승인 책임자로 두는 Git 흐름을 ADR-0013과 정책 정본에 승인함. 작업 PR은 squash, 릴리스 PR은 조상 관계 보존을 위해 merge commit을 사용함.
 - 2026-08-20: Backend·Frontend CI를 artifact 없는 Verify와 테스트 DB 없는 Build로 분리하고, Backend 검증 DB image를 ECR Public 기반으로 만들어 전용 private ECR에 캐시해 Docker Hub pull limit에 의존하지 않도록 delivery 계약을 보완함.
 - 2026-08-20: CodeBuild false-green 방지를 위해 Backend `TEST_DB_URL` 필수 통합 검사와 Frontend typecheck·현재 Vite release 검사를 공통 로컬/CodeBuild 진입점으로 고정함.
 - 2026-08-20: F3 매물 앵커가 F1 세대 소프트 삭제를 따르도록 매물 단건 조회 범위에 부모 세대 삭제 여부를 포함하고, `agent_run.requested_by`의 보존·삭제를 개인정보 정책 정본에서 `agent_run` 감사 이력과 같은 생명주기로 확정해 OQ-007 범위를 미확정 항목만으로 좁힘. 배포용 Worker 프로세스는 있으나 polling loop·handler는 없다는 구현 상태와 활성 실행 재사용·`SUPERSEDED`·SSE 미구현을 F3 아키텍처와 API 계약에 같은 사실로 반영함.
