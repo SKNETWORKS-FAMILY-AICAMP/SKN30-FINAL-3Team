@@ -6,6 +6,8 @@
   --dw-accent: var(--pf-t--global--color--brand--default, #0284c7);
   --dw-success: var(--pf-t--global--color--status--success--default, #16a34a);
   --dw-warning: var(--pf-t--global--color--status--warning--default, #d97706);
+  /* pointer target 최소치(WCAG 2.2 target size minimum). 밀도를 높여도 이 아래로 내리지 않는다. */
+  --dw-control-min-size: 24px;
 }
 
 .detail-workspace-modal.pf-v6-c-modal-box {
@@ -1406,26 +1408,26 @@
  * 상세 밀도.
  *
  * 세대 상세는 칸이 많아 기본 여백대로 두면 스크롤 없이는 절반도 못 본다.
- * 글자 크기는 읽기 쉬운 선(입력 14px, 라벨 12px)에서 유지하고 여백만 걷어내
- * 한 화면에 최대한 담는다. 클릭 대상은 28px 이상으로 남긴다.
+ * 글자 크기는 읽기 쉬운 선에서 유지하고 여백만 걷어내 한 화면에 최대한 담는다.
+ *
+ * 여백은 PatternFly의 compact 컨트롤 전용 spacer를 쓴다. 임의 값으로 좁히면
+ * wrapper만 줄어들고 정작 클릭 대상인 input이 24px 밑으로 내려간다.
+ * pointer target 최소 24x24는 밀도보다 우선하므로 min-height로 바닥을 고정한다.
  */
 .detail-workspace-modal .pf-v6-c-form-control {
-  --pf-v6-c-form-control--MinHeight: 28px;
-  --pf-v6-c-form-control--PaddingBlockStart: 2px;
-  --pf-v6-c-form-control--PaddingBlockEnd: 2px;
-  --pf-v6-c-form-control--PaddingInlineStart: 6px;
-  --pf-v6-c-form-control--PaddingInlineEnd: 6px;
-  --pf-v6-c-form-control--FontSize: 14px;
-  min-height: 28px;
-  font-size: 14px;
+  --pf-v6-c-form-control--PaddingBlockStart: var(--pf-t--global--spacer--control--vertical--compact);
+  --pf-v6-c-form-control--PaddingBlockEnd: var(--pf-t--global--spacer--control--vertical--compact);
+  --pf-v6-c-form-control--PaddingInlineStart: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-form-control--PaddingInlineEnd: var(--pf-t--global--spacer--sm);
+  min-height: var(--dw-control-min-size);
 }
 
 .detail-workspace-modal .pf-v6-c-form-control > input,
 .detail-workspace-modal .pf-v6-c-form-control > select,
 .detail-workspace-modal .pf-v6-c-form-control > textarea {
-  padding-block: 2px;
-  padding-inline: 6px;
-  font-size: 14px;
+  padding-block: var(--pf-t--global--spacer--control--vertical--compact);
+  padding-inline: var(--pf-t--global--spacer--sm);
+  min-height: var(--dw-control-min-size);
   line-height: 1.35;
 }
 
@@ -1439,8 +1441,8 @@
 }
 
 .detail-workspace-modal .complex-picker__toggle {
-  padding: 3px 8px;
-  font-size: 14px;
+  padding: var(--pf-t--global--spacer--control--vertical--compact) var(--pf-t--global--spacer--sm);
+  min-height: var(--dw-control-min-size);
 }
 
 .detail-workspace-modal .pf-v6-c-check {
