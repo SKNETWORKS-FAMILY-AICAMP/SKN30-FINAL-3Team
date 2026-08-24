@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # F3 포지션 카드 Backend–AI 계약
@@ -16,17 +16,26 @@ updated: 2026-08-20
 | 어휘와 DTO | `ai/src/brokerage_ai/f3/contracts.py` |
 | 생성 Protocol | `ai/src/brokerage_ai/f3/ports.py` |
 | 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/validation.py` |
+| 모델 구조화 출력 schema | `ai/src/brokerage_ai/f3/model_output.py` |
+| 프롬프트와 prompt version | `ai/src/brokerage_ai/f3/prompts.py` |
+| 생성 구현과 workflow version | `ai/src/brokerage_ai/f3/generator.py` |
 | Backend 앵커 종류 | `backend/src/domain/agent_execution/models.py` (`AnchorType`) |
 | Backend cache key | `backend/src/domain/agent_execution/cache_key.py` |
 
-## 두 버전 축
+## 버전 축
 
 | 축 | 값 | 의미 | 소유 |
 |---|---|---|---|
 | 계약 버전 | `position-card:v1` | DTO와 의미 규격의 버전 | AI |
+| Prompt 버전 | `position-card-prompt:v1` | 프롬프트 원문의 버전 | AI |
+| Workflow 버전 | `position-card-workflow:v1` | 생성 절차의 버전 | AI |
 | Cache key 버전 | `position-card:v2` | 캐시 키 계산 방식의 버전 | Backend |
 
-둘은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
+네 값은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
+
+prompt·workflow 버전은 모델을 부르기 전에 cache key 입력으로 사용할 수 있어야 한다.
+`PositionCardGenerator.versions`가 프레임워크 중립 `PositionCardGeneratorVersions`로 두 값을
+먼저 제공하며 Provider SDK 객체와 DB의 모델 설정 식별자는 이 DTO에 담지 않는다.
 
 ## negotiation_side 어휘
 
@@ -112,6 +121,7 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
 | `contract_version` | `position-card:v1` 고정 |
 | `negotiation_side` | 대리하는 측 |
 | `anchor_id` | 대상 식별자. `anchor`의 대상 ID와 같아야 한다 |
+| `target_label` | Backend가 구조화 장부값으로 만든 비식별 표시 라벨 |
 | `source` | `SourceIdentity`. Backend가 준 입력 snapshot 신원 |
 | `anchor` | `LISTING`/`REQUIREMENT` 중 하나의 context |
 | `date_signals` | Backend가 계산한 날짜 신호 |
@@ -145,6 +155,8 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 | `tenancy_status`, `current_deposit_amount`, `current_monthly_rent_amount` | `property_unit` |
 | `tenancy_expiry_date`, `tenancy_raw_text` | `property_unit` |
 | `complex_name` | `property_complex.name` |
+| `party_roles` | 현재 유효한 세대 관계의 비식별 역할·대표·공동명의 여부 |
+| `client_party_role` | 의뢰인의 세대 관계상 역할. 식별자는 싣지 않음 |
 
 | REQUIREMENT context 필드 | F1 출처 |
 |---|---|
@@ -155,6 +167,11 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 | `desired_move_in_date`, `move_in_date_raw_text` | `property_requirement` |
 | `request_expiry_date`, `current_tenancy_expiry_date` | `property_requirement` |
 | `desired_complex_names` | `property_requirement_complex` + `property_complex.name` |
+| `has_co_broker` | 공동중개인 존재 여부. 식별자는 싣지 않음 |
+
+`PartyRoleContext`는 결정권 제약을 판단하기 위한 비식별 역할 정보다. `party_id`, 성명과 연락처는
+담지 않으며, 임차인·공동명의·비결정권자 제약은 별도 출력 어휘를 늘리지 않고 `inflexible`에
+근거와 함께 표현한다.
 
 `memo`, `custom_fields`와 대출 금액은 계약에 넣지 않는다. 자유 메모에는 성명·연락처가 섞일
 수 있고 대출 금액은 판정에 필요한 최소 항목이 아니다 (F3-SE-01). `*_raw_text`는 사용자 입력
@@ -209,12 +226,13 @@ DB snapshot 어디에도 넣지 않는다.
 
 ### target과 source 소유권
 
-`negotiation_side`, `anchor_id`, `data_version`, `interaction_count`,
+`negotiation_side`, `anchor_id`, `target_label`, `data_version`, `interaction_count`,
 `last_interaction_at`, `max_interaction_id`, `cache_key`, `generated_at`은 모델이 만들거나
 고치는 값이 아니다.
 
 - `PositionCardTarget`은 `PositionCardTarget.from_request()`로 요청에서 결정적으로 복사한다.
-- 모델 구조화 출력이 대상 ID나 source identity를 만들게 하지 않는다.
+- 모델 구조화 출력이 대상 ID·라벨이나 source identity를 만들게 하지 않는다.
+- 장부 표기 금액도 모델 출력 schema에서 제외하고 요청의 구조화 값으로 조립한다.
 - `cache_key`는 Backend가 계산하며 결과 DTO에 없다.
 - `generated_at`은 Backend 또는 DB가 저장 시점에 정하며 결과 DTO에 없다.
 
@@ -271,9 +289,9 @@ DB snapshot 어디에도 넣지 않는다.
 - 프롬프트 원문과 전체 모델 응답은 diagnostics에 넣지 않는다.
 - Secret, token, 인증 헤더는 넣지 않는다.
 
-`prompt_version`과 `workflow_version`은 AI가 소유하는 문자열이며 비어 있을 수 없다. 실제
-값 체계는 프롬프트가 생기는 다음 구현에서 정한다. Backend는 이 두 값을 cache key 입력으로만
-쓰고 의미를 해석하지 않는다.
+`prompt_version`과 `workflow_version`은 AI가 소유하는 문자열이며 비어 있을 수 없다. 현재 값은
+각각 `position-card-prompt:v1`, `position-card-workflow:v1`이다. Backend는 이 두 값을 cache key
+입력으로만 쓰고 의미를 해석하지 않는다.
 
 ## 개인정보 경계
 
@@ -319,21 +337,25 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider
 - 계약 버전 `position-card:v1`
 - 요청·결과 DTO와 LISTING/REQUIREMENT 입력 격리
 - `PositionCardGenerator` Protocol
+- `PositionCardGeneratorVersions`와 실제 prompt·workflow 버전
+- `LlmPositionCardGenerator` 구조화 출력 생성 구현
+- 모델 출력에서 서버 소유 대상·source identity·장부 표기 금액을 제거한 내부 schema
+- 대리 측면별 한국어 프롬프트와 전체 상담 로그 시간순 전달
+- 주입한 fake Provider로 모델 요청·출력 조립을 검증하는 단위 테스트
 - 요청·결과 교차 검증 순수 함수
 - Backend `AnchorType`과의 값 일치 계약 테스트
 
 ### 아직 구현하지 않음 (`계획됨`)
 
-- 프롬프트와 실제 모델 호출
-- 포지션 카드 생성 알고리즘과 LangGraph workflow
 - Backend의 F1 snapshot 조립과 상담 로그 마스킹
 - 카드와 근거의 DB 저장, quote offset 계산
 - `ANCHOR_READY` 상태 전이
 - SQL 후보 추출, 후보 카드, 중개 판정
 - Worker polling과 `WORKER_ENABLED=true`
+- F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
+  덧씌우지 않는다
 
 ### 미확정
 
 - 실제 모델 ID와 운영 Provider (AI-OQ-001, AI-OQ-002, AI-OQ-003)
-- `prompt_version`·`workflow_version`의 실제 값 체계
 - LangGraph checkpoint 저장 계약 (AI-OQ-004)

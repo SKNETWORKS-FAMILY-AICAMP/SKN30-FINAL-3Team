@@ -31,6 +31,7 @@ from brokerage_ai.f3 import (
     PositionCardGenerationRequest,
     PositionCardGenerationResult,
     PositionCardGenerator,
+    PositionCardGeneratorVersions,
     PositionCardTarget,
     PositionCondition,
     PriceAssessment,
@@ -107,6 +108,7 @@ def listing_request(**overrides: object) -> PositionCardGenerationRequest:
     values: dict[str, object] = {
         "negotiation_side": NegotiationSide.LISTING,
         "anchor_id": 51,
+        "target_label": "검증단지 1801호",
         "source": source(),
         "anchor": listing_anchor(),
         "date_signals": signals(),
@@ -187,6 +189,7 @@ def test_requirement_request_rejects_a_listing_context() -> None:
         PositionCardGenerationRequest(
             negotiation_side=NegotiationSide.REQUIREMENT,
             anchor_id=51,
+            target_label="구입장 #51",
             source=source(),
             anchor=listing_anchor(),  # pyright: ignore[reportArgumentType]
             date_signals=signals(),
@@ -549,7 +552,10 @@ def test_a_result_for_a_different_target_or_source_is_rejected() -> None:
     other_target = result_for(
         request,
         target=PositionCardTarget(
-            negotiation_side=NegotiationSide.LISTING, anchor_id=52, source=source()
+            negotiation_side=NegotiationSide.LISTING,
+            anchor_id=52,
+            target_label="검증단지 1801호",
+            source=source(),
         ),
     )
     with pytest.raises(PositionCardContractError, match="different anchor"):
@@ -560,6 +566,7 @@ def test_a_result_for_a_different_target_or_source_is_rejected() -> None:
         target=PositionCardTarget(
             negotiation_side=NegotiationSide.LISTING,
             anchor_id=51,
+            target_label="검증단지 1801호",
             source=SourceIdentity(
                 data_version=4,
                 interaction_count=1,
@@ -594,6 +601,7 @@ def test_the_requirement_side_uses_the_budget_price_kind() -> None:
     request = PositionCardGenerationRequest(
         negotiation_side=NegotiationSide.REQUIREMENT,
         anchor_id=91,
+        target_label="구입장 #91",
         source=source(),
         anchor=requirement_anchor(),  # pyright: ignore[reportArgumentType]
         date_signals=signals(),
@@ -686,6 +694,12 @@ async def test_a_fake_generator_satisfies_the_protocol_without_any_sdk() -> None
         def __init__(self) -> None:
             self.seen: list[PositionCardGenerationRequest] = []
 
+        @property
+        def versions(self) -> PositionCardGeneratorVersions:
+            return PositionCardGeneratorVersions(
+                prompt_version="fake-prompt:v1", workflow_version="fake-workflow:v1"
+            )
+
         async def generate_position_card(
             self, request: PositionCardGenerationRequest
         ) -> PositionCardGenerationResult:
@@ -704,3 +718,23 @@ async def test_a_fake_generator_satisfies_the_protocol_without_any_sdk() -> None
 
     assert produced.target == PositionCardTarget.from_request(request)
     validate_generation_result(request, produced)
+
+
+def test_target_label_is_copied_from_the_request_and_cannot_be_changed() -> None:
+    """라벨은 Backend 가 F1 구조화 값에서 만든다. 모델이 바꾸면 저장하지 않는다."""
+    request = listing_request()
+
+    assert PositionCardTarget.from_request(request).target_label == request.target_label
+    validate_generation_result(request, result_for(request))
+
+    tampered = result_for(request)
+    tampered = tampered.model_copy(
+        update={"target": tampered.target.model_copy(update={"target_label": "다른 라벨"})}
+    )
+    with pytest.raises(PositionCardContractError, match="target label"):
+        validate_generation_result(request, tampered)
+
+
+def test_a_blank_target_label_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        listing_request(target_label="   ")

@@ -17,12 +17,12 @@ from brokerage_ai.f3.contracts import (
     ALLOWED_PRICE_KINDS,
     Evidence,
     EvidenceKind,
-    ListingAnchorContext,
     NegotiationSide,
     PositionCardGenerationRequest,
     PositionCardGenerationResult,
     PriceAssessment,
-    PriceKind,
+    enabled_price_kinds,
+    stated_price_for,
 )
 
 
@@ -41,21 +41,6 @@ def _evidence(result: PositionCardGenerationResult) -> Iterator[Evidence]:
         yield from condition.evidence
 
 
-def _stated_amounts(
-    request: PositionCardGenerationRequest, kind: PriceKind
-) -> tuple[int | None, int | None]:
-    """장부가 실제로 갖고 있는 금액. (주 금액, 월 차임) 순서다."""
-    anchor = request.anchor
-    if isinstance(anchor, ListingAnchorContext):
-        if kind is PriceKind.SALE:
-            return anchor.sale_price, None
-        if kind is PriceKind.JEONSE:
-            return anchor.jeonse_deposit_amount, None
-        return anchor.monthly_rent_deposit_amount, anchor.monthly_rent_amount
-    # 구입장의 표기 가격은 예산 상한이다. 하한은 조건 조회용이라 카드 금액으로 쓰지 않는다.
-    return anchor.max_budget_amount, None
-
-
 def _check_price(
     request: PositionCardGenerationRequest, side: NegotiationSide, assessment: PriceAssessment
 ) -> None:
@@ -63,18 +48,11 @@ def _check_price(
         raise PositionCardContractError(
             f"price kind {assessment.price_kind} is not valid for {side}"
         )
-    anchor = request.anchor
-    if isinstance(anchor, ListingAnchorContext):
-        enabled = {
-            PriceKind.SALE: anchor.is_sale_available,
-            PriceKind.JEONSE: anchor.is_jeonse_available,
-            PriceKind.MONTHLY_RENT: anchor.is_monthly_rent_available,
-        }
-        if not enabled[assessment.price_kind]:
-            raise PositionCardContractError(
-                f"price kind {assessment.price_kind} is not enabled by the listing"
-            )
-    stated_amount, stated_monthly = _stated_amounts(request, assessment.price_kind)
+    if assessment.price_kind not in enabled_price_kinds(request.anchor):
+        raise PositionCardContractError(
+            f"price kind {assessment.price_kind} is not enabled by the ledger"
+        )
+    stated_amount, stated_monthly = stated_price_for(request.anchor, assessment.price_kind)
     if assessment.stated_amount != stated_amount:
         raise PositionCardContractError(
             f"stated amount for {assessment.price_kind} does not match the ledger"
@@ -97,6 +75,8 @@ def validate_generation_result(
         raise PositionCardContractError("result targets a different negotiation side")
     if target.anchor_id != request.anchor_id:
         raise PositionCardContractError("result targets a different anchor")
+    if target.target_label != request.target_label:
+        raise PositionCardContractError("result carries a different target label")
     if target.source != request.source:
         raise PositionCardContractError("result carries a different source identity")
 

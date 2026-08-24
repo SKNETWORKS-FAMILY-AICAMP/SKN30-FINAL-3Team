@@ -176,6 +176,25 @@ class DateSignals(_Frozen):
         return value
 
 
+class PartyRoleContext(_Frozen):
+    """당사자의 비식별 역할 정보. 결정권 판정에만 쓴다 (F3-LA-07).
+
+    `party_id`, 성명, 연락처는 담지 않는다. 임차인이라 처분 결정권이 없거나 공동명의라
+    단독 결정이 불가한 상황을 근거와 함께 `inflexible`로 표현하는 데 필요한 최소값이다.
+    """
+
+    role: str = Field(min_length=1)
+    is_primary: bool = False
+    is_co_owner: bool = False
+
+    @field_validator("role")
+    @classmethod
+    def role_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("role must not be blank")
+        return value.strip()
+
+
 class ListingAnchorContext(_Frozen):
     """매물 측 입력만 담는다. 손님 측 값은 어떤 필드로도 들어올 수 없다 (F3-LA-02).
 
@@ -211,9 +230,12 @@ class ListingAnchorContext(_Frozen):
     current_monthly_rent_amount: int | None = Field(default=None, ge=0)
     tenancy_expiry_date: date | None = None
     tenancy_raw_text: str | None = None
+    party_roles: tuple[PartyRoleContext, ...] = ()
+    client_party_role: str | None = None
 
     @field_validator(
         "listing_status",
+        "client_party_role",
         "price_raw_text",
         "handover_condition",
         "complex_name",
@@ -257,6 +279,7 @@ class RequirementAnchorContext(_Frozen):
     move_in_date_raw_text: str | None = None
     request_expiry_date: date | None = None
     current_tenancy_expiry_date: date | None = None
+    has_co_broker: bool = False
 
     @field_validator(
         "demand_type",
@@ -286,10 +309,42 @@ class RequirementAnchorContext(_Frozen):
         return values
 
 
-AnchorContext = Annotated[
-    ListingAnchorContext | RequirementAnchorContext,
-    Field(discriminator="negotiation_side"),
-]
+AnchorContextValue = ListingAnchorContext | RequirementAnchorContext
+
+AnchorContext = Annotated[AnchorContextValue, Field(discriminator="negotiation_side")]
+
+
+def stated_price_for(anchor: AnchorContextValue, kind: PriceKind) -> tuple[int | None, int | None]:
+    """장부가 실제로 갖고 있는 금액. `(주 금액, 월 차임)` 순서다.
+
+    AI generator 가 결과를 조립할 때와 Backend 가 결과를 검증할 때 같은 함수를 써야
+    모델이 표기 금액을 바꿔치기할 자리가 없다.
+    """
+    if isinstance(anchor, ListingAnchorContext):
+        if kind is PriceKind.SALE:
+            return anchor.sale_price, None
+        if kind is PriceKind.JEONSE:
+            return anchor.jeonse_deposit_amount, None
+        if kind is PriceKind.MONTHLY_RENT:
+            return anchor.monthly_rent_deposit_amount, anchor.monthly_rent_amount
+        return None, None
+    # 구입장의 표기 가격은 예산 상한이다. 하한은 조건 조회용이라 카드 금액으로 쓰지 않는다.
+    return (anchor.max_budget_amount, None) if kind is PriceKind.BUDGET else (None, None)
+
+
+def enabled_price_kinds(anchor: AnchorContextValue) -> frozenset[PriceKind]:
+    """장부가 실제로 열어 둔 거래 유형. 닫힌 유형의 가격은 카드에 실을 수 없다."""
+    if isinstance(anchor, ListingAnchorContext):
+        return frozenset(
+            kind
+            for kind, available in (
+                (PriceKind.SALE, anchor.is_sale_available),
+                (PriceKind.JEONSE, anchor.is_jeonse_available),
+                (PriceKind.MONTHLY_RENT, anchor.is_monthly_rent_available),
+            )
+            if available
+        )
+    return frozenset({PriceKind.BUDGET})
 
 
 class PositionCardGenerationRequest(_Frozen):
@@ -301,6 +356,7 @@ class PositionCardGenerationRequest(_Frozen):
     contract_version: ContractVersion = POSITION_CARD_CONTRACT_VERSION
     negotiation_side: NegotiationSide
     anchor_id: int = Field(ge=1)
+    target_label: str = Field(min_length=1, max_length=200)
     source: SourceIdentity
     anchor: AnchorContext
     date_signals: DateSignals
@@ -333,6 +389,13 @@ class PositionCardGenerationRequest(_Frozen):
             if self.source.last_interaction_at != last_interaction_at:
                 raise ValueError("consultation_logs last moment does not match source identity")
         return self
+
+    @field_validator("target_label")
+    @classmethod
+    def label_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("target_label must not be blank")
+        return value.strip()
 
     def log_contents(self) -> dict[int, str]:
         """근거 검증용 색인. interaction_id에서 마스킹된 본문으로 간다."""
@@ -481,10 +544,15 @@ class PositionCardAnalysis(_Frozen):
 
 
 class PositionCardTarget(_Frozen):
-    """대상과 입력 신원. 요청에서 그대로 복사하며 모델 출력으로 받지 않는다."""
+    """대상, 화면 라벨과 입력 신원. 요청에서 그대로 복사하며 모델 출력으로 받지 않는다.
+
+    `target_label`은 Backend가 F1 구조화 값에서 결정적으로 만든다. 모델 출력 schema 에는
+    존재하지 않는다.
+    """
 
     negotiation_side: NegotiationSide
     anchor_id: int = Field(ge=1)
+    target_label: str = Field(min_length=1, max_length=200)
     source: SourceIdentity
 
     @classmethod
@@ -492,6 +560,7 @@ class PositionCardTarget(_Frozen):
         return cls(
             negotiation_side=request.negotiation_side,
             anchor_id=request.anchor_id,
+            target_label=request.target_label,
             source=request.source,
         )
 

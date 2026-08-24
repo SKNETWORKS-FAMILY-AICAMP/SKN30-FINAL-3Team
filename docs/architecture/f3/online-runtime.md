@@ -197,6 +197,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `claim_next_run` 작업 선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
 | 앵커 포지션 카드 cache key 계산과 캐시 조회, 생성 요청 준비 | `backend/src/domain/agent_execution/service.py` |
 | 포지션 카드 Backend–AI 공개 계약. 어휘, 요청·결과 DTO, 생성 Protocol, 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/` |
+| 포지션 카드 프롬프트와 구조화 출력 생성 (`position-card-prompt:v1`, `position-card-workflow:v1`) | `ai/src/brokerage_ai/f3/prompts.py`, `generator.py` |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
@@ -213,7 +214,8 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
 | 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
 | AI 호출 | 없음. F3 경로는 AI runtime을 부르지 않는다 |
-| 포지션 카드 생성 구현체 | 계약과 Protocol 만 있고 프롬프트·모델 호출·LangGraph workflow 는 없다 |
+| Backend의 포지션 카드 생성기 연결 | AI 생성기는 있으나 F3 handler가 아직 호출하지 않는다 |
+| LangGraph production graph와 checkpoint | 없음. 포지션 카드 생성은 구조화 출력 1회이며 이름뿐인 graph를 두지 않는다 |
 | Backend 의 F1 snapshot 조립과 상담 로그 마스킹 | 없음. 계약이 요구하는 마스킹 입력을 아직 만들지 않는다 |
 | 포지션 카드 저장 | 조회와 생성 요청 준비까지만 있다. 근거 저장과 quote offset 계산도 없다 |
 | `ANCHOR_READY` 이후 상태 전이 완료 경로 | 없음 |

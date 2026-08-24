@@ -5,6 +5,7 @@ updated: 2026-08-20
 
 # 위키 변경 로그
 
+- 2026-08-24: F3 포지션 카드의 Provider 중립 구조화 출력 생성기를 구현했다. 서버 소유 대상·source identity·장부 표기 금액은 모델 schema에서 제외하고 요청으로부터 결정적으로 조립하며, prompt·workflow 버전을 모델 호출 전에 공개한다. Backend 입력 조립·저장과 운영 Provider 선택은 후속 범위로 유지했다.
 - 2026-08-20: Backend·Frontend CI를 artifact 없는 Verify와 테스트 DB 없는 Build로 분리하고, Backend 검증 DB image를 ECR Public 기반으로 만들어 전용 private ECR에 캐시해 Docker Hub pull limit에 의존하지 않도록 delivery 계약을 보완함.
 - 2026-08-20: CodeBuild false-green 방지를 위해 Backend `TEST_DB_URL` 필수 통합 검사와 Frontend typecheck·현재 Vite release 검사를 공통 로컬/CodeBuild 진입점으로 고정함.
 - 2026-08-20: F3 포지션 카드의 Backend–AI 계약을 `contracts/f3-ai.md`로 확정했다. `negotiation_side`를 `LISTING`·`REQUIREMENT`로 고정해 OQ-012를 종료하고, 계약 버전 `position-card:v1`을 cache key 버전 `position-card:v2`와 별개 축으로 분리했으며, intent·urgency·contactability·evidence·price_kind 어휘와 화면 한국어 매핑, LISTING/REQUIREMENT 입력 격리, 근거 필수 규칙, 마스킹된 상담 로그만 전달하는 개인정보 경계를 정의했다. F3-SE-03의 원문 보관 요구보다 승인된 개인정보 정책의 전체 프롬프트·응답 로그 금지를 우선한다. 프롬프트, 모델 호출, LangGraph workflow, 카드 저장과 `ANCHOR_READY` 전환은 아직 구현하지 않았고 운영 Provider·모델은 미확정이다.
