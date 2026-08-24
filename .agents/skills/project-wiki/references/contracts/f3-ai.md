@@ -497,6 +497,7 @@ checkpoint 저장 계약은 AI-OQ-004로 계속 미확정이다.
 - 후보 0건의 AI 호출 없는 빈 결과 완료
 - RDS polling Worker와 저장 상태 기반 F3 handler 연결
 - capability별 모델 설정의 단계별 lazy binding과 합성 프로토타입 이중 opt-in
+- `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`가 없으면 DB·Provider 접근과 claim 전에 활성 Worker 기동 거절
 - 일시 Provider 오류의 lease release·3회 상한 재시도, 입력 변경 `SUPERSEDED`, 영구 오류
   `FAILED_TERMINAL` 처리
 
@@ -504,7 +505,7 @@ checkpoint 저장 계약은 AI-OQ-004로 계속 미확정이다.
 
 - 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
 - 배포 환경의 `WORKER_ENABLED=true` 전환과 운영 Provider 선택. 실행 코드는 지원하지만 현재 Infra
-  기본값은 `false`다
+  기본값은 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`다
 - F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
   덧씌우지 않는다
 

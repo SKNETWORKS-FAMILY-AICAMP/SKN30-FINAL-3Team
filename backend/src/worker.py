@@ -56,15 +56,34 @@ logger = structlog.get_logger()
 DEFAULT_READY_FILE = Path("/tmp/brokerage-worker-ready")
 IDLE_WAIT_SECONDS = 2.0
 WORKER_ID_MAX_LENGTH = 64
+SYNTHETIC_PROTOTYPE_SETTING = "F3_ALLOW_SYNTHETIC_PROTOTYPE"
 
 
-def worker_enabled(source: Mapping[str, str]) -> bool:
-    raw = source.get("WORKER_ENABLED", "false").strip().lower()
+def boolean_setting(source: Mapping[str, str], name: str, *, default: bool = False) -> bool:
+    raw = source.get(name, str(default)).strip().lower()
     if raw in {"0", "false", "no", "off"}:
         return False
     if raw in {"1", "true", "yes", "on"}:
         return True
-    raise ConfigurationError("WORKER_ENABLED must be a boolean")
+    raise ConfigurationError(f"{name} must be a boolean")
+
+
+def worker_enabled(source: Mapping[str, str]) -> bool:
+    return boolean_setting(source, "WORKER_ENABLED")
+
+
+def require_synthetic_prototype_opt_in(source: Mapping[str, str]) -> None:
+    """활성 Worker가 합성 데이터임을 운영자가 명시하지 않으면 기동을 막는다.
+
+    코드만으로 DB 행이 실제 인물과 무관한 합성 데이터인지 증명할 수 없다. 따라서 현재 유일하게
+    구현된 ``SYNTHETIC_PROTOTYPE`` 경로는 배포 환경의 별도 opt-in을 요구한다. 실사용 데이터용
+    ``MASKED`` 조립이 구현되기 전까지 이 설정을 켜지 않은 Worker는 어떤 실행도 claim하지 않는다.
+    """
+    if not boolean_setting(source, SYNTHETIC_PROTOTYPE_SETTING):
+        raise ConfigurationError(
+            "WORKER_ENABLED=true requires F3_ALLOW_SYNTHETIC_PROTOTYPE=true "
+            "for a reviewed synthetic-only dataset"
+        )
 
 
 def build_worker_id(source: Mapping[str, str] | None = None) -> str:
@@ -266,9 +285,13 @@ def run_enabled_worker(
     worker_id: str,
     environ: Mapping[str, str] | None = None,
 ) -> None:
-    """DB와 AI 설정을 먼저 검증한 뒤 실제 polling을 시작한다."""
+    """개인정보 모드, DB와 AI 설정을 검증한 뒤 실제 polling을 시작한다."""
+    values = os.environ if environ is None else environ
+    # DB나 Provider에 접근하기 전에 막는다. 이 검증을 뒤로 보내면 잘못 구성된 Worker가
+    # readiness를 통과한 뒤 실행을 claim하거나 외부 client를 조립할 여지가 생긴다.
+    require_synthetic_prototype_opt_in(values)
     database_is_ready(config)
-    ai_config = require_ai_provider(config.app.environment.value, environ)
+    ai_config = require_ai_provider(config.app.environment.value, values)
 
     loop = asyncio.new_event_loop()
     runtime = create_ai_runtime(ai_config)

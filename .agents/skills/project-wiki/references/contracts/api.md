@@ -52,6 +52,7 @@ updated: 2026-08-24
 - 같은 필터 파라미터를 반복하면 OR로 결합한다.
 - 예약값 `__EMPTY__`는 해당 컬럼이 비어 있는 행을 뜻하며 다른 값과 함께 선택할 수 있다. `column-values` 응답도 같은 예약값과 건수를 목록에 포함한다. 값이 비어 있는 파라미터는 필터로 취급하지 않는다.
 - 부분 수정은 PATCH를 사용하고 본문에 `row_version`을 요구한다. 값이 다르면 409로 거절하며 마지막 저장이 앞 변경을 덮어쓰지 않게 한다.
+- 매물과 구입장 PATCH에서 요청값이 저장값과 모두 같으면 쓰기와 `row_version` 증가를 생략한다. 같은 값이어도 요청 `row_version`이 이미 낡았으면 409로 거절한다. 구입장의 `desired_complex_ids`는 순서가 아닌 단지 집합으로 비교하며 집합이 바뀌면 구입장 `row_version`도 올린다.
 - 다른 중개사무소가 소유한 식별자는 403이 아니라 404로 응답해 존재 여부를 드러내지 않는다.
 
 ### 매물장
@@ -202,6 +203,39 @@ updated: 2026-08-24
 행을 건드리지 않으므로 매물 자신의 삭제 표시만으로는 부족하다. 세 조건 중 하나라도 어긋나면 다른
 사무소의 식별자와 똑같이 404로 답해 삭제 여부와 존재 여부를 구분해서 드러내지 않는다.
 `REQUIREMENT` 앵커는 사무소와 `property_requirement.is_deleted = false`를 본다.
+
+### F1 저장 후 자동 접수
+
+다음 네 저장이 성공하면 Backend가 F3 실행을 자동 접수한다 (F3-CR-01, F3-CR-02).
+
+| 저장 경로 | 앵커 | 접수 조건 |
+|---|---|---|
+| `POST /api/v1/property-units/{unit_id}/listings` | 매물 | 신규 등록 |
+| `PATCH /api/v1/property-listings/{listing_id}` | 매물 | 거래 유형·가격·명도 조건·상태·의뢰인 등 판정 입력의 실제 변경 |
+| `POST /api/v1/property-requirements` | 구입장 | 신규 등록 |
+| `PATCH /api/v1/property-requirements/{requirement_id}` | 구입장 | 거래 유형·예산·면적·평형·이사일·만료일·상태·공동중개·희망 단지 등 판정 입력의 실제 변경 |
+
+자동 접수는 F1 저장 transaction이 commit된 뒤 별도 transaction으로 실행한다. 접수 중 오류가
+발생해도 이미 성공한 F1 저장과 응답을 되돌리거나 실패로 바꾸지 않는다 (F3-CM-06, F3-NF-07).
+요청 처리 중 Worker나 AI를 호출하지 않고 기존 `queue_cross_judgment_run`으로 `agent_run` 적재까지만
+수행한다.
+
+F1 응답 형태에는 실행 ID나 F3 상태를 추가하지 않는다. 화면은 `POST /api/v1/f3/runs`로 실행을
+확인하며, 같은 앵커·입력 버전의 활성 실행이면 저장 시 자동 생성된 실행 ID를 그대로 돌려받는다.
+자동 실행의 `trigger_type`은 `LEDGER_SAVE`이고 직접 실행 요청의 `USER_REQUEST`와 구분한다. 기존
+활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다.
+
+PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 서비스가 저장 직전에 비교한 **실제 변경
+필드**로 판단한다. 메모·담당자 같은 운영 필드만 바꾸거나 가격·예산 등 기존과 같은 값을 다시
+보내면 새 실행을 만들지 않는다. 희망 단지는 순서가 아니라 집합 변경을 판정 입력 변경으로 본다.
+자동 접수 실패 로그에는 앵커 종류·ID와 예외 타입만 남기고 상담 원문·연락처·성명은 남기지 않는다.
+
+자동 접수와 AI 처리는 별도 경계다. 접수된 실행은 검토된 합성 전용 환경에서
+`WORKER_ENABLED=true`와 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 모두 명시한 경우에만 현재 Worker가
+처리한다. 합성 opt-in이 없으면 Worker는 DB·Provider 접근과 작업 선점 전에 기동을 거절한다. 현재
+Infra 기본값은 두 설정 모두 `false`다. `MASKED` 입력 조립은 아직 구현되지 않았으므로 실제 F1
+사용자 데이터를 처리하는 근거로 합성 opt-in을 사용할 수 없다. 실사용 연결 전에는 ADR-0014에 따라
+Backend 마스킹을 구현하고 `input_privacy_mode=MASKED`로 전환해야 한다.
 
 ### 요청자 기록
 

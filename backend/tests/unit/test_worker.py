@@ -23,7 +23,9 @@ from worker import (
     build_worker_id,
     process_run,
     require_ai_provider,
+    require_synthetic_prototype_opt_in,
     run_disabled_worker,
+    run_enabled_worker,
     run_worker_loop,
     worker_enabled,
 )
@@ -39,6 +41,46 @@ def test_worker_enabled_parses_supported_boolean_spellings() -> None:
 def test_worker_enabled_rejects_invalid_value() -> None:
     with pytest.raises(ConfigurationError, match="WORKER_ENABLED"):
         worker_enabled({"WORKER_ENABLED": "sometimes"})
+
+
+def test_enabled_worker_requires_explicit_synthetic_prototype_opt_in() -> None:
+    with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE=true"):
+        require_synthetic_prototype_opt_in({})
+    with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE=true"):
+        require_synthetic_prototype_opt_in({"F3_ALLOW_SYNTHETIC_PROTOTYPE": "false"})
+
+    require_synthetic_prototype_opt_in({"F3_ALLOW_SYNTHETIC_PROTOTYPE": "true"})
+
+
+def test_synthetic_prototype_opt_in_rejects_invalid_value() -> None:
+    with pytest.raises(ConfigurationError, match="must be a boolean"):
+        require_synthetic_prototype_opt_in({"F3_ALLOW_SYNTHETIC_PROTOTYPE": "sometimes"})
+
+
+def test_enabled_worker_checks_privacy_gate_before_db_or_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import worker
+
+    monkeypatch.setattr(
+        worker,
+        "database_is_ready",
+        lambda *_args: pytest.fail("privacy gate must run before DB readiness"),
+    )
+    monkeypatch.setattr(
+        worker,
+        "require_ai_provider",
+        lambda *_args: pytest.fail("privacy gate must run before Provider setup"),
+    )
+
+    with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE=true"):
+        run_enabled_worker(
+            config=cast(Any, object()),
+            stop_event=threading.Event(),
+            ready_file=tmp_path / "worker-ready",
+            worker_id="worker-test",
+            environ={"WORKER_ENABLED": "true"},
+        )
 
 
 def test_disabled_worker_checks_readiness_without_claiming(tmp_path: Path) -> None:

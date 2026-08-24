@@ -115,7 +115,8 @@ def test_listing_anchor_queues_a_single_run_for_the_current_user(config: Config)
         assert run["requested_by"] == user_id
         assert run["run_type"] == "CROSS_JUDGMENT"
         assert run["agent_type"] == "BROKERAGE_WORKFLOW"
-        assert run["trigger_type"] == "USER_REQUEST"
+        # 매물 저장이 만든 실행을 화면 요청이 재사용한다.
+        assert run["trigger_type"] == "LEDGER_SAVE"
         assert run["parent_run_id"] is None
         assert run["model_config_id"] is None
         assert run["target_listing_id"] == listing["id"]
@@ -163,7 +164,9 @@ def test_listing_row_version_becomes_the_input_data_version(config: Config) -> N
         ).json()
 
         assert body["input_data_version"] == updated["row_version"]
-        assert stored_runs(session, brokerage_id)[0]["input_data_version"] == updated["row_version"]
+        latest = stored_runs(session, brokerage_id)[-1]
+        assert latest["id"] == body["run_id"]
+        assert latest["input_data_version"] == updated["row_version"]
 
 
 @requires_database
@@ -190,7 +193,8 @@ def test_requirement_anchor_stores_the_requirement_target_and_row_version(
         assert body["anchor_id"] == requirement["id"]
         assert body["input_data_version"] == updated["row_version"]
 
-        run = stored_runs(session, brokerage_id)[0]
+        run = stored_runs(session, brokerage_id)[-1]
+        assert run["id"] == body["run_id"]
         assert run["target_requirement_id"] == requirement["id"]
         assert run["target_listing_id"] is None
         assert run["target_unit_id"] is None
@@ -405,6 +409,7 @@ def test_deleted_requirement_is_not_found_and_live_requirement_still_queues(
             ).status_code
             == 202
         )
+        before = len(stored_runs(session, brokerage_id))
         response = client.post(
             "/api/v1/f3/runs",
             json={"anchor_type": "REQUIREMENT", "anchor_id": removed["id"]},
@@ -412,9 +417,10 @@ def test_deleted_requirement_is_not_found_and_live_requirement_still_queues(
 
         assert response.status_code == 404
         assert response.json()["code"] == "NOT_FOUND"
-        assert [run["target_requirement_id"] for run in stored_runs(session, brokerage_id)] == [
-            live["id"]
-        ]
+        assert len(stored_runs(session, brokerage_id)) == before
+        assert live["id"] in {
+            run["target_requirement_id"] for run in stored_runs(session, brokerage_id)
+        }
 
 
 @requires_database
@@ -422,6 +428,7 @@ def test_request_cannot_override_server_owned_fields(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "위조단지")
         listing = create_listing(client, complex_id)
+        before = stored_runs(session, brokerage_id)
 
         response = client.post(
             "/api/v1/f3/runs",
@@ -436,7 +443,7 @@ def test_request_cannot_override_server_owned_fields(config: Config) -> None:
         )
 
         assert response.status_code == 422
-        assert stored_runs(session, brokerage_id) == []
+        assert stored_runs(session, brokerage_id) == before
 
 
 @requires_database
@@ -611,7 +618,21 @@ def test_failed_insert_leaves_no_partial_run(config: Config) -> None:
     """requested_by가 실재하지 않으면 FK가 거절한다. 실패한 실행이 남으면 Worker가 집어간다."""
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "실패단지")
-        listing = create_listing(client, complex_id)
+        unit_id = session.execute(
+            text(
+                "INSERT INTO property_unit (brokerage_id, complex_id, unit_number)"
+                " VALUES (:brokerage_id, :complex_id, '9001') RETURNING id"
+            ),
+            {"brokerage_id": brokerage_id, "complex_id": complex_id},
+        ).scalar_one()
+        listing_id = session.execute(
+            text(
+                "INSERT INTO property_listing (brokerage_id, unit_id, is_sale_available,"
+                " sale_price) VALUES (:brokerage_id, :unit_id, true, 100) RETURNING id"
+            ),
+            {"brokerage_id": brokerage_id, "unit_id": unit_id},
+        ).scalar_one()
+        session.commit()
 
         with pytest.raises(IntegrityError):
             service.queue_cross_judgment_run(
@@ -619,7 +640,7 @@ def test_failed_insert_leaves_no_partial_run(config: Config) -> None:
                 brokerage_id,
                 requested_by=987_654_321,
                 anchor_type=AnchorType.LISTING,
-                anchor_id=listing["id"],
+                anchor_id=listing_id,
             )
 
         assert stored_runs(session, brokerage_id) == []
