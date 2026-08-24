@@ -202,6 +202,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 주입된 생성기 호출, 저장 직전 fencing, 카드·가격·근거 원자 저장과 `ANCHOR_READY` 전이 | `backend/src/domain/agent_execution/anchor_card.py` |
 | 포지션 카드 Backend–AI 공개 계약. 어휘, 요청·결과 DTO, 생성 Protocol, 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/` |
 | 포지션 카드 프롬프트와 구조화 출력 생성 (`position-card-prompt:v1`, `position-card-workflow:v1`) | `ai/src/brokerage_ai/f3/prompts.py`, `generator.py` |
+| 중개 판정 Backend–AI 공개 계약과 구조화 출력 생성 (`brokerage-judgment:v1`, `brokerage-judgment-workflow:v1`) | `ai/src/brokerage_ai/f3/judgment_contracts.py`, `judgment_generator.py` |
 | 결정적 SQL 후보 추출, 점수와 정렬, `CANDIDATES_READY` 전이 | `backend/src/domain/agent_execution/candidates.py` |
 | 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
 | 상위 15건 후보 카드 순차 생성·재사용, 카드 ID 기록과 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
@@ -223,7 +224,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker에서 AI 호출 | 앵커 카드 유스케이스의 주입 생성기 호출 경계는 있으나 F3 handler가 아직 호출하지 않는다 |
 | LangGraph production graph와 checkpoint | 없음. 포지션 카드 생성은 구조화 출력 1회이며 이름뿐인 graph를 두지 않는다 |
 | 실사용 F1 snapshot 마스킹 | 없음. 현재 조립은 ADR-0014의 명시적 `SYNTHETIC_PROTOTYPE`만 허용하며 `MASKED`는 거절한다 |
-| `CANDIDATE_CARDS_READY` 이후 상태 전이 | 없음. 중개 판정부터 미구현이다 |
+| `CANDIDATE_CARDS_READY` 이후 상태 전이 | 없음. AI 중개 판정 계약·생성기는 구현됐지만 Backend 입력 조립·저장과 `JUDGING`·`COMPLETED` 전이는 미구현이다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | `SUPERSEDED` 전이 | 없음 |

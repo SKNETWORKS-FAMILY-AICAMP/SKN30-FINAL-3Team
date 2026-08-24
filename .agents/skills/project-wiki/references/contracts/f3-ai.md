@@ -3,11 +3,11 @@ status: 결정
 updated: 2026-08-24
 ---
 
-# F3 포지션 카드 Backend–AI 계약
+# F3 포지션 카드·중개 판정 Backend–AI 계약
 
-이 문서가 F3 포지션 카드의 어휘, 입력, 결과, 근거와 개인정보 경계의 정본이다. 모듈 경계
-자체는 [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)이 소유하며 이 계약은 그
-경계 안의 구체 규격이다. HTTP 계약은 [contracts/api.md](api.md)에 있고 여기서 바꾸지 않는다.
+이 문서가 F3 포지션 카드와 중개 판정의 어휘, 입력, 결과, 근거와 개인정보 경계의 정본이다.
+모듈 경계 자체는 [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)이 소유하며 이 계약은
+그 경계 안의 구체 규격이다. HTTP 계약은 [contracts/api.md](api.md)에 있고 여기서 바꾸지 않는다.
 
 코드 정본:
 
@@ -25,6 +25,12 @@ updated: 2026-08-24
 | Backend 생성·저장 유스케이스 | `backend/src/domain/agent_execution/anchor_card.py` |
 | Backend 후보 카드 단계 | `backend/src/domain/agent_execution/candidate_cards.py` |
 | 카드·가격·근거 ORM | `backend/src/domain/agent_execution/models.py` |
+| 중개 판정 어휘와 DTO | `ai/src/brokerage_ai/f3/judgment_contracts.py` |
+| 중개 판정 생성 Protocol | `ai/src/brokerage_ai/f3/judgment_ports.py` |
+| 중개 판정 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/judgment_validation.py` |
+| 중개 판정 모델 출력 schema | `ai/src/brokerage_ai/f3/judgment_model_output.py` |
+| 중개 판정 프롬프트 | `ai/src/brokerage_ai/f3/judgment_prompts.py` |
+| 중개 판정 생성 구현 | `ai/src/brokerage_ai/f3/judgment_generator.py` |
 
 ## 버전 축
 
@@ -34,8 +40,11 @@ updated: 2026-08-24
 | Prompt 버전 | `position-card-prompt:v1` | 프롬프트 원문의 버전 | AI |
 | Workflow 버전 | `position-card-workflow:v1` | 생성 절차의 버전 | AI |
 | Cache key 버전 | `position-card:v3` | 캐시 키 계산 방식의 버전 | Backend |
+| 판정 계약 버전 | `brokerage-judgment:v1` | 중개 판정 DTO와 의미 규격의 버전 | AI |
+| 판정 Prompt 버전 | `brokerage-judgment-prompt:v1` | 중개 판정 프롬프트 원문의 버전 | AI |
+| 판정 Workflow 버전 | `brokerage-judgment-workflow:v1` | 중개 판정 절차의 버전 | AI |
 
-네 값은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
+각 값은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
 
 prompt·workflow 버전은 모델을 부르기 전에 cache key 입력으로 사용할 수 있어야 한다.
 `PositionCardGenerator.versions`가 프레임워크 중립 `PositionCardGeneratorVersions`로 두 값을
@@ -332,7 +341,7 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 
 | 구분 | 항목 |
 |---|---|
-| Backend → AI 전달 가능 | 내부 anchor ID, 구조화된 매물·구입 조건, 날짜 신호, Provider 전달용 상담 내용, 내부 `interaction_id`, source identity, 입력 privacy mode |
+| Backend → AI 전달 가능 | 내부 anchor·card ID, 구조화된 매물·구입 조건, 날짜 신호, Provider 전달용 상담 내용과 검증된 카드 근거 인용, 내부 `interaction_id`, source identity, 입력 privacy mode |
 | 전달 금지 | 실사용자 성명, 로그인 ID, 전화번호, 이메일, 생년월일, 인증·세션·CSRF 정보, `requested_by`, 치환 대응표, Secret, 프롬프트 원문 전체, 반대편 당사자 데이터. 실제 인물과 무관한 합성 케이스는 ADR-0014 예외를 따름 |
 | 저장 | Backend가 검증한 구조화 포지션 카드, 필요한 근거 인용, 안전한 모델 진단, 버전 정보 |
 | 로그 금지 | 전체 프롬프트, 전체 모델 원문 응답, 상담 로그 전체 원문, 성명·연락처, 토큰·인증 헤더 |
@@ -356,10 +365,98 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로�
   token/latency metadata로 제한한다.
 - 이 정책을 바꾸려면 별도 개인정보 결정이 필요하다.
 
+## 중개 판정 계약
+
+앵커 포지션 카드 1장과 반대편 후보 카드 N장을 **한 번의 구조화 출력 호출**로 판정한다
+(F3-BR-01, F3-BR-02, F3-NF-04). 후보를 개별 호출하지 않고 앵커를 후보 수만큼 반복 전송하지
+않는다. 후보가 0건이면 요청을 만들지 않으며 모델도 부르지 않는다. 이 PR은 AI 계약과 생성기만
+구현하며 Backend의 입력 조립·저장과 `JUDGING`·`COMPLETED` 상태 전이는 후속 범위다.
+
+### 등급과 행동 어휘
+
+| 계약값 | 화면 한국어 | 의미 |
+|---|---|---|
+| `STRONG` | 강함 | 지금 연결할 만함 |
+| `WEAK` | 약함 | 조건이 움직이면 가능함 |
+| `REJECTED` | 기각 | 현재 조건으로 성사 불가 |
+
+같은 의미의 `HIGH`, `LOW`, `EXCLUDED`나 한국어 화면 표기를 계약값으로 쓰지 않는다. 행동 제안의
+접촉 경로는 `CALL`, `MESSAGE`, `IN_PERSON` 세 값이며 F1의 아직 미확정인
+`client_interaction.interaction_channel`과 다른 F3 판정 어휘다.
+
+### 요청 계약
+
+`BrokerageJudgmentRequest`는 다음 필드를 갖는다.
+
+| 필드 | 의미 |
+|---|---|
+| `contract_version` | `brokerage-judgment:v1` 고정 |
+| `input_privacy_mode` | `SYNTHETIC_PROTOTYPE` 또는 `MASKED` |
+| `anchor` | `JudgmentCard` 1장 |
+| `candidates` | 반대편 `JudgmentCard` 1~15장 |
+
+`JudgmentCard`는 내부 `card_id`, `negotiation_side`, 비식별 `target_label`과 포지션 카드 계약의
+`PositionCardAnalysis`를 그대로 담는다. 별도 카드 표현을 만들지 않는다. 후보 ID는 중복될 수
+없고 앵커가 후보로 들어올 수 없으며 후보는 모두 앵커의 반대편 측면이어야 한다.
+
+카드 안의 근거 인용도 Provider 입력에 포함되므로 ADR-0014의 개인정보 통제를 그대로 적용한다.
+`SYNTHETIC_PROTOTYPE` 요청은 생성기 조립 지점의 `allow_synthetic_prototype=True`가 함께 있어야
+하며 기본 생성기는 Provider를 호출하기 전에 거절한다. 이 구현은 외부 Provider·리전·저장 여부를
+승인하지 않는다.
+
+### 결과 계약
+
+`BrokerageJudgmentResult`는 계약 버전, 요청에서 결정적으로 복사한 `target`, 후보별 판정,
+prompt·workflow 버전과 안전한 diagnostics를 담는다. 모델 출력 schema에는 계약 버전, 실행·사무소
+식별자, 앵커 target과 후보 집합 같은 서버 소유 필드를 두지 않는다.
+
+후보별 `CandidateJudgment`는 다음을 담는다.
+
+| 필드 | 의미 |
+|---|---|
+| `card_id` | 후보 카드 ID |
+| `grade` | `STRONG`·`WEAK`·`REJECTED` |
+| `rank` | 전체 후보의 1부터 N까지 연속 순위 |
+| `comparison_basis` | 다른 후보와 비교해 먼저 보여줄 이유 |
+| `primary_obstacle` | 결정적 가격·시점·조건 차이 |
+| `possible_concession` | 누가 무엇을 얼마나 움직일지 |
+| `recommended_action` | 접촉 측면·경로·한 문장 행동 제안 |
+| `rejection_reason` | 기각 사유. `REJECTED`에서만 필수 |
+| `evidence` | 카드에서 유래한 근거 1건 이상 |
+
+기각 후보도 결과에서 제거하지 않는다. 실제 발송 문안은 만들지 않고 `recommended_action.message`는
+먼저 꺼낼 말에 대한 500자 이하 제안으로 제한한다.
+
+### 근거와 교차 검증
+
+판정 단계에는 상담 원문이 없다. `QUOTE`는 해당 앵커 또는 **그 후보 카드가 이미 보유한**
+`(interaction_id, quote_text)` 쌍만 허용한다. 카드에 없는 인용은 거절하며 카드 값을 비교한
+판단은 `INFERENCE`로 표시한다.
+
+`validate_judgment_result()`는 다음을 강제한다.
+
+- 요청·결과 계약 버전, 앵커 카드 ID·측면과 후보 카드 집합의 정확한 일치
+- 요청 후보 전건 판정, 후보 누락·추가·중복 금지
+- 순위가 중복이나 구멍 없이 1부터 N까지 연속
+- 기각 사유 유무와 후보별 근거 1건 이상
+- 인용이 해당 카드가 가진 근거 범위 안에 존재
+
+`LlmBrokerageJudgmentGenerator`는 이 검증을 **결과를 반환하기 전에 직접 호출**한다. 호출자가
+검증을 빠뜨려도 잘못된 모델 결과가 공개 생성 경계 밖으로 나가지 않는다. Backend는 후속 저장
+단계에서 tenant, lease, 후보 snapshot과 카드의 현재 유효성을 별도로 재검증한다.
+
+### LangGraph 적용 범위
+
+중개 판정 자체는 요구사항상 구조화 출력 1회이므로 현재 LangGraph를 씌우지 않는다. 단일 노드
+wrapper는 재개 지점을 만들지 않는다. 전체 F3 단계 진행과 재선점은 Backend DB 상태가 담당하고,
+한 AI 호출 내부에 도구 호출·분기·재질의가 생길 때 production graph 도입을 다시 검토한다.
+checkpoint 저장 계약은 AI-OQ-004로 계속 미확정이다.
+
 ## 오류와 재시도 경계
 
 - Provider 오류는 AI의 `ProviderError` 계층으로 표현하고 `retryable` 여부를 함께 준다.
-- 결과가 요청과 맞지 않으면 `PositionCardContractError`이며 재시도로 해결되지 않는다.
+- 결과가 요청과 맞지 않으면 `PositionCardContractError` 또는
+  `BrokerageJudgmentContractError`이며 재시도로 해결되지 않는다.
 - 재시도 횟수와 backoff는 Worker가 소유한다. AI SDK 자동 재시도는 꺼져 있다.
 - 검증에 실패한 결과로 카드를 저장하지 않는다. 조용히 근거를 지우고 성공으로 위장하지 않는다.
 
@@ -387,11 +484,15 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로�
 - cache hit 재사용과 저장 경합 단일화, `ANCHOR_READY` 상태 전이
 - 결정적 SQL 후보 snapshot의 상위 15건에 대한 반대편 카드 순차 생성·캐시 재사용
 - 후보 카드 ID snapshot 기록과 전건 성공 후 `CANDIDATE_CARDS_READY` 상태 전이
+- 중개 판정 계약 `brokerage-judgment:v1`, 등급·행동·근거 어휘와 프레임워크 중립 Protocol
+- 앵커 1장과 후보 1~15장을 한 번에 보내는 Provider 중립 구조화 출력 생성기
+- 합성 입력 이중 opt-in과 생성 결과 반환 전 후보 집합·순위·근거 교차 검증
 
 ### 아직 구현하지 않음 (`계획됨`)
 
 - 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
-- 중개 판정과 최종 결과 저장
+- Backend 중개 판정 입력 조립, DB 현재 상태 fencing과 최종 결과 저장
+- `JUDGING`·`COMPLETED` 상태 전이
 - Worker polling과 `WORKER_ENABLED=true`
 - F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
   덧씌우지 않는다
