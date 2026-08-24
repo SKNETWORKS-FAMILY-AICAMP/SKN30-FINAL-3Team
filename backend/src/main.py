@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 
 import structlog
+from brokerage_ai import load_ai_config
+from brokerage_ai.f2 import F2Runtime, create_f2_runtime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -23,9 +26,26 @@ logger = structlog.get_logger()
 def create_app(
     config: Config | None = None,
     readiness_probe: Callable[[Request], bool] | None = None,
+    f2_runtime_factory: Callable[[], F2Runtime] | None = None,
 ) -> FastAPI:
     resolved_config = config or get_config()
     configure_logging(resolved_config.log)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        runtime: F2Runtime | None = None
+        if resolved_config.f2.enabled:
+            runtime = (
+                f2_runtime_factory()
+                if f2_runtime_factory is not None
+                else create_f2_runtime(load_ai_config(resolved_config.app.environment.value))
+            )
+            app.state.f2_pipeline = runtime.pipeline
+        try:
+            yield
+        finally:
+            if runtime is not None:
+                await runtime.close()
 
     app = FastAPI(
         title="Brokerage Backend",
@@ -33,6 +53,7 @@ def create_app(
         docs_url="/docs" if resolved_config.app.openapi_enabled else None,
         redoc_url=None,
         openapi_url=("/openapi.json" if resolved_config.app.openapi_enabled else None),
+        lifespan=lifespan,
     )
     app.state.config = resolved_config
     app.state.db_engine = create_database_engine(resolved_config)
