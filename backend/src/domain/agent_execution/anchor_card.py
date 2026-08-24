@@ -1,4 +1,9 @@
-"""앵커 포지션 카드 생성과 저장의 application 유스케이스.
+"""포지션 카드 생성과 저장의 application 유스케이스.
+
+앵커 카드와 후보 카드가 **같은 코드**를 쓴다. 두 경우가 다른 것은 대상(`CardTarget`),
+기대 실행 상태, 그리고 저장 뒤에 상태를 옮기는지뿐이다. snapshot 조립, 마스킹, cache key,
+cache lookup, 저장 직전 재검증과 개인정보 검사는 한 벌만 존재한다. 후보용으로 같은 로직을
+복사하면 한쪽만 고쳐진 채 조용히 갈라진다.
 
 흐름을 세 단계로 나눈다.
 
@@ -19,6 +24,7 @@ from brokerage_ai.f3 import (
     Evidence,
     EvidenceKind,
     InputPrivacyMode,
+    ListingAnchorContext,
     NegotiationSide,
     PositionCardAnalysis,
     PositionCardGenerationRequest,
@@ -33,6 +39,7 @@ from domain.agent_execution import repository, snapshot
 from domain.agent_execution.cache_key import position_card_cache_key
 from domain.agent_execution.fingerprint import as_of_bucket, input_fingerprint
 from domain.agent_execution.models import (
+    RUNNING_STATUS,
     AgentRun,
     AnchorType,
     InputVersionChangedError,
@@ -42,7 +49,7 @@ from domain.agent_execution.models import (
     NegotiationPositionPrice,
     anchor_of,
 )
-from domain.agent_execution.service import current_anchor_version
+from domain.agent_execution.service import current_target_version
 
 
 class GenerationBindingError(RuntimeError):
@@ -109,6 +116,24 @@ class AnchorPositionCardResult:
 
 
 @dataclass(frozen=True)
+class CardTarget:
+    """카드를 만들 장부 대상 한 건.
+
+    앵커면 실행의 `target_*` 에서 나오고 후보면 후보 snapshot 에서 나온다. 어느 쪽이든
+    이 대상의 측면이 곧 카드의 `negotiation_side` 다. 앵커가 매물이면 후보는 구입장이므로
+    같은 실행 안에서 두 측면의 카드가 만들어진다.
+    """
+
+    anchor_type: AnchorType
+    anchor_id: int
+
+    @classmethod
+    def of_run_anchor(cls, run: AgentRun) -> CardTarget:
+        anchor_type, anchor_id = anchor_of(run)
+        return cls(anchor_type=anchor_type, anchor_id=anchor_id)
+
+
+@dataclass(frozen=True)
 class PreparedGeneration:
     """준비 단계 결과. ORM 행도 열린 transaction 도 들고 있지 않다.
 
@@ -142,9 +167,15 @@ def _require_supported_privacy_mode(mode: InputPrivacyMode) -> None:
 
 
 def _require_leased_run(
-    session: Session, run_id: int, worker_id: str, attempt_count: int
+    session: Session,
+    run_id: int,
+    worker_id: str,
+    attempt_count: int,
+    expected_status: str = RUNNING_STATUS,
 ) -> AgentRun:
-    run = repository.find_leased_run(session, run_id, worker_id, attempt_count)
+    run = repository.find_leased_run(
+        session, run_id, worker_id, attempt_count, status=expected_status
+    )
     if run is None:
         raise LeaseNotHeldError("the worker does not hold a valid lease on this run")
     return run
@@ -156,6 +187,7 @@ def _resolve_binding(
     binding: GenerationBinding,
     worker_id: str,
     attempt_count: int,
+    expected_status: str,
 ) -> dict[str, object]:
     """실행의 모델 바인딩을 확정한다. 처음이면 기록하고, 이미 있으면 같은지 확인한다.
 
@@ -181,6 +213,7 @@ def _resolve_binding(
             model_snapshot=expected,
             prompt_version=binding.prompt_version,
             workflow_version=binding.workflow_version,
+            expected_status=expected_status,
         )
         if changed != 1:
             raise GenerationBindingError("the execution binding could not be recorded")
@@ -206,17 +239,29 @@ def prepare_generation(
     attempt_count: int,
     binding: GenerationBinding,
     *,
+    target: CardTarget | None = None,
+    expected_status: str = RUNNING_STATUS,
     as_of: datetime | None = None,
 ) -> PreparedGeneration:
-    """1단계. 바인딩을 확정하고 입력을 조립한 뒤 transaction 을 닫는다."""
+    """1단계. 바인딩을 확정하고 입력을 조립한 뒤 transaction 을 닫는다.
+
+    `target` 이 없으면 실행 자신의 앵커를 만든다. 후보 카드는 후보 대상을 명시해서 부른다.
+    앵커는 접수 시점의 `input_data_version` 을 기대 버전으로 쓰고, 후보는 접수 시점 버전이
+    실행에 없으므로 지금 장부 버전을 읽어 그 값으로 저장 단계까지 고정한다.
+    """
     moment = as_of or datetime.now(UTC)
     try:
         _require_supported_privacy_mode(binding.input_privacy_mode)
-        run = _require_leased_run(session, run_id, worker_id, attempt_count)
-        model_snapshot = _resolve_binding(session, run, binding, worker_id, attempt_count)
+        run = _require_leased_run(session, run_id, worker_id, attempt_count, expected_status)
+        model_snapshot = _resolve_binding(
+            session, run, binding, worker_id, attempt_count, expected_status
+        )
 
-        anchor_type, anchor_id = anchor_of(run)
-        if current_anchor_version(session, run, anchor_type, anchor_id) != run.input_data_version:
+        resolved = target or CardTarget.of_run_anchor(run)
+        anchor_type, anchor_id = resolved.anchor_type, resolved.anchor_id
+        current = current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
+        expected_version = run.input_data_version if target is None else current
+        if current != expected_version:
             raise InputVersionChangedError("the anchor changed after the run was queued")
 
         assembled = snapshot.build_anchor_snapshot(
@@ -228,8 +273,8 @@ def prepare_generation(
             input_privacy_mode=binding.input_privacy_mode,
         )
         request = assembled.request
-        if request.source.data_version != run.input_data_version:
-            raise InputVersionChangedError("the anchor changed while the snapshot was assembled")
+        if request.source.data_version != expected_version:
+            raise InputVersionChangedError("the target changed while the snapshot was assembled")
 
         side = NegotiationSide(anchor_type.value)
         fingerprint = input_fingerprint(request)
@@ -258,7 +303,7 @@ def prepare_generation(
             negotiation_side=side.value,
             listing_id=anchor_id if side is NegotiationSide.LISTING else None,
             requirement_id=anchor_id if side is NegotiationSide.REQUIREMENT else None,
-            data_version=run.input_data_version,
+            data_version=expected_version,
             interactions=repository.InteractionSummary(
                 request.source.interaction_count,
                 request.source.last_interaction_at,
@@ -271,7 +316,7 @@ def prepare_generation(
             anchor_id=anchor_id,
             negotiation_side=side,
             target_label=request.target_label,
-            data_version=run.input_data_version,
+            data_version=expected_version,
             cache_key=cache_key,
             scope_identity=scope_identity,
             source=request.source,
@@ -349,6 +394,9 @@ def _card_row(
 ) -> NegotiationPositionAnalysis:
     analysis = result.analysis
     listing_side = prepared.negotiation_side is NegotiationSide.LISTING
+    # 세대는 실행의 `target_unit_id` 가 아니라 **이 카드가 가리키는 매물**의 세대다.
+    # 후보 카드는 실행 앵커와 다른 세대를 가리키므로 실행 컬럼을 쓰면 남의 세대가 붙는다.
+    unit_id = request.anchor.unit_id if isinstance(request.anchor, ListingAnchorContext) else None
     # 가격이 정확히 하나일 때만 기존 scalar 컬럼을 호환 projection 으로 채운다. 여러 개일 때
     # 첫 번째를 대표로 고르면 나머지 거래 유형의 금액이 조용히 사라진다.
     single = analysis.price[0] if len(analysis.price) == 1 else None
@@ -356,7 +404,7 @@ def _card_row(
         brokerage_id=run.brokerage_id,
         agent_run_id=run.id or 0,
         negotiation_side=prepared.negotiation_side.value,
-        unit_id=run.target_unit_id if listing_side else None,
+        unit_id=unit_id,
         listing_id=prepared.anchor_id if listing_side else None,
         requirement_id=None if listing_side else prepared.anchor_id,
         target_label=prepared.target_label,
@@ -468,6 +516,134 @@ def _require_reusable_card(
     return found.id
 
 
+def _verify_and_insert_card(
+    session: Session,
+    run: AgentRun,
+    binding: GenerationBinding,
+    prepared: PreparedGeneration,
+    result: PositionCardGenerationResult | None,
+) -> int:
+    """저장 직전 재검증과 카드 삽입. 실행 상태는 건드리지 않는다.
+
+    앵커와 후보가 이 함수를 공유한다. 상태 전이는 호출자가 자기 단계에 맞게 한다.
+    """
+    _require_supported_privacy_mode(binding.input_privacy_mode)
+    if binding.input_privacy_mode is not prepared.input_privacy_mode:
+        raise GenerationBindingError("the input privacy mode changed during generation")
+    if run.brokerage_id != prepared.brokerage_id:
+        raise LeaseNotHeldError("the run belongs to a different brokerage")
+    # model_snapshot 도 실행 감사 계약의 일부다. 네 값을 모두 본다.
+    expected_snapshot = _expected_model_snapshot(session, run, binding)
+    if (
+        run.model_config_id != binding.model_config_id
+        or run.prompt_version != binding.prompt_version
+        or run.workflow_version != binding.workflow_version
+        or run.model_snapshot != expected_snapshot
+        or prepared.model_snapshot != expected_snapshot
+    ):
+        raise GenerationBindingError("the run binding changed while the card was generated")
+
+    if (
+        current_target_version(session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id)
+        != prepared.data_version
+    ):
+        raise InputVersionChangedError("the target changed while the card was generated")
+
+    # 범위를 현재 장부에서 **다시** 만든다. 준비 시점 범위를 재사용하면 그 사이에 생긴
+    # 당사자 관계와 그 로그를 저장 단계가 영영 보지 못한다.
+    current_scope = repository.build_interaction_scope(
+        session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id
+    )
+    if current_scope.identity() != prepared.scope_identity:
+        # 로그 수가 우연히 같아도 범위가 달라졌으면 다른 입력이다.
+        raise SourceChangedError("the consultation log scope changed during generation")
+
+    # cache hit 과 miss 모두 여기서 상담 집합을 다시 센다. 재사용 경로만 빠져나가면
+    # 낡은 카드가 그대로 확정된다.
+    current = snapshot.current_source_identity(session, current_scope, prepared.data_version)
+    if current != prepared.source:
+        raise SourceChangedError("the consultation log set changed while the card was generated")
+
+    # 대상 row_version 은 세대 스펙·단지명·당사자 역할·날짜 bucket 이 바뀌어도 그대로다.
+    # 모델에 넘긴 입력 전체를 다시 조립해 지문으로 비교한다.
+    rebuilt = snapshot.build_anchor_snapshot(
+        session,
+        run.brokerage_id,
+        prepared.anchor_type,
+        prepared.anchor_id,
+        as_of=datetime.fromisoformat(prepared.as_of_bucket).replace(tzinfo=UTC),
+        input_privacy_mode=prepared.input_privacy_mode,
+    )
+    if input_fingerprint(rebuilt.request) != prepared.input_fingerprint:
+        raise SourceChangedError("the model input changed while the card was generated")
+
+    analysis_id = prepared.cached_analysis_id
+    request = prepared.request
+    if result is None:
+        # cache hit. 재사용하려던 카드가 저장 직전에도 유효한지 다시 확인한다.
+        analysis_id = _require_reusable_card(session, run, prepared, current)
+    elif request is not None:
+        if (
+            result.prompt_version != binding.prompt_version
+            or result.workflow_version != binding.workflow_version
+        ):
+            raise GenerationBindingError(
+                "the result was produced by a different prompt or workflow version"
+            )
+        validate_generation_result(request, result)
+
+        stored = repository.insert_position_card(session, _card_row(run, prepared, request, result))
+        if stored is None:
+            # 같은 키를 다른 실행이 먼저 넣었다. 진 쪽은 그 카드를 재사용한다.
+            won = repository.lock_card_that_won_the_cache_key(
+                session, run.brokerage_id, prepared.cache_key
+            )
+            if won is None:  # pragma: no cover - 방어
+                raise SourceChangedError("the winning card disappeared")
+            analysis_id = won.id
+        else:
+            analysis_id = stored.id or 0
+            repository.insert_position_prices(
+                session, _price_rows(run.brokerage_id, analysis_id, result.analysis)
+            )
+            repository.insert_position_evidence(
+                session,
+                _evidence_rows(
+                    run.brokerage_id, analysis_id, result.analysis, request.log_contents()
+                ),
+            )
+
+    if analysis_id is None:
+        raise SourceChangedError("no position card is available for this run")
+    return analysis_id
+
+
+def store_position_card(
+    session: Session,
+    run_id: int,
+    worker_id: str,
+    attempt_count: int,
+    binding: GenerationBinding,
+    prepared: PreparedGeneration,
+    result: PositionCardGenerationResult | None,
+    *,
+    expected_status: str,
+) -> int:
+    """카드 하나를 재검증 후 저장하고 그 카드 ID 를 돌려준다. 상태는 옮기지 않는다.
+
+    후보 카드가 쓰는 경로다. 카드마다 transaction 을 열고 닫으므로 앞 후보가 이미 저장한
+    카드는 뒤 후보가 실패해도 남는다. 남은 카드는 유효한 캐시라서 재시도가 그대로 재사용한다.
+    """
+    try:
+        run = _require_leased_run(session, run_id, worker_id, attempt_count, expected_status)
+        analysis_id = _verify_and_insert_card(session, run, binding, prepared, result)
+        session.commit()
+    except BaseException:
+        session.rollback()
+        raise
+    return analysis_id
+
+
 def store_generated_card(
     session: Session,
     run_id: int,
@@ -477,101 +653,10 @@ def store_generated_card(
     prepared: PreparedGeneration,
     result: PositionCardGenerationResult | None,
 ) -> AnchorPositionCardResult:
-    """3단계. 재검증하고 카드·가격·근거·상태를 한 transaction 에 저장한다."""
+    """3단계. 앵커 카드를 재검증해 저장하고 같은 transaction 에서 `ANCHOR_READY` 로 옮긴다."""
     try:
-        _require_supported_privacy_mode(binding.input_privacy_mode)
-        if binding.input_privacy_mode is not prepared.input_privacy_mode:
-            raise GenerationBindingError("the input privacy mode changed during generation")
         run = _require_leased_run(session, run_id, worker_id, attempt_count)
-        if run.brokerage_id != prepared.brokerage_id:
-            raise LeaseNotHeldError("the run belongs to a different brokerage")
-        # model_snapshot 도 실행 감사 계약의 일부다. 네 값을 모두 본다.
-        expected_snapshot = _expected_model_snapshot(session, run, binding)
-        if (
-            run.model_config_id != binding.model_config_id
-            or run.prompt_version != binding.prompt_version
-            or run.workflow_version != binding.workflow_version
-            or run.model_snapshot != expected_snapshot
-            or prepared.model_snapshot != expected_snapshot
-        ):
-            raise GenerationBindingError("the run binding changed while the card was generated")
-
-        if (
-            current_anchor_version(session, run, prepared.anchor_type, prepared.anchor_id)
-            != prepared.data_version
-        ):
-            raise InputVersionChangedError("the anchor changed while the card was generated")
-
-        # 범위를 현재 장부에서 **다시** 만든다. 준비 시점 범위를 재사용하면 그 사이에 생긴
-        # 당사자 관계와 그 로그를 저장 단계가 영영 보지 못한다.
-        current_scope = repository.build_interaction_scope(
-            session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id
-        )
-        if current_scope.identity() != prepared.scope_identity:
-            # 로그 수가 우연히 같아도 범위가 달라졌으면 다른 입력이다.
-            raise SourceChangedError("the consultation log scope changed during generation")
-
-        # cache hit 과 miss 모두 여기서 상담 집합을 다시 센다. 재사용 경로만 빠져나가면
-        # 낡은 카드가 그대로 확정된다.
-        current = snapshot.current_source_identity(session, current_scope, prepared.data_version)
-        if current != prepared.source:
-            raise SourceChangedError(
-                "the consultation log set changed while the card was generated"
-            )
-
-        # 앵커 row_version 은 세대 스펙·단지명·당사자 역할·날짜 bucket 이 바뀌어도 그대로다.
-        # 모델에 넘긴 입력 전체를 다시 조립해 지문으로 비교한다.
-        rebuilt = snapshot.build_anchor_snapshot(
-            session,
-            run.brokerage_id,
-            prepared.anchor_type,
-            prepared.anchor_id,
-            as_of=datetime.fromisoformat(prepared.as_of_bucket).replace(tzinfo=UTC),
-            input_privacy_mode=prepared.input_privacy_mode,
-        )
-        if input_fingerprint(rebuilt.request) != prepared.input_fingerprint:
-            raise SourceChangedError("the model input changed while the card was generated")
-
-        analysis_id = prepared.cached_analysis_id
-        request = prepared.request
-        if result is None:
-            # cache hit. 재사용하려던 카드가 저장 직전에도 유효한지 다시 확인한다.
-            analysis_id = _require_reusable_card(session, run, prepared, current)
-        elif result is not None and request is not None:
-            if (
-                result.prompt_version != binding.prompt_version
-                or result.workflow_version != binding.workflow_version
-            ):
-                raise GenerationBindingError(
-                    "the result was produced by a different prompt or workflow version"
-                )
-            validate_generation_result(request, result)
-
-            stored = repository.insert_position_card(
-                session, _card_row(run, prepared, request, result)
-            )
-            if stored is None:
-                # 같은 키를 다른 실행이 먼저 넣었다. 진 쪽은 그 카드를 재사용한다.
-                won = repository.lock_card_that_won_the_cache_key(
-                    session, run.brokerage_id, prepared.cache_key
-                )
-                if won is None:  # pragma: no cover - 방어
-                    raise SourceChangedError("the winning card disappeared")
-                analysis_id = won.id
-            else:
-                analysis_id = stored.id or 0
-                repository.insert_position_prices(
-                    session, _price_rows(run.brokerage_id, analysis_id, result.analysis)
-                )
-                repository.insert_position_evidence(
-                    session,
-                    _evidence_rows(
-                        run.brokerage_id, analysis_id, result.analysis, request.log_contents()
-                    ),
-                )
-
-        if analysis_id is None:
-            raise SourceChangedError("no position card is available for this run")
+        analysis_id = _verify_and_insert_card(session, run, binding, prepared, result)
 
         usage = result.diagnostics.usage if result and result.diagnostics else None
         latency = result.diagnostics.latency_ms if result and result.diagnostics else None

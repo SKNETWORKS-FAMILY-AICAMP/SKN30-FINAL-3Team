@@ -211,18 +211,29 @@ def anchor_interaction_summary(
     return repository.summarize_scoped_interactions(session, scope)
 
 
-def current_anchor_version(
-    session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int
+def current_target_version(
+    session: Session, brokerage_id: int, anchor_type: AnchorType, anchor_id: int
 ) -> int:
+    """장부 대상 한 건의 현재 `row_version`.
+
+    앵커와 후보가 같은 함수를 쓴다. 조회 범위도 F1 과 같으므로 화면에서 사라진 대상은
+    버전을 돌려주지 않고 `NotFoundError` 가 된다.
+    """
     if anchor_type is AnchorType.LISTING:
-        listing = repository.find_listing_anchor(session, run.brokerage_id, anchor_id)
+        listing = repository.find_listing_anchor(session, brokerage_id, anchor_id)
         if listing is None:
             raise NotFoundError("property listing is not found")
         return listing.row_version
-    requirement = repository.find_requirement_anchor(session, run.brokerage_id, anchor_id)
+    requirement = repository.find_requirement_anchor(session, brokerage_id, anchor_id)
     if requirement is None:
         raise NotFoundError("property requirement is not found")
     return requirement.row_version
+
+
+def current_anchor_version(
+    session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int
+) -> int:
+    return current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
 
 
 def prepare_anchor_position_card(
