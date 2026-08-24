@@ -44,3 +44,15 @@ updated: 2026-08-24
 - 모듈별 런타임과 도구 버전을 명시한다.
 - 의존성 잠금 파일은 해당 모듈이 생성될 때 모듈 내부에서 관리한다.
 - 컨테이너 이미지는 모듈에 필요한 의존성만 포함한다.
+
+## 커밋 전 자동 포맷
+
+- 루트 `.pre-commit-config.yaml`이 AI·Backend Python 파일의 공통 커밋 전 hook 정본이다.
+- 개발자는 저장소 루트에서 `uv run --locked --project backend pre-commit install`을 한 번 실행한다.
+- hook은 staged 상태의 `ai/src`, `ai/tests`, `backend/src`, `backend/tests` Python 파일에 모듈별
+  고정 Ruff 환경으로 `ruff check --fix`를 먼저 실행하고 `ruff format`을 적용한 뒤 해당 모듈의
+  Pyright를 실행한다.
+- 자동 수정이 발생하면 pre-commit이 커밋을 중단하며, 개발자는 변경분을 검토하고 다시 stage한 뒤
+  커밋한다. hook 우회 가능성을 고려해 CodeBuild의 format·lint·type 검사를 유지한다.
+- 루트 공통 Python 환경은 만들지 않으며 hook 실행 환경은 기존 Backend·AI 모듈 환경을 사용한다.
+- hook은 `--locked`로 실행해 pyproject와 lock이 다르면 lock을 암묵적으로 바꾸지 않고 실패한다.

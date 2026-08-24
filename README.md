@@ -151,6 +151,19 @@ cd SKN30-FINAL-3Team
 - [AI README](ai/README.md)
 - [Infra README](infra/README.md)
 
+### 2. 커밋 전 자동 포맷 설정
+
+저장소를 받은 뒤 루트에서 Git pre-commit hook을 한 번 설치합니다.
+
+```bash
+uv run --locked --project backend pre-commit install
+```
+
+이후 커밋할 때 staged 상태의 `ai/`·`backend/` Python 파일에 Ruff 안전 수정과 포맷이
+자동 적용되고 해당 모듈의 Pyright가 실행됩니다. hook이 파일을 바꾸면 변경분을 다시 `git add`한
+뒤 커밋합니다. 로컬 hook은 `git commit --no-verify`로 우회할 수 있으므로 CodeBuild의
+format·lint·type 검사는 계속 유지합니다.
+
 ---
 
 ## 문서
