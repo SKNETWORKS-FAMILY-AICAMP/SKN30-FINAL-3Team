@@ -10,7 +10,19 @@
   --dw-control-min-size: 24px;
 }
 
+/*
+ * 닫기 버튼 자리.
+ *
+ * PatternFly는 닫기 버튼을 헤더 기본 여백(24px)을 기준으로 절대 배치한다.
+ * 헤더를 6px까지 좁힌 뒤에는 37px짜리 버튼이 헤더 밖으로 내려가고,
+ * 바로 아래 본문이 position: relative여서 그 위를 덮어 버튼이 잘려 보인다.
+ * 좁아진 헤더 안에 버튼을 다시 앉히고, 헤더 내용이 버튼 자리를 비켜 가게 한다.
+ */
 .detail-workspace-modal.pf-v6-c-modal-box {
+  --pf-v6-c-modal-box__close--InsetBlockStart: 1px;
+  --pf-v6-c-modal-box__close--InsetInlineEnd: 8px;
+  --pf-v6-c-modal-box__close--sibling--MarginInlineEnd: 50px;
+
   z-index: 501 !important;
   width: min(1456px, calc(100vw - 40px));
   max-width: min(1456px, calc(100vw - 40px));
@@ -24,6 +36,8 @@
 
 .detail-workspace-modal .pf-v6-c-modal-box__header,
 .detail-workspace-modal > .pf-v6-c-modal-box__header {
+  /* 헤더가 더 낮아지면 절대 배치된 닫기 버튼(37px)이 다시 본문에 덮인다. 버튼 높이를 하한으로 둔다. */
+  min-height: 39px;
   padding: 6px 10px;
   background: #ffffff;
   border-bottom: 1px solid var(--dw-border);
