@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # 결정 인덱스
@@ -9,7 +9,7 @@ updated: 2026-08-20
 |---|---|---|
 | [ADR-0001](ADR-0001-agent-wiki.md) | 승인됨 | 프로젝트 지식을 저장소 스킬 위키로 관리 |
 | [ADR-0002](ADR-0002-root-boundaries.md) | 대체됨 | 다섯 개 루트 모듈과 독립 환경 경계 사용; ADR-0006에서 대체 |
-| [ADR-0003](ADR-0003-main-pr-flow.md) | 승인됨 | `develop` 없이 작업 브랜치에서 `main`으로 PR |
+| [ADR-0003](ADR-0003-main-pr-flow.md) | 대체됨 | `develop` 없이 작업 브랜치에서 `main`으로 PR; ADR-0013에서 대체 |
 | [ADR-0004](ADR-0004-cross-agent-instructions.md) | 승인됨 | 공용 에이전트 지침과 스킬을 Claude Code에서도 재사용 |
 | [ADR-0005](ADR-0005-requirements-management.md) | 승인됨 | 제품 요구사항을 분할 정본과 얇은 라우터로 관리 |
 | [ADR-0006](ADR-0006-ai-backend-boundary.md) | 승인됨 | AI와 Backend의 프레임워크·영속성 경계 분리 |
@@ -19,6 +19,7 @@ updated: 2026-08-20
 | [ADR-0010](ADR-0010-pr-policy-ai-review-discord.md) | 승인됨 | GitHub Actions 기반 결정적 분할·통합 PR AI 리뷰와 Discord 결과 전달 |
 | [ADR-0011](ADR-0011-dev-cicd-pipeline-modes.md) | 승인됨 | main 자동 통합과 Backend·Frontend 수동 독립 CodePipeline 운영 |
 | [ADR-0012](ADR-0012-retain-iam-access.md) | 승인됨 | Identity Center 전환을 폐기하고 기존 개인 IAM·MFA·역할 접근 유지 |
+| [ADR-0013](ADR-0013-dev-integration-pr-flow.md) | 승인됨 | `dev` 개발 통합, `main` 릴리스 PR과 Hong1008 기본 승인 책임 사용 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 
