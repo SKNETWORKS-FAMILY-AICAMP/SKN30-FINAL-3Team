@@ -1,0 +1,90 @@
+"""F3 포지션 카드의 Backend–AI 공개 계약과 구조화 출력 생성기.
+
+어휘·DTO·Protocol·교차 검증, 프롬프트와 Provider 중립 생성기까지 제공한다.
+Backend 입력 조립·저장, 운영 Provider 선택과 상태 전이는 후속 범위다.
+"""
+
+from brokerage_ai.f3.contracts import (
+    ALLOWED_PRICE_KINDS,
+    POSITION_CARD_CONTRACT_VERSION,
+    AnchorContext,
+    AnchorContextValue,
+    ConsultationLogInput,
+    ContactabilityAssessment,
+    ContactabilityStatus,
+    ContractVersion,
+    DateSignals,
+    Evidence,
+    EvidenceKind,
+    InputPrivacyMode,
+    IntentAssessment,
+    ListingAnchorContext,
+    NegotiationIntent,
+    NegotiationSide,
+    PartyRoleContext,
+    PositionCardAnalysis,
+    PositionCardGenerationRequest,
+    PositionCardGenerationResult,
+    PositionCardTarget,
+    PositionCondition,
+    PriceAssessment,
+    PriceKind,
+    RequirementAnchorContext,
+    SourceIdentity,
+    TimingAssessment,
+    Urgency,
+    UrgencyAssessment,
+    enabled_price_kinds,
+    stated_price_for,
+)
+from brokerage_ai.f3.generator import (
+    POSITION_CARD_WORKFLOW_VERSION,
+    LlmPositionCardGenerator,
+)
+from brokerage_ai.f3.ports import PositionCardGenerator, PositionCardGeneratorVersions
+from brokerage_ai.f3.prompts import POSITION_CARD_PROMPT_VERSION
+from brokerage_ai.f3.validation import (
+    PositionCardContractError,
+    validate_generation_result,
+)
+
+__all__ = [
+    "ALLOWED_PRICE_KINDS",
+    "POSITION_CARD_CONTRACT_VERSION",
+    "AnchorContext",
+    "ConsultationLogInput",
+    "ContactabilityAssessment",
+    "ContactabilityStatus",
+    "ContractVersion",
+    "DateSignals",
+    "Evidence",
+    "EvidenceKind",
+    "InputPrivacyMode",
+    "IntentAssessment",
+    "ListingAnchorContext",
+    "NegotiationIntent",
+    "NegotiationSide",
+    "PositionCardAnalysis",
+    "PositionCardContractError",
+    "PositionCardGenerationRequest",
+    "PositionCardGenerationResult",
+    "PositionCardGenerator",
+    "PositionCardTarget",
+    "PositionCondition",
+    "PriceAssessment",
+    "PriceKind",
+    "RequirementAnchorContext",
+    "SourceIdentity",
+    "TimingAssessment",
+    "Urgency",
+    "UrgencyAssessment",
+    "AnchorContextValue",
+    "LlmPositionCardGenerator",
+    "POSITION_CARD_PROMPT_VERSION",
+    "POSITION_CARD_WORKFLOW_VERSION",
+    "PartyRoleContext",
+    "PositionCardGeneratorVersions",
+    "enabled_price_kinds",
+    "stated_price_for",
+    "validate_generation_result",
+]
