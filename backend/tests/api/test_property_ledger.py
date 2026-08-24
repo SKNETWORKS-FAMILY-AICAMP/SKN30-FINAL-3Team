@@ -237,3 +237,158 @@ def test_non_numeric_value_for_an_integer_filter_is_rejected(config: Config) -> 
 
         assert response.status_code == 422
         assert response.json()["code"] == "VALIDATION_FAILED"
+
+
+@requires_database
+def test_list_carries_the_current_parties_of_each_row(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "인물단지")
+        create_unit(
+            client,
+            complex_id,
+            unit_number="101",
+            parties=[
+                {"role": "LANDLORD", "role_index": 2, "name": "송경련", "is_co_owner": True},
+                {
+                    "role": "LANDLORD",
+                    "role_index": 1,
+                    "name": "박이서",
+                    "phone": "010-1111-2222",
+                    "is_co_owner": True,
+                },
+                {"role": "TENANT", "role_index": 1, "name": "김세입", "phone": "010-3333-4444"},
+            ],
+        )
+
+        response = client.get("/api/v1/property-units")
+
+        assert response.status_code == 200, response.text
+        parties = response.json()["items"][0]["parties"]
+        assert [(entry["role"], entry["role_index"]) for entry in parties] == [
+            ("LANDLORD", 1),
+            ("LANDLORD", 2),
+            ("TENANT", 1),
+        ]
+        assert [entry["party"]["name"] for entry in parties] == ["박이서", "송경련", "김세입"]
+        assert [entry["is_co_owner"] for entry in parties] == [True, True, False]
+        assert [contact["contact_value"] for contact in parties[0]["party"]["contacts"]] == [
+            "010-1111-2222"
+        ]
+
+
+@requires_database
+def test_list_and_detail_assemble_parties_the_same_way(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "동일조립단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="102",
+            parties=[
+                {"role": "LANDLORD", "role_index": 1, "name": "박이서", "phone": "010-1111-2222"},
+                {"role": "TENANT", "role_index": 1, "name": "김세입"},
+            ],
+        )
+        unit_id = created["unit"]["id"]
+
+        listed = client.get("/api/v1/property-units").json()["items"][0]["parties"]
+        detailed = client.get(f"/api/v1/property-units/{unit_id}").json()["parties"]
+
+        assert listed == detailed
+
+
+@requires_database
+def test_list_drops_a_party_slot_that_the_last_write_left_out(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "관계종료단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="103",
+            parties=[
+                {"role": "LANDLORD", "role_index": 1, "name": "박이서"},
+                {"role": "TENANT", "role_index": 1, "name": "김세입"},
+            ],
+        )
+        unit = created["unit"]
+
+        patched = client.patch(
+            f"/api/v1/property-units/{unit['id']}",
+            json={
+                "row_version": unit["row_version"],
+                "parties": [{"role": "LANDLORD", "role_index": 1, "name": "박이서"}],
+            },
+        )
+        assert patched.status_code == 200, patched.text
+
+        listed = client.get("/api/v1/property-units").json()["items"][0]["parties"]
+        assert [entry["party"]["name"] for entry in listed] == ["박이서"]
+
+
+@requires_database
+def test_list_party_summary_carries_only_the_fields_the_grid_draws(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "노출범위단지")
+        create_unit(
+            client,
+            complex_id,
+            unit_number="104",
+            parties=[{"role": "LANDLORD", "role_index": 1, "name": "박이서"}],
+        )
+
+        party = client.get("/api/v1/property-units").json()["items"][0]["parties"][0]["party"]
+
+        assert set(party) == {
+            "id",
+            "party_type",
+            "name",
+            "alternate_name",
+            "privacy_consent_at",
+            "contacts",
+        }
+
+
+@requires_database
+def test_list_does_not_carry_the_parties_of_another_brokerage(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "우리단지")
+        create_unit(
+            client,
+            complex_id,
+            unit_number="105",
+            parties=[{"role": "LANDLORD", "role_index": 1, "name": "우리임대인"}],
+        )
+
+        other_brokerage_id = session.execute(
+            text("INSERT INTO brokerage (name) VALUES ('남의 사무소') RETURNING id")
+        ).scalar_one()
+        other_complex_id = create_complex(client, session, other_brokerage_id, "남의단지")
+        other_unit_id = session.execute(
+            text(
+                "INSERT INTO property_unit (brokerage_id, complex_id, unit_number)"
+                " VALUES (:b, :c, '999') RETURNING id"
+            ),
+            {"b": other_brokerage_id, "c": other_complex_id},
+        ).scalar_one()
+        other_party_id = session.execute(
+            text(
+                "INSERT INTO party (brokerage_id, party_type, name)"
+                " VALUES (:b, 'PERSON', '남의임대인') RETURNING id"
+            ),
+            {"b": other_brokerage_id},
+        ).scalar_one()
+        session.execute(
+            text(
+                "INSERT INTO property_unit_party_relation"
+                " (brokerage_id, unit_id, party_id, role, role_index)"
+                " VALUES (:b, :u, :p, 'LANDLORD', 1)"
+            ),
+            {"b": other_brokerage_id, "u": other_unit_id, "p": other_party_id},
+        )
+
+        items = client.get("/api/v1/property-units").json()["items"]
+
+        assert [item["unit_number"] for item in items] == ["105"]
+        assert [entry["party"]["name"] for item in items for entry in item["parties"]] == [
+            "우리임대인"
+        ]
