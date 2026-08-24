@@ -92,13 +92,13 @@ function partyFor(index: number, name: string): PartySummaryDto {
   };
 }
 
-/** 세대에 연결된 인물. 상세 응답에만 실린다. */
-export function relationsFor(index: number): UnitPartyRelationDto[] {
+/** 세대에 연결된 인물. 목록과 상세 응답 모두에 실린다. */
+function relationsFor(index: number): UnitPartyRelationDto[] {
   const relations: UnitPartyRelationDto[] = [];
   if (index % 11 !== 0) {
     const isCoOwned = index % 13 === 0;
     relations.push({
-      role: "OWNER",
+      role: "LANDLORD",
       role_index: 1,
       is_primary: true,
       is_co_owner: isCoOwned,
@@ -108,7 +108,7 @@ export function relationsFor(index: number): UnitPartyRelationDto[] {
     // 공동명의 세대. 그리드에서는 한 행으로 접어 표시한다(F1-GR-06).
     if (isCoOwned) {
       relations.push({
-        role: "OWNER",
+        role: "LANDLORD",
         role_index: 2,
         is_primary: false,
         is_co_owner: true,
@@ -203,8 +203,9 @@ export function createUnitRowDtos(count: number): PropertyUnitRowDto[] {
       last_contact_at: index % 7 === 0 ? null : isoTimestamp(2026, 8, (index % 12) + 1),
       row_version: 1,
       current_listing: listingFor(index, unitId),
-      // 실제 서버도 목록에 최신 상담 로그 1건을 함께 싣는다.
+      // 실제 서버도 목록에 최신 상담 로그 1건과 현재 인물 관계를 함께 싣는다.
       latest_interaction_content: index % 3 === 0 ? interactionFor(index, unitId, null).interaction_content : null,
+      parties: relationsFor(index),
     };
   });
 }

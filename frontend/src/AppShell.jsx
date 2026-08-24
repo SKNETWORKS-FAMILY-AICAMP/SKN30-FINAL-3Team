@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Button, Checkbox, Dropdown, DropdownItem, DropdownList, Label, MenuToggle,
   Modal, ModalBody, ModalFooter, ModalHeader,
@@ -104,7 +104,16 @@ export function AppShell() {
   // 장부 데이터는 features/ledger가 소유한다. mock/API 전환은 VITE_LEDGER_SOURCE가 정한다.
   const ledgerEnabled = isMockSource() || user != null;
   const ledgerQuery = useMemo(() => ({}), []);
-  const propertyLedger = usePropertyLedger(ledgerQuery, { enabled: ledgerEnabled });
+  /*
+   * 담당 열은 세대에 `assigned_user_id`만 들어 있어 이름 조회표가 없으면 늘 빈칸이다.
+   * 계약에 사용자 목록 엔드포인트가 없으므로 지금 이름을 아는 사람은 로그인한 본인뿐이다.
+   * 다른 담당자는 이름 대신 빈칸이 되며, 사용자 목록이 생기면 이 함수만 넓히면 된다.
+   */
+  const userName = useCallback(
+    (userId) => (userId != null && userId === user?.id ? user.displayName : ""),
+    [user],
+  );
+  const propertyLedger = usePropertyLedger(ledgerQuery, { enabled: ledgerEnabled, userName });
   const buyerLedger = useBuyerLedger(ledgerQuery, { enabled: ledgerEnabled });
   const rows = propertyLedger.state.rows;
   const buyerRows = buyerLedger.state.rows;

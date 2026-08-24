@@ -236,6 +236,9 @@ export function decodePropertyUnitRow(value: unknown, path = "item"): PropertyUn
       record["latest_interaction_content"],
       `${path}.latest_interaction_content`,
     ),
+    parties: asArray(record["parties"] ?? [], `${path}.parties`).map((entry, index) =>
+      decodeUnitPartyRelation(entry, `${path}.parties[${index}]`),
+    ),
   };
 }
 

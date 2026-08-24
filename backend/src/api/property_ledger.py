@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
@@ -114,6 +115,26 @@ def changed_fields(payload: Any) -> dict[str, Any]:
     return payload.model_dump(exclude_unset=True)
 
 
+def unit_parties(
+    db: Session, brokerage_id: int, unit_ids: Sequence[int]
+) -> dict[int, list[UnitPartyRelationResponse]]:
+    """세대 여러 건의 인물 관계를 세대별로 묶는다. 목록과 상세가 같은 조립 규칙을 쓴다."""
+    relations = repository.list_unit_party_relations_for_units(db, brokerage_id, unit_ids)
+    contacts = repository.list_party_contacts(
+        db, brokerage_id, [party.id or 0 for _, party in relations]
+    )
+    grouped: dict[int, list[UnitPartyRelationResponse]] = {}
+    for relation, party in relations:
+        grouped.setdefault(relation.unit_id, []).append(
+            UnitPartyRelationResponse.from_domain(
+                relation,
+                party,
+                [contact for contact in contacts if contact.party_id == party.id],
+            )
+        )
+    return grouped
+
+
 @router.get("/property-complexes", response_model=PropertyComplexListResponse)
 def list_property_complexes(
     user: CurrentUser = Depends(get_current_user),
@@ -168,8 +189,14 @@ def list_property_units(
     page = build_page(limit, offset)
     total = repository.count_property_units(db, user.brokerage_id, filters)
     rows = repository.list_property_units(db, user.brokerage_id, filters, page)
+    parties = unit_parties(db, user.brokerage_id, [row[0].id or 0 for row in rows])
     return PropertyUnitListResponse(
-        items=[PropertyUnitRow.from_domain(row[0], row[1], row[2], row[3]) for row in rows],
+        items=[
+            PropertyUnitRow.from_domain(
+                row[0], row[1], row[2], row[3], parties.get(row[0].id or 0, [])
+            )
+            for row in rows
+        ],
         total=total,
         limit=page.limit,
         offset=page.offset,
@@ -200,21 +227,13 @@ def get_property_unit(
 ) -> PropertyUnitDetailResponse:
     unit, complex_row = service.require_property_unit(db, user.brokerage_id, unit_id)
     listings = repository.list_listings_for_unit(db, user.brokerage_id, unit_id)
-    relations = repository.list_unit_party_relations(db, user.brokerage_id, unit_id)
-    contacts = repository.list_party_contacts(
-        db, user.brokerage_id, [party.id or 0 for _, party in relations]
-    )
+    parties = unit_parties(db, user.brokerage_id, [unit_id]).get(unit_id, [])
     return PropertyUnitDetailResponse(
-        unit=PropertyUnitRow.from_domain(unit, complex_row, listings[0] if listings else None),
+        unit=PropertyUnitRow.from_domain(
+            unit, complex_row, listings[0] if listings else None, None, parties
+        ),
         listings=[PropertyListingResponse.from_domain(listing) for listing in listings],
-        parties=[
-            UnitPartyRelationResponse.from_domain(
-                relation,
-                party,
-                [contact for contact in contacts if contact.party_id == party.id],
-            )
-            for relation, party in relations
-        ],
+        parties=parties,
     )
 
 
@@ -225,7 +244,12 @@ def create_property_unit(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyUnitDetailResponse:
-    unit_id = service.create_property_unit(db, user.brokerage_id, payload.model_dump())
+    fields = payload.model_dump()
+    # 인물은 property_unit 열이 아니라 별도 테이블이다. 세대 payload에서 떼어내 따로 저장한다.
+    parties = fields.pop("parties", None)
+    unit_id = service.create_property_unit(db, user.brokerage_id, fields)
+    if parties is not None:
+        service.replace_unit_parties(db, user.brokerage_id, unit_id, parties)
     return get_property_unit(unit_id, user, db)
 
 
@@ -237,7 +261,11 @@ def update_property_unit(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyUnitDetailResponse:
-    service.update_property_unit(db, user.brokerage_id, unit_id, changed_fields(payload))
+    fields = changed_fields(payload)
+    parties = fields.pop("parties", None)
+    service.update_property_unit(db, user.brokerage_id, unit_id, fields)
+    if parties is not None:
+        service.replace_unit_parties(db, user.brokerage_id, unit_id, parties)
     return get_property_unit(unit_id, user, db)
 
 

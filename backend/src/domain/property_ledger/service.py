@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import re
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlmodel import Session
@@ -14,11 +15,19 @@ from core.errors import (
 from domain.property_ledger import repository
 from domain.property_ledger.models import (
     ClientInteraction,
+    Party,
+    PartyContact,
     PropertyComplex,
     PropertyListing,
     PropertyRequirement,
     PropertyUnit,
+    PropertyUnitPartyRelation,
 )
+
+#: 매물장 그리드가 만드는 인물은 모두 자연인이다. 법인 임대인은 상세에서 따로 다룬다.
+DEFAULT_PARTY_TYPE = "PERSON"
+#: 그리드의 전화 칸은 휴대전화 한 개만 받는다.
+DEFAULT_CONTACT_METHOD = "PHONE"
 
 
 def require_property_unit(session: Session, brokerage_id: int, unit_id: int) -> Any:
@@ -85,6 +94,124 @@ def delete_property_complex(
     if not updated:
         session.rollback()
         raise RowVersionConflictError()
+    session.commit()
+
+
+def normalize_contact_value(value: str) -> str:
+    """연락처 비교용 정규화 값.
+
+    `party_contact`는 사용자 입력 원문(`contact_value`)과 정규화 값을 함께 둔다. 원문은
+    `010-1234-5678`처럼 사람이 읽는 형태로 남기고, 중복 판정과 검색은 정규화 값으로 한다.
+    """
+    return re.sub(r"[^0-9a-zA-Z@.]", "", value)
+
+
+def upsert_primary_contact(
+    session: Session, brokerage_id: int, party_id: int, phone: str | None
+) -> None:
+    """인물의 대표 연락처를 그리드가 입력한 값으로 맞춘다.
+
+    전화 칸을 비운 것은 "연락처를 지운다"는 뜻이므로 기존 대표 연락처를 소프트 삭제한다.
+    연락처 이력은 다른 화면이 참조할 수 있어 행을 실제로 지우지 않는다.
+    """
+    contacts = [
+        contact
+        for contact in repository.list_party_contacts(session, brokerage_id, [party_id])
+        if contact.contact_method == DEFAULT_CONTACT_METHOD
+    ]
+    primary = next((contact for contact in contacts if contact.is_primary), None)
+
+    cleaned = (phone or "").strip()
+    if cleaned == "":
+        if primary is not None:
+            primary.is_deleted = True
+            primary.deleted_at = datetime.now(UTC)
+            session.add(primary)
+        return
+
+    if primary is not None:
+        primary.contact_value = cleaned
+        primary.normalized_contact_value = normalize_contact_value(cleaned)
+        session.add(primary)
+        return
+
+    session.add(
+        PartyContact(
+            brokerage_id=brokerage_id,
+            party_id=party_id,
+            contact_method=DEFAULT_CONTACT_METHOD,
+            contact_value=cleaned,
+            normalized_contact_value=normalize_contact_value(cleaned),
+            is_primary=True,
+        )
+    )
+
+
+def replace_unit_parties(
+    session: Session, brokerage_id: int, unit_id: int, entries: list[dict[str, Any]]
+) -> None:
+    """세대의 인물 관계를 요청이 보낸 집합으로 맞춘다.
+
+    그리드는 임대인·임차인을 각각 한 칸에 접어 보여주므로 부분 수정이라는 개념이 없다.
+    보낸 목록이 곧 그 세대의 현재 인물 전체이고, 빠진 자리는 관계가 끝난 것으로 본다.
+
+    관계를 끝낼 때 인물 자체는 지우지 않는다. 같은 인물이 다른 세대나 구입장에 걸려 있을 수
+    있고, 상담 로그도 인물을 참조한다. `valid_to`를 채워 현재 관계에서만 빼면
+    `uq_unit_party_relation_current_role`(valid_to IS NULL 부분 유니크)도 그대로 지켜진다.
+    """
+    require_property_unit(session, brokerage_id, unit_id)
+
+    existing = {
+        (relation.role, relation.role_index): (relation, party)
+        for relation, party in repository.list_unit_party_relations(session, brokerage_id, unit_id)
+    }
+    wanted: set[tuple[str, int]] = set()
+
+    for entry in entries:
+        role = str(entry["role"]).strip().upper()
+        role_index = int(entry.get("role_index") or 1)
+        name = str(entry["name"]).strip()
+        if role == "" or name == "":
+            raise ValidationError("party role and name are required")
+        key = (role, role_index)
+        if key in wanted:
+            raise ValidationError(f"duplicate party slot: {role}#{role_index}")
+        wanted.add(key)
+
+        found = existing.get(key)
+        if found is None:
+            party = Party(brokerage_id=brokerage_id, party_type=DEFAULT_PARTY_TYPE, name=name)
+            session.add(party)
+            session.flush()
+            session.add(
+                PropertyUnitPartyRelation(
+                    brokerage_id=brokerage_id,
+                    unit_id=unit_id,
+                    party_id=party.id or 0,
+                    role=role,
+                    role_index=role_index,
+                    is_primary=role_index == 1,
+                    is_co_owner=bool(entry.get("is_co_owner")),
+                    valid_from=date.today(),
+                )
+            )
+        else:
+            relation, party = found
+            party.name = name
+            session.add(party)
+            relation.is_co_owner = bool(entry.get("is_co_owner"))
+            session.add(relation)
+
+        session.flush()
+        upsert_primary_contact(session, brokerage_id, party.id or 0, entry.get("phone"))
+
+    ended_at = date.today()
+    for key, (relation, _party) in existing.items():
+        if key in wanted:
+            continue
+        relation.valid_to = ended_at
+        session.add(relation)
+
     session.commit()
 
 

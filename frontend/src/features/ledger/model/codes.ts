@@ -139,13 +139,18 @@ export const REQUIREMENT_STATUS = createTable(
 /* party / party_contact                                               */
 /* ------------------------------------------------------------------ */
 
-/** property_unit_party_relation.role */
+/**
+ * property_unit_party_relation.role
+ *
+ * 서버가 실제로 쓰는 코드는 `LANDLORD`다. `client_interaction.counterparty_role`도 같다.
+ * 임대차 관계를 가리키는 값이라 소유권을 뜻하는 `OWNER`와 구분한다.
+ */
 export const PARTY_ROLE = createTable(
   {
-    OWNER: "임대인",
+    LANDLORD: "임대인",
     TENANT: "임차인",
   },
-  { provisional: true },
+  { provisional: false },
 );
 
 /**
