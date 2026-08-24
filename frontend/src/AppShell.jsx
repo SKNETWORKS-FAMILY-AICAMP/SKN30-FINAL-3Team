@@ -19,7 +19,7 @@ import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
 import { CrossMatchPanel } from "./features/CrossMatchPanel.jsx";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
-import { useAuth } from "./context/AuthContext.jsx";
+import { currentUser, useAuth } from "./features/auth/index.ts";
 
 const compactNavItems = ["배치 캠페인"];
 
@@ -98,9 +98,11 @@ function normalizeComposer(payload) {
 }
 
 export function AppShell() {
-  const { user, isAuthenticated, loginDev, logout, loading: authLoading } = useAuth();
+  // 로그인 여부는 AuthGate가 이미 걸렀다. 여기서는 헤더 표시와 로그아웃만 다룬다.
+  const { state: authState, isSubmitting: authSubmitting, signOut, markSessionExpired } = useAuth();
+  const user = currentUser(authState);
   // 장부 데이터는 features/ledger가 소유한다. mock/API 전환은 VITE_LEDGER_SOURCE가 정한다.
-  const ledgerEnabled = isMockSource() || isAuthenticated;
+  const ledgerEnabled = isMockSource() || user != null;
   const ledgerQuery = useMemo(() => ({}), []);
   const propertyLedger = usePropertyLedger(ledgerQuery, { enabled: ledgerEnabled });
   const buyerLedger = useBuyerLedger(ledgerQuery, { enabled: ledgerEnabled });
@@ -112,6 +114,17 @@ export function AppShell() {
   // 단지는 세대의 상위 레코드다. 목록도 생성도 /property-complexes를 쓴다.
   const complexes = useComplexOptions({ enabled: ledgerEnabled });
   const complexOptions = complexes.options;
+
+  // 세션이 끊긴 채로 장부를 열어두지 않는다. 사무소 공용 PC를 전제하므로(F1-SE-11)
+  // 401을 본 순간 게이트를 다시 세워 로그인 화면으로 돌린다.
+  const propertyLoadError = propertyLedger.state.error;
+  const buyerLoadError = buyerLedger.state.error;
+  useEffect(() => {
+    if (propertyLoadError?.kind === "unauthorized" || buyerLoadError?.kind === "unauthorized") {
+      markSessionExpired();
+    }
+  }, [propertyLoadError, buyerLoadError, markSessionExpired]);
+
   const [activeNav, setActiveNav] = useState("매물장");
   const [searchQuery, setSearchQuery] = useState("");
   const [complexFilter, setComplexFilter] = useState("전체");
@@ -522,31 +535,21 @@ export function AppShell() {
           <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
           <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />
           <Button variant="plain" aria-label="사용자 메뉴" icon={<UserIcon />} />
-          {isAuthenticated && user ? (
+          {user && (
             <>
-              <span className="user-name" title={`ID: ${user.login_id} (${user.role})`}>
-                {user.display_name}
+              <span className="user-name" title={`${user.loginId} · ${user.role}`}>
+                {user.displayName}
               </span>
-              <Button variant="secondary" size="sm" onClick={logout} style={{ marginLeft: "8px" }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={authSubmitting}
+                onClick={() => void signOut()}
+                style={{ marginLeft: "8px" }}
+              >
                 로그아웃
               </Button>
             </>
-          ) : (
-            <Button
-              variant="primary"
-              size="sm"
-              isLoading={authLoading}
-              onClick={async () => {
-                try {
-                  const result = await loginDev();
-                  setToast({ variant: "success", title: `개발 세션으로 로그인했습니다 (${result?.user?.display_name || "개발사용자"}).` });
-                } catch (err) {
-                  setToast({ variant: "warning", title: `개발 로그인 안내: 백엔드 서버 연결이 필요합니다 (${err.message}).` });
-                }
-              }}
-            >
-              개발용 로그인
-            </Button>
           )}
         </div>
       </header>
