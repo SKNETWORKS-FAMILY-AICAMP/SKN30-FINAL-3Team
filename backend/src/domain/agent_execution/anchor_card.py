@@ -463,6 +463,9 @@ def _output_snapshot(
         "input_data_version": prepared.data_version,
         "position_analysis_id": analysis_id,
         "cache_hit": result is None,
+        # 결과 조회가 합성 프로토타입 전용 공개 경계를 다시 확인하는 표식이다. 이 값이 없는
+        # 과거·수동 실행은 카드와 근거를 외부에 공개하지 않는다.
+        "input_privacy_mode": prepared.input_privacy_mode.value,
         "contract_version": result.contract_version if result else _CONTRACT_VERSION_FOR_CACHE_HIT,
         "prompt_version": result.prompt_version if result else run.prompt_version,
         "workflow_version": result.workflow_version if result else run.workflow_version,

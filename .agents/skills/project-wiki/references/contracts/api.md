@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # API 계약 규칙
@@ -133,8 +133,8 @@ updated: 2026-08-20
 ## F3 실행 계약 (제안)
 
 이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 요청을 검증해
-`agent_run`에 `QUEUED`로 적재하고 그 실행의 현재 상태를 조회하는 것까지다. 결과와 후보 조회, 피드백
-경로는 아직 없다.
+`agent_run`에 `QUEUED`로 적재하고, 현재 상태와 마지막으로 저장된 안전한 결과를 조회하는 것까지다.
+피드백 경로는 아직 없다.
 
 이 절은 브라우저와 Backend 사이의 HTTP 계약만 다룬다. Backend와 AI 사이의 포지션 카드 입력·결과,
 어휘와 근거 규칙은 [F3 AI 계약](f3-ai.md)이 소유하며 그 계약은 이 HTTP 경로로 노출되지 않는다.
@@ -143,6 +143,10 @@ updated: 2026-08-20
 |---|---|---|---|
 | POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
 | GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
+| GET | /api/v1/f3/runs/{run_id}/result | 세션 | 실행의 앵커 카드·후보 조회 조건·후보별 판정 결과를 현재 저장 단계까지 조회 |
+
+위 세 경로는 모두 현재 Backend에 **구현됨**이다. 특히 결과 조회는 더 이상 미구현 후속 경로가
+아니며, 아래 `실행 결과 조회` 절이 공개 계약의 정본이다. 사용자 피드백 API만 후속 범위다.
 
 요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
 정수다. 선언하지 않은 필드가 있으면 422로 거절한다.
@@ -259,12 +263,44 @@ Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 
 상태 순서대로 호출한다. 그 밖의 상태는 아직 만들지 않는다.
 
 후보 조회 조건, 전체 후보 집합과 상위 후보의 `position_analysis_id`는
-`match_evaluation.candidate_selection_snapshot`에 저장하며 이 HTTP 계약으로는 아직 노출하지
-않는다. 후보 카드와 최종 결과 조회 경로는 여전히 없다.
+`match_evaluation.candidate_selection_snapshot`에 저장한다. 상태 조회 경로는 이 내부 snapshot을
+노출하지 않으며 아래 결과 조회 경로만 허용된 필드로 변환한다.
 
 상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
 열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
+
+### 실행 결과 조회
+
+`GET /api/v1/f3/runs/{run_id}/result`는 상태를 변경하지 않으므로 CSRF 토큰을 요구하지 않는다.
+상태 조회와 동일하게 세션의 `brokerage_id`, 루트 `CROSS_JUDGMENT`, 숫자 `run_id >= 1` 조건으로
+격리하며 없는 실행·다른 사무소 실행·하위 실행·다른 실행 유형은 모두 404로 답한다.
+
+후보 목록은 `limit`과 `offset`으로 페이지 처리한다. `limit` 기본값은 20이고 범위는 1..100,
+`offset` 기본값은 0이며 0 이상이다. 범위를 벗어나면 422로 답한다. 페이지 대상은 카드화된 상위
+15건만이 아니라 결정적 SQL에 포함된 **전체 후보**다. 카드화·판정되지 않은 후보도 목록에 남고
+`selected_for_cards=false`, 판정·근거 필드는 `null` 또는 빈 목록으로 반환한다.
+
+진행 중인 실행은 완료를 가장하지 않고 마지막으로 영속화된 안전 단계까지만 반환한다.
+
+- `QUEUED`·`RUNNING`: 실행 정보, 빈 카드·후보 결과
+- `ANCHOR_READY`: 앵커 카드의 공개 `analysis`와 카드 근거
+- `CANDIDATES_READY` 이후: 실제 SQL 조회 조건, 전체·카드화·잔여 건수와 페이지 후보
+- `COMPLETED`: 후보별 등급·순위·비교 근거·걸림돌·양보·추천 행동·기각 사유·판정 근거
+
+앵커 카드 snapshot 전체를 반환하지 않고 `analysis`만 반환한다. 계약 버전, 프롬프트·워크플로 버전,
+Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청자·모델 설정·입출력 snapshot·토큰 수,
+`run_group_id`, `parent_run_id`, lease 값과 내부 실패 원문도 싣지 않는다. 실패 정보는 상태 조회와
+같은 allowlist 변환을 적용한다. 카드·판정 근거의 `quote_text`는 현재 승인된
+`SYNTHETIC_PROTOTYPE` 입력에서 저장된 공개 근거만 반환하며 실제 F1 데이터 연결은 마스킹 구현 전까지
+허용하지 않는다. 카드 저장 단계가 실행 snapshot에 기록한 `input_privacy_mode`가
+`SYNTHETIC_PROTOTYPE`인 실행만 카드·후보·근거 내용을 공개한다. 표식이 없거나 다른 값이면 실행
+상태와 안전한 실패 정보만 반환하고 나머지 결과는 빈 값으로 둔다.
+
+응답 최상위는 실행·앵커 정보와 `anchor_card`, `candidate_selection`, `candidates`,
+`candidates_total`, `limit`, `offset`이다. `candidate_selection`은 `criteria`, `total_count`,
+`carded_count`, `remaining_count`를 싣는다. 후보는 장부 `candidate_id`, SQL 순위·점수·금액·접수일,
+카드화 여부와 저장된 경우에만 중개 판정 및 근거를 싣는다. 빈 후보 결과도 같은 형태로 200을 반환한다.
 
 ### Worker 선점과 lease
 
