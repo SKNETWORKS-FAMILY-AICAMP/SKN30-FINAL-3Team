@@ -1,15 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 from sqlmodel import Session
 
-from api.schemas.f3_runs import F3RunCreateRequest, F3RunResponse, F3RunStatusResponse
-from domain.agent_execution import service
+from api.schemas.f3_runs import (
+    F3RunCreateRequest,
+    F3RunResponse,
+    F3RunResultResponse,
+    F3RunStatusResponse,
+)
+from domain.agent_execution import results, service
 from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser
 from domain.session import get_db_session
 
 router = APIRouter(prefix="/f3", tags=["agent-execution"])
+
+DEFAULT_CANDIDATE_LIMIT = 20
+MAX_CANDIDATE_LIMIT = 100
 
 
 @router.post("/runs", response_model=F3RunResponse, status_code=202)
@@ -33,3 +41,16 @@ def get_f3_run(
 ) -> F3RunStatusResponse:
     run = service.require_cross_judgment_run(db, user.brokerage_id, run_id)
     return F3RunStatusResponse.from_domain(run)
+
+
+@router.get("/runs/{run_id}/result", response_model=F3RunResultResponse)
+def get_f3_run_result(
+    run_id: int = Path(ge=1),
+    limit: int = Query(default=DEFAULT_CANDIDATE_LIMIT, ge=1, le=MAX_CANDIDATE_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> F3RunResultResponse:
+    """실행의 현재 결과를 전체 SQL 후보 기준 페이지로 조회한다."""
+    result = results.load_run_result(db, user.brokerage_id, run_id, limit=limit, offset=offset)
+    return F3RunResultResponse.from_domain(result)

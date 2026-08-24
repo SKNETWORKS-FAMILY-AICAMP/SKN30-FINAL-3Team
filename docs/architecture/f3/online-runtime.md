@@ -196,6 +196,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `POST /api/v1/f3/runs`. 요청마다 새 `QUEUED` 실행 생성 | `backend/src/api/f3_runs.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
+| `GET /api/v1/f3/runs/{run_id}/result` 진행 단계별 앵커 카드·전체 SQL 후보·후보 판정 페이지 조회 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/results.py` |
 | `claim_next_run` 작업 선점, `RUNNING`·`ANCHOR_READY`·`CANDIDATES_READY`·`CANDIDATE_CARDS_READY`·`JUDGING` 재선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py`, migration 016 |
 | 합성 F1 앵커 snapshot과 측면별 상담 로그 범위·날짜 신호 조립 | `backend/src/domain/agent_execution/snapshot.py` |
 | 입력 fingerprint·상담 범위 identity를 포함한 `position-card:v3` cache key와 재사용 | `backend/src/domain/agent_execution/fingerprint.py`, `cache_key.py` |
@@ -228,6 +229,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | SSE 진행 구독과 재연결 | 없음. polling만 제공 |
+| 사용자 피드백 API | 없음 |
 | 배포 환경의 `WORKER_ENABLED=true` 전환 | 실행 코드는 지원하지만 현재 Infra 기본값은 `false`. 운영 Provider 선택과 함께 별도 적용 |
 
 ## 결정적 후보 검색
@@ -305,8 +307,9 @@ snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, �
 확보되기 전에는 실행 상태와 후보 카드 ID 목록을 완료 처리하지 않는다. 최종 카드 ID는
 `match_evaluation.candidate_selection_snapshot.candidate_cards`에 기록한다.
 
-현재 상태 조회 API는 진행·완료 상태 문자열만 공개하고 후보 카드 본문이나 ID 목록은 공개하지
-않는다. 판정 결과·후보 카드 조회 API는 후속 범위다.
+상태 조회 API는 진행·완료 상태 문자열만 공개한다. 별도 결과 조회 API는 앵커 카드의 공개 본문,
+전체 SQL 후보와 저장된 후보 판정만 허용된 응답 DTO로 변환하며 내부 snapshot 전체나 후보 카드
+본문·모델 진단은 공개하지 않는다.
 
 ## 중개 판정과 완료
 
