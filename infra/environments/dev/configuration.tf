@@ -32,6 +32,7 @@ locals {
     backend_http_cors_allowed_origins     = { path = "backend/HTTP_CORS_ALLOWED_ORIGINS", value = "[]" }
     backend_log_format                    = { path = "backend/LOG_FORMAT", value = "json" }
     backend_log_level                     = { path = "backend/LOG_LEVEL", value = "INFO" }
+    backend_f3_allow_synthetic_prototype  = { path = "backend/F3_ALLOW_SYNTHETIC_PROTOTYPE", value = "false" }
     backend_worker_enabled                = { path = "backend/WORKER_ENABLED", value = "false" }
     ai_openai_base_url                    = { path = "ai/AI_OPENAI_BASE_URL", value = "https://api.openai.com/v1" }
     ai_request_timeout_seconds            = { path = "ai/AI_REQUEST_TIMEOUT_SECONDS", value = "60" }

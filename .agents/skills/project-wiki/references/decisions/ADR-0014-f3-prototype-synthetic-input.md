@@ -23,6 +23,10 @@ F3 포지션 카드 프로토타입은 케이스 테스트용 합성 장부와 �
 - 합성 입력은 별도 마스킹 변환 없이 Provider 프롬프트에 전달할 수 있다.
 - 요청은 `input_privacy_mode=SYNTHETIC_PROTOTYPE`을 명시하고 생성기 조립 지점도
   `allow_synthetic_prototype=True`로 별도 opt-in해야 한다. 기본 생성기는 이 모드를 거절한다.
+- Backend Worker도 배포 환경에서 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 별도로 명시해야 한다.
+  기본값은 `false`이며 opt-in이 없으면 활성 Worker는 DB·Provider 접근과 작업 선점 전에 기동을
+  거절한다. 이 설정은 데이터가 합성임을 코드가 증명한다는 뜻이 아니라 검토된 합성 전용
+  환경이라는 운영자 선언이다.
 - 실사용자 이름·로그인 ID·연락처·생년월일이나 운영 DB의 상담 원문은 이 예외에 포함하지 않는다.
 - 전체 프롬프트·전체 모델 응답과 상담 원문을 로그에 남기지 않는 기존 정책은 유지한다.
 - 외부 Provider, 처리 리전과 저장 여부의 선택은 이 결정에 포함하지 않는다. 별도 결정 전에는

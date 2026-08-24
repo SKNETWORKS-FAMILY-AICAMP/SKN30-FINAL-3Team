@@ -230,6 +230,13 @@ PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 �
 보내면 새 실행을 만들지 않는다. 희망 단지는 순서가 아니라 집합 변경을 판정 입력 변경으로 본다.
 자동 접수 실패 로그에는 앵커 종류·ID와 예외 타입만 남기고 상담 원문·연락처·성명은 남기지 않는다.
 
+자동 접수와 AI 처리는 별도 경계다. 접수된 실행은 검토된 합성 전용 환경에서
+`WORKER_ENABLED=true`와 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 모두 명시한 경우에만 현재 Worker가
+처리한다. 합성 opt-in이 없으면 Worker는 DB·Provider 접근과 작업 선점 전에 기동을 거절한다. 현재
+Infra 기본값은 두 설정 모두 `false`다. `MASKED` 입력 조립은 아직 구현되지 않았으므로 실제 F1
+사용자 데이터를 처리하는 근거로 합성 opt-in을 사용할 수 없다. 실사용 연결 전에는 ADR-0014에 따라
+Backend 마스킹을 구현하고 `input_privacy_mode=MASKED`로 전환해야 한다.
+
 ### 요청자 기록
 
 요청자는 세션에서 도출한 내부 `app_user.id` 하나이며 `agent_run.requested_by`에 저장한다. 실행

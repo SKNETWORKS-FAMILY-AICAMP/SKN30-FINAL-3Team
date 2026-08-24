@@ -226,6 +226,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
+| 합성 opt-in이 없으면 DB·Provider 접근과 claim 전 활성 Worker 기동 거절 | `backend/src/worker.py` |
 | RDS polling, `claim_next_run` 연결과 저장 상태 기반 F3 handler | `backend/src/worker.py`, `backend/src/domain/agent_execution/pipeline.py` |
 | capability별 lazy 모델 binding, 합성 모드 명시적 opt-in과 하나의 asyncio loop | `backend/src/worker.py` |
 | 일시 Provider 오류의 즉시 lease release·3회 상한 재시도, 입력 변경 `SUPERSEDED`, 영구 오류 `FAILED_TERMINAL` | `backend/src/domain/agent_execution/pipeline.py` |
@@ -244,7 +245,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | SSE 진행 구독과 재연결 | 없음. polling만 제공 |
 | 정정 피드백과 다음 판정 입력 연결 (F3-TR-02) | 없음. 정정 상담 로그를 함께 만드는 유스케이스 전에는 공개 입력으로 받지 않는다 |
 | 변경 없는 완료 판정 결과 재사용 (F3-CR-12 나머지) | 없음. 전체 입력 identity와 AI 구성의 동일성을 접수 시점에 검증할 수 있을 때 구현한다 |
-| 배포 환경의 `WORKER_ENABLED=true` 전환 | 실행 코드는 지원하지만 현재 Infra 기본값은 `false`. 운영 Provider 선택과 함께 별도 적용 |
+| 배포 환경의 활성 Worker 전환 | 실행 코드는 지원하지만 현재 Infra 기본값은 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`. 합성 전용 시연은 두 값을 모두 명시하고, 실사용은 마스킹과 `MASKED` 전환 뒤 별도 적용 |
 
 ## 결정적 후보 검색
 
