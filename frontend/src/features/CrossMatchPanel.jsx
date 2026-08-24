@@ -378,7 +378,7 @@ function CandidateDetail({ candidate, anchor, parentContext, isReadOnly, onCompo
   );
 }
 
-export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage, parentContext = "unit-detail", onOpenEvidence, onLater, onInterest, onSchedule }) {
+export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage, parentContext = "unit-detail", onOpenEvidence, onLater, onInterest, onSchedule, focusRequest = 0 }) {
   const [viewState, setViewState] = useState("sequential");
   const panelRef = useRef(null);
   const [processStep, setProcessStep] = useState(0);
@@ -396,14 +396,19 @@ export function CrossMatchPanel({ isOpen, onClose, anchorRow, onComposeMessage, 
   const visibleCandidates = candidates.filter((candidate) => !hiddenGrades.includes(candidate.grade));
   const cacheKey = `${parentContext}:${anchor.id}`;
 
+  /*
+   * 스크롤과 포커스는 사용자가 "교차 매칭"을 직접 눌렀을 때만 옮긴다.
+   * 상세를 열 때 이 패널도 함께 열리는데, 그때까지 스크롤을 가져가면
+   * 상세가 맨 위(기본 정보)가 아니라 이 패널 위치에서 열린 것처럼 보인다.
+   */
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen || !focusRequest) return undefined;
     const frame = window.requestAnimationFrame(() => {
       panelRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
       panelRef.current?.querySelector("#cross-match-panel-title")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [isOpen, focusRequest]);
 
   useEffect(() => {
     if (!isOpen || viewState !== "sequential") return undefined;

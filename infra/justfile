@@ -107,6 +107,13 @@ db-migrate:
 db-verify:
     uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" verify
 
+# 개발 DB 클라이언트 접속 정보와 15분 IAM 토큰을 명시적으로 표시한다.
+db-info:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" client-info
+
+[private]
+db-client-info: db-info
+
 # maintenance window에서 runtime DB 비밀번호를 회전한다.
 [confirm("API와 Worker가 중지된 maintenance window입니까?")]
 db-rotate:

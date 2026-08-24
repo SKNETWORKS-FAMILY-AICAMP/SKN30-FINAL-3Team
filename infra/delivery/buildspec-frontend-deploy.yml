@@ -1,0 +1,11 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  pre_build:
+    commands:
+      - curl -fsS --retry 3 "https://${CLOUDFRONT_DOMAIN}/health/ready"
+  build:
+    commands:
+      - chmod +x deploy_frontend.sh
+      - ./deploy_frontend.sh

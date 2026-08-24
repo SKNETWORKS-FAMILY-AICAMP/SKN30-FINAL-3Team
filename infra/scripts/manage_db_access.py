@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import secrets
+import shlex
 import shutil
 import socket
 import subprocess
@@ -346,8 +347,10 @@ def ensure_role(
     )
     if password is not None:
         cursor.execute(
-            sql.SQL("ALTER ROLE {} PASSWORD %s").format(sql.Identifier(role_name)),
-            (password,),
+            sql.SQL("ALTER ROLE {} PASSWORD {}").format(
+                sql.Identifier(role_name),
+                sql.Literal(password),
+            )
         )
 
 
@@ -373,6 +376,7 @@ def configure_fixed_roles(
         sql.SQL("ALTER ROLE {} PASSWORD NULL").format(sql.Identifier(DB_MIGRATOR_USER))
     )
 
+    grant_role(cursor, DB_OWNER_ROLE, DB_MASTER_USER)
     grant_role(cursor, DB_RW_ROLE, DB_RUNTIME_USER)
     grant_role(cursor, "rds_iam", DB_MIGRATOR_USER)
     grant_role(cursor, DB_OWNER_ROLE, DB_MIGRATOR_USER)
@@ -452,8 +456,10 @@ def sync_personal_roles(
         grant_role(cursor, "rds_iam", username)
         grant_role(cursor, DB_OWNER_ROLE, username)
         cursor.execute(
-            sql.SQL("COMMENT ON ROLE {} IS %s").format(sql.Identifier(username)),
-            (MANAGED_ROLE_COMMENT,),
+            sql.SQL("COMMENT ON ROLE {} IS {}").format(
+                sql.Identifier(username),
+                sql.Literal(MANAGED_ROLE_COMMENT),
+            )
         )
         enabled.append(username)
 
@@ -510,6 +516,51 @@ def parse_runtime_secret(secret_string: str) -> dict[str, object]:
     ):
         raise ToolError("runtime secret has an unexpected structure")
     return value
+
+
+def validate_runtime_secret_target(
+    target: DatabaseTarget, secret: dict[str, object]
+) -> None:
+    expected = {
+        "engine": "postgres",
+        "host": target.endpoint,
+        "port": target.port,
+        "dbname": target.database,
+        "username": DB_RUNTIME_USER,
+    }
+    actual = {name: secret.get(name) for name in expected}
+    if actual != expected:
+        raise ToolError("runtime secret database target metadata does not match RDS")
+
+
+def verify_fixed_role_contract(cursor: psycopg.Cursor[Any]) -> None:
+    required = {
+        DB_OWNER_ROLE,
+        DB_RW_ROLE,
+        DB_RUNTIME_USER,
+        DB_MIGRATOR_USER,
+    }
+    cursor.execute(
+        "SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname = ANY(%s)",
+        (list(required),),
+    )
+    roles = {str(name): bool(can_login) for name, can_login in cursor.fetchall()}
+    if set(roles) != required:
+        raise ToolError("required database roles are missing")
+    if roles[DB_OWNER_ROLE] or roles[DB_RW_ROLE]:
+        raise ToolError("database capability roles must not allow login")
+    if not roles[DB_RUNTIME_USER] or not roles[DB_MIGRATOR_USER]:
+        raise ToolError("database application users must allow login")
+
+    for member, granted in (
+        (DB_RUNTIME_USER, DB_RW_ROLE),
+        (DB_MIGRATOR_USER, "rds_iam"),
+        (DB_MIGRATOR_USER, DB_OWNER_ROLE),
+    ):
+        cursor.execute("SELECT pg_has_role(%s, %s, 'member')", (member, granted))
+        membership = cursor.fetchone()
+        if membership is None or not membership[0]:
+            raise ToolError(f"{member} is missing required database role {granted}")
 
 
 def get_runtime_secret(
@@ -705,8 +756,106 @@ def rotate_runtime(
 def caller_username(identity_arn: str) -> str:
     marker = ":user/"
     if marker not in identity_arn:
-        raise ToolError("migrate requires direct IAM user credentials from aws login")
+        raise ToolError("direct IAM user credentials from aws login are required")
     return identity_arn.split(marker, 1)[1].rsplit("/", 1)[-1]
+
+
+def render_client_info(
+    settings: Settings,
+    target: DatabaseTarget,
+    instance_id: str,
+    username: str,
+    token: str,
+    ca_bundle: Path,
+) -> str:
+    tunnel_params = json.dumps(
+        {
+            "host": [target.endpoint],
+            "portNumber": [str(target.port)],
+            "localPortNumber": [str(settings.local_port)],
+        },
+        separators=(",", ":"),
+    )
+    psql_environment = {
+        "PGHOST": target.endpoint,
+        "PGHOSTADDR": "127.0.0.1",
+        "PGPORT": str(settings.local_port),
+        "PGDATABASE": target.database,
+        "PGUSER": username,
+        "PGSSLMODE": "verify-full",
+        "PGSSLROOTCERT": str(ca_bundle),
+    }
+    psql_command = " ".join(
+        [
+            *(f"{key}={shlex.quote(value)}" for key, value in psql_environment.items()),
+            "psql -W",
+        ]
+    )
+
+    return "\n".join(
+        [
+            "================================================================================",
+            "                      RDS 개발 DB 접속 정보 (IAM DB Auth)                      ",
+            "================================================================================",
+            f"• Database Name  : {target.database}",
+            f"• IAM Username   : {username}",
+            "• Local Host     : 127.0.0.1",
+            f"• Local Port     : {settings.local_port}",
+            f"• Remote RDS Host: {target.endpoint}:{target.port}",
+            f"• App EC2 Target : {instance_id}",
+            f"• CA Bundle Path : {ca_bundle}",
+            "--------------------------------------------------------------------------------",
+            "• IAM DB Token (비밀번호 / 15분 유효, 아래 프롬프트나 클라이언트에만 붙여넣기):",
+            token,
+            "  주의: 터미널 로그·화면 공유에 노출하지 말고 사용 후 클립보드를 비운다.",
+            "--------------------------------------------------------------------------------",
+            "1. SSM 포트 포워딩 터널 실행 (별도 터미널에서 실행):",
+            (
+                f"   aws ssm start-session --target {instance_id} "
+                "--document-name AWS-StartPortForwardingSessionToRemoteHost "
+                f"--parameters {shlex.quote(tunnel_params)} --region {settings.region}"
+            ),
+            "",
+            "2. psql 접속 (터널 실행 후 명령을 실행하고 Password 프롬프트에 토큰 붙여넣기):",
+            f"   {psql_command}",
+            "",
+            "3. DBeaver / DataGrip 설정:",
+            "   - Host     : 127.0.0.1",
+            f"   - Port     : {settings.local_port}",
+            f"   - Database : {target.database}",
+            f"   - Username : {username}",
+            "   - Password : [위의 IAM DB Token 문자열]",
+            "   - SSL Mode : verify-ca",
+            f"   - Root CA  : {ca_bundle}",
+            "   - localhost 터널에서는 RDS 호스트명 검증 대신 CA 체인을 검증한다.",
+            "================================================================================",
+        ]
+    )
+
+
+def client_info(settings: Settings) -> None:
+    direct = base_session(settings)
+    identity = direct.client("sts").get_caller_identity()
+    username = caller_username(identity["Arn"])
+    target = describe_database(direct, settings)
+    instance_id = find_app_instance(direct, settings)
+    token = direct.client("rds").generate_db_auth_token(
+        DBHostname=target.endpoint,
+        Port=target.port,
+        DBUsername=username,
+        Region=settings.region,
+    )
+    ca_bundle = ensure_ca_bundle()
+    print(
+        render_client_info(
+            settings,
+            target,
+            instance_id,
+            username,
+            token,
+            ca_bundle,
+        )
+    )
 
 
 def migration_url(
@@ -773,6 +922,7 @@ def verify(settings: Settings) -> None:
     runtime_secret, _ = get_runtime_secret(operator, settings)
     if runtime_secret is None or not runtime_secret.get("password"):
         raise ToolError("runtime secret is not initialized")
+    validate_runtime_secret_target(target, runtime_secret)
 
     ca_bundle = ensure_ca_bundle()
     with PortForward(operator, instance_id, target, settings.local_port):
@@ -788,19 +938,7 @@ def verify(settings: Settings) -> None:
             ) as connection,
             connection.cursor() as cursor,
         ):
-            required = {
-                DB_OWNER_ROLE,
-                DB_RW_ROLE,
-                DB_RUNTIME_USER,
-                DB_MIGRATOR_USER,
-            }
-            cursor.execute(
-                "SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)",
-                (list(required),),
-            )
-            present = {row[0] for row in cursor.fetchall()}
-            if present != required:
-                raise ToolError("required database roles are missing")
+            verify_fixed_role_contract(cursor)
     emit("verification-complete", database=target.identifier)
 
 
@@ -824,6 +962,7 @@ def parser() -> argparse.ArgumentParser:
     rotate.add_argument("--apply", action="store_true")
     rotate.add_argument("--maintenance-window-confirmed", action="store_true")
     commands.add_parser("verify")
+    commands.add_parser("client-info")
     return command_parser
 
 
@@ -861,6 +1000,8 @@ def main() -> None:
         migrate(settings, arguments.apply)
     elif arguments.command == "verify":
         verify(settings)
+    elif arguments.command == "client-info":
+        client_info(settings)
 
 
 if __name__ == "__main__":

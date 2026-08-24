@@ -1,6 +1,6 @@
 ---
 status: 제안
-updated: 2026-08-17
+updated: 2026-08-20
 ---
 
 # F3 온라인 실행 아키텍처
@@ -12,6 +12,7 @@ updated: 2026-08-17
 - **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)
 - **이 문서가 소유하지 않는 상세:** API 경로·전송 스키마, DB 테이블, 큐·Worker 제품, 재시도 횟수, 검색 top-K와 점수 가중치
 - **탐색:** [아키텍처 인덱스](../index.md) · [F3 개요](overview.md) · [오프라인 데이터·평가](offline-data-evaluation.md)
+- **읽는 법:** 이 문서의 본문은 **목표 아키텍처**다. 지금 저장소에 있는 것과 없는 것은 [현재 구현 범위](#현재-구현-범위)에서 확인한다.
 
 ## 트리거와 작업 생성
 
@@ -26,7 +27,9 @@ MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 
 Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 상세 진입에서도 F3 패널만 로딩·실패 상태를 표시한다.
 
-작업 생성 시 사용자 권한, 앵커 종류·식별자, 현재 데이터 버전과 활성 AI 구성을 확인한다. 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용한다.
+작업 생성 시 사용자 권한, 앵커 종류·식별자, 현재 데이터 버전과 활성 AI 구성을 확인한다. **목표 정책은** 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용하는 것이다. 현재 구현은 요청마다 새 실행을 만든다. 아래 [현재 구현 범위](#현재-구현-범위)를 함께 본다.
+
+앵커 유효성은 F1 장부 조회 범위를 그대로 따른다. 매물 앵커는 사무소, 매물 삭제 여부와 **부모 세대 삭제 여부**를 모두 만족해야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물 행을 건드리지 않으므로 매물 행의 표시만 보면 화면에 없는 세대의 매물이 앵커로 들어온다.
 
 ## 실행 구조와 공개 경계
 
@@ -78,11 +81,11 @@ sequenceDiagram
     User->>FE: 손님/매물 저장 또는 상세 진입
     FE->>API: 현재 화면 컨텍스트 전달
     API->>API: 권한·앵커·입력 버전 확인
-    API->>Job: 동일 실행 조회 또는 queued 생성
+    API->>Job: 동일 실행 조회 또는 QUEUED 생성
     API-->>FE: 실행 식별자·현재 상태
     FE->>API: 진행 구독(SSE 후보 + 상태 조회 복구)
 
-    W->>Job: queued 작업 획득
+    W->>Job: QUEUED 작업 선점(lease)
     W->>AI: 프레임워크 중립 실행 요청
     AI->>Cap: 앵커 구조화 컨텍스트·접촉 이력 조회
     Cap-->>AI: 구조화 값·날짜 신호
@@ -92,14 +95,14 @@ sequenceDiagram
     Cap-->>AI: 원본 log_ref·검색 진단
     AI->>Model: 앵커 대리 실행
     Model-->>AI: 앵커 포지션 카드
-    AI-->>W: anchor_ready
+    AI-->>W: ANCHOR_READY
     W->>Job: 앵커 카드·진행 저장
     Job-->>API: 상태 변경
     API-->>FE: 앵커 카드 부분 표시
 
     AI->>Cap: 추정 조건 기반 결정적 후보 SQL
     Cap-->>AI: 후보 ID·점수·조회 조건
-    AI-->>W: candidates_ready
+    AI-->>W: CANDIDATES_READY
     W->>Job: SQL 후보 스냅샷 저장
     API-->>FE: 후보 목록 부분 표시
 
@@ -124,11 +127,11 @@ sequenceDiagram
     end
     AI-->>W: 후보 카드 생성·캐시 진행률
     W->>Job: 진행 저장
-    AI-->>W: candidate_cards_ready
+    AI-->>W: CANDIDATE_CARDS_READY
     W->>Job: 후보 카드 저장
     API-->>FE: 카드 생성 진행률 표시
 
-    AI-->>W: judging
+    AI-->>W: JUDGING
     W->>Job: 최종 비교 중 상태 저장
     AI->>Model: 앵커 1 + 후보 N 중개 판정 1회
     Model-->>AI: 전체 등급·순위·근거·행동
@@ -136,32 +139,82 @@ sequenceDiagram
     AI-->>W: 최종 결과·실행 진단
     W->>W: 원본 근거·권한·입력 버전 재검증
     alt 입력 버전 일치·검증 성공
-        W->>Job: completed 결과 원자 저장
+        W->>Job: COMPLETED 결과 원자 저장
         API-->>FE: 최종 등급·순위 함께 반영
     else 데이터 변경 또는 권한·근거 실패
-        W->>Job: superseded 또는 failed 기록
+        W->>Job: SUPERSEDED 또는 FAILED 기록
         API-->>FE: 최신 작업 전환 또는 재시도 안내
     end
 ```
 
-`candidates_ready`까지는 SQL 후보이며 AI 등급이 아니다. 후보 간 순위가 전체 비교 전 뒤집히지 않도록 `judging` 완료 전에는 강함·약함·기각과 최종 순위를 노출하지 않는다.
+`CANDIDATES_READY`까지는 SQL 후보이며 AI 등급이 아니다. 후보 간 순위가 전체 비교 전 뒤집히지 않도록 `JUDGING` 완료 전에는 강함·약함·기각과 최종 순위를 노출하지 않는다.
 
 ## 작업 상태와 공개 정책
 
-| 상태 | 의미 | 사용자 공개 |
-|---|---|---|
-| `queued` | 영속 작업 생성, Worker 대기 | 실행 준비 중 |
-| `anchor_ready` | 앵커 카드 검증·저장 완료 | 앵커 카드와 근거 표시 |
-| `candidates_ready` | 결정적 SQL 후보 스냅샷 완료 | 후보 수·조회 조건·목록 표시 |
-| `candidate_cards_ready` | 필요한 후보 카드 생성·재사용 완료 | 생성/캐시 진행률과 카드 근거 표시 가능 |
-| `judging` | 전체 후보 중개 판정 1회 실행 중 | 최종 비교 중; 임시 등급 미표시 |
-| `completed` | Backend 검증을 통과한 최종 결과 저장 | 전체 등급·순위 원자 반영 |
-| `failed_retryable` | 모델·검색·Worker의 일시 오류 | F1은 계속 사용, F3 재시도 제공 |
-| `failed_terminal` | 입력·권한·출력 검증의 영구 오류 | 안전한 오류와 수정 방법 표시 |
-| `cancelled` | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
-| `superseded` | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
+상태값은 `agent_run.status` 기본값에 맞춰 대문자 스네이크로 표기한다. `QUEUED`와 `RUNNING`은 Worker가 작업을 잡았는지를 나타내는 실행 제어 상태이고, `ANCHOR_READY` 이후는 실제 업무 처리 진행 상태다.
 
-5초 안에 `completed`가 되지 않으면 빈 패널을 유지하지 않고 확보된 마지막 안전 단계를 표시한다. SSE 후보 연결이 끊기면 작업은 취소되지 않으며 상태 조회로 스냅샷을 복구한 뒤 마지막 이벤트 이후를 다시 구독한다.
+| 상태 | 구분 | 의미 | 사용자 공개 |
+|---|---|---|---|
+| `QUEUED` | 실행 제어 | 영속 작업 생성, Worker 대기 | 실행 준비 중 |
+| `RUNNING` | 실행 제어 | Worker가 lease를 걸고 선점함 | 실행 중 |
+| `ANCHOR_READY` | 업무 처리 | 앵커 카드 검증·저장 완료 | 앵커 카드와 근거 표시 |
+| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 후보 수·조회 조건·목록 표시 |
+| `CANDIDATE_CARDS_READY` | 업무 처리 | 필요한 후보 카드 생성·재사용 완료 | 생성/캐시 진행률과 카드 근거 표시 가능 |
+| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 1회 실행 중 | 최종 비교 중; 임시 등급 미표시 |
+| `COMPLETED` | 업무 처리 | Backend 검증을 통과한 최종 결과 저장 | 전체 등급·순위 원자 반영 |
+| `FAILED_RETRYABLE` | 종료 | 모델·검색·Worker의 일시 오류 | F1은 계속 사용, F3 재시도 제공 |
+| `FAILED_TERMINAL` | 종료 | 입력·권한·출력 검증의 영구 오류 | 안전한 오류와 수정 방법 표시 |
+| `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
+| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
+
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 세 가지다. 나머지는 아직 `제안`이며 구현되지 않았다.
+
+`ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
+
+현재 구현된 범위는 lease 소유권 확인, 앵커·입력 버전 확인, cache key 계산, 캐시 조회와 생성 요청 준비까지다. AI 카드 생성과 `ANCHOR_READY` 전환은 아직 구현하지 않았다.
+
+포지션 카드 cache key의 현재 schema version은 `position-card:v2`이며 마지막 상담 시각만으로는 부족하다. F1의 상담 로그 추가는 매물·구입장의 `row_version`을 올리지 않으므로, 기존 최신 로그보다 **과거 시각의 로그를 추가**하거나 **로그를 무효화**하면 `MAX(interaction_at)`과 데이터 버전이 그대로여서 낡은 카드가 재사용된다. 따라서 key에는 상담 로그 **건수**와 **최대 로그 ID**를 source revision으로 함께 넣어 집합이 바뀌면 반드시 cache miss가 되게 한다.
+
+재사용 판정은 cache key만 믿지 않고 저장된 카드의 `source_interaction_count`와 `last_interaction_at`을 현재 값과 다시 대조한다. 조회 시점과 카드 저장 시점 사이에 로그가 또 바뀔 수 있으므로, 카드 저장과 `ANCHOR_READY` 전환 단계에서 생성 요청에 실린 source identity를 한 번 더 확인해야 한다. 그 재검증은 아직 구현하지 않았다.
+
+**목표 정책은** 5초 안에 `COMPLETED`가 되지 않으면 빈 패널을 유지하지 않고 확보된 마지막 안전 단계를 표시하는 것이다. SSE 후보 연결이 끊기면 작업은 취소되지 않으며 상태 조회로 스냅샷을 복구한 뒤 마지막 이벤트 이후를 다시 구독한다.
+
+SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend가 쓸 수 있는 것은 `GET /api/v1/f3/runs/{run_id}` polling뿐이다.
+
+## 현재 구현 범위
+
+이 절이 위 목표 아키텍처 중 무엇이 저장소에 있고 무엇이 없는지의 정본이다. 상태 표의 `구현됨` 표기와 [API 계약](../../../.agents/skills/project-wiki/references/contracts/api.md)의 F3 절은 이 절과 같은 사실을 설명해야 한다.
+
+### 구현됨
+
+| 항목 | 위치 |
+|---|---|
+| `POST /api/v1/f3/runs`. 요청마다 새 `QUEUED` 실행 생성 | `backend/src/api/f3_runs.py` |
+| 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
+| `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
+| `claim_next_run` 작업 선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
+| 앵커 포지션 카드 cache key 계산과 캐시 조회, 생성 요청 준비 | `backend/src/domain/agent_execution/service.py` |
+| API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
+| Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
+| `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
+
+Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
+
+### 미구현
+
+| 항목 | 현재 상태 |
+|---|---|
+| Worker polling loop | 없음. `WORKER_ENABLED=false` Worker는 stop 이벤트만 기다린다 |
+| Worker의 `claim_next_run` 호출 연결 | 유스케이스는 있으나 Worker가 부르지 않는다 |
+| 실제 F3 handler | 없음. `WORKER_ENABLED=true`는 `ConfigurationError`로 기동을 거부한다 |
+| AI 호출 | 없음. F3 경로는 AI runtime을 부르지 않는다 |
+| 포지션 카드 저장 | 조회와 생성 요청 준비까지만 있다 |
+| `ANCHOR_READY` 이후 상태 전이 완료 경로 | 없음 |
+| 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
+| 뒤따른 화면의 기존 실행 구독 | 없음 |
+| `SUPERSEDED` 전이 | 없음 |
+| SSE 진행 구독과 재연결 | 없음. polling만 제공 |
+| `WORKER_ENABLED=true` 운영 | 허용하지 않는다 |
 
 ## 결정적 후보 검색
 
@@ -205,7 +258,9 @@ pgvector, PostgreSQL 전문검색과 구체 결합 점수·top-K는 후보 구�
 | 최종 교차 판정 | 앵커·후보 집합과 각 카드 버전, 중개 모델·프롬프트·워크플로 버전 일치 | 카드·후보 집합·AI 구성 중 하나라도 변경 |
 | 활성 작업 | 앵커, 입력 버전, AI 구성과 권한 범위 일치 | 입력 버전 또는 권한 변경 |
 
-동일 키의 활성 작업은 하나만 실행하고 뒤따른 화면은 그 작업을 구독한다. 실행 중 F1 데이터가 바뀌면 이전 실행을 강제 성공으로 덮어쓰지 않고 `superseded`로 남긴다. 새 입력 버전 작업이 현재 화면의 결과 소유권을 가진다.
+**목표 정책은** 동일 키의 활성 작업을 하나만 실행하고 뒤따른 화면이 그 작업을 구독하는 것이다. 실행 중 F1 데이터가 바뀌면 이전 실행을 강제 성공으로 덮어쓰지 않고 `SUPERSEDED`로 남기며, 새 입력 버전 작업이 현재 화면의 결과 소유권을 가진다.
+
+활성 작업 재사용, 기존 작업 구독과 `SUPERSEDED` 전이는 아직 구현하지 않았다. 현재는 `POST /api/v1/f3/runs` 요청마다 새 `QUEUED` 실행이 생기고, 앵커가 바뀐 실행은 Worker 단계에서 거부될 뿐 `SUPERSEDED`로 기록되지 않는다.
 
 ## 검증·개인정보와 실행 로그
 
@@ -227,7 +282,7 @@ AI와 Backend 검증을 분리한다.
 | 임베딩 생성·검색 실패 | 의미 검색 축소 진단 표시 | 전문검색으로 폴백하고 실패를 별도 계측 |
 | Worker 재시작 | 처리 중 또는 복구 중 표시 | 영속 단계·lease로 작업 회수, 완료 호출 중복 방지 |
 | 진행 연결 끊김 | 재연결 중 표시 | 상태 조회 후 마지막 이벤트 이후 구독 |
-| 입력 데이터 변경 | 최신 데이터로 다시 판정 중 표시 | 이전 실행 `superseded`, 새 버전 실행 생성 |
+| 입력 데이터 변경 | 최신 데이터로 다시 판정 중 표시 | 이전 실행 `SUPERSEDED`, 새 버전 실행 생성 |
 | 권한 변경·근거 불일치 | 결과 미노출, 접근 또는 재실행 안내 | Backend 최종 검증 실패와 감사 기록 |
 | F3 전체 중단 | F3 패널 실패·재시도 표시 | F1 조회·저장·편집은 계속 동작 |
 

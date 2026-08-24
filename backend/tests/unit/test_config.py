@@ -17,6 +17,8 @@ def test_environment_values_are_bound_to_group_dtos() -> None:
     assert config.db.target is DatabaseTarget.TEST
     assert config.db.pool.size == 5
     assert config.auth.development.enabled is False
+    assert config.auth.session.cookie_name == "brokerage_session"
+    assert config.auth.session.csrf_cookie_name == "brokerage_csrf"
     assert config.http.cors_allowed_origins == ["http://localhost:5173"]
     assert config.log.level == "INFO"
 
@@ -36,6 +38,15 @@ def test_required_value_is_rejected() -> None:
         bind_config(values)
 
 
+def test_application_runtime_does_not_require_migration_url() -> None:
+    values = config_values()
+    values.pop("DB_MIGRATION_URL")
+
+    config = bind_config(values)
+
+    assert config.db.migration_url is None
+
+
 def test_environment_and_database_target_must_match() -> None:
     values = config_values(APP_ENV="prod", DB_TARGET="development")
 
@@ -53,4 +64,14 @@ def test_production_rejects_development_authentication() -> None:
     )
 
     with pytest.raises(ValidationError, match="forbidden in production"):
+        bind_config(values)
+
+
+def test_session_and_csrf_cookie_names_must_differ() -> None:
+    values = config_values(
+        AUTH_SESSION_COOKIE_NAME="same-cookie",
+        AUTH_CSRF_COOKIE_NAME="same-cookie",
+    )
+
+    with pytest.raises(ValidationError, match="must use different names"):
         bind_config(values)

@@ -1,0 +1,76 @@
+name: brokerage-dev
+
+x-application: &application
+  image: "${BACKEND_IMAGE:?BACKEND_IMAGE must be an immutable ECR digest}"
+  env_file:
+    - "${RUNTIME_ENV_FILE:?RUNTIME_ENV_FILE is required}"
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  volumes:
+    - "${RDS_CA_FILE:?RDS_CA_FILE is required}:${RDS_CA_CONTAINER_FILE:?RDS_CA_CONTAINER_FILE is required}:ro"
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: "${AWS_REGION:?AWS_REGION is required}"
+      awslogs-create-group: "false"
+
+services:
+  api:
+    <<: *application
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: "${AWS_REGION}"
+        awslogs-group: "${API_LOG_GROUP:?API_LOG_GROUP is required}"
+        awslogs-stream: "${INSTANCE_ID:?INSTANCE_ID is required}/api"
+        awslogs-create-group: "false"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+  worker:
+    <<: *application
+    command: ["python", "src/worker.py"]
+    restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: "${AWS_REGION}"
+        awslogs-group: "${WORKER_LOG_GROUP:?WORKER_LOG_GROUP is required}"
+        awslogs-stream: "${INSTANCE_ID:?INSTANCE_ID is required}/worker"
+        awslogs-create-group: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/brokerage-worker-ready"]
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 15s
+
+  migrate:
+    <<: *application
+    profiles: ["migration"]
+    env_file:
+      - "${MIGRATION_ENV_FILE:?MIGRATION_ENV_FILE is required}"
+    command: ["python", "src/migration_guard.py"]
+    restart: "no"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: "${AWS_REGION}"
+        awslogs-group: "${WORKER_LOG_GROUP:?WORKER_LOG_GROUP is required}"
+        awslogs-stream: "${INSTANCE_ID:?INSTANCE_ID is required}/migration"
+        awslogs-create-group: "false"

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-12
+updated: 2026-08-24
 ---
 
 # 개인정보 정책
@@ -31,6 +31,51 @@ updated: 2026-08-12
 - 전송 구간 암호화와 저장 암호화를 활성화한다.
 - OpenAI API, RunPod 또는 다른 외부 처리자에게 전송되는 데이터를 별도로 검토한다.
 - 개인정보가 포함된 실패 메시지를 DLQ에 장기간 방치하지 않는다.
+
+## 필드별 확정 처리
+
+아직 확정되지 않은 개인정보는 [OQ-007](../open-questions.md)에 남긴다. 이 표에 있는 항목은 결정됐다.
+
+### `agent_run.requested_by`
+
+F3 실행을 요청한 내부 `app_user.id`다. 성명, 연락처와 로그인 ID는 저장하지 않는다.
+
+| 항목 | 결정 |
+|---|---|
+| 목적 | 실행 요청자 식별과 감사 추적 |
+| 처리 위치 | `ap-northeast-2`의 암호화된 RDS PostgreSQL |
+| 접근 주체 | Backend와 승인된 DB·Infra 운영자 |
+| 외부 전송 | 없음. API 응답, 애플리케이션 로그, AI 입력과 Queue 메시지에 싣지 않는다 |
+| 보존 기간 | 서비스 운영 기간 동안 `agent_run` 감사 이력으로 계속 보존한다. `app_user` 비활성화는 보존 종료 조건이 아니다 |
+| 삭제 | 개별 삭제·익명화하지 않는다. 서비스 또는 환경의 최종 데이터 폐기 승인을 받아 `agent_run`을 제거할 때 함께 제거한다 |
+
+- `app_user`가 비활성화되어도 기존 `agent_run.requested_by`를 삭제하거나 익명화하지 않는다.
+  요청자를 지우면 그 실행이 누구의 요청이었는지 확인할 수 없어 감사 추적이 끊긴다.
+- `requested_by`만 따로 삭제하는 경로는 만들지 않는다.
+- RDS 자동 백업에는 포함될 수 있고 원본 폐기 후 현재 인프라 정책인 최대 7일 동안 잔존할 수 있다.
+- 종료 시 만드는 final snapshot에 포함된 `requested_by`는 서비스 데이터 최종 폐기 승인을 받은
+  Infra 운영자가 그 snapshot을 폐기할 때 함께 제거한다.
+
+API 관점의 계약은 [API 계약](../contracts/api.md)에 있고 보존·삭제의 정본은 이 문서다.
+
+### GitHub PR 협업 Discord 알림
+
+사람이 PR에 남긴 일반 댓글, 리뷰 제출과 인라인 코드 댓글을 팀 Discord 채널에 알린다.
+
+| 항목 | 결정 |
+|---|---|
+| 목적 | 리뷰 요청·응답과 승인·변경 요청을 팀이 빠르게 인지하도록 알림 |
+| 전송 필드 | GitHub 사용자명, PR 번호·제목, 이벤트 유형, 댓글 앞 240자, 인라인 파일·줄 위치, GitHub 원문 링크 |
+| 처리 위치 | GitHub Actions에서 이벤트 payload를 처리하고 Discord Incoming Webhook으로 전송 |
+| 접근 주체 | 저장소 Actions 관리자와 해당 Discord 채널 구성원 |
+| 외부 전송 | Discord. OpenAI에는 댓글 알림 payload를 보내지 않음 |
+| 저장 | 저장소 DB·artifact에 저장하지 않고 Actions 로그에 댓글 원문을 출력하지 않음. Discord 메시지는 채널의 메시지 보존 정책에 따름 |
+| 삭제 | GitHub 댓글 삭제와 Discord 메시지 삭제는 연동하지 않음. 필요한 경우 Discord 채널 관리자가 메시지를 삭제 |
+
+- 봇 댓글과 일반 Issue 댓글은 알림에서 제외한다.
+- 댓글의 secret-like line은 `[REDACTED SECRET-LIKE LINE]`으로 바꾸고, 댓글 미리보기는 240자로 제한한다.
+- Discord payload의 mention parsing을 비활성화해 댓글의 `@everyone`, 사용자·역할 표기가 실제 멘션을 발생시키지 않게 한다.
+- 댓글에 비밀값이나 불필요한 개인정보를 작성하지 않는 것이 우선이며 redaction은 보조 통제다.
 
 ## 변경 검토
 

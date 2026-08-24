@@ -59,6 +59,20 @@ data "aws_iam_policy_document" "app_runtime" {
   }
 
   statement {
+    sid    = "ReadDeploymentArtifacts"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:ListBucket",
+    ]
+    resources = [
+      aws_s3_bucket.workload["pipeline_artifact"].arn,
+      "${aws_s3_bucket.workload["pipeline_artifact"].arn}/*",
+    ]
+  }
+
+  statement {
     sid     = "ListWorkloadBuckets"
     effect  = "Allow"
     actions = ["s3:ListBucket"]
@@ -103,8 +117,24 @@ data "aws_iam_policy_document" "app_runtime" {
     actions = [
       "ssm:GetParameter",
       "ssm:GetParameters",
+      "ssm:GetParametersByPath",
     ]
-    resources = [for parameter in aws_ssm_parameter.application : parameter.arn]
+    resources = concat(
+      [for parameter in aws_ssm_parameter.application : parameter.arn],
+      [
+        "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name_prefix}",
+        "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name_prefix}/*",
+      ],
+    )
+  }
+
+  statement {
+    sid     = "ConnectAsMigrationRole"
+    effect  = "Allow"
+    actions = ["rds-db:connect"]
+    resources = [
+      "arn:aws:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.postgres.resource_id}/app_migrator",
+    ]
   }
 
   statement {
@@ -273,7 +303,7 @@ resource "aws_launch_template" "app" {
     systemctl enable --now amazon-ssm-agent
 
     for attempt in 1 2 3; do
-      if dnf install -y docker amazon-cloudwatch-agent; then
+      if dnf install -y docker amazon-cloudwatch-agent ruby wget; then
         break
       fi
       if [ "$attempt" -eq 3 ]; then
@@ -283,6 +313,21 @@ resource "aws_launch_template" "app" {
     done
 
     systemctl enable --now docker
+
+    install -d -m 0755 /usr/local/lib/docker/cli-plugins
+    curl -fsSL https://github.com/docker/compose/releases/download/v2.35.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+    chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+    docker compose version
+
+    install -d -m 0755 /opt/brokerage/revision
+    install -d -m 0700 /opt/brokerage/config
+
+    cd /tmp
+    wget -q https://aws-codedeploy-${var.aws_region}.s3.${var.aws_region}.amazonaws.com/latest/install -O codedeploy-install
+    chmod 0700 codedeploy-install
+    ./codedeploy-install auto
+    systemctl enable --now codedeploy-agent
+    systemctl is-active --quiet codedeploy-agent
 
     install -d -m 0755 /opt/aws/amazon-cloudwatch-agent/etc
     cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWAGENT'
@@ -366,7 +411,7 @@ resource "aws_autoscaling_group" "app" {
   vpc_zone_identifier = [for subnet in aws_subnet.public : subnet.id]
   target_group_arns   = [aws_lb_target_group.app.arn]
 
-  health_check_type         = "EC2"
+  health_check_type         = var.app_asg_health_check_type
   health_check_grace_period = 300
   capacity_rebalance        = false
   termination_policies      = ["OldestLaunchTemplate"]

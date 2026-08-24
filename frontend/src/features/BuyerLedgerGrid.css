@@ -1,52 +1,67 @@
 .buyer-ledger-grid {
   display: flex;
-  min-height: 560px;
+  flex: 1 1 auto;
+  min-height: 0;
   flex-direction: column;
   width: 100%;
-  background: #fff;
+  height: 100%;
+  background: #ffffff;
 }
 
 .buyer-ledger-grid__toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 8px;
-  border: 1px solid #d2d2d2;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
   border-bottom: 0;
+  background: #f8fafc;
 }
 
 .buyer-ledger-grid__period {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+}
+
+.buyer-ledger-grid__period .pf-v6-c-button {
+  height: 32px;
+  border-radius: 6px;
+  font-size: 12px;
 }
 
 .buyer-ledger-grid__toolbar label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 8px;
-  color: #3c3f42;
+  margin-left: 4px;
+  color: #475569;
   font-size: 12px;
   font-weight: 600;
 }
 
 .buyer-ledger-grid__toolbar select {
   min-height: 32px;
-  padding: 4px 28px 4px 8px;
-  border: 1px solid #b8bbbe;
-  border-radius: 3px;
-  background: #fff;
+  padding: 4px 28px 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .buyer-ledger-grid__count {
   margin-left: auto;
-  color: #3c3f42;
+  color: #64748b;
   font-size: 12px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .buyer-ledger-grid__table {
-  min-height: 520px;
-  height: calc(100vh - 220px);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
+

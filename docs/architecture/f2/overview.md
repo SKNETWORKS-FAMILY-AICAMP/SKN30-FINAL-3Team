@@ -12,7 +12,7 @@ updated: 2026-08-17
 - **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)
 - **이 문서가 소유하지 않는 상세:** 요구사항 필드 목록, API DTO·경로, DB 테이블, Pydantic 모델, 코드 폴더·클래스 구조
 - **탐색:** [아키텍처 인덱스](../index.md) · [온라인 실행](online-runtime.md) · [오프라인 데이터·학습·평가](offline-data-training-evaluation.md)
-
+;\
 ## 목적과 범위
 
 F2는 업로드한 상담 음성에서 장부 입력 후보와 근거를 만들고, 사용자가 현재값과 비교해 선택·수정·승인한 경우에만 F1 장부에 저장하도록 돕는다.

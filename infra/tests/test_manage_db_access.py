@@ -61,6 +61,51 @@ class ManageDbAccessTest(unittest.TestCase):
         with self.assertRaises(MODULE.ToolError):
             MODULE.parse_runtime_secret('{"username":"dbadmin","password":"secret"}')
 
+    def test_runtime_secret_target_must_match_rds(self) -> None:
+        payload = MODULE.runtime_secret_payload(self.target(), "generated-password")
+        MODULE.validate_runtime_secret_target(self.target(), payload)
+
+        payload["host"] = "stale.example.rds.amazonaws.com"
+        with self.assertRaisesRegex(
+            MODULE.ToolError, "database target metadata does not match RDS"
+        ):
+            MODULE.validate_runtime_secret_target(self.target(), payload)
+
+    def test_fixed_role_contract_requires_iam_migrator_membership(self) -> None:
+        class DummyCursor:
+            def __init__(self, memberships: dict[tuple[str, str], bool]) -> None:
+                self.memberships = memberships
+                self.result: list[tuple[object, ...]] = []
+
+            def execute(self, query: object, params: object = None) -> None:
+                if "FROM pg_roles" in str(query):
+                    self.result = [
+                        ("app_owner", False),
+                        ("app_rw", False),
+                        ("app_runtime", True),
+                        ("app_migrator", True),
+                    ]
+                    return
+                member, granted = params
+                self.result = [(self.memberships[(member, granted)],)]
+
+            def fetchall(self) -> list[tuple[object, ...]]:
+                return self.result
+
+            def fetchone(self) -> tuple[object, ...] | None:
+                return self.result[0] if self.result else None
+
+        memberships = {
+            ("app_runtime", "app_rw"): True,
+            ("app_migrator", "rds_iam"): True,
+            ("app_migrator", "app_owner"): True,
+        }
+        MODULE.verify_fixed_role_contract(DummyCursor(memberships))
+
+        memberships[("app_migrator", "rds_iam")] = False
+        with self.assertRaisesRegex(MODULE.ToolError, "rds_iam"):
+            MODULE.verify_fixed_role_contract(DummyCursor(memberships))
+
     def test_caller_username_requires_direct_iam_user(self) -> None:
         self.assertEqual(
             MODULE.caller_username("arn:aws:iam::123456789012:user/team/alice"),
@@ -93,6 +138,57 @@ class ManageDbAccessTest(unittest.TestCase):
         )
         with self.assertRaises(MODULE.ToolError):
             MODULE.settings_from(wrong_region)
+
+
+    def test_ensure_role_formats_password_as_literal(self) -> None:
+        executed: list[tuple[object, ...]] = []
+
+        class DummyCursor:
+            def execute(self, query: object, params: object = None) -> None:
+                executed.append((query, params))
+
+            def fetchone(self) -> tuple[int] | None:
+                return None
+
+        cursor = DummyCursor()
+        MODULE.ensure_role(cursor, "app_runtime", login=True, password="secret'password")
+        ddl_calls = [
+            (q.as_string() if hasattr(q, "as_string") else str(q), p)
+            for q, p in executed
+            if "ALTER ROLE" in (q.as_string() if hasattr(q, "as_string") else str(q))
+        ]
+        self.assertTrue(any("PASSWORD 'secret''password'" in q for q, _ in ddl_calls))
+        self.assertTrue(all(p is None for _, p in ddl_calls))
+
+    def test_client_info_prints_token_once_without_embedding_it_in_command(self) -> None:
+        settings = MODULE.Settings(
+            account_id="123456789012",
+            profile="skn30-session",
+            region="ap-northeast-2",
+            project="skn30-final-3team",
+            local_port=15432,
+            operator_role="TerraformOperatorRole",
+        )
+        token = "signed/token?with=special&characters"
+
+        output = MODULE.render_client_info(
+            settings,
+            self.target(),
+            "i-0123456789abcdef0",
+            "team-user",
+            token,
+            Path("/tmp/rds ca.pem"),
+        )
+
+        self.assertEqual(output.count(token), 1)
+        self.assertNotIn("PGPASSWORD", output)
+        self.assertNotIn("--set=sslmode", output)
+        self.assertIn("PGHOST=project.cluster.example.rds.amazonaws.com", output)
+        self.assertIn("PGHOSTADDR=127.0.0.1", output)
+        self.assertIn("PGSSLMODE=verify-full", output)
+        self.assertIn("PGSSLROOTCERT='/tmp/rds ca.pem'", output)
+        self.assertIn("psql -W", output)
+        self.assertIn("SSL Mode : verify-ca", output)
 
 
 if __name__ == "__main__":

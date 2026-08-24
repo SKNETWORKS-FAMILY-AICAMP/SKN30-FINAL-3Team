@@ -1,24 +1,31 @@
 .detail-workspace-modal {
   --dw-border: var(--pf-t--global--border--color--default, #d2d2d2);
   --dw-border-subtle: var(--pf-t--global--border--color--subtle, #e7e7e7);
-  --dw-surface-subtle: var(--pf-t--global--background--color--secondary--default, #f7f7f7);
-  --dw-text-subtle: var(--pf-t--global--text--color--subtle, #4f5255);
-  --dw-accent: var(--pf-t--global--color--brand--default, #0066cc);
-  --dw-success: var(--pf-t--global--color--status--success--default, #3e8635);
-  --dw-warning: var(--pf-t--global--color--status--warning--default, #f0ab00);
+  --dw-surface-subtle: var(--pf-t--global--background--color--secondary--default, #f8fafc);
+  --dw-text-subtle: var(--pf-t--global--text--color--subtle, #64748b);
+  --dw-accent: var(--pf-t--global--color--brand--default, #0284c7);
+  --dw-success: var(--pf-t--global--color--status--success--default, #16a34a);
+  --dw-warning: var(--pf-t--global--color--status--warning--default, #d97706);
+  /* pointer target 최소치(WCAG 2.2 target size minimum). 밀도를 높여도 이 아래로 내리지 않는다. */
+  --dw-control-min-size: 24px;
 }
 
 .detail-workspace-modal.pf-v6-c-modal-box {
+  z-index: 501 !important;
   width: min(1456px, calc(100vw - 40px));
   max-width: min(1456px, calc(100vw - 40px));
   height: min(900px, calc(100vh - 40px));
   max-height: min(900px, calc(100vh - 40px));
   overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+  background: #ffffff;
 }
 
 .detail-workspace-modal .pf-v6-c-modal-box__header,
 .detail-workspace-modal > .pf-v6-c-modal-box__header {
-  padding: 20px 24px;
+  padding: 6px 10px;
+  background: #ffffff;
   border-bottom: 1px solid var(--dw-border);
 }
 
@@ -57,10 +64,9 @@
 
 .detail-workspace__state-item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 92px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .detail-workspace__state-item > span:first-child {
@@ -79,7 +85,7 @@
 
 .detail-workspace__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 200px;
+  grid-template-columns: minmax(0, 1fr) 196px;
   min-height: 0;
   height: 100%;
 }
@@ -87,31 +93,50 @@
 .detail-workspace__content {
   min-width: 0;
   height: 100%;
-  padding: 24px;
+  padding: 6px;
   overflow-y: auto;
   background: var(--pf-t--global--background--color--primary--default, #fff);
 }
 
 .detail-workspace__save-error {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .detail-section {
-  padding: 20px;
+  padding: 5px 6px;
   border: 1px solid var(--dw-border);
   background: var(--pf-t--global--background--color--primary--default, #fff);
 }
 
 .detail-section + .detail-section {
-  margin-top: 16px;
+  margin-top: 4px;
 }
 
 .detail-section__heading {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+/* 제목과 설명이 두 줄로 갈라지면 그만큼 목록이 밀린다. 한 줄에 붙여 둔다. */
+.detail-section__heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.detail-section__heading > div > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-workspace__content .detail-section__heading .pf-v6-c-title {
+  font-size: 15px;
+  line-height: 1.2;
 }
 
 .detail-section__heading > span,
@@ -138,32 +163,259 @@
 .detail-people-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 6px;
+  /* 각 그룹이 제 내용만큼만 차지하게 한다. 늘어나면 짧은 그룹 아래가 빈칸으로 남는다. */
+  align-items: start;
 }
 
 .detail-info-column,
 .detail-person-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 3px;
   min-width: 0;
-  padding: 16px;
+  padding: 5px;
   border: 1px solid var(--dw-border-subtle);
   background: var(--dw-surface-subtle);
 }
 
 .detail-info-column h3,
 .detail-person-card h3 {
-  margin: 0 0 2px;
+  margin: 0;
   color: var(--pf-t--global--text--color--regular, #151515);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.25;
+}
+
+/*
+ * 매물 조건과 시설의 배치.
+ *
+ * 시설 칸이 다섯이라 세로로 세우면 옆의 두 열 아래가 통째로 빈다.
+ * 오른쪽 열을 상담 로그와 비고가 3:2로 나눠 쓰고,
+ * 시설과 인물은 남는 두 칸을 가로로 눕혀 빈 곳을 없앤다.
+ */
+.detail-info-column--log {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  flex-direction: row;
+  gap: 6px;
+  align-self: stretch;
+}
+
+.detail-log-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.detail-log-pane--log {
+  flex: 3 1 0;
+}
+
+.detail-log-pane--memo {
+  flex: 2 1 0;
+}
+
+.detail-log-pane h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.detail-log-pane h3 > span {
+  overflow: hidden;
+  color: var(--dw-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-log-pane .pf-v6-c-form-control,
+.detail-log-pane textarea {
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+.detail-workspace-modal #detail-memo {
+  min-height: 56px;
 }
 
 .detail-inline-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 5px;
+}
+
+/*
+ * 그룹 안의 칸 배치.
+ *
+ * 줄바꿈 흐름에 맡기면 칸 개수와 이름 길이에 따라 줄 끝이 들쭉날쭉해지고,
+ * 옆 그룹과 라벨 줄도 서로 어긋난다. 그룹마다 3열 격자를 고정해
+ * 단지·동·호 / 평형·향·타입처럼 한 줄에 세 칸씩 딱 떨어지게 둔다.
+ * 한 칸을 넓게 써야 하는 곳만 data-span으로 열을 늘린다.
+ * 안쪽 2열 묶음은 display: contents로 풀어 같은 격자에 태운다.
+ *
+ * 열 구성은 --dw-group-tracks로 받는다. :not()이 낀 이 선택자가 그룹별 규칙보다
+ * 우선순위가 높아, 속성을 직접 덮어쓰면 그룹 쪽 지정이 조용히 무시된다.
+ */
+.detail-info-column:not(.detail-info-column--log) {
+  display: grid;
+  grid-template-columns: var(--dw-group-tracks, repeat(3, minmax(0, 1fr)));
+  gap: 4px 5px;
+  align-content: start;
+}
+
+.detail-info-column > h3 {
+  grid-column: 1 / -1;
+}
+
+.detail-info-column .detail-inline-fields {
+  display: contents;
+}
+
+.detail-info-column .detail-field[data-span="2"] {
+  grid-column: span 2;
+}
+
+.detail-info-column .detail-field[data-span="3"] {
+  grid-column: 1 / -1;
+}
+
+/* 새 단지 추가 패널이 열리면 한 칸 폭으로는 좁아 그 줄을 통째로 쓴다. */
+.detail-info-column .detail-complex-field:has(.detail-complex-quick-add) {
+  grid-column: 1 / -1;
+}
+
+/*
+ * 날짜와 전화는 표시 문자열이 길어 3열 폭에서 가장 먼저 잘린다.
+ * 배치를 흐트러뜨리는 대신 이 두 종류만 글자와 좌우 여백을 한 단계 줄인다.
+ */
+.detail-info-column .detail-field:has(input[type="date"]) .pf-v6-c-form-control,
+.detail-info-column .detail-field:has(input[type="tel"]) .pf-v6-c-form-control,
+.detail-info-column .detail-field:has(input[type="date"]) input,
+.detail-info-column .detail-field:has(input[type="tel"]) input {
+  --pf-v6-c-form-control--FontSize: 13px;
+  --pf-v6-c-form-control--PaddingInlineStart: 4px;
+  --pf-v6-c-form-control--PaddingInlineEnd: 4px;
+  padding-inline: 4px;
+  font-size: 13px;
+}
+
+/* 여러 줄로 적는 칸은 라벨 아래 남는 높이를 입력이 다 쓴다. */
+.detail-field--area {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-field--area .pf-v6-c-form-control,
+.detail-field--area textarea {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 44px;
+}
+
+/*
+ * 시설·연락 보조.
+ *
+ * 두 열 폭을 쓰는 그룹이라 3열로 두면 칸 하나가 필요 이상으로 넓어진다.
+ * 여러 줄로 적는 스펙과 인물 카드를 양 끝에 세로로 세우고,
+ * 가운데 세 칸에 나머지 입력을 두 줄로 채워 빈 곳을 없앤다.
+ */
+.detail-info-column--facility {
+  --dw-group-tracks: minmax(0, 1.1fr) repeat(3, minmax(0, 1fr)) minmax(150px, 1.2fr);
+
+  grid-column: 1 / span 2;
+  grid-row: 2;
+}
+
+.detail-info-column--facility .detail-field--spec {
+  grid-column: 1;
+  grid-row: 2 / span 2;
+}
+
+.detail-info-column--facility .detail-people-card {
+  grid-column: 5;
+  grid-row: 2 / span 2;
+}
+
+/* 두 줄 높이가 카드 높이를 정하므로, 목록은 고정 높이 대신 남는 만큼만 쓰고 그 안에서 스크롤한다. */
+.detail-info-column--facility .detail-people-card .detail-people-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+/*
+ * 연락 동의 인물.
+ *
+ * 시설 줄 마지막 칸에 들어가 폭이 좁다. 이름·동의·연락처를 두 줄로 접고,
+ * 인물이 여럿이면 카드 안에서만 스크롤해 바깥 배치가 밀리지 않게 한다.
+ */
+.detail-people-card {
+  display: flex;
+  flex: 1 1 190px;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 170px;
+}
+
+.detail-people-card h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.detail-people-card h4 > span {
+  overflow: hidden;
+  color: var(--dw-text-subtle);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-people-card .detail-people-list {
+  max-height: 92px;
+  overflow-y: auto;
+}
+
+.detail-people-card .detail-person-row {
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 0 4px;
+  padding: 3px 5px;
+}
+
+.detail-people-card .detail-person-row > span:not(.detail-consent-badge) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.detail-people-card .detail-consent-badge {
+  grid-column: 2;
+  grid-row: 1;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+}
+
+.detail-people-card .detail-person-row > .pf-v6-c-button {
+  grid-column: 2;
+  grid-row: 2;
+  padding: 0;
+  font-size: 11px;
+}
+
+.detail-people-card .detail-empty-state {
+  padding: 6px;
+  font-size: 12px;
 }
 
 .detail-field {
@@ -172,10 +424,11 @@
 
 .detail-field__label {
   display: inline-block;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   color: var(--pf-t--global--text--color--regular, #151515);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .detail-complex-field > .pf-v6-c-button {
@@ -217,8 +470,9 @@
   outline-offset: 4px;
 }
 
+/* 저장 완료 조건 목록 바로 아래, 오른쪽 작업 레일에 붙는다. */
 .detail-duplicate-check {
-  padding: 12px;
+  padding: 4px 8px;
   border-left: 3px solid var(--dw-warning);
   background: var(--pf-t--global--color--status--warning--default--light, #fff4cc);
 }
@@ -230,7 +484,7 @@
 
 .detail-duplicate-check > span {
   display: block;
-  margin: 6px 0 0 24px;
+  margin: 2px 0 0 24px;
   color: var(--dw-text-subtle);
   font-size: 12px;
 }
@@ -579,8 +833,8 @@
 .detail-log-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
-  margin-top: 10px;
+  gap: 16px;
+  margin-top: 4px;
   color: var(--dw-text-subtle);
   font-size: 12px;
 }
@@ -588,10 +842,10 @@
 .detail-workspace__action-rail {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
   min-width: 0;
   height: 100%;
-  padding: 20px 16px;
+  padding: 10px;
   overflow-y: auto;
   border-left: 1px solid var(--dw-border);
   background: var(--dw-surface-subtle);
@@ -600,7 +854,7 @@
 .action-rail__primary {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .action-rail__primary .pf-v6-c-button {
@@ -611,7 +865,7 @@
 .action-rail__status {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .action-rail__status-heading {
@@ -624,7 +878,7 @@
 .action-rail__status ul {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -659,7 +913,7 @@
 
 .action-rail__dirty {
   margin-top: 0;
-  padding: 10px;
+  padding: 5px 8px;
   border: 1px solid var(--dw-border-subtle);
   background: #fff;
   color: var(--dw-text-subtle);
@@ -741,6 +995,24 @@
   margin: -8px 0 18px;
 }
 
+.detail-workspace__delete-modal-body > p:first-child {
+  margin: 0 0 22px;
+  color: var(--dw-text-subtle);
+  line-height: 1.55;
+}
+
+/* 저장하지 않은 변경이 함께 사라진다는 경고는 본문 설명보다 눈에 띄어야 한다. */
+.detail-workspace__decision-card p.decision-card__unsaved,
+.detail-workspace__delete-modal-body p.decision-card__unsaved {
+  margin: -8px 0 18px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--pf-t--global--color--status--danger--default--dark, #8a1519);
+  background: var(--pf-t--global--color--status--danger--default--light, #fce6e6);
+  color: var(--pf-t--global--color--status--danger--default--dark, #8a1519);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .decision-card__actions {
   display: flex;
   flex-wrap: wrap;
@@ -797,6 +1069,29 @@
   .detail-info-grid,
   .detail-people-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* 한 줄로 접히면 배치 지정을 풀어 원래 순서대로 쌓는다. */
+  .detail-info-column--log,
+  .detail-info-column--facility {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  /* 시설도 다른 그룹과 같은 3열로 돌아가고, 세로로 세웠던 두 칸은 제 줄을 쓴다. */
+  .detail-info-column--facility {
+    --dw-group-tracks: repeat(3, minmax(0, 1fr));
+  }
+
+  .detail-info-column--facility .detail-field--spec,
+  .detail-info-column--facility .detail-people-card {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  /* 두 줄 높이가 더는 카드를 잡아 주지 않으므로, 인물이 많아도 뒤 내용을 밀지 않게 다시 막는다. */
+  .detail-info-column--facility .detail-people-card .detail-people-list {
+    max-height: 92px;
   }
 
   .f2-empty,
@@ -896,8 +1191,13 @@
     padding: 14px;
   }
 
-  .detail-inline-fields {
-    grid-template-columns: 1fr;
+  /* 좁은 화면에서는 세 칸이 다 들어가지 않아 두 칸씩 접는다. */
+  .detail-info-column {
+    --dw-group-tracks: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-info-column .detail-field[data-span="2"] {
+    grid-column: 1 / -1;
   }
 
   .detail-workspace__title-group {
@@ -1084,14 +1384,14 @@
 .f2-review__summary > div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--dw-border-subtle); background: var(--dw-surface-subtle); }
 .f2-review__summary span { color: var(--dw-text-subtle); font-size: 12px; }
 .f2-review__summary strong { font-variant-numeric: tabular-nums; }
-.detail-people-list { display: grid; gap: 8px; }
-.detail-person-row { display: grid; grid-template-columns: minmax(180px, 1fr) 44px minmax(140px, 0.8fr) auto; align-items: center; gap: 12px; min-width: 0; padding: 12px 14px; border: 1px solid var(--dw-border-subtle); background: var(--dw-surface-subtle); }
-.detail-person-row > div { display: grid; gap: 3px; min-width: 0; }
+.detail-people-list { display: grid; gap: 4px; }
+.detail-person-row { display: grid; grid-template-columns: minmax(180px, 1fr) 32px minmax(140px, 0.8fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; border: 1px solid var(--dw-border-subtle); background: var(--dw-surface-subtle); }
+.detail-person-row > div { display: grid; gap: 0; min-width: 0; }
 .detail-person-row > div span, .detail-person-row > span:not(.detail-consent-badge) { overflow: hidden; color: var(--dw-text-subtle); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.detail-consent-badge { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid currentColor; border-radius: 50%; font-weight: 700; }
+.detail-consent-badge { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid currentColor; border-radius: 50%; font-weight: 700; }
 .detail-consent-badge--yes { color: var(--dw-success); }
 .detail-consent-badge--no { color: var(--pf-t--global--color--status--danger--default, #c9190b); }
-.detail-empty-state { margin: 0; padding: 16px; color: var(--dw-text-subtle); text-align: center; }
+.detail-empty-state { margin: 0; padding: 8px; color: var(--dw-text-subtle); text-align: center; }
 .relation-edit-modal.pf-v6-c-modal-box { width: min(640px, calc(100vw - 32px)); max-width: min(640px, calc(100vw - 32px)); }
 .relation-edit-modal__content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .relation-edit-modal__field { display: grid; gap: 6px; }
@@ -1102,6 +1402,65 @@
   .detail-person-row > .pf-v6-c-button { grid-column: 2; grid-row: 1 / span 2; }
   .relation-edit-modal__content, .f2-review__summary { grid-template-columns: 1fr; }
   .f2-review__action-bar { align-items: flex-start; flex-direction: column; }
+}
+
+/*
+ * 상세 밀도.
+ *
+ * 세대 상세는 칸이 많아 기본 여백대로 두면 스크롤 없이는 절반도 못 본다.
+ * 글자 크기는 읽기 쉬운 선에서 유지하고 여백만 걷어내 한 화면에 최대한 담는다.
+ *
+ * 여백은 PatternFly의 compact 컨트롤 전용 spacer를 쓴다. 임의 값으로 좁히면
+ * wrapper만 줄어들고 정작 클릭 대상인 input이 24px 밑으로 내려간다.
+ * pointer target 최소 24x24는 밀도보다 우선하므로 min-height로 바닥을 고정한다.
+ */
+.detail-workspace-modal .pf-v6-c-form-control {
+  --pf-v6-c-form-control--PaddingBlockStart: var(--pf-t--global--spacer--control--vertical--compact);
+  --pf-v6-c-form-control--PaddingBlockEnd: var(--pf-t--global--spacer--control--vertical--compact);
+  --pf-v6-c-form-control--PaddingInlineStart: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-form-control--PaddingInlineEnd: var(--pf-t--global--spacer--sm);
+  min-height: var(--dw-control-min-size);
+}
+
+.detail-workspace-modal .pf-v6-c-form-control > input,
+.detail-workspace-modal .pf-v6-c-form-control > select,
+.detail-workspace-modal .pf-v6-c-form-control > textarea {
+  padding-block: var(--pf-t--global--spacer--control--vertical--compact);
+  padding-inline: var(--pf-t--global--spacer--sm);
+  min-height: var(--dw-control-min-size);
+  line-height: 1.35;
+}
+
+.detail-workspace-modal .pf-v6-c-form-control.pf-m-textarea {
+  min-height: 0;
+}
+
+/* 상담 로그는 열 높이를 그대로 쓰고, 모자라면 아래로 늘려 쓴다. */
+.detail-workspace-modal #detail-log {
+  min-height: 56px;
+}
+
+.detail-workspace-modal .complex-picker__toggle {
+  padding: var(--pf-t--global--spacer--control--vertical--compact) var(--pf-t--global--spacer--sm);
+  min-height: var(--dw-control-min-size);
+}
+
+.detail-workspace-modal .pf-v6-c-check {
+  --pf-v6-c-check--GridGap: 6px;
+}
+
+.detail-workspace-modal .pf-v6-c-check__label {
+  font-size: 13px;
+}
+
+.action-rail__primary .pf-v6-c-button,
+.detail-workspace__content .detail-person-row .pf-v6-c-button {
+  --pf-v6-c-button--PaddingBlockStart: 4px;
+  --pf-v6-c-button--PaddingBlockEnd: 4px;
+}
+
+.detail-workspace__content .detail-person-row .pf-v6-c-button {
+  font-size: 13px;
 }
 
 .buyer-detail-workspace {

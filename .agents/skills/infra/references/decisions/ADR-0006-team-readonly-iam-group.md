@@ -1,11 +1,12 @@
 ---
-status: 결정
-updated: 2026-08-19
+status: 부분 대체됨
+updated: 2026-08-20
 ---
 
 # ADR-0006: 팀 읽기 전용 IAM 그룹
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
+- 접근 모델 대체: [ADR-0012](ADR-0012-existing-iam-operators.md)
 - 결정일: 2026-08-19
 
 ## 맥락
@@ -17,8 +18,8 @@ updated: 2026-08-19
 - `infra/bootstrap`이 `team-readonly` IAM 그룹과 AWS 관리형 `ReadOnlyAccess` 정책 연결을 소유한다.
 - IAM 사용자 생성·삭제, 그룹 멤버 추가·제거, console password와 MFA 장치는 Terraform에서 관리하지 않는다.
 - 그룹에는 쓰기 정책과 장기 access key 사용 권한을 추가하지 않는다.
-- 이 구성은 Identity Center organization instance로 전환하기 전의 임시 계정 접근 모델이다.
+- 이 구성을 Identity Center 전환 전 임시 모델로 보던 원래 결정은 ADR-0012로 폐기됐다. 기존 IAM 접근은 개발 환경 종료일까지 유지한다.
 
 ## 결과
 
-공통 읽기 권한과 변경 이력은 Terraform plan과 state로 검토할 수 있다. 사용자 수명주기와 MFA 등록은 수동 운영으로 남으며, AWS가 `ReadOnlyAccess` 관리형 정책을 갱신하면 그룹 권한에도 자동 반영된다. Identity Center 전환과 기존 IAM 권한 폐기 순서는 `INFRA-OQ-001`에서 계속 관리한다.
+공통 읽기 권한과 변경 이력은 Terraform plan과 state로 검토할 수 있다. 사용자 수명주기와 MFA 등록은 수동 운영으로 남으며, AWS가 `ReadOnlyAccess` 관리형 정책을 갱신하면 그룹 권한에도 자동 반영된다. 폐기된 `INFRA-OQ-001` 대신 ADR-0012의 기존 IAM 유지·종료 회수 절차를 따른다.

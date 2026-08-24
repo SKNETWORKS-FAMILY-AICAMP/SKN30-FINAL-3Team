@@ -1,0 +1,13 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+  pre_build:
+    commands:
+      - test "${#CODEBUILD_RESOLVED_SOURCE_VERSION}" -eq 40
+  build:
+    commands:
+      - infra/delivery/scripts/verify_frontend.sh

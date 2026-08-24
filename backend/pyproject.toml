@@ -35,6 +35,8 @@ extend-ignore = ["B008"]
 
 [tool.pyright]
 pythonVersion = "3.13"
+venvPath = "."
+venv = ".venv"
 include = ["src", "tests"]
 extraPaths = ["src"]
 typeCheckingMode = "standard"

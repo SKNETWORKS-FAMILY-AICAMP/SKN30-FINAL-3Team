@@ -14,7 +14,7 @@ def migration_files() -> list[Path]:
 def test_migration_names_and_sequence() -> None:
     files = migration_files()
 
-    assert [int(path.name[:3]) for path in files] == list(range(1, 11))
+    assert [int(path.name[:3]) for path in files] == list(range(1, 12))
     assert all(NAME_PATTERN.fullmatch(path.name) for path in files)
 
 
@@ -66,9 +66,7 @@ def test_all_tables_and_columns_have_comments() -> None:
             expected_columns.add((table, column))
 
     commented_tables = set(re.findall(r"(?m)^COMMENT ON TABLE\s+(\w+)\s+IS", text))
-    commented_columns = set(
-        re.findall(r"(?m)^COMMENT ON COLUMN\s+(\w+)\.(\w+)\s+IS", text)
-    )
+    commented_columns = set(re.findall(r"(?m)^COMMENT ON COLUMN\s+(\w+)\.(\w+)\s+IS", text))
 
     assert commented_tables == expected_tables
     assert commented_columns == expected_columns
@@ -77,4 +75,4 @@ def test_all_tables_and_columns_have_comments() -> None:
 def test_yoyo_can_parse_all_sql_migrations() -> None:
     migrations = read_migrations(str(MIGRATION_DIRECTORY))
 
-    assert len(migrations) == 10
+    assert len(migrations) == 11

@@ -5,7 +5,8 @@ updated: 2026-08-18
 
 # ADR-0008: 개발·시연 런타임과 수동 전달 경로
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
+- 전달 결정 대체: [ADR-0011](ADR-0011-dev-cicd-pipeline-modes.md)
 - 결정일: 2026-08-18
 - 보완 결정: [ADR-0009](ADR-0009-dev-demo-operating-constraints.md)
 

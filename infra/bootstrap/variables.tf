@@ -76,7 +76,7 @@ variable "monthly_budget_amount" {
 }
 
 variable "expires_at" {
-  description = "임시 IAM 운영 권한 종료 예정일(YYYY-MM-DD)"
+  description = "기존 IAM 운영 권한과 개발 환경 종료 예정일(YYYY-MM-DD)"
   type        = string
 
   validation {

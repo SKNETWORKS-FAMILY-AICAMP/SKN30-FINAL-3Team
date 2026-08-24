@@ -1,12 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-19
+updated: 2026-08-20
 ---
 
 # ADR-0008: 개발 DB 계정과 IAM 인증 관리
 
 - 상태: 승인됨
 - 결정일: 2026-08-19
+- 수정일: 2026-08-20
 
 ## 맥락
 
@@ -44,8 +45,12 @@ Backend는 현재 일반 실행에도 `DB_MIGRATION_URL`을 요구하므로 migr
 - `sync-team --apply`는 그룹 멤버를 DB 역할과 동기화한다. 제거된 사용자는 권한을 회수하고 `NOLOGIN`으로 바꾸며 활성 세션을 종료하되 role은 감사 목적으로 보존한다.
 - `rotate-runtime --apply --maintenance-window-confirmed`는 pending Secret과 DB 비밀번호를 검증한 뒤 current version을 전환한다.
 - `migrate --apply`는 개인 IAM 사용자로 SSM 터널과 IAM 토큰을 만들고 Yoyo를 실행한다.
-- `verify`는 runtime credential과 필수 역할을 읽기 전용으로 검증한다.
-- 도구는 비밀번호, IAM 토큰과 전체 접속 URL을 출력하거나 저장소에 기록하지 않는다.
+- `verify`는 runtime Secret의 endpoint metadata가 실제 RDS와 일치하는지, 고정 역할의
+  `LOGIN` 속성과 `app_runtime → app_rw`, `app_migrator → rds_iam/app_owner` 멤버십을
+  읽기 전용으로 검증한다.
+- 도구는 장기 비밀번호, AWS 자격 증명과 전체 접속 URL을 출력하거나 저장소에 기록하지 않는다.
+- `client-info`는 사용자가 psql Password 프롬프트나 GUI 클라이언트에 직접 입력할 수 있도록 15분 IAM DB 토큰만 명시적으로 한 번 출력한다. 토큰을 셸 명령에 삽입하지 않으며 터미널 로그·화면 공유 노출 방지와 사용 후 클립보드 삭제를 안내한다.
+- psql은 RDS hostname과 로컬 SSM tunnel 주소를 분리하고 CA bundle 기반 `verify-full`을 사용한다. localhost만 받는 GUI 클라이언트는 CA chain을 검증하는 `verify-ca`를 사용한다.
 
 ### 관측과 실행 책임
 

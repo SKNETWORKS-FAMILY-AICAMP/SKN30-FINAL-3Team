@@ -27,6 +27,7 @@ Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. �
 - [just](https://github.com/casey/just)
 - uv
 - [aws cli](https://docs.aws.amazon.com/ko_kr/cli/latest/userguide/getting-started-install.html)
+  - [session manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-debian-and-ubuntu.html): cli 설치 후 세션 매니저 플러그인 설치
 - python 3.13
 - [terraform](https://developer.hashicorp.com/terraform/install)
 
@@ -121,7 +122,7 @@ RDS 정지는 임시 개발 비용 절감 기능이다. 데이터, endpoint와 �
 
 ## DB 계정 초기화와 migration
 
-이 절차는 dev Terraform apply와 `team-db-tunnel` 멤버 추가가 끝난 뒤 운영자가 실행한다. Python 3.13, `uv`, AWS CLI와 Session Manager plugin이 필요하며 실제 비밀번호와 IAM 토큰은 출력하지 않는다.
+이 절차는 dev Terraform apply와 `team-db-tunnel` 멤버 추가가 끝난 뒤 운영자가 실행한다. Python 3.13, `uv`, AWS CLI와 Session Manager plugin이 필요하다. 장기 비밀번호와 전체 접속 URL은 출력하지 않으며, `just db-info`만 로컬 DB 클라이언트 입력을 위해 15분 IAM DB 토큰을 명시적으로 표시한다.
 
 로컬 PC에서 private RDS에 접근할 팀원은 `team-db-tunnel` 그룹에 수동으로 추가한다. 이 그룹은 태그가 일치하는 dev app EC2를 경유하는 SSM remote-host 포트 포워딩만 제공하며 interactive shell이나 Run Command를 허용하지 않는다.
 
@@ -143,11 +144,20 @@ just db-sync
 just db-migrate
 ```
 
-적용 후 운영자는 runtime credential과 필수 DB 역할을 검증한다.
+적용 후 운영자는 runtime credential·RDS endpoint metadata와 고정 DB 역할의 로그인 속성 및
+필수 role membership을 검증한다.
 
 ```bash
 just db-verify
 ```
+
+로컬 DB 클라이언트(DBeaver, DataGrip, psql 등)에서 접속할 때 필요한 호스트, 포트, IAM 사용자명, 임시 IAM DB 인증 토큰 및 SSM 터널 실행 명령어를 한 번에 확인하려면 다음 명령을 사용한다.
+
+```bash
+just db-info
+```
+
+토큰은 Password 프롬프트나 GUI 비밀번호 필드에만 붙여 넣고 터미널 로그·화면 공유에 노출하지 않으며 사용 후 클립보드를 비운다. 출력되는 psql 명령은 토큰을 셸 히스토리에 넣지 않고 RDS hostname과 로컬 tunnel 주소를 분리해 `verify-full`을 적용한다. localhost로 접속하는 GUI 클라이언트는 제공된 CA bundle과 `verify-ca`를 사용한다.
 
 master secret은 RDS가 관리한다. runtime Secret 값만 도구가 구조화된 JSON으로 주입하며 migration Secret 컨테이너는 Backend 호환을 위해 비어 있는 deprecated 자원으로 유지한다. runtime 비밀번호 수동 회전은 API·Worker를 중지한 maintenance window에서만 `just db-rotate`로 수행한다.
 
@@ -163,7 +173,7 @@ state bucket은 개인 IAM 사용자의 직접 접근을 거부한다. 직접 `a
 1. root 계정에 MFA, 결제·보안 연락처를 설정하고 root access key가 없음을 확인한다.
 2. 공유 계정 대신 팀원별 IAM 사용자를 만들고 console password와 OTP MFA를 등록한다.
 3. 최초 Infra 담당자에게만 bootstrap용 관리자 권한과 AWS 관리형 `SignInLocalDevelopmentAccess`를 임시 부여한다.
-4. 운영 자원 배포 전 Identity Center 전환 여부를 재검토한다.
+4. 프로젝트 종료까지 기존 개인 IAM+MFA와 `TerraformOperatorRole`을 유지하고 Identity Center로 전환하지 않는다.
 
 MFA 장치를 Terraform으로 생성하면 seed가 state에 남을 수 있으므로 수동으로 등록한다. Terraform은 account password policy와 `aws login`에서 발급된 Sign-In session만 허용하는 역할 trust policy를 관리한다.
 
@@ -202,7 +212,7 @@ cp infra/environments/dev/example.tfvars infra/environments/dev/dev.tfvars
 - `create_budget`: 현재 계정에서는 반드시 `false`
 - `budget_notification_email`: 기존 bootstrap 입력 호환용이며 `create_budget=false`에서는 사용하지 않음
 - `monthly_budget_amount`: 기존 bootstrap 입력 호환용이며 운영 비용 한도로 해석하지 않음
-- `expires_at`: 임시 IAM 방식과 개발 환경의 종료 예정일
+- `expires_at`: 기존 IAM 권한과 개발 환경의 종료 예정일
 
 ## 3. local state로 bootstrap
 

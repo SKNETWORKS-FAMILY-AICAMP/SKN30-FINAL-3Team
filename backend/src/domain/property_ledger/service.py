@@ -14,6 +14,7 @@ from core.errors import (
 from domain.property_ledger import repository
 from domain.property_ledger.models import (
     ClientInteraction,
+    PropertyComplex,
     PropertyListing,
     PropertyRequirement,
     PropertyUnit,
@@ -34,9 +35,68 @@ def require_property_requirement(session: Session, brokerage_id: int, requiremen
     return found
 
 
+def create_property_complex(session: Session, brokerage_id: int, payload: dict[str, Any]) -> int:
+    """단지를 만든다. 세대를 등록하려면 단지가 먼저 있어야 한다."""
+    name = str(payload.get("name", "")).strip()
+    if not name:
+        raise ValidationError("name must not be empty")
+    if repository.find_property_complex_by_name(session, brokerage_id, name) is not None:
+        raise ValidationError("complex name already exists in this brokerage")
+
+    complex_row = PropertyComplex(brokerage_id=brokerage_id, **{**payload, "name": name})
+    session.add(complex_row)
+    session.flush()
+    session.commit()
+    return complex_row.id or 0
+
+
+def delete_property_complex(
+    session: Session, brokerage_id: int, complex_id: int, expected_row_version: int
+) -> None:
+    """단지를 소프트 삭제한다.
+
+    세대가 남아 있으면 거절한다. 세대는 단지를 필수로 참조하므로 단지를 먼저 감추면
+    그 세대들이 이름 없는 상태가 된다. 지우려면 세대를 먼저 정리해야 한다.
+
+    세대 수를 세기 전에 단지 행을 배타로 잠근다. 세대 등록은 같은 행의 공유 잠금을 거치므로,
+    "세대가 없음"을 확인한 시점과 커밋 사이에 새 세대가 끼어들 수 없다.
+    """
+    if repository.lock_property_complex(session, brokerage_id, complex_id, exclusive=True) is None:
+        raise NotFoundError("property complex is not found")
+
+    remaining = repository.count_units_in_complex(session, brokerage_id, complex_id)
+    if remaining > 0:
+        # 거절하고 나가는 길이므로 잠금을 바로 놓는다. 안 그러면 세대 등록이 세션이
+        # 닫힐 때까지 기다린다.
+        session.rollback()
+        # 화면이 사유를 그대로 안내할 수 있도록 코드를 준다.
+        raise ValidationError(
+            f"this complex still has {remaining} unit(s)", code="COMPLEX_HAS_UNITS"
+        )
+
+    updated = repository.bump_row_version(
+        session,
+        PropertyComplex,
+        brokerage_id,
+        complex_id,
+        expected_row_version,
+        {"is_deleted": True, "deleted_at": datetime.now(UTC)},
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+    session.commit()
+
+
 def create_property_unit(session: Session, brokerage_id: int, payload: dict[str, Any]) -> int:
+    """세대를 만든다.
+
+    단지 행을 공유 잠금으로 확인한다. 단지 삭제는 같은 행의 배타 잠금을 거치므로, 확인 시점과
+    커밋 사이에 단지가 사라질 수 없다. 삭제가 먼저 커밋됐다면 잠근 뒤 읽을 때 이미 감춰져 있어
+    여기서 거절된다. 공유 잠금이므로 다른 세대 등록과는 서로 기다리지 않는다.
+    """
     complex_id = int(payload["complex_id"])
-    if repository.find_property_complex(session, brokerage_id, complex_id) is None:
+    if repository.lock_property_complex(session, brokerage_id, complex_id, exclusive=False) is None:
         raise ValidationError("complex_id does not belong to this brokerage")
 
     unit = PropertyUnit(brokerage_id=brokerage_id, **payload)
@@ -56,6 +116,53 @@ def update_property_unit(
 
     updated = repository.bump_row_version(
         session, PropertyUnit, brokerage_id, unit_id, expected_row_version, payload
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+    session.commit()
+
+
+def delete_property_unit(
+    session: Session, brokerage_id: int, unit_id: int, expected_row_version: int
+) -> None:
+    """세대를 소프트 삭제한다.
+
+    행을 실제로 지우지 않는다. 상담 로그와 매물 이력이 세대를 참조하고 있어 물리 삭제는
+    이력을 함께 잃는다. 목록 조회는 이미 `is_deleted = false`만 본다.
+
+    딸린 매물 건은 건드리지 않는다. 매물 건은 자신의 `row_version`을 따로 갖고 있어,
+    한 요청에서 함께 수정하면 그 낙관적 잠금 경계를 우회한다. 매물 조회는 세대를 join하므로
+    세대가 감춰지면 매물도 목록에 나타나지 않는다.
+    """
+    require_property_unit(session, brokerage_id, unit_id)
+    deleted_at = datetime.now(UTC)
+    updated = repository.bump_row_version(
+        session,
+        PropertyUnit,
+        brokerage_id,
+        unit_id,
+        expected_row_version,
+        {"is_deleted": True, "deleted_at": deleted_at},
+    )
+    if not updated:
+        session.rollback()
+        raise RowVersionConflictError()
+    session.commit()
+
+
+def delete_property_requirement(
+    session: Session, brokerage_id: int, requirement_id: int, expected_row_version: int
+) -> None:
+    """구입장 행을 소프트 삭제한다. 상담 로그는 남긴다."""
+    require_property_requirement(session, brokerage_id, requirement_id)
+    updated = repository.bump_row_version(
+        session,
+        PropertyRequirement,
+        brokerage_id,
+        requirement_id,
+        expected_row_version,
+        {"is_deleted": True, "deleted_at": datetime.now(UTC)},
     )
     if not updated:
         session.rollback()

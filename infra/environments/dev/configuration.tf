@@ -28,8 +28,11 @@ locals {
     backend_db_pool_size                  = { path = "backend/DB_POOL_SIZE", value = "5" }
     backend_db_pool_timeout               = { path = "backend/DB_POOL_TIMEOUT_SECONDS", value = "30" }
     backend_db_target                     = { path = "backend/DB_TARGET", value = "production" }
+    backend_http_allowed_hosts            = { path = "backend/HTTP_ALLOWED_HOSTS", value = jsonencode([aws_lb.app.dns_name, "localhost", "127.0.0.1"]) }
+    backend_http_cors_allowed_origins     = { path = "backend/HTTP_CORS_ALLOWED_ORIGINS", value = "[]" }
     backend_log_format                    = { path = "backend/LOG_FORMAT", value = "json" }
     backend_log_level                     = { path = "backend/LOG_LEVEL", value = "INFO" }
+    backend_worker_enabled                = { path = "backend/WORKER_ENABLED", value = "false" }
     ai_openai_base_url                    = { path = "ai/AI_OPENAI_BASE_URL", value = "https://api.openai.com/v1" }
     ai_request_timeout_seconds            = { path = "ai/AI_REQUEST_TIMEOUT_SECONDS", value = "60" }
   }
