@@ -36,6 +36,7 @@ from brokerage_ai.f3 import (
     NegotiationIntent,
     NegotiationSide,
     PartyRoleContext,
+    PositionCardContractError,
     PositionCardGenerationRequest,
     PositionCardTarget,
     PositionCondition,
@@ -369,8 +370,10 @@ async def test_provider_errors_carry_no_prompt_or_raw_response() -> None:
 # --- 프롬프트 ------------------------------------------------------------------
 
 
-async def sent_prompt(request: PositionCardGenerationRequest) -> str:
-    provider = FakeProvider()
+async def sent_prompt(
+    request: PositionCardGenerationRequest, output: PositionCardModelOutput | None = None
+) -> str:
+    provider = FakeProvider(output)
     await generator(provider).generate_position_card(request)
     return "\n".join(message.content for message in provider.calls[0].messages)
 
@@ -439,7 +442,19 @@ async def test_an_empty_log_set_still_produces_a_valid_prompt() -> None:
         date_signals=DateSignals(as_of=datetime(2026, 8, 20, 1, 0, tzinfo=UTC)),
     )
 
-    prompt = await sent_prompt(request)
+    prompt = await sent_prompt(
+        request,
+        model_output(
+            intent=IntentAssessment(
+                value=NegotiationIntent.PRESENT,
+                evidence=(inference("조건 입력에서 의향을 확인했다"),),
+            ),
+            urgency=UrgencyAssessment(
+                value=Urgency.RELAXED,
+                evidence=(inference("명시된 기한이 없다"),),
+            ),
+        ),
+    )
 
     assert "상담 로그 0건" in prompt
 
@@ -469,6 +484,48 @@ async def test_the_assembled_result_passes_the_shared_contract_validation() -> N
 
     validate_generation_result(request, result)
     assert result.analysis.timing.hard_deadline == date(2026, 11, 30)
+
+
+async def test_generator_rejects_a_quote_from_outside_the_request() -> None:
+    provider = FakeProvider(
+        model_output(
+            intent=IntentAssessment(
+                value=NegotiationIntent.PRESENT,
+                evidence=(quote(interaction_id=999),),
+            )
+        )
+    )
+
+    with pytest.raises(PositionCardContractError, match="outside the request"):
+        await generator(provider).generate_position_card(listing_request())
+
+
+async def test_generator_rejects_a_quote_not_present_in_the_masked_content() -> None:
+    provider = FakeProvider(
+        model_output(
+            intent=IntentAssessment(
+                value=NegotiationIntent.PRESENT,
+                evidence=(quote(text="본문에 없는 인용문"),),
+            )
+        )
+    )
+
+    with pytest.raises(PositionCardContractError, match="not present"):
+        await generator(provider).generate_position_card(listing_request())
+
+
+async def test_generator_rejects_a_deadline_outside_the_backend_date_signal() -> None:
+    provider = FakeProvider(
+        model_output(
+            timing=TimingAssessment(
+                constraints=(PositionCondition(description="명도 일정", evidence=(quote(),)),),
+                hard_deadline=date(2026, 12, 1),
+            )
+        )
+    )
+
+    with pytest.raises(PositionCardContractError, match="backend date signal"):
+        await generator(provider).generate_position_card(listing_request())
 
 
 def test_model_output_rejects_a_repeated_price_kind() -> None:

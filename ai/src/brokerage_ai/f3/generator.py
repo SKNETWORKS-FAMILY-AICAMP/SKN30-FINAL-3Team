@@ -19,6 +19,7 @@ from brokerage_ai.f3.prompts import (
     POSITION_CARD_PROMPT_VERSION,
     build_position_card_messages,
 )
+from brokerage_ai.f3.validation import validate_generation_result
 from brokerage_ai.providers.ports import LlmProvider
 
 POSITION_CARD_WORKFLOW_VERSION = "position-card-workflow:v1"
@@ -58,10 +59,12 @@ class LlmPositionCardGenerator:
         )
         produced = await self._provider.generate_structured(generation, PositionCardModelOutput)
         versions = self.versions
-        return PositionCardGenerationResult(
+        result = PositionCardGenerationResult(
             target=PositionCardTarget.from_request(request),
             analysis=assemble_analysis(request, produced.output),
             prompt_version=versions.prompt_version,
             workflow_version=versions.workflow_version,
             diagnostics=produced.diagnostics,
         )
+        validate_generation_result(request, result)
+        return result

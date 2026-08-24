@@ -9,6 +9,7 @@
 
 import subprocess
 import sys
+from pathlib import Path
 
 from brokerage_ai.f3 import (
     POSITION_CARD_CONTRACT_VERSION,
@@ -21,6 +22,8 @@ from brokerage_ai.f3 import (
 
 from domain.agent_execution.cache_key import CACHE_KEY_SCHEMA_VERSION
 from domain.agent_execution.models import AnchorType
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_negotiation_side_matches_the_backend_anchor_type() -> None:
@@ -44,6 +47,25 @@ def test_contract_version_and_cache_key_version_are_separate_axes() -> None:
     assert POSITION_CARD_CONTRACT_VERSION == "position-card:v1"
     assert CACHE_KEY_SCHEMA_VERSION == "position-card:v2"
     assert POSITION_CARD_CONTRACT_VERSION != CACHE_KEY_SCHEMA_VERSION
+
+
+def test_f3_ai_contract_is_registered_and_oq_012_is_closed() -> None:
+    """공개 계약 변경에서 정본 등록과 미해결 질문 정리를 빠뜨리지 않게 한다."""
+    references = REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references"
+    contract_path = references / "contracts" / "f3-ai.md"
+    assert contract_path.is_file()
+
+    contract = contract_path.read_text()
+    index = (references / "index.md").read_text()
+    log = (references / "log.md").read_text()
+    open_questions = (references / "open-questions.md").read_text()
+
+    assert "status: 결정" in contract
+    assert "| `LISTING` |" in contract
+    assert "| `REQUIREMENT` |" in contract
+    assert "[contracts/f3-ai.md](contracts/f3-ai.md)" in index
+    assert "`contracts/f3-ai.md`" in log
+    assert "OQ-012" not in open_questions
 
 
 def test_importing_the_contract_has_no_configuration_or_client_side_effect() -> None:

@@ -275,7 +275,11 @@ DB snapshot 어디에도 넣지 않는다.
 | 요청·결과 | `validate_generation_result()` | 계약 버전, 대상과 side 일치, source identity 일치, hard deadline이 Backend 날짜 신호와 같은지, 인용 로그가 요청 범위 안인지, 인용문이 마스킹 본문에 실재하는지, price_kind가 해당 측과 활성 거래 유형에 허용되는지, 표기 금액이 장부와 같은지 |
 | DB 현재 상태 | Backend (후속 구현) | lease 소유권, 입력 버전, source identity 재대조, tenant 격리, offset 계산 |
 
-`validate_generation_result()`는 Session이나 Repository를 받지 않는다.
+`LlmPositionCardGenerator`는 조립한 결과를 경계 밖으로 반환하기 전에
+`validate_generation_result()`를 반드시 호출한다. 따라서 호출자는 요청 범위를 위반한 모델
+결과를 정상 결과로 받을 수 없다. Backend는 저장 직전에 DB 현재 상태를 검증하고 필요하면 이
+순수 검증을 방어적으로 다시 호출한다. `validate_generation_result()`는 Session이나 Repository를
+받지 않는다.
 
 ## 진단과 버전
 
@@ -342,8 +346,9 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 외부 Provider
 - 모델 출력에서 서버 소유 대상·source identity·장부 표기 금액을 제거한 내부 schema
 - 대리 측면별 한국어 프롬프트와 전체 상담 로그 시간순 전달
 - 주입한 fake Provider로 모델 요청·출력 조립을 검증하는 단위 테스트
-- 요청·결과 교차 검증 순수 함수
+- 생성 결과 반환 전 요청·결과 교차 검증을 강제하는 순수 함수
 - Backend `AnchorType`과의 값 일치 계약 테스트
+- 정본 등록과 OQ-012 종료를 강제하는 계약 테스트
 
 ### 아직 구현하지 않음 (`계획됨`)
 
