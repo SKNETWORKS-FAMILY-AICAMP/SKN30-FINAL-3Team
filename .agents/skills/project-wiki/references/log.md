@@ -5,6 +5,7 @@ updated: 2026-08-24
 
 # 위키 변경 로그
 
+- 2026-08-24: PR Policy Agent가 `synchronize`에서 base·설정·chunk fingerprint가 같은 정제 결과만 재사용하고 project-wide 변경은 전체 무효화하도록 ADR-0010을 확장했다. 부분 리뷰는 Luna/low, 통합은 Terra/medium으로 분리하고 고정 정책 explicit prompt cache, cache read/write 계측, PR 종료 시 숨은 상태 제거를 구현했다.
 - 2026-08-24: 사람의 PR 일반 댓글·리뷰 제출·인라인 코드 댓글을 봇 제외, secret-like line redaction, 240자 미리보기와 멘션 비활성화 조건으로 Discord에 전달하는 읽기 전용 알림 workflow를 추가하고 ADR-0010·개인정보 정책·운영 가이드에 반영함.
 - 2026-08-24: PR Policy Agent의 실제 코드·설정·운영 가이드와 일치하도록 ADR-0010의 finding 상한을 부분 리뷰당 3건, 최종 통합 5건으로 정정함.
 - 2026-08-24: 일반 개발 PR을 `dev`에 통합하고 `dev → main` 릴리스 PR로 배포 기준을 갱신하며, `Hong1008`을 기본 사람 승인 책임자로 두는 Git 흐름을 ADR-0013과 정책 정본에 승인함. 작업 PR은 squash, 릴리스 PR은 조상 관계 보존을 위해 merge commit을 사용함.

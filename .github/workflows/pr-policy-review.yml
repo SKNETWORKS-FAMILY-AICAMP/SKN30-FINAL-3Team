@@ -61,6 +61,8 @@ jobs:
           OPENAI_REVIEW_REASONING_EFFORT: ${{ vars.OPENAI_REVIEW_REASONING_EFFORT }}
           OPENAI_REVIEW_MERGE_MODEL: ${{ vars.OPENAI_REVIEW_MERGE_MODEL }}
           OPENAI_REVIEW_MERGE_REASONING_EFFORT: ${{ vars.OPENAI_REVIEW_MERGE_REASONING_EFFORT }}
+          OPENAI_REVIEW_VERBOSITY: ${{ vars.OPENAI_REVIEW_VERBOSITY }}
+          OPENAI_REVIEW_MERGE_VERBOSITY: ${{ vars.OPENAI_REVIEW_MERGE_VERBOSITY }}
           AI_REVIEW_MAX_FILES: ${{ vars.AI_REVIEW_MAX_FILES }}
           AI_REVIEW_MAX_CHANGED_LINES: ${{ vars.AI_REVIEW_MAX_CHANGED_LINES }}
           AI_REVIEW_MAX_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_CONTEXT_CHARS }}
@@ -71,8 +73,31 @@ jobs:
           AI_REVIEW_CHUNK_MAX_FINDINGS: ${{ vars.AI_REVIEW_CHUNK_MAX_FINDINGS }}
           AI_REVIEW_MAX_MERGE_CONTEXT_CHARS: ${{ vars.AI_REVIEW_MAX_MERGE_CONTEXT_CHARS }}
           AI_REVIEW_MAX_FINDINGS: ${{ vars.AI_REVIEW_MAX_FINDINGS }}
-          AI_REVIEW_MAX_OUTPUT_TOKENS: ${{ vars.AI_REVIEW_MAX_OUTPUT_TOKENS }}
+          AI_REVIEW_LEAF_MAX_OUTPUT_TOKENS: ${{ vars.AI_REVIEW_LEAF_MAX_OUTPUT_TOKENS }}
+          AI_REVIEW_MERGE_MAX_OUTPUT_TOKENS: ${{ vars.AI_REVIEW_MERGE_MAX_OUTPUT_TOKENS }}
           PR_REVIEW_PR_NUMBER: ${{ inputs.pr_number }}
           PR_REVIEW_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
           PR_REVIEW_INVOKE_OPENAI: ${{ github.event_name != 'workflow_dispatch' || inputs.invoke_openai }}
+        run: node .github/scripts/pr-policy-review.mjs
+
+  cleanup-closed-draft:
+    name: Remove incremental state from a closed Draft PR
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted base revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Remove hidden incremental review state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_REVIEW_SKIP_DISCORD: "true"
         run: node .github/scripts/pr-policy-review.mjs

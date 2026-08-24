@@ -6,7 +6,9 @@ import {
   REVIEW_MARKER,
   addRedactionFinding,
   applyLimits,
+  attachReviewState,
   buildMergeContext,
+  buildOpenAIRequest,
   buildReviewContext,
   chunkText,
   discordPayload,
@@ -14,18 +16,24 @@ import {
   fetchWithRetry,
   findCheckRun,
   findReviewComment,
+  hasProjectWideChange,
   isInternalPullRequest,
   isPatchIncomplete,
+  isReusableReviewState,
   mapWithConcurrency,
   mergeReviewsFallback,
   normalizeReview,
+  parseReviewState,
   patchChangedLines,
   planForEvent,
   planReviewChunks,
   reconcileMergedReview,
+  reviewChunkFingerprint,
   renderDiscordReviewMessages,
   renderGitHubComment,
   selectPolicyPaths,
+  stableObjectHash,
+  stripReviewState,
   sumUsage
 } from "../pr-review-lib.mjs";
 
@@ -68,6 +76,14 @@ test("draft and lifecycle events route correctly", () => {
     planForEvent({ eventName: "pull_request_target", action: "closed", pr }).notifyClosed,
     true
   );
+  assert.equal(
+    planForEvent({
+      eventName: "pull_request_target",
+      action: "closed",
+      pr: { ...pr, draft: true }
+    }).notifyClosed,
+    true
+  );
 });
 
 test("changed paths select only applicable module policies", async () => {
@@ -106,8 +122,40 @@ test("secret-like patch lines are redacted before context leaves the runner", as
   });
   assert.equal(context.redactionCount, 1);
   assert.deepEqual(context.redactedFiles, ["ai/example.py"]);
+  assert.match(context.cachePrefixText, /^<accepted_policy>/);
+  assert.match(context.dynamicText, /^<pull_request/);
+  assert.doesNotMatch(context.dynamicText, /<accepted_policy>/);
   assert.match(context.text, /\[REDACTED SECRET-LIKE LINE\]/);
   assert.doesNotMatch(context.text, /sk-proj-abcdefghijklmnopqrstuvwxyz/);
+});
+
+test("GPT-5.6 requests cache only the stable policy prefix", () => {
+  const base = {
+    model: "gpt-5.6-luna",
+    instructions: "stable instructions",
+    cachePrefixText: "<accepted_policy>stable policy</accepted_policy>",
+    dynamicText: "<pull_request head_sha=\"one\">changed patch</pull_request>",
+    taskInstruction: "review chunk",
+    reasoningEffort: "low",
+    verbosity: "low",
+    schemaName: "pr_policy_chunk_review",
+    maxOutputTokens: 2500,
+    safetyIdentifier: "safe"
+  };
+  const first = buildOpenAIRequest(base);
+  const second = buildOpenAIRequest({
+    ...base,
+    dynamicText: "<pull_request head_sha=\"two\">new patch</pull_request>"
+  });
+  assert.equal(first.prompt_cache_key, second.prompt_cache_key);
+  assert.deepEqual(first.prompt_cache_options, { mode: "explicit", ttl: "30m" });
+  assert.deepEqual(first.input[0].content[0].prompt_cache_breakpoint, { mode: "explicit" });
+  assert.match(first.input[0].content[0].text, /stable policy/);
+  assert.doesNotMatch(first.input[0].content[0].text, /changed patch/);
+  assert.match(first.input[1].content[0].text, /changed patch/);
+  assert.equal(first.store, false);
+  assert.equal(first.max_output_tokens, 2500);
+  assert.ok(first.prompt_cache_key.length <= 64);
 });
 
 test("file and changed-line limits reject oversized PRs", () => {
@@ -129,6 +177,8 @@ test("file and changed-line limits reject oversized PRs", () => {
 test("review publication limits favor a short actionable result", () => {
   assert.equal(policy.limits.chunkMaxFindings, 3);
   assert.equal(policy.limits.maxFindings, 5);
+  assert.equal(policy.limits.leafMaxOutputTokens, 2500);
+  assert.equal(policy.limits.mergeMaxOutputTokens, 4000);
 });
 
 test("structured review output is validated and capped", () => {
@@ -233,12 +283,18 @@ test("GitHub output is sticky and Discord output is bounded", () => {
     pr,
     review,
     model: "gpt-5.6-terra",
-    usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+    usage: {
+      input_tokens: 100,
+      output_tokens: 20,
+      total_tokens: 120,
+      input_tokens_details: { cached_tokens: 60, cache_write_tokens: 10 }
+    },
     durationMs: 1200,
     context: { modules: ["backend"] }
   });
   assert.ok(comment.startsWith(REVIEW_MARKER));
   assert.match(comment, /HIGH · 병합 전 확인/);
+  assert.match(comment, /cache read 60 \/ write 10/);
   const mediumComment = renderGitHubComment({
     pr,
     review: { ...review, findings: [{ ...review.findings[0], severity: "medium" }] },
@@ -271,6 +327,79 @@ test("sticky resources only select GitHub-owned records", () => {
   const foreignCheck = { id: 3, name: "PR Policy Agent", app: { slug: "other-app" } };
   const actionsCheck = { id: 4, name: "PR Policy Agent", app: { slug: "github-actions" } };
   assert.equal(findCheckRun([foreignCheck, actionsCheck]).id, 4);
+});
+
+test("incremental review state round-trips without storing raw patches", () => {
+  const state = {
+    version: 1,
+    repository: "owner/repo",
+    prNumber: 12,
+    baseSha: "base",
+    headSha: "head",
+    configurationHash: "config",
+    aggregateFingerprint: "aggregate",
+    chunks: [
+      {
+        fingerprint: "chunk",
+        model: "gpt-5.6-luna",
+        review: { status: "clean", summary: "완료", findings: [], missing_evidence: [] }
+      }
+    ],
+    finalReview: { status: "clean", summary: "완료", findings: [], missing_evidence: [] }
+  };
+  const attached = attachReviewState(`${REVIEW_MARKER}\nvisible`, state);
+  assert.equal(attached.persisted, true);
+  assert.deepEqual(parseReviewState(attached.body), state);
+  assert.equal(stripReviewState(attached.body), `${REVIEW_MARKER}\nvisible`);
+  assert.doesNotMatch(attached.body, /raw patch/);
+  assert.equal(attachReviewState("x".repeat(100), state, 20).persisted, false);
+  assert.equal(parseReviewState("<!-- pr-policy-state:v1:not-base64 -->"), null);
+});
+
+test("incremental state reuse requires the same base and configuration", () => {
+  const state = {
+    version: 1,
+    repository: "owner/repo",
+    prNumber: 12,
+    baseSha: "base",
+    configurationHash: "config",
+    chunks: []
+  };
+  const expected = {
+    repository: "owner/repo",
+    prNumber: 12,
+    baseSha: "base",
+    configurationHash: "config"
+  };
+  assert.equal(isReusableReviewState(state, expected), true);
+  assert.equal(isReusableReviewState(state, { ...expected, baseSha: "changed" }), false);
+  assert.equal(isReusableReviewState(state, { ...expected, projectWideChanged: true }), false);
+});
+
+test("chunk fingerprints change with patch content and project-wide paths force a full review", () => {
+  const chunk = {
+    group: "backend",
+    files: [
+      {
+        filename: "backend/a.py",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: "@@ -0,0 +1 @@\n+a"
+      }
+    ]
+  };
+  assert.equal(reviewChunkFingerprint(chunk), reviewChunkFingerprint(chunk));
+  assert.notEqual(
+    reviewChunkFingerprint(chunk),
+    reviewChunkFingerprint({
+      ...chunk,
+      files: [{ ...chunk.files[0], patch: "@@ -0,0 +1 @@\n+b" }]
+    })
+  );
+  assert.equal(hasProjectWideChange([{ filename: ".github/workflow.yml" }], policy), true);
+  assert.equal(hasProjectWideChange([{ filename: "backend/a.py" }], policy), false);
+  assert.equal(stableObjectHash({ b: 2, a: 1 }), stableObjectHash({ a: 1, b: 2 }));
 });
 
 test("missing patches are reported as unavailable evidence", async () => {
@@ -409,10 +538,25 @@ test("concurrent chunk execution is bounded and keeps result order", async () =>
 test("usage and fallback findings are merged deterministically", () => {
   assert.deepEqual(
     sumUsage([
-      { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
-      { input_tokens: 20, output_tokens: 3, total_tokens: 23 }
+      {
+        input_tokens: 10,
+        output_tokens: 2,
+        total_tokens: 12,
+        input_tokens_details: { cached_tokens: 4, cache_write_tokens: 2 }
+      },
+      {
+        input_tokens: 20,
+        output_tokens: 3,
+        total_tokens: 23,
+        input_tokens_details: { cached_tokens: 5, cache_write_tokens: 1 }
+      }
     ]),
-    { input_tokens: 30, output_tokens: 5, total_tokens: 35 }
+    {
+      input_tokens: 30,
+      output_tokens: 5,
+      total_tokens: 35,
+      input_tokens_details: { cached_tokens: 9, cache_write_tokens: 3 }
+    }
   );
   const finding = {
     severity: "high",

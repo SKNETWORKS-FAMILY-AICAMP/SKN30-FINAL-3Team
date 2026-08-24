@@ -58,25 +58,6 @@ F3 실행을 요청한 내부 `app_user.id`다. 성명, 연락처와 로그인 I
 
 API 관점의 계약은 [API 계약](../contracts/api.md)에 있고 보존·삭제의 정본은 이 문서다.
 
-### GitHub PR 협업 Discord 알림
-
-사람이 PR에 남긴 일반 댓글, 리뷰 제출과 인라인 코드 댓글을 팀 Discord 채널에 알린다.
-
-| 항목 | 결정 |
-|---|---|
-| 목적 | 리뷰 요청·응답과 승인·변경 요청을 팀이 빠르게 인지하도록 알림 |
-| 전송 필드 | GitHub 사용자명, PR 번호·제목, 이벤트 유형, 댓글 앞 240자, 인라인 파일·줄 위치, GitHub 원문 링크 |
-| 처리 위치 | GitHub Actions에서 이벤트 payload를 처리하고 Discord Incoming Webhook으로 전송 |
-| 접근 주체 | 저장소 Actions 관리자와 해당 Discord 채널 구성원 |
-| 외부 전송 | Discord. OpenAI에는 댓글 알림 payload를 보내지 않음 |
-| 저장 | 저장소 DB·artifact에 저장하지 않고 Actions 로그에 댓글 원문을 출력하지 않음. Discord 메시지는 채널의 메시지 보존 정책에 따름 |
-| 삭제 | GitHub 댓글 삭제와 Discord 메시지 삭제는 연동하지 않음. 필요한 경우 Discord 채널 관리자가 메시지를 삭제 |
-
-- 봇 댓글과 일반 Issue 댓글은 알림에서 제외한다.
-- 댓글의 secret-like line은 `[REDACTED SECRET-LIKE LINE]`으로 바꾸고, 댓글 미리보기는 240자로 제한한다.
-- Discord payload의 mention parsing을 비활성화해 댓글의 `@everyone`, 사용자·역할 표기가 실제 멘션을 발생시키지 않게 한다.
-- 댓글에 비밀값이나 불필요한 개인정보를 작성하지 않는 것이 우선이며 redaction은 보조 통제다.
-
 ## 변경 검토
 
 개인정보를 새로 처리하는 기능은 PR에 다음을 명시한다.

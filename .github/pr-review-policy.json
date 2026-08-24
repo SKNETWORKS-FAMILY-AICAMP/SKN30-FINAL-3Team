@@ -11,7 +11,8 @@
     "chunkMaxFindings": 3,
     "maxMergeContextChars": 300000,
     "maxFindings": 5,
-    "maxOutputTokens": 4000
+    "leafMaxOutputTokens": 2500,
+    "mergeMaxOutputTokens": 4000
   },
   "ignored": {
     "basenames": [
