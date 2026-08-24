@@ -130,3 +130,5 @@ CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.
 - Terraform은 계속 `preflight → fmt/validate → plan → 승인 → apply → 검증 → drift` 수동 절차를 따른다.
 - RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)의 기존 경계를 유지한다.
+- 로컬 F2 종단 간 검증의 Qwen·Whisper Pod 실행과 SSH tunnel 절차는
+  [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다.

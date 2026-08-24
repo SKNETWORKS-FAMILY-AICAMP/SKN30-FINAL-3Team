@@ -117,6 +117,28 @@ updated: 2026-08-24
 
 상담 로그는 추가 전용이므로 수정과 삭제 경로를 두지 않는다. 로그를 추가하면 서버가 대상 세대 또는 구입장의 최종접촉일을 갱신한다. 무효 처리와 AI 생성 로그의 승인 경로는 현재 범위에 포함하지 않는다.
 
+## F2 음성 분석 계약 (구현됨 · 1차 연동)
+
+| Method | Path | 인증 | 동작 |
+|---|---|---|---|
+| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod Whisper로 전사하고 Qwen으로 분석해 검토용 제안을 동기 반환 |
+
+요청은 `multipart/form-data`이며 `audio`, `ledger_type`, `current_fields`,
+`privacy_confirmed`를 받는다. `audio`는 비어 있지 않은 WAV·MP3·M4A이고 현재 상한은 25 MiB다.
+`ledger_type`은 `매물장` 또는 `구입장`, `current_fields`는 필드명에서 문자열 또는 null로 가는 JSON
+객체다. `privacy_confirmed`가 true가 아니면 422로 거절한다. Backend는 세션에서 사용자 문맥을
+검증하지만 사용자·사무소 식별자는 모델에 보내지 않는다.
+
+응답은 상담 유형, 장부 불일치 여부, 필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
+상담 로그 초안과 서버가 확인한 주의 문구 확인 시각을 반환한다. 전사 전문, 모델 진단, 요청자와
+Provider 오류 원문은 반환하지 않는다. 제안 응답만으로 장부를 저장하지 않으며 Frontend가 선택한 값을
+부모 상세의 미저장 draft에 반영한다.
+
+이 경로는 RunPod base model 연결을 검증하는 1차 동기 수직 슬라이스다. 영속 작업, Worker 재개,
+SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 구현하지 않았으며
+`docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
+음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
+
 ### 오류 코드
 
 | code | HTTP | 발생 조건 |
@@ -128,6 +150,8 @@ updated: 2026-08-24
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
+| F2_UNAVAILABLE | 503 | F2가 비활성화됐거나 RunPod STT·LLM Provider를 사용할 수 없음 |
+| F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
 

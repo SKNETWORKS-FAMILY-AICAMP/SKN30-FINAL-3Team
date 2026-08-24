@@ -65,6 +65,25 @@ def test_vllm_key_requires_matching_base_url() -> None:
         bind_ai_config({"AI_VLLM_LLM_API_KEY": "secret"}, AiProfile.LOCAL)
 
 
+def test_f2_runpod_endpoints_and_models_are_bound() -> None:
+    config = bind_ai_config(
+        {
+            "AI_VLLM_LLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
+            "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
+            "AI_VLLM_STT_API_KEY": "stt-secret",
+            "AI_F2_LLM_MODEL": "Qwen/Qwen3-4B",
+            "AI_F2_STT_MODEL": "openai/whisper-large-v3-turbo",
+        },
+        AiProfile.LOCAL,
+    )
+
+    assert config.vllm.stt is not None
+    assert config.vllm.stt.api_key is not None
+    assert config.vllm.stt.api_key.get_secret_value() == "stt-secret"
+    assert config.f2.llm_model == "Qwen/Qwen3-4B"
+    assert config.f2.stt_model == "openai/whisper-large-v3-turbo"
+
+
 def test_invalid_provider_url_is_sanitized() -> None:
     with pytest.raises(ConfigurationError) as caught:
         bind_ai_config(
