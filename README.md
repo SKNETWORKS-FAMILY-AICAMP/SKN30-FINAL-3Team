@@ -93,7 +93,11 @@ flowchart LR
 - AI가 요청하는 조회나 부수 효과는 Backend가 주입한 제한된 capability를 거쳐 검증됩니다.
 - Data는 재현 가능한 학습·평가 입력을, Infra는 Terraform 기반 계정·배포 기반과 비밀값 주입 경계를 담당합니다.
 
-> 위 다이어그램은 승인된 모듈 경계와 현재 설계 방향을 함께 보여줍니다. 공유 dev의 네트워크·RDS·EC2/ALB·CloudFront와 기존 delivery 자원은 적용됐습니다. Verify/Build 분리와 이번 환경설정 변경은 코드·검증까지만 완료됐으며 별도 Terraform plan·승인·apply가 필요합니다. 운영 Provider 선택과 조건부 SQS/ECS 분리는 아직 확정되지 않았습니다.
+> 위 다이어그램은 승인된 모듈 경계와 현재 설계 방향을 함께 보여줍니다.
+>
+> - **현재 AWS에 적용됨:** 공유 dev 네트워크·RDS·EC2/ALB·CloudFront와 기존 `main` source delivery 자원
+> - **이번 PR의 목표 구성·아직 미적용:** `dev` source 전환, Verify/Build 분리와 환경설정 materialization. 별도 Terraform plan·승인·apply가 필요합니다.
+> - **미확정:** 운영 Provider 선택과 조건부 SQS/ECS 분리
 
 ### 기술 스택
 

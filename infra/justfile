@@ -70,6 +70,22 @@ dev-drift: require-dev-secrets
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -detailed-exitcode -var-file=dev.tfvars
 
+# dev 삭제 plan을 저장한다.
+dev-destroy-plan: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    terraform -chdir=environments/dev validate
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -destroy -input=false -var-file=dev.tfvars -out=dev-destroy.tfplan
+
+# 저장된 dev destroy plan을 사람이 검토할 수 있게 표시한다.
+dev-destroy-show:
+    terraform -chdir=environments/dev show dev-destroy.tfplan
+
+# 검토하고 승인한 dev-destroy.tfplan을 적용해 dev root 소유 리소스를 삭제한다.
+[confirm("정말로 dev root가 소유한 모든 리소스를 영구 삭제(destroy)합니까? DB 데이터와 애플리케이션 인프라가 삭제됩니다.")]
+dev-destroy: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-destroy.tfplan
+
 # RDS, ASG와 SSM 연결 상태를 변경 없이 확인한다.
 dev-status:
     uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status

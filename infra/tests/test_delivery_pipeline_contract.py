@@ -246,6 +246,29 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn("stat -c '%a'", justfile)
         self.assertIn('case "$secret_mode" in *00)', justfile)
 
+    def test_dev_destroy_requires_a_reviewed_saved_plan(self) -> None:
+        justfile = read("infra/justfile")
+        gitignore = read(".gitignore")
+
+        self.assertIn("dev-destroy-plan: require-dev-secrets", justfile)
+        self.assertIn(
+            "terraform -chdir=environments/dev plan -destroy -input=false "
+            "-var-file=dev.tfvars -out=dev-destroy.tfplan",
+            justfile,
+        )
+        self.assertIn(
+            "dev-destroy-show:\n"
+            "    terraform -chdir=environments/dev show dev-destroy.tfplan",
+            justfile,
+        )
+        self.assertIn("dev-destroy: require-dev-secrets", justfile)
+        self.assertIn(
+            "terraform -chdir=environments/dev apply dev-destroy.tfplan",
+            justfile,
+        )
+        self.assertNotIn("terraform -chdir=environments/dev destroy", justfile)
+        self.assertIn("*.tfplan", gitignore)
+
     def test_dev_secret_gate_rejects_missing_empty_and_shared_files(self) -> None:
         justfile = read("infra/justfile")
         recipe = justfile.split("require-dev-secrets:\n", maxsplit=1)[1]

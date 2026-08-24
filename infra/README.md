@@ -99,11 +99,14 @@ just dev-plan
 just dev-show
 just dev-apply
 just dev-drift
+just dev-destroy-plan
+just dev-destroy-show
+just dev-destroy
 ```
 
-`dev-show`로 저장된 plan의 자원, 교체, 삭제와 비용을 검토하고 승인을 받은 뒤에만 `dev-apply`를 실행한다. bootstrap root 변경에는 같은 순서의 `bootstrap-plan`, `bootstrap-show`, `bootstrap-apply`, `bootstrap-drift`를 사용한다. apply recipe는 실행 전에 추가 확인을 요구한다.
+`dev-show`로 저장된 plan의 자원, 교체, 삭제와 비용을 검토하고 승인을 받은 뒤에만 `dev-apply`를 실행한다. dev root가 소유한 환경을 영구 삭제할 때는 `dev-destroy-plan`으로 `dev-destroy.tfplan`을 생성하고 `dev-destroy-show`로 삭제 대상과 보존 대상을 검토한 뒤 `dev-destroy`를 실행한다. bootstrap root의 state bucket과 계정 baseline은 이 destroy plan의 대상이 아니다. bootstrap root 변경에는 같은 순서의 `bootstrap-plan`, `bootstrap-show`, `bootstrap-apply`, `bootstrap-drift`를 사용한다. apply와 destroy recipe는 실행 전에 추가 확인을 요구한다.
 
-`dev-plan`, `dev-apply`, `dev-drift`는 `secrets.auto.tfvars`가 비어 있지 않은 일반 파일이고 group/other 권한 bit가 모두 꺼져 있을 때만 시작한다(`0600` 또는 `0400` 계열). Setup과 `verify-account`에는 이 gate를 적용하지 않는다. AI·Discord 평문이 `dev.tfplan`, `terraform show -json` 또는 state에 나타나면 apply하지 않는다.
+`dev-plan`, `dev-apply`, `dev-drift`, `dev-destroy-plan`, `dev-destroy`는 `secrets.auto.tfvars`가 비어 있지 않은 일반 파일이고 group/other 권한 bit가 모두 꺼져 있을 때만 시작한다(`0600` 또는 `0400` 계열). Setup과 `verify-account`에는 이 gate를 적용하지 않는다. AI·Discord 평문이 `dev.tfplan`, `terraform show -json` 또는 state에 나타나면 apply하지 않는다.
 
 `just fmt`는 Terraform 파일을 수정하므로 포맷이 필요할 때만 실행한다. `just verify-account`는 state와 AWS 계정 연결을 읽기 전용으로 검증한다.
 
