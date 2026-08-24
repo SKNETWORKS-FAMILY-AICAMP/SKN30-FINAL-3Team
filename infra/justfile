@@ -21,7 +21,7 @@ check:
     terraform fmt -check -recursive .
     terraform -chdir=bootstrap validate
     terraform -chdir=environments/dev validate
-    uvx ruff check scripts/manage_db_access.py scripts/manage_dev_power.py tests
+    uvx ruff check scripts/manage_db_access.py scripts/manage_dev_power.py deploy/scripts/render_env.py delivery/lambda/discord_notifier.py tests
     uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
 
 # 모든 Terraform 파일을 포맷한다.
@@ -50,7 +50,7 @@ bootstrap-drift:
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=bootstrap plan -input=false -detailed-exitcode -var-file=bootstrap.tfvars
 
 # dev 변경 plan을 저장한다.
-dev-plan:
+dev-plan: require-dev-secrets
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     terraform -chdir=environments/dev validate
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -out=dev.tfplan
@@ -61,12 +61,12 @@ dev-show:
 
 # 승인된 dev plan만 적용한다.
 [confirm("검토하고 승인한 dev.tfplan을 적용합니까?")]
-dev-apply:
+dev-apply: require-dev-secrets
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev.tfplan
 
 # dev 적용 후 drift가 없는지 검사한다.
-dev-drift:
+dev-drift: require-dev-secrets
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -detailed-exitcode -var-file=dev.tfvars
 
@@ -118,3 +118,7 @@ db-client-info: db-info
 [confirm("API와 Worker가 중지된 maintenance window입니까?")]
 db-rotate:
     uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" rotate-runtime --apply --maintenance-window-confirmed
+
+[private]
+require-dev-secrets:
+    @secret_file="environments/dev/secrets.auto.tfvars"; test -f "$secret_file" && test ! -L "$secret_file" && test -s "$secret_file" || { echo "$secret_file은 비어 있지 않은 일반 파일이어야 합니다. secrets.example.tfvars를 복사하고 실제 비밀값을 입력하세요." >&2; exit 1; }; secret_mode="$(stat -c '%a' "$secret_file")"; case "$secret_mode" in *00) ;; *) echo "$secret_file의 group/other 권한을 제거하세요(예: chmod 600 $secret_file). 현재 mode: $secret_mode" >&2; exit 1 ;; esac

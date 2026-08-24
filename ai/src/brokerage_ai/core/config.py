@@ -135,7 +135,11 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
 
 
 def _dotenv_mapping(path: Path) -> dict[str, str]:
-    return {key: value for key, value in dotenv_values(path).items() if value is not None}
+    return {
+        key: value
+        for key, value in dotenv_values(path, interpolate=False).items()
+        if value is not None
+    }
 
 
 def load_ai_config(
@@ -148,8 +152,8 @@ def load_ai_config(
         raise ConfigurationError("AI profile must be local, test, or prod") from exc
 
     values: dict[str, str] = {}
-    if selected_profile is not AiProfile.TEST:
-        values.update(_dotenv_mapping(AI_ROOT / f".env.{selected_profile.value}"))
+    if selected_profile is AiProfile.LOCAL:
+        values.update(_dotenv_mapping(AI_ROOT / ".env.local"))
         values.update(_dotenv_mapping(AI_ROOT / ".env"))
     values.update(dict(os.environ if environ is None else environ))
     return bind_ai_config(values, selected_profile)

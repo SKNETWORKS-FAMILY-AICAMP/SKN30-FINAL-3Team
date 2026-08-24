@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # 인프라 자원 인벤토리
@@ -22,9 +22,9 @@ updated: 2026-08-20
 | Frontend | CloudFront, private S3 origin, OAC, ALB custom origin | 결정 | 적용됨 | 기본 도메인, `/api/*` ALB, managed security headers; 배포 artifact는 미준비 |
 | 업무 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱이 성공·취소 즉시, 실패 1시간 이내 삭제; lifecycle 1일 안전망 |
 | 데이터·모델 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료, 그 외 자동 만료 없음 |
-| 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 적용됨 | runtime은 구조화된 DB credential, migration은 IAM 인증과 deprecated 빈 container, master는 RDS 관리; value는 Terraform 외부 주입 |
+| 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 기존 자원 적용됨·환경 materialization 미적용 | runtime DB·migration IAM·RDS master 자동 경계 유지; AI·Discord ignored tfvars→write-only 전환은 plan·apply 전 |
 | 관측성 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 6개; IAM DB 인증용 FreeableMemory 경보 포함, SNS 구독 없음 |
-| 전달 | CodeConnections, CodePipeline V2, CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | 통합 main 자동, Backend·Frontend 수동, 모두 QUEUED; Verify/Build 분리 예정 |
+| 전달 | CodeConnections, CodePipeline V2, CodeBuild, CodeDeploy | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, 모두 QUEUED |
 | 전달 저장소 | Pipeline artifact S3 | 결정 | 적용됨 | non-versioned, 객체 14일 만료; 업무용 S3·Terraform state와 분리 |
 | 모델 실행 | RunPod 공용 Template, 개발자별 Pod | 결정 | 보류 | 운영 구조는 결정됐으나 Terraform 소유 범위는 재개 전 결정 |
 | 공개 TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 환경에는 도메인이 없고 실제 개인정보 사용 금지; 운영 승격 시 별도 결정 |

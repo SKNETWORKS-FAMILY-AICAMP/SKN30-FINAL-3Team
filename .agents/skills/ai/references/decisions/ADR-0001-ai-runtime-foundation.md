@@ -1,12 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-17
+updated: 2026-08-24
 ---
 
 # ADR-0001: AI 런타임 기반과 Provider 경계
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
 - 결정일: 2026-08-17
+- 대체 범위: 환경 profile 파일과 dotenv 우선순위는 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)가 대체
 
 ## 맥락
 
@@ -24,8 +25,7 @@ Backend와 독립적으로 AI workflow를 개발·검증하면서도 Backend Wor
 - vLLM 생성 endpoint와 embedding endpoint는 독립 설정한다.
 - `runtime.py`는 검증된 `AiConfig`만 받고 SDK client의 중복 생성을 방지하며 async 종료를 책임진다.
 - SDK 자동 재시도는 끄고 workflow·Worker가 실제 호출 수와 비용을 포함한 재시도 정책을 소유한다.
-- 설정 우선순위는 프로세스 환경변수, Git에서 제외한 `.env`, Git 추적 `.env.<profile>` 순서다. import 시 설정을 읽지 않는다.
-- 공개 profile 파일에는 endpoint와 timeout만 두고 비밀값은 로컬 `.env` 또는 Infra가 주입한 프로세스 환경변수로 전달한다.
+- 환경 파일 소유권과 로딩 규칙은 프로젝트 ADR-0015를 따른다. import 시 설정을 읽지 않는 경계는 유지한다.
 - `brokerage_ai` 공개 진입점은 SDK·LangGraph 구체 타입과 adapter를 재노출하지 않는다.
 - AI는 FastAPI·SQLAlchemy·DB client를 import하지 않고 Backend는 OpenAI SDK·LangGraph·프롬프트를 직접 import하지 않는다.
 - 실제 workflow 책임이 생기기 전에는 `workflows/`, `graphs/`, `prompts/`, `agents/`, `capabilities/`, `checkpoints/`, `evals/`를 만들지 않는다.

@@ -5,6 +5,7 @@ updated: 2026-08-24
 
 # 위키 변경 로그
 
+- 2026-08-24: 환경설정 정본을 별도 JSON으로 늘리지 않고 tracked `.env.local`의 팀 공통 공개값, ignored `.env`의 개인 비밀·override, Terraform map의 운영 공개값, ignored tfvars와 ephemeral/write-only Secrets Manager version의 수동 비밀값으로 분리했다. `.env.prod`를 폐기하고 Frontend build 값은 Terraform map에서 CodeBuild process env로 동적 전달하도록 ADR-0015에서 승인했다.
 - 2026-08-24: F3-CR-12 중 같은 사무소·앵커·`input_data_version`의 활성 실행 중복 방지를 구현했다. `QUEUED`와 다섯 진행 상태는 기존 실행 ID를 반환하고 입력 버전이 바뀌거나 `COMPLETED`·`FAILED_TERMINAL`·`SUPERSEDED`이면 새 실행을 만든다. 여러 API 인스턴스의 동시 접수는 PostgreSQL transaction advisory lock으로 직렬화하며 잠금 뒤 최신 앵커 버전을 읽고 재사용 조회와 적재를 한 transaction에서 수행한다. 완료 결과는 상담 로그·세대·단지·당사자 관계와 AI 구성까지 같은지 접수 시점에 증명할 identity가 없어 stale 결과를 피하기 위해 재사용하지 않으며 F3-CR-12의 남은 범위로 명시했다.
 - 2026-08-24: F3-TR-03의 구조화 관심없음 피드백 API를 구현했다. 포지션 카드와 후보 판정을 세션 사무소로 격리하고 `NOT_INTERESTED` 유형을 서버가 고정하며, 사유는 `CONDITION_MISMATCH`·`ALREADY_CONTACTED`·`WRONG_JUDGMENT`·`OTHER`만 허용한다. 자유문자·원문·정정값·사무소·작성자는 요청에서 받지 않고 작성자는 세션의 내부 사용자 ID로만 저장한다. `created_by`는 감사 이력으로 서비스 운영 기간 보존하고 응답·로그·AI·Queue에 싣지 않는 정책을 확정했다. 추가 상담 로그와 다음 판정 입력을 요구하는 F3-TR-02 정정 피드백은 후속 범위로 분리했다.
 - 2026-08-24: `GET /api/v1/f3/runs/{run_id}/result`를 추가해 진행 중에는 마지막으로 저장된 안전 단계까지만 앵커 카드·후보 조회 조건·전체 SQL 후보를 반환하고, 완료 뒤에는 후보별 등급·순위·비교 근거·행동·기각 사유·판정 근거를 페이지로 조회하게 했다. 세션 사무소와 루트 실행으로 격리하고 카드 snapshot 전체·모델 설정·프롬프트·워크플로·lease·내부 실패 원문은 공개하지 않는다. 카드 저장 시 기록한 `SYNTHETIC_PROTOTYPE` privacy mode를 조회 경계에서 다시 확인하며 표식이 없거나 다르면 상태 외 결과를 비운다. 이 항목을 기록한 시점에는 피드백 API와 실행 재사용이 후속 범위였고 위 후속 항목들에서 관심없음 피드백과 활성 실행 재사용을 구현했다. SSE와 실사용 F1 마스킹은 계속 후속 범위다.

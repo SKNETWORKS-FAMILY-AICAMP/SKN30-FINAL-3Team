@@ -1,7 +1,50 @@
 version: 1
-updated: "2026-08-20"
+updated: "2026-08-24"
 
 sources:
+  - id: "environment-configuration-ownership-2026-08-24"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-24)"
+    received: "2026-08-24"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md"
+      - ".agents/skills/project-wiki/references/development/environments.md"
+      - "backend/.env.local"
+      - "ai/.env.local"
+      - "frontend/.env.local"
+      - "infra/environments/dev/configuration.tf"
+      - "infra/environments/dev/delivery.tf"
+      - "docs/architecture/infra/deployment-and-operations.md"
+    scope: "별도 JSON 정본 없이 tracked .env.local, ignored 개인 .env, Terraform 공개 설정 map, ignored tfvars의 수동 비밀값과 Frontend build 자동 주입으로 환경설정 소유권을 분리"
+
+  - id: "terraform-ephemeral-write-only-secrets"
+    type: "official-documentation"
+    url: "https://developer.hashicorp.com/terraform/language/manage-sensitive-data/ephemeral"
+    accessed: "2026-08-24"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md"
+      - "infra/environments/dev/configuration.tf"
+    scope: "ephemeral input과 write-only resource argument로 수동 비밀값을 plan·state에 저장하지 않는 경계"
+
+  - id: "aws-secrets-manager-write-only-version"
+    type: "official-documentation"
+    url: "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version"
+    accessed: "2026-08-24"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md"
+      - "infra/environments/dev/configuration.tf"
+      - "infra/environments/dev/delivery.tf"
+    scope: "secret_string_wo와 명시적 version counter를 사용한 Secrets Manager rotation trigger"
+
+  - id: "node-env-file-precedence"
+    type: "official-documentation"
+    url: "https://nodejs.org/download/release/v22.18.0/docs/api/cli.html#--env-fileconfig"
+    accessed: "2026-08-24"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md"
+      - "frontend/package.json"
+    scope: "다중 env-file은 뒤 파일이 앞 파일을 덮고 기존 process env가 파일보다 우선하는 Node 22 실행 규칙"
+
   - id: "pr-policy-multi-review-2026-08-20"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-20)"

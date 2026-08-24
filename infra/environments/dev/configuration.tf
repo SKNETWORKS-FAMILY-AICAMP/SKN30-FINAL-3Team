@@ -10,32 +10,47 @@ locals {
     }
     ai_provider = {
       name        = "/${local.name_prefix}/ai/provider-api-keys"
-      description = "Container for AI_OPENAI_API_KEY, AI_VLLM_LLM_API_KEY, and AI_VLLM_EMBEDDING_API_KEY; values are populated outside Terraform"
+      description = "AI provider API keys managed from the ignored secrets.auto.tfvars input"
     }
   }
 
-  application_parameters = {
-    backend_app_env                       = { path = "backend/APP_ENV", value = "prod" }
-    backend_app_host                      = { path = "backend/APP_HOST", value = "0.0.0.0" }
-    backend_app_openapi_enabled           = { path = "backend/APP_OPENAPI_ENABLED", value = "false" }
-    backend_app_port                      = { path = "backend/APP_PORT", value = "8000" }
-    backend_auth_development_enabled      = { path = "backend/AUTH_DEVELOPMENT_ENABLED", value = "false" }
-    backend_auth_session_absolute_minutes = { path = "backend/AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES", value = "10080" }
-    backend_auth_session_cookie_name      = { path = "backend/AUTH_SESSION_COOKIE_NAME", value = "brokerage_session" }
-    backend_auth_session_idle_minutes     = { path = "backend/AUTH_SESSION_IDLE_TIMEOUT_MINUTES", value = "1440" }
-    backend_auth_session_last_seen        = { path = "backend/AUTH_SESSION_LAST_SEEN_UPDATE_SECONDS", value = "300" }
-    backend_db_pool_max_overflow          = { path = "backend/DB_POOL_MAX_OVERFLOW", value = "5" }
-    backend_db_pool_size                  = { path = "backend/DB_POOL_SIZE", value = "5" }
-    backend_db_pool_timeout               = { path = "backend/DB_POOL_TIMEOUT_SECONDS", value = "30" }
-    backend_db_target                     = { path = "backend/DB_TARGET", value = "production" }
-    backend_http_allowed_hosts            = { path = "backend/HTTP_ALLOWED_HOSTS", value = jsonencode([aws_lb.app.dns_name, "localhost", "127.0.0.1"]) }
-    backend_http_cors_allowed_origins     = { path = "backend/HTTP_CORS_ALLOWED_ORIGINS", value = "[]" }
-    backend_log_format                    = { path = "backend/LOG_FORMAT", value = "json" }
-    backend_log_level                     = { path = "backend/LOG_LEVEL", value = "INFO" }
-    backend_worker_enabled                = { path = "backend/WORKER_ENABLED", value = "false" }
-    ai_openai_base_url                    = { path = "ai/AI_OPENAI_BASE_URL", value = "https://api.openai.com/v1" }
-    ai_request_timeout_seconds            = { path = "ai/AI_REQUEST_TIMEOUT_SECONDS", value = "60" }
+  application_environment = {
+    backend = {
+      APP_ENV                               = "prod"
+      APP_HOST                              = "0.0.0.0"
+      APP_OPENAPI_ENABLED                   = "false"
+      APP_PORT                              = "8000"
+      AUTH_CSRF_COOKIE_NAME                 = "brokerage_csrf"
+      AUTH_DEVELOPMENT_ENABLED              = "false"
+      AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "10080"
+      AUTH_SESSION_COOKIE_NAME              = "brokerage_session"
+      AUTH_SESSION_IDLE_TIMEOUT_MINUTES     = "1440"
+      AUTH_SESSION_LAST_SEEN_UPDATE_SECONDS = "300"
+      DB_POOL_MAX_OVERFLOW                  = "5"
+      DB_POOL_SIZE                          = "5"
+      DB_POOL_TIMEOUT_SECONDS               = "30"
+      DB_TARGET                             = "production"
+      HTTP_ALLOWED_HOSTS                    = jsonencode([aws_lb.app.dns_name, "localhost", "127.0.0.1"])
+      HTTP_CORS_ALLOWED_ORIGINS             = "[]"
+      LOG_FORMAT                            = "json"
+      LOG_LEVEL                             = "INFO"
+      WORKER_ENABLED                        = "false"
+      WORKER_READY_FILE                     = "/tmp/brokerage-worker-ready"
+    }
+    ai = {
+      AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
+      AI_REQUEST_TIMEOUT_SECONDS = "60"
+    }
   }
+
+  application_parameters = merge([
+    for namespace, values in local.application_environment : {
+      for name, value in values : "${namespace}_${lower(name)}" => {
+        path  = "${namespace}/${name}"
+        value = value
+      }
+    }
+  ]...)
 }
 
 resource "aws_secretsmanager_secret" "application" {
@@ -48,6 +63,12 @@ resource "aws_secretsmanager_secret" "application" {
   tags = {
     Name = each.value.name
   }
+}
+
+resource "aws_secretsmanager_secret_version" "ai_provider" {
+  secret_id                = aws_secretsmanager_secret.application["ai_provider"].id
+  secret_string_wo         = jsonencode(var.ai_provider_api_keys)
+  secret_string_wo_version = var.ai_provider_secret_version
 }
 
 resource "aws_ssm_parameter" "application" {
@@ -64,8 +85,28 @@ resource "aws_ssm_parameter" "application" {
   }
 }
 
+moved {
+  from = aws_ssm_parameter.application["backend_auth_session_absolute_minutes"]
+  to   = aws_ssm_parameter.application["backend_auth_session_absolute_timeout_minutes"]
+}
+
+moved {
+  from = aws_ssm_parameter.application["backend_auth_session_idle_minutes"]
+  to   = aws_ssm_parameter.application["backend_auth_session_idle_timeout_minutes"]
+}
+
+moved {
+  from = aws_ssm_parameter.application["backend_auth_session_last_seen"]
+  to   = aws_ssm_parameter.application["backend_auth_session_last_seen_update_seconds"]
+}
+
+moved {
+  from = aws_ssm_parameter.application["backend_db_pool_timeout"]
+  to   = aws_ssm_parameter.application["backend_db_pool_timeout_seconds"]
+}
+
 output "application_secret_arns" {
-  description = "런타임 IAM과 배포 주입 구성이 참조할 빈 application secret container ARN"
+  description = "런타임 IAM과 배포 주입 구성이 참조할 application secret container ARN"
   value       = { for purpose, secret in aws_secretsmanager_secret.application : purpose => secret.arn }
 }
 

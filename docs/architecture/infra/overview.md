@@ -1,7 +1,7 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·Verify/Build 분리 미적용
-updated: 2026-08-20
+implementation: workload·기존 delivery 적용·dev source/Verify·Build/environment materialization 미적용
+updated: 2026-08-24
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -43,10 +43,10 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
 | 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
 | CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨 | 기본 도메인, `/api/*` cache disabled, managed security headers |
-| 보안 | Secrets Manager, Parameter Store | 결정 | 적용됨 | runtime DB·migration DB·AI secret container 분리, value는 외부 주입 |
+| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·Discord ignored tfvars→write-only 전환은 plan·apply 전 |
 | 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 5개; SNS 구독 없음 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
-| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 구조 적용됨·분리 변경 미적용 | 통합 main 자동 전환 예정, Backend·Frontend 수동, QUEUED |
+| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
 | 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |
 | 전달 | Pipeline artifact 전용 S3 | 결정 | 적용됨 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
 | DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
@@ -65,7 +65,7 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 ```mermaid
 flowchart LR
     user["개발자·시연 사용자"]
-    github["GitHub main 또는 지정 commit"]
+    github["GitHub dev 또는 지정 commit"]
 
     subgraph aws["AWS ap-northeast-2"]
         cf["CloudFront"]
@@ -86,7 +86,7 @@ flowchart LR
         openai["OpenAI API"]
     end
 
-    github -->|"main 자동 또는 수동 SHA"| pipeline
+    github -->|"dev 자동 또는 수동 SHA"| pipeline
     pipeline --> artifact
     pipeline --> ecr
     pipeline --> webS3

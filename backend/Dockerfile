@@ -32,9 +32,5 @@ COPY --chown=brokerage:brokerage backend/yoyo.ini /workspace/backend/yoyo.ini
 COPY --chown=brokerage:brokerage docs/db/migrate /workspace/docs/db/migrate
 
 USER brokerage
-EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"]
-
-CMD ["uvicorn", "main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "src/server.py"]

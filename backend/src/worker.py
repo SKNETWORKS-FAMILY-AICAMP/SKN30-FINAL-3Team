@@ -53,26 +53,14 @@ from domain.agent_execution.models import (
 from domain.engine import create_database_engine
 
 logger = structlog.get_logger()
-DEFAULT_READY_FILE = Path("/tmp/brokerage-worker-ready")
 IDLE_WAIT_SECONDS = 2.0
 WORKER_ID_MAX_LENGTH = 64
 
 
-def worker_enabled(source: Mapping[str, str]) -> bool:
-    raw = source.get("WORKER_ENABLED", "false").strip().lower()
-    if raw in {"0", "false", "no", "off"}:
-        return False
-    if raw in {"1", "true", "yes", "on"}:
-        return True
-    raise ConfigurationError("WORKER_ENABLED must be a boolean")
-
-
-def build_worker_id(source: Mapping[str, str] | None = None) -> str:
+def build_worker_id(configured: str | None = None) -> str:
     """재시작과 병렬 인스턴스 사이에 겹치지 않는 64자 이하 lease owner를 만든다."""
-    values = os.environ if source is None else source
-    configured = values.get("WORKER_ID", "").strip()
-    if configured:
-        return configured[:WORKER_ID_MAX_LENGTH]
+    if configured and configured.strip():
+        return configured.strip()[:WORKER_ID_MAX_LENGTH]
     host = socket.gethostname().split(".")[0][:24]
     return f"{host}-{os.getpid()}-{uuid4().hex[:8]}"[:WORKER_ID_MAX_LENGTH]
 
@@ -139,9 +127,7 @@ def _card_model_config(session: Session, run: AgentRun) -> AiModelConfig | None:
         return repository.find_position_card_model_config(
             session, run.brokerage_id, run.model_config_id
         )
-    return repository.find_active_model_config(
-        session, run.brokerage_id, POSITION_CARD_CAPABILITY
-    )
+    return repository.find_active_model_config(session, run.brokerage_id, POSITION_CARD_CAPABILITY)
 
 
 def _judgment_model_config(session: Session, run: AgentRun) -> AiModelConfig | None:
@@ -158,9 +144,7 @@ def _judgment_model_config(session: Session, run: AgentRun) -> AiModelConfig | N
 
 def _judgment_required(session: Session, run: AgentRun) -> bool:
     """후보 카드가 없으면 판정 설정과 Provider를 조회하지 않는다."""
-    header = repository.find_match_evaluation_for_run(
-        session, run.brokerage_id, run.id or 0
-    )
+    header = repository.find_match_evaluation_for_run(session, run.brokerage_id, run.id or 0)
     if header is None:
         return False
     entries = header.candidate_selection_snapshot.get("candidate_cards")
@@ -306,7 +290,6 @@ def run_enabled_worker(
 def main() -> None:
     config = get_config()
     configure_logging(config.log)
-    enabled = worker_enabled(os.environ)
     stop_event = threading.Event()
 
     def request_stop(signum: int, _frame: object) -> None:
@@ -315,12 +298,11 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
-    ready_file = Path(os.getenv("WORKER_READY_FILE", str(DEFAULT_READY_FILE)))
 
-    if not enabled:
+    if not config.worker.enabled:
         run_disabled_worker(
             stop_event=stop_event,
-            ready_file=ready_file,
+            ready_file=config.worker.ready_file,
             readiness_probe=lambda: database_is_ready(config),
         )
         return
@@ -328,8 +310,8 @@ def main() -> None:
     run_enabled_worker(
         config=config,
         stop_event=stop_event,
-        ready_file=ready_file,
-        worker_id=build_worker_id(),
+        ready_file=config.worker.ready_file,
+        worker_id=build_worker_id(config.worker.worker_id),
     )
 
 

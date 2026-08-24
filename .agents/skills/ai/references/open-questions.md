@@ -1,6 +1,6 @@
 ---
 status: 미확정
-updated: 2026-08-17
+updated: 2026-08-24
 ---
 
 # AI 미해결 질문
@@ -12,4 +12,4 @@ updated: 2026-08-17
 | AI-OQ-003 | 운영 기본 Provider를 무엇으로 할 것인가? | adapter 구현은 운영 Provider 승인을 의미하지 않음 | 배포, 장애 대응, 비용 |
 | AI-OQ-004 | LangGraph checkpoint를 어디에 어떤 계약으로 저장할 것인가? | F3에서 재개가 필요하지만 Backend에 LangGraph 타입을 노출할 수 없음 | 실행 복구, 보존, Backend facade |
 
-비밀 저장소 제품과 환경별 주입 방식은 project-wiki의 OQ-010에서 관리한다.
+비밀 저장소와 환경별 주입 방식은 [프로젝트 ADR-0015](../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)에서 해결했다. 실제 Provider 선택은 AI-OQ-003으로 유지한다.

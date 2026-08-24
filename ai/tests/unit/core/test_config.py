@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ from brokerage_ai.core.config import AiProfile, bind_ai_config, load_ai_config
 from brokerage_ai.core.errors import ConfigurationError
 
 
-def test_process_environment_overrides_secret_and_profile_files(
+def test_local_environment_merges_team_personal_and_process_values(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -32,15 +33,45 @@ def test_process_environment_overrides_secret_and_profile_files(
     assert config.openai.api_key.get_secret_value() == "process-secret"
 
 
-def test_test_profile_does_not_read_dotenv_files(
+def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    (tmp_path / ".env.test").write_text("AI_OPENAI_API_KEY=must-not-load\n")
-    (tmp_path / ".env").write_text("AI_OPENAI_API_KEY=must-not-load\n")
+    (tmp_path / ".env.local").write_text(
+        "AI_OPENAI_BASE_URL=https://api.openai.com/v1\nAI_REQUEST_TIMEOUT_SECONDS=10\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".env").write_text(
+        "AI_OPENAI_API_KEY=${AI_CONFIG_SENTINEL}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_module, "AI_ROOT", tmp_path)
+    monkeypatch.delenv("AI_CONFIG_SENTINEL", raising=False)
+
+    config = load_ai_config(AiProfile.LOCAL, environ={})
+
+    assert config.openai is not None
+    assert config.openai.api_key.get_secret_value() == "${AI_CONFIG_SENTINEL}"
+    assert "AI_CONFIG_SENTINEL" not in os.environ
+
+
+@pytest.mark.parametrize("profile", [AiProfile.TEST, AiProfile.PROD])
+def test_non_local_profiles_do_not_read_dotenv_files(
+    profile: AiProfile,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / ".env.local").write_text(
+        "AI_OPENAI_API_KEY=must-not-load\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".env").write_text(
+        "AI_OPENAI_API_KEY=must-not-load\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(config_module, "AI_ROOT", tmp_path)
 
-    config = load_ai_config(AiProfile.TEST, environ={})
+    config = load_ai_config(profile, environ={})
 
     assert config.openai is None
 
