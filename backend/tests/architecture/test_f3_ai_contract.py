@@ -46,7 +46,7 @@ def test_card_vocabularies_fit_the_stored_columns() -> None:
 
 def test_contract_version_and_cache_key_version_are_separate_axes() -> None:
     assert POSITION_CARD_CONTRACT_VERSION == "position-card:v1"
-    assert CACHE_KEY_SCHEMA_VERSION == "position-card:v2"
+    assert CACHE_KEY_SCHEMA_VERSION == "position-card:v3"
     assert POSITION_CARD_CONTRACT_VERSION != CACHE_KEY_SCHEMA_VERSION
 
 
@@ -77,6 +77,24 @@ def test_f3_ai_project_decisions_are_registered() -> None:
     assert "OQ-012" not in open_questions
     assert "SYNTHETIC_PROTOTYPE" in privacy_policy
     assert "상태: 승인됨" in prototype_decision
+
+
+def test_anchor_card_storage_is_registered_in_the_current_project_contracts() -> None:
+    """코드가 진행됐는데 위키가 계속 미구현이라고 남는 회귀를 막는다."""
+    references = REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references"
+    contract = (references / "contracts" / "f3-ai.md").read_text()
+    api_contract = (references / "contracts" / "api.md").read_text()
+    log = (references / "log.md").read_text()
+    online_runtime = (
+        REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"
+    ).read_text()
+
+    assert "| Cache key 버전 | `position-card:v3`" in contract
+    assert "카드·거래 유형별 가격·근거 인용과 quote offset 저장" in contract
+    assert "| `ANCHOR_READY` | 업무 처리 | 앵커 카드 검증·저장 완료 | 구현됨 |" in api_contract
+    assert "`position-card:v3`" in online_runtime
+    assert "Worker polling·handler" in online_runtime
+    assert "F3 앵커 포지션 카드의 합성 F1 snapshot 조립" in log
 
 
 def test_importing_the_contract_has_no_configuration_or_client_side_effect() -> None:

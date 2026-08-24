@@ -4,7 +4,7 @@
 정본 문서는 `.agents/skills/project-wiki/references/contracts/f3-ai.md`다.
 
 여기의 `POSITION_CARD_CONTRACT_VERSION`은 DTO와 의미 규격의 버전이다. Backend가 계산하는
-cache key 버전(`position-card:v2`)과는 다른 축이며 서로 독립적으로 올라간다.
+cache key 버전(`position-card:v3`)과는 다른 축이며 서로 독립적으로 올라간다.
 """
 
 from __future__ import annotations

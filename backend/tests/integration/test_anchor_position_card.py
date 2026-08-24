@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import brokerage_ai
 import pytest
+from brokerage_ai.f3 import InputPrivacyMode
 from sqlalchemy import text
 from sqlmodel import Session, create_engine
 
@@ -84,6 +85,20 @@ class Fixture:
             b=self.brokerage_id,
             u=self.unit_id,
         )
+        self.owner_party_id = scalar(
+            session,
+            "INSERT INTO party (brokerage_id, party_type, name) VALUES (:b, 'PERSON', '소유자')"
+            " RETURNING id",
+            b=self.brokerage_id,
+        )
+        scalar(
+            session,
+            "INSERT INTO property_unit_party_relation (brokerage_id, unit_id, party_id, role)"
+            " VALUES (:b, :u, :p, 'OWNER') RETURNING id",
+            b=self.brokerage_id,
+            u=self.unit_id,
+            p=self.owner_party_id,
+        )
         self.party_id = scalar(
             session,
             "INSERT INTO party (brokerage_id, party_type, name) VALUES (:b, 'PERSON', '손님')"
@@ -135,14 +150,17 @@ class Fixture:
         )
 
     def interaction(self, *, at: datetime, unit: bool = True) -> int:
+        """세대 로그에는 당사자를 붙인다. 매물 대리는 허용 당사자의 말만 읽는다."""
         return scalar(
             self.session,
             "INSERT INTO client_interaction (brokerage_id, interaction_at, interaction_content,"
-            " unit_id, requirement_id) VALUES (:b, :at, '상담 내용', :u, :r) RETURNING id",
+            " unit_id, requirement_id, party_id)"
+            " VALUES (:b, :at, '상담 내용', :u, :r, :p) RETURNING id",
             b=self.brokerage_id,
             at=at,
             u=self.unit_id if unit else None,
             r=None if unit else self.requirement_id,
+            p=self.owner_party_id if unit else self.party_id,
         )
 
     def card(
@@ -193,6 +211,7 @@ def prepare(session: Session, run_id: int, **overrides: object) -> service.Ancho
         run_id,
         str(overrides.get("worker_id", WORKER)),
         int(overrides.get("attempt_count", ATTEMPT)),  # pyright: ignore[reportArgumentType]
+        input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
     )
 
 
@@ -613,8 +632,14 @@ def test_summary_of_an_anchor_without_interactions_is_empty() -> None:
     with anchor_session() as session:
         fixture = Fixture(session)
 
-        summary = repository.summarize_interactions(
-            session, fixture.brokerage_id, unit_id=fixture.unit_id, listing_id=fixture.listing_id
+        summary = repository.summarize_scoped_interactions(
+            session,
+            repository.InteractionScope(
+                brokerage_id=fixture.brokerage_id,
+                allowed_party_ids=frozenset({fixture.owner_party_id}),
+                unit_id=fixture.unit_id,
+                listing_id=fixture.listing_id,
+            ),
         )
 
         assert summary == repository.InteractionSummary(0, None, None)

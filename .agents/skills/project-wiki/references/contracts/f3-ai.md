@@ -21,6 +21,9 @@ updated: 2026-08-24
 | 생성 구현과 workflow version | `ai/src/brokerage_ai/f3/generator.py` |
 | Backend 앵커 종류 | `backend/src/domain/agent_execution/models.py` (`AnchorType`) |
 | Backend cache key | `backend/src/domain/agent_execution/cache_key.py` |
+| Backend 합성 입력 조립 | `backend/src/domain/agent_execution/snapshot.py` |
+| Backend 생성·저장 유스케이스 | `backend/src/domain/agent_execution/anchor_card.py` |
+| 카드·가격·근거 ORM | `backend/src/domain/agent_execution/models.py` |
 
 ## 버전 축
 
@@ -29,7 +32,7 @@ updated: 2026-08-24
 | 계약 버전 | `position-card:v1` | DTO와 의미 규격의 버전 | AI |
 | Prompt 버전 | `position-card-prompt:v1` | 프롬프트 원문의 버전 | AI |
 | Workflow 버전 | `position-card-workflow:v1` | 생성 절차의 버전 | AI |
-| Cache key 버전 | `position-card:v2` | 캐시 키 계산 방식의 버전 | Backend |
+| Cache key 버전 | `position-card:v3` | 캐시 키 계산 방식의 버전 | Backend |
 
 네 값은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
 
@@ -272,7 +275,7 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 
 - 아무 근거도 없는 카드 항목은 거절한다 (F3-CM-02).
 - AI는 quote offset을 만들지 않는다. `Evidence`에 offset 필드가 없다.
-- Backend가 저장 전에 `quote_text`가 해당 마스킹 상담 로그에 실제로 존재하는지 확인하고,
+- Backend가 저장 전에 `quote_text`가 해당 Provider 전달용 상담 로그에 실제로 존재하는지 확인하고,
   실제 원문 기준 offset을 계산해 `negotiation_position_evidence`에 넣는다.
 
 구조 validation과 요청·결과 간 validation을 구분한다.
@@ -280,8 +283,8 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 | 계층 | 위치 | 확인 |
 |---|---|---|
 | 구조 | Pydantic DTO | 어휘, 필수값, 빈 문자열, 음수, extra field, kind별 필수값 |
-| 요청·결과 | `validate_generation_result()` | 계약 버전, 대상과 side 일치, source identity 일치, hard deadline이 Backend 날짜 신호와 같은지, 인용 로그가 요청 범위 안인지, 인용문이 마스킹 본문에 실재하는지, price_kind가 해당 측과 활성 거래 유형에 허용되는지, 표기 금액이 장부와 같은지 |
-| DB 현재 상태 | Backend (후속 구현) | lease 소유권, 입력 버전, source identity 재대조, tenant 격리, offset 계산 |
+| 요청·결과 | `validate_generation_result()` | 계약 버전, 대상과 side 일치, source identity 일치, hard deadline이 Backend 날짜 신호와 같은지, 인용 로그가 요청 범위 안인지, 인용문이 Provider 전달용 본문에 실재하는지, price_kind가 해당 측과 활성 거래 유형에 허용되는지, 표기 금액이 장부와 같은지 |
+| DB 현재 상태 | Backend | lease 소유권과 attempt fencing, 입력 버전·상담 범위·source identity·입력 fingerprint 재대조, tenant 격리, offset 계산 |
 
 `LlmPositionCardGenerator`는 조립한 결과를 경계 밖으로 반환하기 전에
 `validate_generation_result()`를 반드시 호출한다. 따라서 호출자는 요청 범위를 위반한 모델
@@ -312,7 +315,7 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 | 구분 | 항목 |
 |---|---|
 | Backend → AI 전달 가능 | 내부 anchor ID, 구조화된 매물·구입 조건, 날짜 신호, Provider 전달용 상담 내용, 내부 `interaction_id`, source identity, 입력 privacy mode |
-| 전달 금지 | 성명, 로그인 ID, 전화번호, 이메일, 생년월일, 인증·세션·CSRF 정보, `requested_by`, 치환 대응표, Secret, 프롬프트 원문 전체, 반대편 당사자 데이터 |
+| 전달 금지 | 실사용자 성명, 로그인 ID, 전화번호, 이메일, 생년월일, 인증·세션·CSRF 정보, `requested_by`, 치환 대응표, Secret, 프롬프트 원문 전체, 반대편 당사자 데이터. 실제 인물과 무관한 합성 케이스는 ADR-0014 예외를 따름 |
 | 저장 | Backend가 검증한 구조화 포지션 카드, 필요한 근거 인용, 안전한 모델 진단, 버전 정보 |
 | 로그 금지 | 전체 프롬프트, 전체 모델 원문 응답, 상담 로그 전체 원문, 성명·연락처, 토큰·인증 헤더 |
 
@@ -359,13 +362,15 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로�
 - 생성 결과 반환 전 요청·결과 교차 검증을 강제하는 순수 함수
 - Backend `AnchorType`과의 값 일치 계약 테스트
 - 정본 등록과 OQ-012 종료를 강제하는 계약 테스트
+- 합성 F1 장부·측면별 상담 로그를 `SYNTHETIC_PROTOTYPE` 요청 snapshot으로 조립
+- 입력 전체 fingerprint와 상담 범위 identity를 포함하는 Backend cache key `position-card:v3`
+- AI 호출 전후 transaction 분리와 lease·attempt·입력 버전·상담 범위·source identity 재검증
+- 검증된 카드·거래 유형별 가격·근거 인용과 quote offset 저장
+- cache hit 재사용과 저장 경합 단일화, `ANCHOR_READY` 상태 전이
 
 ### 아직 구현하지 않음 (`계획됨`)
 
-- Backend의 F1 snapshot 조립
 - 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
-- 카드와 근거의 DB 저장, quote offset 계산
-- `ANCHOR_READY` 상태 전이
 - SQL 후보 추출, 후보 카드, 중개 판정
 - Worker polling과 `WORKER_ENABLED=true`
 - F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
