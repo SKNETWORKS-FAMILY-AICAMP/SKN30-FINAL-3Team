@@ -4,12 +4,14 @@ from fastapi import APIRouter, Depends, Path, Query
 from sqlmodel import Session
 
 from api.schemas.f3_runs import (
+    F3FeedbackCreateRequest,
+    F3FeedbackResponse,
     F3RunCreateRequest,
     F3RunResponse,
     F3RunResultResponse,
     F3RunStatusResponse,
 )
-from domain.agent_execution import results, service
+from domain.agent_execution import feedback, results, service
 from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser
 from domain.session import get_db_session
@@ -18,6 +20,25 @@ router = APIRouter(prefix="/f3", tags=["agent-execution"])
 
 DEFAULT_CANDIDATE_LIMIT = 20
 MAX_CANDIDATE_LIMIT = 100
+
+
+@router.post("/feedback", response_model=F3FeedbackResponse, status_code=201)
+def create_f3_feedback(
+    payload: F3FeedbackCreateRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    _: None = Depends(require_csrf),
+) -> F3FeedbackResponse:
+    stored = feedback.record_not_interested_feedback(
+        db,
+        user.brokerage_id,
+        user.id,
+        payload.target,
+        payload.target_id,
+        payload.reason,
+        payload.field_name,
+    )
+    return F3FeedbackResponse.from_domain(stored)
 
 
 @router.post("/runs", response_model=F3RunResponse, status_code=202)

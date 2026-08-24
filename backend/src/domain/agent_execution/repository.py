@@ -23,6 +23,7 @@ from domain.agent_execution.models import (
     QUEUED_STATUS,
     RUNNING_STATUS,
     AgentRun,
+    AiDecisionFeedback,
     AiModelConfig,
     AnchorType,
     MatchCandidateEvaluation,
@@ -1449,3 +1450,33 @@ def list_candidate_judgment_evidence(
         .order_by(col(MatchCandidateEvidence.id).asc())
     )
     return list(session.execute(statement).scalars().all())
+
+
+def find_position_card(
+    session: Session, brokerage_id: int, position_analysis_id: int
+) -> NegotiationPositionAnalysis | None:
+    """피드백 대상 포지션 카드를 사무소 범위에서 조회한다."""
+    statement = select(NegotiationPositionAnalysis).where(
+        col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+        col(NegotiationPositionAnalysis.id) == position_analysis_id,
+    )
+    return session.execute(statement).scalars().first()
+
+
+def find_candidate_judgment(
+    session: Session, brokerage_id: int, candidate_evaluation_id: int
+) -> MatchCandidateEvaluation | None:
+    """피드백 대상 후보 판정을 사무소 범위에서 조회한다."""
+    statement = select(MatchCandidateEvaluation).where(
+        col(MatchCandidateEvaluation.brokerage_id) == brokerage_id,
+        col(MatchCandidateEvaluation.id) == candidate_evaluation_id,
+    )
+    return session.execute(statement).scalars().first()
+
+
+def add_decision_feedback(
+    session: Session, feedback: AiDecisionFeedback
+) -> AiDecisionFeedback:
+    session.add(feedback)
+    session.flush()
+    return feedback

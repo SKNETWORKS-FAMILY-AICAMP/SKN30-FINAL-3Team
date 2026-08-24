@@ -130,11 +130,10 @@ updated: 2026-08-24
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
 
-## F3 실행 계약 (제안)
+## F3 실행 계약
 
-이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 요청을 검증해
-`agent_run`에 `QUEUED`로 적재하고, 현재 상태와 마지막으로 저장된 안전한 결과를 조회하는 것까지다.
-피드백 경로는 아직 없다.
+이 절은 현재 구현된 브라우저–Backend 공개 계약의 정본이다. 실행 요청을 `agent_run`에 `QUEUED`로
+적재하고 현재 상태와 마지막 안전 결과를 조회하며, 저장된 카드·판정에 구조화 피드백을 남긴다.
 
 이 절은 브라우저와 Backend 사이의 HTTP 계약만 다룬다. Backend와 AI 사이의 포지션 카드 입력·결과,
 어휘와 근거 규칙은 [F3 AI 계약](f3-ai.md)이 소유하며 그 계약은 이 HTTP 경로로 노출되지 않는다.
@@ -144,9 +143,10 @@ updated: 2026-08-24
 | POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
 | GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
 | GET | /api/v1/f3/runs/{run_id}/result | 세션 | 실행의 앵커 카드·후보 조회 조건·후보별 판정 결과를 현재 저장 단계까지 조회 |
+| POST | /api/v1/f3/feedback | 세션·CSRF | 포지션 카드 또는 후보 판정에 구조화된 관심없음 사유를 기록 |
 
-위 세 경로는 모두 현재 Backend에 **구현됨**이다. 특히 결과 조회는 더 이상 미구현 후속 경로가
-아니며, 아래 `실행 결과 조회` 절이 공개 계약의 정본이다. 사용자 피드백 API만 후속 범위다.
+위 네 경로는 모두 현재 Backend에 **구현됨**이다. 결과 조회와 관심없음 피드백은 더 이상 미구현
+후속 경로가 아니며 아래 각 절이 공개 계약의 정본이다. 상담 로그를 만드는 정정 피드백만 후속 범위다.
 
 요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
 정수다. 선언하지 않은 필드가 있으면 422로 거절한다.
@@ -301,6 +301,61 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 `candidates_total`, `limit`, `offset`이다. `candidate_selection`은 `criteria`, `total_count`,
 `carded_count`, `remaining_count`를 싣는다. 후보는 장부 `candidate_id`, SQL 순위·점수·금액·접수일,
 카드화 여부와 저장된 경우에만 중개 판정 및 근거를 싣는다. 빈 후보 결과도 같은 형태로 200을 반환한다.
+
+### 관심없음 피드백
+
+`POST /api/v1/f3/feedback`은 F3-TR-03의 [관심없음]만 기록하는 상태 변경 경로이므로 세션과 CSRF를
+요구한다. 응답은 `201 Created`다. 요청은 다음 네 필드만 허용하며 선언하지 않은 필드는 422로
+거절한다.
+
+```json
+{
+  "target": "MATCH_CANDIDATE",
+  "target_id": 81,
+  "reason": "WRONG_JUDGMENT",
+  "field_name": "match_grade"
+}
+```
+
+- `target`: `POSITION_ANALYSIS` 또는 `MATCH_CANDIDATE`
+- `target_id`: 1 이상의 숫자 식별자
+- `reason`: `CONDITION_MISMATCH`, `ALREADY_CONTACTED`, `WRONG_JUDGMENT`, `OTHER`
+- `field_name`: 선택값. `negotiation_intent`, `urgency`, `preferred_timing`,
+  `flexible_conditions`, `inflexible_conditions`, `contactability_status`, `price`,
+  `match_grade`, `evaluation_basis`, `primary_obstacle`, `possible_concession`,
+  `recommended_action`, `exclusion_reason` 중 하나
+
+| 화면 사유 | reason |
+|---|---|
+| 조건 안 맞음 | `CONDITION_MISMATCH` |
+| 이미 연락함 | `ALREADY_CONTACTED` |
+| 판정이 틀림 | `WRONG_JUDGMENT` |
+| 기타 | `OTHER` |
+
+`feedback_type`은 클라이언트 입력이 아니라 서버가 `NOT_INTERESTED`로 고정한다. `detail`,
+`original_value`, `corrected_value`, `correction_interaction_id`, `brokerage_id`, `created_by`도 받지
+않는다. 따라서 이 경로에는 상담 원문, 이름, 연락처와 자유문자를 저장할 입력란이 없다.
+
+대상은 세션의 `brokerage_id`로 조회한다. 없거나 다른 사무소 소유이면 모두 404로 답하고,
+`brokerage_id`와 `created_by`는 세션에서만 도출한다. 응답은 아래 필드만 포함하며 사무소와 작성자
+식별자를 싣지 않는다.
+
+```json
+{
+  "feedback_id": 12,
+  "target": "MATCH_CANDIDATE",
+  "target_id": 81,
+  "feedback_type": "NOT_INTERESTED",
+  "reason": "WRONG_JUDGMENT",
+  "field_name": "match_grade",
+  "created_at": "2026-08-24T12:00:00+09:00"
+}
+```
+
+F3-TR-02의 정정은 이번 계약에 포함하지 않는다. 정정은 값을 저장하는 것만으로 끝나지 않고 추가 전용
+상담 로그를 생성해 다음 판정 입력에 포함해야 한다. 그 유스케이스와 권한·개인정보 경계를 함께
+구현하기 전까지 `CORRECTION`이나 임의 정정값을 공개 입력으로 받지 않는다. 작성자 식별자의 처리
+정본은 [개인정보 정책](../privacy/policy.md)의 `ai_decision_feedback.created_by` 절이다.
 
 ### Worker 선점과 lease
 
