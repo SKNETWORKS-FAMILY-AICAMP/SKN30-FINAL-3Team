@@ -4,7 +4,8 @@ import hashlib
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, NamedTuple, cast
 
 from sqlalchemy import CursorResult, and_, case, func, literal, or_, text, update
@@ -23,6 +24,7 @@ from domain.agent_execution.models import (
     AgentRun,
     AiModelConfig,
     AnchorType,
+    MatchEvaluation,
     NegotiationPositionAnalysis,
     NegotiationPositionEvidence,
     NegotiationPositionPrice,
@@ -30,6 +32,7 @@ from domain.agent_execution.models import (
 from domain.property_ledger import repository as ledger_repository
 from domain.property_ledger.models import (
     ClientInteraction,
+    Party,
     PropertyComplex,
     PropertyListing,
     PropertyRequirement,
@@ -163,17 +166,20 @@ def fail_runs_over_attempt_limit(
 
 
 def find_leased_run(
-    session: Session, run_id: int, worker_id: str, attempt_count: int
+    session: Session, run_id: int, worker_id: str, attempt_count: int, status: str = RUNNING_STATUS
 ) -> AgentRun | None:
     """이 Worker가 아직 유효한 lease를 쥔 실행만 돌려준다.
 
     만료 판정은 애플리케이션 시계가 아니라 DB의 now()를 쓴다. attempt_count 까지 맞춰야
     같은 Worker가 이전 시도의 결과를 뒤늦게 밀어넣는 것을 막는다.
+
+    `status`는 이 단계가 기대하는 상태다. 단계마다 다르므로 인자로 받는다. 기대와 다른
+    상태의 실행을 집어 처리하면 이미 끝난 단계를 다시 쓰거나 건너뛰게 된다.
     """
     statement = select(AgentRun).where(
         *root_cross_judgment_conditions(),
         col(AgentRun.id) == run_id,
-        col(AgentRun.status) == RUNNING_STATUS,
+        col(AgentRun.status) == status,
         col(AgentRun.lease_owner) == worker_id,
         col(AgentRun.attempt_count) == attempt_count,
         col(AgentRun.lease_expires_at) > func.now(),
@@ -715,6 +721,395 @@ def bind_run_execution_configuration(
             workflow_version=workflow_version,
             updated_at=func.now(),
         )
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+class CandidatePriceRow(NamedTuple):
+    """카드에 실린 거래 유형별 금액. `display_order` 순서를 그대로 유지한다.
+
+    월세는 보증금과 월 차임이 **별도 축**이라 네 값을 모두 들고 온다. 하나로 접으면 어느
+    금액을 비교했는지 알 수 없게 된다.
+    """
+
+    price_kind: str
+    stated_amount: int | None
+    estimated_amount: int | None
+    stated_monthly_amount: int | None
+    estimated_monthly_amount: int | None
+
+
+def list_position_card_prices(
+    session: Session, brokerage_id: int, position_analysis_id: int
+) -> list[CandidatePriceRow]:
+    """카드의 금액을 원래 순서로 읽는다. 첫 행이 후보 조회의 가격 축이 된다."""
+    statement = (
+        select(NegotiationPositionPrice)
+        .where(
+            col(NegotiationPositionPrice.brokerage_id) == brokerage_id,
+            col(NegotiationPositionPrice.position_analysis_id) == position_analysis_id,
+        )
+        .order_by(
+            col(NegotiationPositionPrice.display_order).asc(),
+            col(NegotiationPositionPrice.price_kind).asc(),
+        )
+    )
+    return [
+        CandidatePriceRow(
+            price_kind=row.price_kind,
+            stated_amount=row.stated_amount,
+            estimated_amount=row.estimated_amount,
+            stated_monthly_amount=row.stated_monthly_amount,
+            estimated_monthly_amount=row.estimated_monthly_amount,
+        )
+        for row in session.execute(statement).scalars().all()
+    ]
+
+
+class UnitSpecification(NamedTuple):
+    """후보 조회에 쓰는 세대 사양. 인물과 금액은 담지 않는다."""
+
+    complex_id: int
+    pyeong: Decimal | None
+
+
+class RequirementSpecification(NamedTuple):
+    """구입장 앵커가 어떤 거래를 원하는지. 후보 매물의 거래 유형을 여기서 정한다."""
+
+    demand_type: str
+    desired_pyeongs: tuple[Decimal, ...]
+
+
+def find_requirement_specification(
+    session: Session, brokerage_id: int, requirement_id: int
+) -> RequirementSpecification | None:
+    """구입장의 거래 구분과 희망 평형.
+
+    `demand_type` 은 매물장과 어휘가 다르다. 매물장이 `매매`라고 부르는 것을 구입장은
+    `매수`라고 부른다 (F1 데이터 항목 13.1·13.2).
+    """
+    statement = select(
+        col(PropertyRequirement.demand_type), col(PropertyRequirement.desired_pyeongs)
+    ).where(
+        col(PropertyRequirement.brokerage_id) == brokerage_id,
+        col(PropertyRequirement.id) == requirement_id,
+        col(PropertyRequirement.is_deleted).is_(False),
+    )
+    row = session.execute(statement).first()
+    return RequirementSpecification(row[0], tuple(row[1] or ())) if row else None
+
+
+def find_unit_specification(
+    session: Session, brokerage_id: int, unit_id: int
+) -> UnitSpecification | None:
+    """삭제되지 않은 세대의 단지와 평형. 화면에서 사라진 세대는 조건을 만들지 않는다."""
+    statement = select(col(PropertyUnit.complex_id), col(PropertyUnit.pyeong)).where(
+        col(PropertyUnit.brokerage_id) == brokerage_id,
+        col(PropertyUnit.id) == unit_id,
+        col(PropertyUnit.is_deleted).is_(False),
+    )
+    row = session.execute(statement).first()
+    return UnitSpecification(row[0], row[1]) if row else None
+
+
+def list_requirement_complex_ids(
+    session: Session, brokerage_id: int, requirement_id: int
+) -> list[int]:
+    """구입장이 지정한 희망 단지. 삭제된 단지는 빼서 살아 있는 조건만 남긴다."""
+    statement = (
+        select(col(PropertyRequirementComplex.complex_id))
+        .join(
+            PropertyComplex,
+            (col(PropertyComplex.brokerage_id) == PropertyRequirementComplex.brokerage_id)
+            & (col(PropertyComplex.id) == PropertyRequirementComplex.complex_id),
+        )
+        .where(
+            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+            col(PropertyRequirementComplex.requirement_id) == requirement_id,
+            col(PropertyComplex.is_deleted).is_(False),
+        )
+        .order_by(col(PropertyRequirementComplex.complex_id).asc())
+    )
+    return list(session.execute(statement).scalars().all())
+
+
+class RequirementCandidateRow(NamedTuple):
+    """구입장 후보 1건의 점수 계산 입력."""
+
+    requirement_id: int
+    max_budget_amount: int | None
+    desired_pyeongs: tuple[Decimal, ...]
+    received_at: date | None
+
+
+def list_requirement_candidates(
+    session: Session,
+    brokerage_id: int,
+    *,
+    demand_types: Sequence[str],
+    active_statuses: Sequence[str],
+    budget_floor_amount: int | None,
+    complex_id: int | None,
+) -> list[RequirementCandidateRow]:
+    """매물 앵커의 반대편 후보. 조건에 맞는 구입장만 돌려준다 (F3-SQ-01).
+
+    포함·제외는 전부 SQL 조건이다. 사무소, 구입장 삭제, 인물 삭제, **거래 구분**, **활성
+    업무 상태**, 예산 하한과 희망 단지가 조건이며 평형과 최신성은 점수로만 반영한다.
+
+    `demand_types` 는 앵커 매물의 거래 유형과 호환되는 구입장 구분이다. 매매 매물에 전세
+    손님이 붙거나 월세 매물에 매수 손님이 붙으면 안 된다. 비어 있으면 호환되는 구분이
+    없다는 뜻이므로 후보도 없다.
+
+    희망 단지를 하나도 지정하지 않은 구입장은 단지를 가리지 않는 손님이므로 포함한다.
+    예산이 비어 있는 구입장도 포함한다. 예산 미기재는 "못 산다"가 아니라 "아직 모른다"이며,
+    금액을 모르는 후보는 가격 근접도 0 으로 뒤에 밀린다.
+    """
+    if not demand_types:
+        return []
+
+    conditions: list[Any] = [
+        col(PropertyRequirement.brokerage_id) == brokerage_id,
+        col(PropertyRequirement.is_deleted).is_(False),
+        col(Party.is_deleted).is_(False),
+        col(PropertyRequirement.demand_type).in_(sorted(demand_types)),
+        col(PropertyRequirement.status).in_(sorted(active_statuses)),
+    ]
+    if budget_floor_amount is not None:
+        conditions.append(
+            or_(
+                col(PropertyRequirement.max_budget_amount).is_(None),
+                col(PropertyRequirement.max_budget_amount) >= budget_floor_amount,
+            )
+        )
+    if complex_id is not None:
+        wants_any_complex = ~select(literal(1)).where(
+            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+            col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
+        ).exists()
+        wants_this_complex = select(literal(1)).where(
+            col(PropertyRequirementComplex.brokerage_id) == brokerage_id,
+            col(PropertyRequirementComplex.requirement_id) == PropertyRequirement.id,
+            col(PropertyRequirementComplex.complex_id) == complex_id,
+        ).exists()
+        conditions.append(or_(wants_any_complex, wants_this_complex))
+
+    statement = (
+        select(
+            col(PropertyRequirement.id),
+            col(PropertyRequirement.max_budget_amount),
+            col(PropertyRequirement.desired_pyeongs),
+            col(PropertyRequirement.received_at),
+        )
+        .join(
+            Party,
+            (col(Party.brokerage_id) == PropertyRequirement.brokerage_id)
+            & (col(Party.id) == PropertyRequirement.party_id),
+        )
+        .where(*conditions)
+        .order_by(col(PropertyRequirement.id).asc())
+    )
+    return [
+        RequirementCandidateRow(row[0], row[1], tuple(row[2] or ()), row[3])
+        for row in session.execute(statement).all()
+    ]
+
+
+class ListingCandidateRow(NamedTuple):
+    """매물 후보 1건의 점수 계산 입력.
+
+    `price_amount` 는 요청한 거래 유형의 주 금액이다. 월세는 보증금이고 월 차임은
+    `monthly_amount` 에 따로 담는다. 두 축을 하나로 접지 않는다.
+    """
+
+    listing_id: int
+    price_amount: int | None
+    monthly_amount: int | None
+    pyeong: Decimal | None
+    received_at: date | None
+
+
+# 거래 유형별로 어떤 플래그와 어떤 금액 컬럼을 보는지. 여기 한 곳에만 둔다.
+# 매매가가 있다고 전세 손님의 후보가 되면 안 되므로 유형을 섞어 coalesce 하지 않는다.
+_LISTING_TRADE_COLUMNS: dict[str, tuple[Any, Any, Any]] = {
+    "SALE": (PropertyListing.is_sale_available, PropertyListing.sale_price, None),
+    "JEONSE": (
+        PropertyListing.is_jeonse_available,
+        PropertyListing.jeonse_deposit_amount,
+        None,
+    ),
+    "MONTHLY_RENT": (
+        PropertyListing.is_monthly_rent_available,
+        PropertyListing.monthly_rent_deposit_amount,
+        PropertyListing.monthly_rent_amount,
+    ),
+}
+
+
+def list_listing_candidates(
+    session: Session,
+    brokerage_id: int,
+    *,
+    price_kind: str | None,
+    active_statuses: Sequence[str],
+    price_ceiling_amount: int | None,
+    complex_ids: Sequence[int],
+) -> list[ListingCandidateRow]:
+    """구입장 앵커의 반대편 후보. 조건에 맞는 매물만 돌려준다 (F3-SQ-01).
+
+    `price_kind` 는 앵커 구입장의 `demand_type` 과 호환되는 매물 거래 유형이다. 그 유형의
+    **거래 가능 플래그가 참인 매물만** 후보이며 금액도 그 유형의 컬럼만 본다. 플래그가
+    거짓인 채 남아 있는 과거 금액을 후보 가격으로 쓰지 않는다. 호환되는 유형이 없으면
+    후보도 없다.
+
+    F1 매물 조회와 같은 범위를 본다. **부모 세대 삭제 여부까지** 본다. 세대 소프트 삭제는
+    딸린 매물 행을 건드리지 않아 매물 행만 보면 화면에 없는 세대의 매물이 후보로 올라온다.
+
+    희망 단지를 지정한 구입장이면 그 단지의 매물만 본다. 지정하지 않았으면 단지를 가리지
+    않는다.
+    """
+    trade = _LISTING_TRADE_COLUMNS.get(price_kind or "")
+    if trade is None:
+        return []
+    available, amount_column, monthly_column = trade
+
+    price = col(amount_column)
+    conditions: list[Any] = [
+        col(PropertyListing.brokerage_id) == brokerage_id,
+        col(PropertyListing.is_deleted).is_(False),
+        col(PropertyUnit.is_deleted).is_(False),
+        col(available).is_(True),
+        col(PropertyListing.status).in_(sorted(active_statuses)),
+    ]
+    if price_ceiling_amount is not None:
+        # 보증금·매매가 축만 비교한다. 구입장에는 월 차임에 대응하는 예산 축이 없다.
+        conditions.append(or_(price.is_(None), price <= price_ceiling_amount))
+    if complex_ids:
+        conditions.append(col(PropertyUnit.complex_id).in_(list(complex_ids)))
+
+    statement = (
+        select(PropertyListing, col(PropertyUnit.pyeong))
+        .join(
+            PropertyUnit,
+            (col(PropertyUnit.brokerage_id) == PropertyListing.brokerage_id)
+            & (col(PropertyUnit.id) == PropertyListing.unit_id),
+        )
+        .where(*conditions)
+        .order_by(col(PropertyListing.id).asc())
+    )
+    # 금액은 위 매핑이 정한 컬럼에서만 읽는다. 조회 조건과 같은 한 곳을 쓴다.
+    return [
+        ListingCandidateRow(
+            listing_id=listing.id or 0,
+            price_amount=getattr(listing, amount_column.key),
+            monthly_amount=(
+                getattr(listing, monthly_column.key) if monthly_column is not None else None
+            ),
+            pyeong=pyeong,
+            received_at=listing.received_at,
+        )
+        for listing, pyeong in session.execute(statement).all()
+    ]
+
+
+def find_position_card_for_target(
+    session: Session,
+    brokerage_id: int,
+    *,
+    position_analysis_id: int,
+    negotiation_side: str,
+    listing_id: int | None,
+    requirement_id: int | None,
+) -> NegotiationPositionAnalysis | None:
+    """실행이 기록한 카드 ID 를 다시 확인한다. 사무소·측면·대상·활성 여부를 함께 본다."""
+    statement = select(NegotiationPositionAnalysis).where(
+        col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+        col(NegotiationPositionAnalysis.id) == position_analysis_id,
+        col(NegotiationPositionAnalysis.negotiation_side) == negotiation_side,
+        col(NegotiationPositionAnalysis.listing_id).is_not_distinct_from(listing_id),
+        col(NegotiationPositionAnalysis.requirement_id).is_not_distinct_from(requirement_id),
+        col(NegotiationPositionAnalysis.invalidated_at).is_(None),
+    )
+    return session.execute(statement).scalars().first()
+
+
+def find_match_evaluation_for_run(
+    session: Session, brokerage_id: int, agent_run_id: int
+) -> MatchEvaluation | None:
+    """이 실행의 판정 헤더. 재선점으로 같은 단계가 다시 돌 때 중복 생성을 막는다."""
+    statement = select(MatchEvaluation).where(
+        col(MatchEvaluation.brokerage_id) == brokerage_id,
+        col(MatchEvaluation.agent_run_id) == agent_run_id,
+    )
+    return session.execute(statement).scalars().first()
+
+
+def insert_match_evaluation(session: Session, header: MatchEvaluation) -> MatchEvaluation:
+    session.add(header)
+    session.flush()
+    return header
+
+
+def update_match_evaluation_selection(
+    session: Session,
+    brokerage_id: int,
+    match_evaluation_id: int,
+    *,
+    anchor_position_analysis_id: int,
+    candidate_count: int,
+    candidate_selection_snapshot: dict[str, Any],
+) -> int:
+    """재선점으로 후보를 다시 뽑았을 때 헤더를 갱신한다. 바꾼 행 수를 돌려준다."""
+    statement = (
+        update(MatchEvaluation)
+        .where(
+            col(MatchEvaluation.brokerage_id) == brokerage_id,
+            col(MatchEvaluation.id) == match_evaluation_id,
+        )
+        .values(
+            anchor_position_analysis_id=anchor_position_analysis_id,
+            candidate_count=candidate_count,
+            candidate_selection_snapshot=candidate_selection_snapshot,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def advance_run_status(
+    session: Session,
+    run_id: int,
+    brokerage_id: int,
+    worker_id: str,
+    attempt_count: int,
+    *,
+    expected_status: str,
+    next_status: str,
+    output_snapshot: dict[str, Any] | None = None,
+    completed: bool = False,
+) -> int:
+    """lease 를 아직 쥐고 있고 상태가 기대값일 때만 다음 단계로 옮긴다.
+
+    lease 세 값은 그대로 둔다. 다음 단계가 같은 fencing 을 이어받아야 중간에 다른 Worker 가
+    끼어들지 못한다. `completed_at` 은 종료 상태에서만 채운다.
+    """
+    values: dict[str, Any] = {"status": next_status, "updated_at": func.now()}
+    if output_snapshot is not None:
+        values["redacted_output_snapshot"] = output_snapshot
+    if completed:
+        values["completed_at"] = func.now()
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.status) == expected_status,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.lease_expires_at) > func.now(),
+        )
+        .values(**values)
         .execution_options(synchronize_session=False)
     )
     return cast(CursorResult[Any], session.execute(statement)).rowcount

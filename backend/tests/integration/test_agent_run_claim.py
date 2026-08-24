@@ -243,13 +243,16 @@ def test_expired_lease_is_reclaimed_and_keeps_the_original_started_at() -> None:
 
 
 @requires_database
-def test_expired_anchor_ready_run_is_reclaimed_without_losing_its_progress() -> None:
+@pytest.mark.parametrize("progress_status", ["ANCHOR_READY", "CANDIDATES_READY"])
+def test_expired_intermediate_run_is_reclaimed_without_losing_its_progress(
+    progress_status: str,
+) -> None:
     with claim_session() as (session, brokerage_id, user_id):
         run_id = insert_run(
             session,
             brokerage_id,
             user_id,
-            status="ANCHOR_READY",
+            status=progress_status,
             attempt_count=1,
             started_at=datetime(2026, 8, 19, 1, 0, tzinfo=UTC),
             lease_owner=WORKER_A,
@@ -260,13 +263,13 @@ def test_expired_anchor_ready_run_is_reclaimed_without_losing_its_progress() -> 
 
         assert claimed is not None and claimed.id == run_id
         stored = stored_run(session, run_id)
-        assert stored["status"] == "ANCHOR_READY"
+        assert stored["status"] == progress_status
         assert stored["lease_owner"] == WORKER_B
         assert stored["attempt_count"] == 2
 
 
 @requires_database
-@pytest.mark.parametrize("progress_status", ["RUNNING", "ANCHOR_READY"])
+@pytest.mark.parametrize("progress_status", ["RUNNING", "ANCHOR_READY", "CANDIDATES_READY"])
 def test_expired_run_over_the_attempt_limit_is_terminated_and_not_claimed(
     progress_status: str,
 ) -> None:

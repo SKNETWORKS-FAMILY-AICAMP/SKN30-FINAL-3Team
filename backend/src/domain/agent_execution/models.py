@@ -23,10 +23,11 @@ USER_REQUEST_TRIGGER_TYPE = "USER_REQUEST"
 QUEUED_STATUS = "QUEUED"
 RUNNING_STATUS = "RUNNING"
 ANCHOR_READY_STATUS = "ANCHOR_READY"
+CANDIDATES_READY_STATUS = "CANDIDATES_READY"
 FAILED_TERMINAL_STATUS = "FAILED_TERMINAL"
 
 # 이 슬라이스에서 Worker가 이어서 처리할 수 있는 진행 상태. 종료 상태는 포함하지 않는다.
-IN_PROGRESS_STATUSES = (RUNNING_STATUS, ANCHOR_READY_STATUS)
+IN_PROGRESS_STATUSES = (RUNNING_STATUS, ANCHOR_READY_STATUS, CANDIDATES_READY_STATUS)
 
 # 포지션 카드 생성에 쓸 모델 구성의 capability. 다른 용도의 설정을 끌어다 쓰지 않는다.
 POSITION_CARD_CAPABILITY = "POSITION_CARD"
@@ -201,6 +202,28 @@ class NegotiationPositionPrice(SQLModel, table=True):
     estimated_amount: int | None = Field(default=None, sa_column=Column(BigInteger))
     estimated_monthly_amount: int | None = Field(default=None, sa_column=Column(BigInteger))
     display_order: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
+    created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
+
+
+class MatchEvaluation(SQLModel, table=True):
+    """교차 판정 헤더. `CANDIDATES_READY` 에서 만들고 `COMPLETED` 에서 결과를 채운다.
+
+    후보 조회 조건과 **전체** 후보 집합은 `candidate_selection_snapshot` 이 소유한다.
+    `candidate_count` 는 실제로 카드화·판정한 후보 수이며 전체 후보 수가 아니다.
+    """
+
+    __tablename__: ClassVar[str] = "match_evaluation"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    id: int | None = Field(default=None, sa_column=identity_column())
+    brokerage_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    agent_run_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    anchor_position_analysis_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    candidate_count: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
+    data_version: int = Field(sa_column=Column(BigInteger, nullable=False))
+    candidate_selection_snapshot: dict[str, object] = Field(
+        default_factory=dict, sa_column=Column(JSON, nullable=False)
+    )
+    generated_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
     created_at: datetime | None = Field(default=None, sa_column=created_timestamp_column())
 
 

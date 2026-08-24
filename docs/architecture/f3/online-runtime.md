@@ -167,7 +167,7 @@ sequenceDiagram
 | `CANCELLED` | 종료 | 더 이상 현재 화면에서 실행할 필요 없음 | 마지막 안전 상태 유지 또는 닫기 |
 | `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 결과 미반영, 최신 버전 작업으로 전환 |
 
-현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 검증된 앵커 카드 확보 시 `ANCHOR_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 네 가지다. `ANCHOR_READY` 유스케이스는 Worker polling·handler에 아직 연결되지 않았다. 나머지는 아직 `제안`이며 구현되지 않았다.
+현재 Backend가 실제로 기록하는 상태는 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`, 검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`, lease 최대 시도 초과 시 `FAILED_TERMINAL` 다섯 가지다. 후보 추출 유스케이스까지 구현됐지만 Worker polling·handler에는 아직 연결되지 않았다. 나머지는 아직 `제안`이며 구현되지 않았다.
 
 `ANCHOR_READY`는 원장 조회를 끝냈다는 뜻이 아니라 **유효한 앵커 포지션 카드를 확보했다**는 뜻이다. Worker는 선점 후 카드 캐시를 먼저 조회한다. cache hit이면 기존 카드를 재사용하고, cache miss이면 AI 카드 생성이 필요하다. 카드를 확보하기 전에는 `ANCHOR_READY`로 넘어가지 않으며 빈 카드로 상태만 진행시키지 않는다.
 
@@ -194,12 +194,14 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `POST /api/v1/f3/runs`. 요청마다 새 `QUEUED` 실행 생성 | `backend/src/api/f3_runs.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
-| `claim_next_run` 작업 선점, `RUNNING`·`ANCHOR_READY` 재선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
+| `claim_next_run` 작업 선점, `RUNNING`·`ANCHOR_READY`·`CANDIDATES_READY` 재선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py` |
 | 합성 F1 앵커 snapshot과 측면별 상담 로그 범위·날짜 신호 조립 | `backend/src/domain/agent_execution/snapshot.py` |
 | 입력 fingerprint·상담 범위 identity를 포함한 `position-card:v3` cache key와 재사용 | `backend/src/domain/agent_execution/fingerprint.py`, `cache_key.py` |
 | 주입된 생성기 호출, 저장 직전 fencing, 카드·가격·근거 원자 저장과 `ANCHOR_READY` 전이 | `backend/src/domain/agent_execution/anchor_card.py` |
 | 포지션 카드 Backend–AI 공개 계약. 어휘, 요청·결과 DTO, 생성 Protocol, 요청·결과 교차 검증 | `ai/src/brokerage_ai/f3/` |
 | 포지션 카드 프롬프트와 구조화 출력 생성 (`position-card-prompt:v1`, `position-card-workflow:v1`) | `ai/src/brokerage_ai/f3/prompts.py`, `generator.py` |
+| 결정적 SQL 후보 추출, 점수와 정렬, `CANDIDATES_READY` 전이 | `backend/src/domain/agent_execution/candidates.py` |
+| 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
@@ -218,7 +220,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 | Worker에서 AI 호출 | 앵커 카드 유스케이스의 주입 생성기 호출 경계는 있으나 F3 handler가 아직 호출하지 않는다 |
 | LangGraph production graph와 checkpoint | 없음. 포지션 카드 생성은 구조화 출력 1회이며 이름뿐인 graph를 두지 않는다 |
 | 실사용 F1 snapshot 마스킹 | 없음. 현재 조립은 ADR-0014의 명시적 `SYNTHETIC_PROTOTYPE`만 허용하며 `MASKED`는 거절한다 |
-| `ANCHOR_READY` 이후 후보·중개 단계 | 없음 |
+| `CANDIDATES_READY` 이후 상태 전이 | 없음. 후보 카드 생성부터 미구현이다 |
 | 같은 앵커·입력 버전의 활성 실행 재사용 (F3-CR-12) | 없음. 요청마다 새 실행 |
 | 뒤따른 화면의 기존 실행 구독 | 없음 |
 | `SUPERSEDED` 전이 | 없음 |
@@ -234,6 +236,58 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 - 상위 15건을 먼저 카드화하고 나머지 후보 수와 다음 페이지를 보존한다.
 - 조건에 맞는 후보가 없으면 사용한 조회 조건과 함께 빈 결과를 저장한다.
 - 7,200행 규모의 100ms 목표는 AI 품질 평가와 분리한 Backend 성능 검증으로 확인한다.
+
+### 현재 구현 규칙
+
+정본 코드는 `backend/src/domain/agent_execution/candidates.py`이고 저장 위치는
+`match_evaluation.candidate_selection_snapshot`(schema `candidate-selection:v2`)이다.
+
+가격 축은 앵커 **카드**의 첫 번째 거래 유형(`negotiation_position_price.display_order` 최소)
+하나다. 카드 생성이 `PriceKind` 열거 순서로 금액을 채우므로 같은 카드에서 항상 같은 축이
+나온다. 그 축의 `estimated_amount`가 있으면 추정가를, 없으면 장부 표기가를 쓴다 (F3-SQ-03).
+단, 구입장 앵커의 카드 가격 종류는 `BUDGET`이므로 후보 매물 거래 유형은 카드가 아니라
+구입장의 `demand_type`에서 정한다.
+
+| 앵커 | 후보 장부 | SQL 조건 |
+|---|---|---|
+| `LISTING` | `property_requirement` | 사무소 · 구입장과 인물 `is_deleted = false` · `status = ACTIVE` · 카드 거래 유형과 호환되는 `demand_type` · `max_budget_amount IS NULL OR >= 추정가 × 0.9` · 희망 단지 미지정이거나 앵커 단지 포함 |
+| `REQUIREMENT` | `property_listing` | 사무소 · 매물과 **부모 세대** `is_deleted = false` · `status = RECEIVED` · 구입장 `demand_type`과 호환되는 거래 가능 플래그 · 해당 거래 금액 `IS NULL OR <= 추정 예산 × 1.1` · 앵커가 희망 단지를 밝혔으면 그 단지 |
+
+호환 어휘는 `SALE ↔ 매수`, `JEONSE ↔ 전세`, `MONTHLY_RENT ↔ 월세`다. `매도`는 매물의
+반대편 수요가 아니므로 어느 방향에도 매핑하지 않고 후보 0건으로 처리한다. 매물 후보 금액은
+호환 거래 유형의 플래그와 컬럼만 사용하며 다른 유형 금액을 `coalesce`하지 않는다. 월세는
+보증금만 가격 축으로 비교한다. 구입장에 월 차임 예산 축이 없기 때문이며, 월 차임 값은 결과에서
+버리지 않고 snapshot의 `monthly_amount`로 보존한다.
+
+금액이나 예산이 비어 있는 행은 조건에서 빼지 않는다. 미기재는 "맞지 않는다"가 아니라 "아직
+모른다"이며, 금액을 모르는 후보는 가격 근접도 0으로 뒤로 밀린다. 평형은 조건이 아니라
+점수다. F1 업무 상태 어휘 전체는 아직 확정되지 않았으므로 현재 서버가 신규 저장에 쓰는 기본값
+`RECEIVED`와 `ACTIVE`만 활성 상태로 사용한다. 이 두 값은 승인된 최종 상태 목록이 아니라 현재
+구현 규칙이며, 상태 계약이 확정되면 필터와 이 문서를 함께 바꾼다.
+
+점수는 세 성분의 가중합이며 Python에서 `Decimal` 6자리로 계산한다. SQL 부동소수 정렬은
+동점 순서가 흔들릴 수 있어 정렬까지 애플리케이션에서 한다.
+
+| 성분 | 가중치 | 정의 |
+|---|---|---|
+| 가격 근접도 | 0.5 | `max(0, 1 - |후보 금액 - 앵커 추정가| / 앵커 추정가)`. 금액 미상은 0 |
+| 평형 일치 | 0.3 | 희망 평형 중 하나가 앵커 평형과 ±1평 이내면 1, 아니면 0. 희망 평형 미기재는 0 |
+| 접수 최신성 | 0.2 | `1 / (1 + 경과일 / 30)`. 접수일 미상은 0, 미래 접수일은 1 |
+
+정렬은 점수 내림차순 → 접수일 내림차순 → **ID 오름차순**이다. 마지막 tie-breaker가 유일해
+동점이 있어도 전체 순서가 결정적이다.
+
+`price_tolerance_ratio` 0.1, `pyeong_tolerance` 1평, 가중치와 반감 기준일 30일은 **MVP
+조정값**이며 팀이 승인한 요구사항 수치가 아니다. 실제로 쓴 값은 snapshot의 `criteria`와
+`score_weights`에 함께 저장하므로 나중에 바꿔도 과거 판정의 근거가 남는다.
+
+snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, 순위와 카드화 여부를 담고
+`total_count`·`carded_count`·`remaining_count`를 함께 기록한다. 후보 0건이면 `candidates`가
+빈 배열이고 `criteria`는 그대로 남는다.
+
+`match_evaluation`은 `CANDIDATES_READY`에서 헤더로 먼저 만들고 중개 판정 결과는 나중에
+채운다. 재선점으로 이 단계가 다시 돌면 같은 실행의 헤더를 새로 만들지 않고 갱신한다.
+`candidate_count`는 실제로 카드화·판정할 후보 수이며 전체 후보 수가 아니다.
 
 ## 하이브리드 상담 로그 검색
 

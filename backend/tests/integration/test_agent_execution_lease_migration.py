@@ -364,3 +364,34 @@ def test_migration_013_extends_the_claim_index_for_anchor_ready_recovery() -> No
                 assert "RUNNING" in after
         finally:
             engine.dispose()
+
+
+@requires_database
+def test_migration_014_extends_the_claim_index_for_candidates_ready_recovery() -> None:
+    with isolated_migration_database() as url:
+        apply_through(url, "013")
+        engine = create_engine(url)
+        try:
+            with engine.connect() as connection:
+                before = connection.execute(
+                    text(
+                        "SELECT indexdef FROM pg_indexes"
+                        " WHERE indexname = 'idx_agent_run_claim_queue'"
+                    )
+                ).scalar_one()
+                assert "ANCHOR_READY" in before
+                assert "CANDIDATES_READY" not in before
+
+            apply_through(url, "014")
+
+            with engine.connect() as connection:
+                after = connection.execute(
+                    text(
+                        "SELECT indexdef FROM pg_indexes"
+                        " WHERE indexname = 'idx_agent_run_claim_queue'"
+                    )
+                ).scalar_one()
+                for expected in ("QUEUED", "RUNNING", "ANCHOR_READY", "CANDIDATES_READY"):
+                    assert expected in after
+        finally:
+            engine.dispose()

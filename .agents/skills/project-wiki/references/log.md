@@ -5,6 +5,7 @@ updated: 2026-08-24
 
 # 위키 변경 로그
 
+- 2026-08-24: F3 결정적 SQL 후보 추출을 구현하고 `CANDIDATES_READY`를 실제 상태로 기록했다. 후보 조회는 LLM을 쓰지 않고 앵커 카드의 추정값을 축으로 반대편 장부를 조회하며, 사무소·소프트 삭제·부모 세대 삭제·호환 거래 유형·현재 서버 기본 활성 상태·가격 밴드·희망 단지를 SQL 조건으로 적용한다. 월세는 보증금만 비교하고 월 차임은 버리지 않고 snapshot에 보존한다. 가격 근접도·평형 일치·접수 최신성은 중개 등급이 아닌 카드화 우선순위 점수로만 사용한다. 전체 후보와 조회 조건은 `match_evaluation.candidate_selection_snapshot`의 `candidate-selection:v2`에 보존하며, 상위 15건은 첫 페이지일 뿐 컷이 아니다. 가격 밴드·평형 오차·가중치는 승인된 수치가 아닌 MVP 조정값으로 snapshot에 함께 기록한다. 만료된 `CANDIDATES_READY` lease 회수용 인덱스를 확장했으며 Worker polling·handler와 후보 카드 생성 이후 단계는 후속 범위로 유지했다.
 - 2026-08-24: F3 앵커 포지션 카드의 합성 F1 snapshot 조립, 측면별 상담 범위, 입력 fingerprint 기반 `position-card:v3` 캐시, 주입 생성기 호출 전후 transaction 분리, 저장 직전 lease·입력 fencing, 카드·거래 유형별 가격·근거 저장과 `ANCHOR_READY` 전이를 구현했다. 만료된 `ANCHOR_READY` lease는 진행 상태를 보존해 재선점하도록 선점 인덱스까지 확장했다. ADR-0014에 따라 `SYNTHETIC_PROTOTYPE`만 명시적으로 허용하며 실사용 F1 마스킹, Worker polling·handler, 운영 Provider 선택과 후보 이후 단계는 후속 범위로 유지했다.
 - 2026-08-24: F3 프로토타입은 실제 인물과 연결되지 않는 합성 케이스에 한해 마스킹 변환을 생략하고 `SYNTHETIC_PROTOTYPE` 요청과 생성기 opt-in을 모두 요구하기로 ADR-0014에서 승인했다. 실제 F1 사용자 데이터 연결 전에는 마스킹과 `MASKED` 모드로 전환하며 외부 Provider 선택은 별도 결정으로 유지한다.
 - 2026-08-24: F3 포지션 카드 생성기가 모델 결과를 반환하기 전에 요청·결과 교차 검증을 강제하도록 계약을 명확히 하고, F3 AI 정본 등록과 `negotiation_side` OQ-012 종료를 아키텍처 테스트로 고정했다.
