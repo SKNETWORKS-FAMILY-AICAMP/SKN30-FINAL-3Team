@@ -49,7 +49,11 @@ _RULES = """규칙을 모두 지킨다.
 12. 개인정보를 생성하거나 복원하지 않는다. 가려진 이름·연락처가 무엇인지 추측하지 않고
     성명, 전화번호, 이메일, 생년월일을 출력에 넣지 않는다.
 13. 법률 판단이나 공식 가격 감정으로 표현하지 않는다. 두 포지션을 놓고 본 중개 판단이다.
-14. 발송 문안을 만들지 않는다. message 는 무슨 말을 꺼낼지에 대한 한 문장 제안이다."""
+14. 발송 문안을 만들지 않는다. message 는 무슨 말을 꺼낼지에 대한 한 문장 제안이다.
+15. 근거의 네 필드는 항상 모두 출력하되 해당하지 않는 필드는 null 로 둔다.
+    - kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고 note 는 null 이다.
+    - kind=INFERENCE 이면 note 만 채우고 interaction_id 와 quote_text 는 null 이다.
+    해당하지 않는 필드는 반드시 null 로 출력하고 임의 값을 채우지 않는다."""
 
 
 def _card_payload(card: JudgmentCard) -> dict[str, object]:

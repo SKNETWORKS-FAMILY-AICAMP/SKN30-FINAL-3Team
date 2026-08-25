@@ -432,6 +432,7 @@ async def test_prompt_states_the_evidence_unknown_and_isolation_rules() -> None:
         "최신 진술이 과거 진술을 이긴다",
         "개인정보를 생성하거나 복원하지 않는다",
         "inflexible",
+        "해당하지 않는 필드는 반드시 null",
     ):
         assert rule in prompt
 
