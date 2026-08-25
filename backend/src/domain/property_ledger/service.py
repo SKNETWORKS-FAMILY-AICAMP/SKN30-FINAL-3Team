@@ -108,11 +108,14 @@ def normalize_contact_value(value: str) -> str:
 
 def upsert_primary_contact(
     session: Session, brokerage_id: int, party_id: int, phone: str | None
-) -> None:
-    """인물의 대표 연락처를 그리드가 입력한 값으로 맞춘다.
+) -> bool:
+    """인물의 대표 연락처를 그리드가 입력한 값으로 맞춘다. 실제로 바꿨으면 True.
 
     전화 칸을 비운 것은 "연락처를 지운다"는 뜻이므로 기존 대표 연락처를 소프트 삭제한다.
     연락처 이력은 다른 화면이 참조할 수 있어 행을 실제로 지우지 않는다.
+
+    같은 값을 다시 보낸 것은 변경이 아니다. 호출자가 이 값을 모아 세대 `row_version`을
+    올릴지 정하므로, 바뀌지 않은 저장이 버전을 올려 다른 화면을 헛되이 충돌시키지 않게 한다.
     """
     contacts = [
         contact
@@ -123,17 +126,20 @@ def upsert_primary_contact(
 
     cleaned = (phone or "").strip()
     if cleaned == "":
-        if primary is not None:
-            primary.is_deleted = True
-            primary.deleted_at = datetime.now(UTC)
-            session.add(primary)
-        return
+        if primary is None:
+            return False
+        primary.is_deleted = True
+        primary.deleted_at = datetime.now(UTC)
+        session.add(primary)
+        return True
 
     if primary is not None:
+        if primary.contact_value == cleaned:
+            return False
         primary.contact_value = cleaned
         primary.normalized_contact_value = normalize_contact_value(cleaned)
         session.add(primary)
-        return
+        return True
 
     session.add(
         PartyContact(
@@ -145,12 +151,17 @@ def upsert_primary_contact(
             is_primary=True,
         )
     )
+    return True
 
 
 def _replace_unit_parties(
     session: Session, brokerage_id: int, unit_id: int, entries: list[dict[str, Any]]
-) -> None:
-    """세대의 인물 관계를 요청이 보낸 집합으로 맞춘다. 커밋과 롤백은 호출자가 한다.
+) -> bool:
+    """세대의 인물 관계를 요청이 보낸 집합으로 맞춘다. 실제로 바꿨으면 True.
+
+    커밋과 롤백은 호출자가 한다. 호출자는 반환값으로 세대 `row_version`을 올릴지 정한다.
+    인물은 별도 테이블이지만 화면에서는 세대 행의 칸이므로, 인물만 바뀐 저장도 세대의
+    동시 편집으로 감지되어야 한다.
 
     인물만 단독으로 저장하는 경로는 두지 않는다. 그리드가 인물을 세대 행의 칸으로 다루므로
     저장은 언제나 `save_property_unit`을 거친 세대 저장의 일부다.
@@ -164,6 +175,7 @@ def _replace_unit_parties(
     """
     require_property_unit(session, brokerage_id, unit_id)
 
+    changed = False
     existing = {
         (relation.role, relation.role_index): (relation, party)
         for relation, party in repository.list_unit_party_relations(session, brokerage_id, unit_id)
@@ -198,15 +210,22 @@ def _replace_unit_parties(
                     valid_from=date.today(),
                 )
             )
+            changed = True
         else:
             relation, party = found
-            party.name = name
-            session.add(party)
-            relation.is_co_owner = bool(entry.get("is_co_owner"))
-            session.add(relation)
+            is_co_owner = bool(entry.get("is_co_owner"))
+            if party.name != name:
+                party.name = name
+                session.add(party)
+                changed = True
+            if relation.is_co_owner != is_co_owner:
+                relation.is_co_owner = is_co_owner
+                session.add(relation)
+                changed = True
 
         session.flush()
-        upsert_primary_contact(session, brokerage_id, party.id or 0, entry.get("phone"))
+        if upsert_primary_contact(session, brokerage_id, party.id or 0, entry.get("phone")):
+            changed = True
 
     ended_at = date.today()
     for key, (relation, _party) in existing.items():
@@ -214,6 +233,9 @@ def _replace_unit_parties(
             continue
         relation.valid_to = ended_at
         session.add(relation)
+        changed = True
+
+    return changed
 
 
 def _create_property_unit(session: Session, brokerage_id: int, payload: dict[str, Any]) -> int:
@@ -244,28 +266,47 @@ def create_property_unit(session: Session, brokerage_id: int, payload: dict[str,
     return unit_id
 
 
-def _update_property_unit(
-    session: Session, brokerage_id: int, unit_id: int, payload: dict[str, Any]
+def _require_row_version(
+    session: Session, brokerage_id: int, unit_id: int, expected_row_version: int
 ) -> None:
-    """세대 필드를 고친다. 커밋과 롤백은 호출자가 한다."""
-    expected_row_version = int(payload.pop("row_version"))
-    require_property_unit(session, brokerage_id, unit_id)
+    """PATCH 시작에서 세대를 읽고 버전을 확인한다.
+
+    아무 필드도 바뀌지 않는 요청에서도 낡은 버전은 거절해야 한다. 뒤따르는 조건부 UPDATE가
+    실제 직렬화를 맡지만, 쓸 것이 하나도 없으면 그 UPDATE가 실행되지 않아 낡은 버전이
+    조용히 통과한다.
+    """
+    current, _complex_row = require_property_unit(session, brokerage_id, unit_id)
+    if current.row_version != expected_row_version:
+        raise RowVersionConflictError()
+
+
+def _update_property_unit(
+    session: Session,
+    brokerage_id: int,
+    unit_id: int,
+    expected_row_version: int,
+    payload: dict[str, Any],
+) -> bool:
+    """세대 필드를 고친다. 실제로 썼으면 True. 커밋과 롤백은 호출자가 한다."""
     if not payload:
-        return
+        return False
 
     updated = repository.bump_row_version(
         session, PropertyUnit, brokerage_id, unit_id, expected_row_version, payload
     )
     if not updated:
         raise RowVersionConflictError()
+    return True
 
 
 def update_property_unit(
     session: Session, brokerage_id: int, unit_id: int, payload: dict[str, Any]
 ) -> None:
     """세대 필드만 따로 고친다."""
+    expected_row_version = int(payload.pop("row_version"))
     try:
-        _update_property_unit(session, brokerage_id, unit_id, payload)
+        _require_row_version(session, brokerage_id, unit_id, expected_row_version)
+        _update_property_unit(session, brokerage_id, unit_id, expected_row_version, payload)
     except Exception:
         session.rollback()
         raise
@@ -286,17 +327,36 @@ def save_property_unit(
     서버 id와 새 `row_version`을 기록한다. 그래서 세대만 커밋되면 화면은 그 사실을 모른 채
     PATCH는 낡은 버전으로 409를 받고 POST는 같은 세대를 다시 만든다.
 
-    인물만 바꾸는 저장은 세대 `row_version`을 올리지 않는다. 기존 동작을 그대로 둔 것이며,
-    인물 편집의 동시 수정 감지는 별도 결정이 필요하다.
+    인물만 바뀐 저장도 세대 `row_version`을 올린다. 인물은 별도 테이블이지만 화면에서는
+    세대 행의 칸이므로, 올리지 않으면 두 사람이 같은 세대의 임대인을 동시에 고쳐도 충돌이
+    잡히지 않고 나중 저장이 앞 변경을 조용히 덮어쓴다. 실제로 바뀐 것이 없으면 올리지 않아
+    같은 값을 다시 저장한 화면이 남을 헛되이 충돌시키지 않는다.
     """
     parties = payload.pop("parties", None)
     try:
         if unit_id is None:
             unit_id = _create_property_unit(session, brokerage_id, payload)
+            if parties is not None:
+                _replace_unit_parties(session, brokerage_id, unit_id, parties)
         else:
-            _update_property_unit(session, brokerage_id, unit_id, payload)
-        if parties is not None:
-            _replace_unit_parties(session, brokerage_id, unit_id, parties)
+            expected_row_version = int(payload.pop("row_version"))
+            _require_row_version(session, brokerage_id, unit_id, expected_row_version)
+            wrote_unit = _update_property_unit(
+                session, brokerage_id, unit_id, expected_row_version, payload
+            )
+            wrote_parties = (
+                _replace_unit_parties(session, brokerage_id, unit_id, parties)
+                if parties is not None
+                else False
+            )
+            if wrote_parties and not wrote_unit:
+                # 세대 필드가 그대로여서 아직 버전을 올리지 않았다. 조건부 UPDATE로 올리면
+                # 같은 세대의 동시 인물 편집이 직렬화되어 나중 저장이 409로 거절된다.
+                bumped = repository.bump_row_version(
+                    session, PropertyUnit, brokerage_id, unit_id, expected_row_version, {}
+                )
+                if not bumped:
+                    raise RowVersionConflictError()
     except Exception:
         session.rollback()
         raise

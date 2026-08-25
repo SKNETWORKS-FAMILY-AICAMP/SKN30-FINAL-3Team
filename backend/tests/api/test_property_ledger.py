@@ -464,3 +464,90 @@ def test_failed_party_save_leaves_the_row_version_retryable(config: Config) -> N
         body = retried.json()
         assert body["unit"]["orientation"] == "남향"
         assert [entry["party"]["name"] for entry in body["parties"]] == ["김세입"]
+
+
+@requires_database
+def test_parties_only_patch_rejects_a_stale_row_version(config: Config) -> None:
+    """인물만 바꾸는 PATCH도 낡은 `row_version`을 거절한다.
+
+    세대 필드가 비어 있으면 조건부 UPDATE가 실행되지 않아 버전 검사가 통째로 건너뛰어졌다.
+    그 사이 다른 사람이 인물을 바꿔도 충돌이 잡히지 않고 나중 저장이 덮어썼다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "동시편집단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="101",
+            parties=[{"role": "LANDLORD", "role_index": 1, "name": "박이서"}],
+        )
+        unit_id = created["unit"]["id"]
+        stale_row_version = created["unit"]["row_version"]
+
+        first = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": stale_row_version,
+                "parties": [{"role": "LANDLORD", "role_index": 1, "name": "먼저 저장한 사람"}],
+            },
+        )
+        assert first.status_code == 200, first.text
+
+        second = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": stale_row_version,
+                "parties": [{"role": "LANDLORD", "role_index": 1, "name": "나중 저장한 사람"}],
+            },
+        )
+
+        assert second.status_code == 409, second.text
+        detail = client.get(f"/api/v1/property-units/{unit_id}").json()
+        assert [entry["party"]["name"] for entry in detail["parties"]] == ["먼저 저장한 사람"]
+
+
+@requires_database
+def test_parties_only_change_bumps_the_unit_row_version(config: Config) -> None:
+    """인물만 바뀌어도 세대 버전이 오른다. 올리지 않으면 다음 동시 편집을 잡을 수 없다."""
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "버전증가단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="102",
+            parties=[{"role": "TENANT", "role_index": 1, "name": "김세입"}],
+        )
+        unit_id = created["unit"]["id"]
+        before = created["unit"]["row_version"]
+
+        response = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": before,
+                "parties": [{"role": "TENANT", "role_index": 1, "name": "이세입"}],
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["unit"]["row_version"] == before + 1
+
+
+@requires_database
+def test_resending_the_same_parties_keeps_the_row_version(config: Config) -> None:
+    """같은 인물을 다시 보낸 것은 변경이 아니다. 버전을 올리면 남의 화면을 헛되이 충돌시킨다."""
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "무변경단지")
+        parties = [
+            {"role": "LANDLORD", "role_index": 1, "name": "박이서", "phone": "010-1111-2222"}
+        ]
+        created = create_unit(client, complex_id, unit_number="103", parties=parties)
+        unit_id = created["unit"]["id"]
+        before = created["unit"]["row_version"]
+
+        response = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={"row_version": before, "parties": parties},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["unit"]["row_version"] == before
