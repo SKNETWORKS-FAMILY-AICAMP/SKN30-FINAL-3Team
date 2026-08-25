@@ -28,6 +28,8 @@ resource "aws_sns_topic" "runtime_alerts" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
+  count = var.dev_edge_enabled ? 1 : 0
+
   alarm_name          = "${local.name_prefix}-alb-unhealthy-hosts"
   alarm_description   = "ALB target group has an unhealthy application host"
   comparison_operator = "GreaterThanOrEqualToThreshold"
@@ -41,7 +43,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    LoadBalancer = aws_lb.app.arn_suffix
+    LoadBalancer = aws_lb.app[0].arn_suffix
     TargetGroup  = aws_lb_target_group.app.arn_suffix
   }
 
@@ -50,6 +52,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "alb_target_5xx" {
+  count = var.dev_edge_enabled ? 1 : 0
+
   alarm_name          = "${local.name_prefix}-alb-target-5xx"
   alarm_description   = "Application targets returned five or more 5xx responses in five minutes"
   comparison_operator = "GreaterThanOrEqualToThreshold"
@@ -62,12 +66,22 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_5xx" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    LoadBalancer = aws_lb.app.arn_suffix
+    LoadBalancer = aws_lb.app[0].arn_suffix
     TargetGroup  = aws_lb_target_group.app.arn_suffix
   }
 
   alarm_actions = [aws_sns_topic.runtime_alerts.arn]
   ok_actions    = [aws_sns_topic.runtime_alerts.arn]
+}
+
+moved {
+  from = aws_cloudwatch_metric_alarm.alb_unhealthy_hosts
+  to   = aws_cloudwatch_metric_alarm.alb_unhealthy_hosts[0]
+}
+
+moved {
+  from = aws_cloudwatch_metric_alarm.alb_target_5xx
+  to   = aws_cloudwatch_metric_alarm.alb_target_5xx[0]
 }
 
 resource "aws_cloudwatch_metric_alarm" "asg_in_service_capacity" {

@@ -100,6 +100,52 @@ dev-start:
 dev-stop:
     uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
 
+# ASG·RDS 정지 후 ALB를 제거하고 CloudFront를 비활성화하는 saved plan을 생성한다.
+dev-deep-stop-plan: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    terraform -chdir=environments/dev validate
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -var=dev_edge_enabled=false -out=dev-deep-stop.tfplan
+
+# 저장된 deep stop plan의 전체 변경·삭제 대상을 표시한다.
+dev-deep-stop-show:
+    terraform -chdir=environments/dev show dev-deep-stop.tfplan
+
+# workload를 정지한 뒤 검토·승인된 deep stop plan을 적용한다.
+[confirm("배포·migration·API·Worker 작업이 모두 종료되었고 dev-deep-stop.tfplan의 ALB 삭제와 CloudFront 비활성화를 승인합니까?")]
+dev-deep-stop: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-deep-stop.tfplan
+
+# deep suspend 상태에서 예상하지 않은 drift가 없는지 검사한다.
+dev-deep-drift: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -detailed-exitcode -var-file=dev.tfvars -var=dev_edge_enabled=false
+
+# ALB를 재생성하고 CloudFront를 재활성화하는 saved plan을 생성한다.
+dev-deep-start-plan: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    terraform -chdir=environments/dev validate
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -var=dev_edge_enabled=true -out=dev-deep-start.tfplan
+
+# 저장된 deep start plan의 전체 변경·생성 대상을 표시한다.
+dev-deep-start-show:
+    terraform -chdir=environments/dev show dev-deep-start.tfplan
+
+# 검토·승인된 deep start plan을 적용한 뒤 RDS·ASG를 시작한다.
+[confirm("dev-deep-start.tfplan의 ALB 재생성과 CloudFront 재활성화를 승인하고 공유 RDS·EC2를 시작합니까?")]
+dev-deep-start: require-dev-secrets
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-deep-start.tfplan
+    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
+
+# Terraform state의 edge mode와 RDS·ASG·SSM·target 상태를 읽기 전용으로 확인한다.
+dev-deep-status:
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev output -json dev_edge_mode
+    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
+
 # Terraform state와 AWS 계정 연결을 읽기 전용으로 검증한다.
 verify-account:
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/verify-account-link.sh

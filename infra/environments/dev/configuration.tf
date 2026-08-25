@@ -30,13 +30,16 @@ locals {
       DB_POOL_SIZE                          = "5"
       DB_POOL_TIMEOUT_SECONDS               = "30"
       DB_TARGET                             = "production"
-      HTTP_ALLOWED_HOSTS                    = jsonencode([aws_lb.app.dns_name, "localhost", "127.0.0.1"])
-      HTTP_CORS_ALLOWED_ORIGINS             = "[]"
-      LOG_FORMAT                            = "json"
-      LOG_LEVEL                             = "INFO"
-      WORKER_ENABLED                        = "false"
-      WORKER_READY_FILE                     = "/tmp/brokerage-worker-ready"
-      F3_ALLOW_SYNTHETIC_PROTOTYPE          = "false"
+      HTTP_ALLOWED_HOSTS = jsonencode(concat(
+        aws_lb.app[*].dns_name,
+        ["localhost", "127.0.0.1"],
+      ))
+      HTTP_CORS_ALLOWED_ORIGINS    = "[]"
+      LOG_FORMAT                   = "json"
+      LOG_LEVEL                    = "INFO"
+      WORKER_ENABLED               = "false"
+      WORKER_READY_FILE            = "/tmp/brokerage-worker-ready"
+      F3_ALLOW_SYNTHETIC_PROTOTYPE = "false"
     }
     ai = {
       AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"

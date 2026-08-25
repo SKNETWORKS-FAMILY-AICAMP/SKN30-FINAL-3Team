@@ -1,14 +1,14 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-24
+implementation: 기존 delivery 적용됨·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-08-25
 ---
 
 # 배포 및 운영 구조
 
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
 - **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
 
@@ -45,7 +45,7 @@ flowchart LR
 
 ## Source revision과 충돌 방지
 
-- 통합 Pipeline만 `dev` 변경 감지를 사용한다. 최초 적용과 실패 주입 검증 중에는 Terraform 변수로 감지를 끈다.
+- 통합 Pipeline만 `dev` 변경 감지를 사용한다. 최초 적용, 실패 주입 검증과 deep suspend 중에는 Terraform 변수 또는 edge mode로 감지를 끈다.
 - 독립 Pipeline은 `DetectChanges=false`이며 Console 또는 `StartPipelineExecution`으로 실행한다.
 - 특정 revision은 Source action에 `COMMIT_ID`와 40자리 SHA를 override한다.
 - 첫 action은 다른 두 Pipeline의 최신 실행이 `InProgress` 또는 `Stopping`인지 확인하고 해당하면 실패한다.
@@ -137,6 +137,8 @@ CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 
 ## 운영 제약
 
 - ASG desired 1 인플레이스 배포의 짧은 개발환경 중단을 수용한다.
+- Deep suspend 중에는 통합 Pipeline 자동 감지가 꺼지며 수동 Pipeline과 migration도 실행하지 않는다. `dev-deep-start`가 ALB·CloudFront 배포를 끝내고 RDS·ASG를 복구한 뒤 배포를 재개한다.
+- Deep 전환은 `plan → show → 승인 → saved-plan apply → 상태·drift 검증` 순서를 지키며, suspend 중 일반 `dev-plan`은 active edge 복구를 제안하므로 전용 drift 명령을 사용한다.
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.
 - Terraform은 계속 `preflight → fmt/validate → plan → 승인 → apply → 검증 → drift` 수동 절차를 따른다.
 - RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)의 기존 경계를 유지한다.

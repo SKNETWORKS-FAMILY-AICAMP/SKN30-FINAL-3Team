@@ -200,6 +200,8 @@ resource "aws_iam_instance_profile" "app" {
 }
 
 resource "aws_lb" "app" {
+  count = var.dev_edge_enabled ? 1 : 0
+
   name                       = "${local.name_prefix}-app"
   internal                   = false
   load_balancer_type         = "application"
@@ -242,7 +244,9 @@ resource "aws_lb_target_group" "app" {
 }
 
 resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.app.arn
+  count = var.dev_edge_enabled ? 1 : 0
+
+  load_balancer_arn = aws_lb.app[0].arn
   port              = 80
   protocol          = "HTTP"
 
@@ -453,10 +457,11 @@ resource "aws_autoscaling_group" "app" {
 output "application_load_balancer" {
   description = "CloudFront custom origin과 운영 검증에 사용할 ALB 식별자"
   value = {
-    arn            = aws_lb.app.arn
-    arn_suffix     = aws_lb.app.arn_suffix
-    dns_name       = aws_lb.app.dns_name
-    listener_arn   = aws_lb_listener.http.arn
+    enabled        = var.dev_edge_enabled
+    arn            = one(aws_lb.app[*].arn)
+    arn_suffix     = one(aws_lb.app[*].arn_suffix)
+    dns_name       = one(aws_lb.app[*].dns_name)
+    listener_arn   = one(aws_lb_listener.http[*].arn)
     readiness_path = local.application_ready_path
     readiness_prerequisites = [
       "Delivery must install and start the application artifact on the Terraform-managed application port.",
@@ -465,8 +470,18 @@ output "application_load_balancer" {
       "Backend must handle the dynamic ALB target-IP Host header without weakening the public origin boundary.",
     ]
     target_group_arn = aws_lb_target_group.app.arn
-    zone_id          = aws_lb.app.zone_id
+    zone_id          = one(aws_lb.app[*].zone_id)
   }
+}
+
+moved {
+  from = aws_lb.app
+  to   = aws_lb.app[0]
+}
+
+moved {
+  from = aws_lb_listener.http
+  to   = aws_lb_listener.http[0]
 }
 
 output "app_runtime_identity" {
