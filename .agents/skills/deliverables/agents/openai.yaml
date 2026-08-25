@@ -1,0 +1,4 @@
+interface:
+  display_name: "산출물 운영"
+  short_description: "프로젝트 산출물을 한 문서씩 대조·검증하고 승인 후 배포"
+  default_prompt: "$deliverables를 사용해 대상 산출물 한 건을 Git 정본과 대조하고 검증하세요."
