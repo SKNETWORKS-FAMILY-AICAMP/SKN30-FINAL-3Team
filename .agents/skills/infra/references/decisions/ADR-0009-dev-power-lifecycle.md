@@ -1,13 +1,14 @@
 ---
-status: 결정
-updated: 2026-08-19
+status: 부분 대체됨
+updated: 2026-08-25
 ---
 
 # ADR-0009: 개발 환경 전원 수명주기
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
 - 결정일: 2026-08-19
 - 부분 대체: ADR-0004의 ASG `min=desired=max=1`과 고정 1대 기준 용량 알람
+- 대체 관계: ASG·RDS 외 자원 변경 금지와 ALB·public IPv4 잔여 비용 수용은 [ADR-0014](ADR-0014-dev-deep-power-lifecycle.md)가 deep 수명주기에 한해 부분 대체한다.
 
 ## 맥락
 

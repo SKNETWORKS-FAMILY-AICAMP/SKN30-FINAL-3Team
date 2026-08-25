@@ -66,8 +66,9 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
 }
 
 resource "aws_cloudfront_distribution" "frontend" {
-  enabled             = true
+  enabled             = var.dev_edge_enabled
   is_ipv6_enabled     = false
+  wait_for_deployment = true
   comment             = "${local.name_prefix} frontend and same-origin API"
   default_root_object = "index.html"
   http_version        = "http2and3"
@@ -79,15 +80,19 @@ resource "aws_cloudfront_distribution" "frontend" {
     origin_id                = local.frontend_s3_origin_id
   }
 
-  origin {
-    domain_name = aws_lb.app.dns_name
-    origin_id   = local.frontend_api_origin_id
+  dynamic "origin" {
+    for_each = var.dev_edge_enabled ? [aws_lb.app[0].dns_name] : []
 
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+    content {
+      domain_name = origin.value
+      origin_id   = local.frontend_api_origin_id
+
+      custom_origin_config {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "http-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
     }
   }
 
@@ -101,28 +106,29 @@ resource "aws_cloudfront_distribution" "frontend" {
     response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
   }
 
-  ordered_cache_behavior {
-    path_pattern               = local.frontend_api_path_pattern
-    target_origin_id           = local.frontend_api_origin_id
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods             = ["GET", "HEAD", "OPTIONS"]
-    compress                   = true
-    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
-    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
-    origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
-  }
+  dynamic "ordered_cache_behavior" {
+    for_each = var.dev_edge_enabled ? {
+      api = {
+        path_pattern    = local.frontend_api_path_pattern
+        allowed_methods = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+      }
+      health = {
+        path_pattern    = "/health/*"
+        allowed_methods = ["GET", "HEAD", "OPTIONS"]
+      }
+    } : {}
 
-  ordered_cache_behavior {
-    path_pattern               = "/health/*"
-    target_origin_id           = local.frontend_api_origin_id
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
-    cached_methods             = ["GET", "HEAD", "OPTIONS"]
-    compress                   = true
-    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
-    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
-    origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    content {
+      path_pattern               = ordered_cache_behavior.value.path_pattern
+      target_origin_id           = local.frontend_api_origin_id
+      viewer_protocol_policy     = "redirect-to-https"
+      allowed_methods            = ordered_cache_behavior.value.allowed_methods
+      cached_methods             = ["GET", "HEAD", "OPTIONS"]
+      compress                   = true
+      cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
+      response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
+      origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    }
   }
 
   restrictions {
@@ -138,6 +144,10 @@ resource "aws_cloudfront_distribution" "frontend" {
   tags = {
     Name = "${local.name_prefix}-frontend"
   }
+
+  # start에서는 listener 생성 뒤 origin을 활성화하고, stop에서는 distribution
+  # 비활성화 전파가 끝난 뒤 listener와 ALB를 제거한다.
+  depends_on = [aws_lb_listener.http]
 }
 
 data "aws_iam_policy_document" "frontend_bucket" {
@@ -193,18 +203,28 @@ resource "aws_s3_bucket_policy" "frontend" {
 output "frontend_delivery" {
   description = "Frontend deployment와 동일-origin API 검증에 사용할 CloudFront·S3 식별자"
   value = {
-    api_path_pattern    = "/api/*"
-    build_output        = "frontend/dist/client"
-    bucket_arn          = aws_s3_bucket.frontend.arn
-    bucket_name         = aws_s3_bucket.frontend.id
-    distribution_arn    = aws_cloudfront_distribution.frontend.arn
-    distribution_domain = aws_cloudfront_distribution.frontend.domain_name
-    distribution_id     = aws_cloudfront_distribution.frontend.id
+    api_path_pattern     = "/api/*"
+    build_output         = "frontend/dist/client"
+    bucket_arn           = aws_s3_bucket.frontend.arn
+    bucket_name          = aws_s3_bucket.frontend.id
+    distribution_arn     = aws_cloudfront_distribution.frontend.arn
+    distribution_domain  = aws_cloudfront_distribution.frontend.domain_name
+    distribution_enabled = var.dev_edge_enabled
+    distribution_id      = aws_cloudfront_distribution.frontend.id
     delivery_prerequisites = [
       "Frontend npm run build must produce a reproducible frontend/dist/client release artifact.",
       "Upload index.html with no-cache or a short TTL, upload hashed assets as immutable, and invalidate the distribution.",
       "Backend HTTP_ALLOWED_HOSTS must allow the ALB DNS Host forwarded by CloudFront; target health Host handling is a separate contract.",
       "Empty the protected frontend bucket before environment teardown.",
     ]
+  }
+}
+
+output "dev_edge_mode" {
+  description = "deep lifecycle에서 관리하는 dev edge 목표 상태"
+  value = {
+    alb_enabled        = var.dev_edge_enabled
+    cloudfront_enabled = var.dev_edge_enabled
+    mode               = var.dev_edge_enabled ? "active" : "suspended"
   }
 }

@@ -5,6 +5,7 @@ updated: 2026-08-24
 
 # 위키 변경 로그
 
+- 2026-08-25: 여러 날 이상 공유 dev를 사용하지 않을 때 일상 ASG·RDS stop보다 깊게 비용을 줄이는 lifecycle을 Infra ADR-0014로 승인했다. deep stop은 ALB·listener·ALB alarm을 제거해 service-managed public IPv4 두 개를 반납하고 CloudFront distribution은 ID·기본 domain·S3 origin을 유지한 채 비활성화한다. target group·ASG·보안·배포·데이터 자원은 보존하며 saved plan 승인과 전용 drift 절차로만 전환한다.
 - 2026-08-24: AI·Backend의 모듈별 검사 전용 pre-commit 설정을 루트 공통 hook으로 통합했다. staged Python 파일에 모듈별 Ruff `check --fix`와 `format`을 커밋 전에 자동 적용하고 Pyright를 유지하며, 수정된 파일은 재검토·재stage하도록 커밋을 중단한다. hook의 UV 실행은 `--locked`로 lock 불일치를 암묵적으로 바꾸지 않으며, 로컬 hook 우회를 고려해 CodeBuild의 format·lint·type 검사는 유지하고 루트 공통 Python 환경은 도입하지 않는다.
 - 2026-08-24: F1 저장 후 F3 자동 접수와 AI 처리 경계를 분리해, 활성 Worker가 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true` 없이 기동하지 못하도록 합성 데이터 실행 게이트를 추가했다. 기본값은 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`이며 합성 opt-in이 없으면 DB readiness·Provider 초기화·작업 claim 전에 실패한다. 자동 접수는 개인정보 원문을 Provider로 보내지 않고 `agent_run` 적재까지만 유지한다. 현재 `MASKED` 조립은 미구현이므로 합성 opt-in을 실사용 데이터 처리 근거로 사용할 수 없으며, 실제 F1 연결 전 마스킹과 `MASKED` 전환이 필요하다.
 - 2026-08-24: F3-CR-01·02에 따라 F1 매물·구입장 신규 등록과 판정 입력의 실제 변경 저장 후 `LEDGER_SAVE` 실행을 자동 접수하도록 연결했다. F1 commit 뒤 별도 transaction에서 `agent_run`만 적재하고 접수 오류는 앵커 종류·ID·예외 타입만 기록한 채 F1 응답과 저장에 전파하지 않는다(F3-CM-06, F3-NF-07). PATCH는 F1 서비스가 계산한 실제 변경 필드만 사용해 메모·담당자 및 동일 가격·예산 저장을 제외하며, 동일 값은 `row_version`도 유지하고 낡은 버전은 계속 409로 거절한다. 희망 단지는 집합으로 비교하고 집합 변경 시 구입장 버전을 올린다. 화면의 `POST /api/v1/f3/runs`는 저장 시 생성된 같은 입력 버전의 활성 실행을 재사용한다.

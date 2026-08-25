@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # 인프라 자원 인벤토리
@@ -14,12 +14,12 @@ updated: 2026-08-24
 | 네트워크 | VPC, IGW, route table, public subnet 2개 AZ | 결정 | 적용됨 | NAT·IPv6 없음 |
 | 네트워크 | EC2 app public subnet, RDS private subnet 2개, security group | 결정 | 적용됨 | ALB HTTP는 CloudFront origin-facing prefix에서만, EC2 inbound는 ALB SG만, RDS inbound는 App SG만 |
 | 네트워크 | S3 Gateway Endpoint | 결정 | 적용됨 | public/app route table의 업무용 S3 접근 경로 |
-| 컴퓨팅 | EC2, Launch Template, ASG desired 1, ALB | 결정 | 적용됨 | AL2023 x86_64, t3.small, gp3 40 GiB, EC2 health; delivery 전 TG unhealthy 예상 |
+| 컴퓨팅 | EC2, Launch Template, ASG desired 1, ALB | 결정 | 기존 자원 적용·deep lifecycle 코드 구현 미적용 | AL2023 x86_64, t3.small, gp3 40 GiB; deep suspend는 ASG 0·ALB 삭제, target group 유지 |
 | 운영 접속 | SSM Session Manager | 결정 | 적용됨 | SSH 차단, IMDSv2 강제 |
 | 이미지 | Backend ECR | 결정 | 적용됨 | immutable tag, untagged image만 7일 후 만료; 배포는 digest 고정 |
 | 검증 이미지 | CI pgvector ECR | 결정 | 코드 구현됨·미적용 | Backend Verify 전용 immutable cache; Docker Hub 미사용, runtime role 접근 없음 |
 | 데이터베이스 | RDS PostgreSQL 15.18, pgvector, Single-AZ | 결정 | 적용됨 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일, IAM DB 인증; `vector`는 최초 DB migration 소유 |
-| Frontend | CloudFront, private S3 origin, OAC, ALB custom origin | 결정 | 적용됨 | 기본 도메인, `/api/*` ALB, managed security headers; 배포 artifact는 미준비 |
+| Frontend | CloudFront, private S3 origin, OAC, ALB custom origin | 결정 | 기존 자원 적용·deep lifecycle 코드 구현 미적용 | deep suspend는 distribution ID·domain을 유지하고 비활성화하며 ALB origin·API behavior를 제거 |
 | 업무 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱이 성공·취소 즉시, 실패 1시간 이내 삭제; lifecycle 1일 안전망 |
 | 데이터·모델 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료, 그 외 자동 만료 없음 |
 | 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 기존 자원 적용됨·환경 materialization 미적용 | runtime DB·migration IAM·RDS master 자동 경계 유지; AI·Discord ignored tfvars→write-only 전환은 plan·apply 전 |
@@ -39,6 +39,7 @@ updated: 2026-08-24
 
 - 현재 계정 bootstrap은 워크로드 자원을 만들지 않는다.
 - `infra/environments/dev`의 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성과 DB migration은 적용됐다.
+- ALB 삭제·CloudFront 비활성화 deep lifecycle은 코드와 운영 명령을 구현했으나 AWS saved plan 검토·apply 전이다.
 - 세 Pipeline, 기존 CodeBuild/CodeDeploy, Discord 알림과 기존 IAM 운영자 policy attachment는 적용됐다. Verify/Build 분리 변경은 검증됐지만 승인 전에는 apply하지 않는다.
 - RunPod Terraform은 사용자 지시에 따라 보류했고 AWS provider 밖의 자원은 추가하지 않았다.
 - Terraform state bucket은 애플리케이션 파일 저장소가 아니며 다른 용도로 재사용하지 않는다.
