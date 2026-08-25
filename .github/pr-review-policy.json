@@ -38,18 +38,15 @@
       "frontend/dist/"
     ],
     "suffixes": [
-      ".png",
-      ".jpg",
-      ".jpeg",
-      ".gif",
-      ".webp",
-      ".ico",
+      ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico",
       ".pdf",
-      ".zip",
-      ".gz",
-      ".woff",
-      ".woff2",
-      ".ttf"
+      ".doc", ".docx",
+      ".xls", ".xlsx",
+      ".ppt", ".pptx",
+      ".odt", ".ods", ".odp",
+      ".hwp", ".hwpx",
+      ".zip", ".gz",
+      ".woff", ".woff2", ".ttf"
     ]
   },
   "headFileEvidence": {
