@@ -1066,10 +1066,17 @@
   font-size: 13px;
 }
 
-.detail-workspace__delete-modal-body > p:first-child {
+.detail-workspace__delete-modal-body > p:first-child,
+.detail-workspace__duplicate-modal-body > p:first-child {
   margin: 0 0 22px;
   color: var(--dw-text-subtle);
   line-height: 1.55;
+}
+
+.detail-workspace__duplicate-modal-body p.duplicate-modal__note {
+  margin: 0;
+  color: var(--dw-text-subtle);
+  font-size: 13px;
 }
 
 /* 저장하지 않은 변경이 함께 사라진다는 경고는 본문 설명보다 눈에 띄어야 한다. */
