@@ -82,7 +82,7 @@ variable "github_full_repository_id" {
 }
 
 variable "integrated_pipeline_detect_changes" {
-  description = "검증 전 false, 최종 전환 후 통합 pipeline main 자동 감지는 true"
+  description = "검증 전 false, 최종 전환 후 통합 pipeline dev 자동 감지는 true"
   type        = bool
   default     = false
 }
@@ -95,5 +95,63 @@ variable "app_asg_health_check_type" {
   validation {
     condition     = contains(["EC2", "ELB"], var.app_asg_health_check_type)
     error_message = "app_asg_health_check_type은 EC2 또는 ELB여야 합니다."
+  }
+}
+
+variable "ai_provider_api_keys" {
+  description = "Secrets Manager에 write-only로 반영할 AI provider 환경변수 이름과 API key"
+  type        = map(string)
+  sensitive   = true
+  ephemeral   = true
+
+  validation {
+    condition = (
+      contains(keys(var.ai_provider_api_keys), "AI_OPENAI_API_KEY") &&
+      alltrue([
+        for name, value in var.ai_provider_api_keys :
+        can(regex("^AI_[A-Z0-9_]+_API_KEY$", name)) &&
+        trimspace(value) != "" &&
+        length(regexall("[[:space:]]", value)) == 0
+      ])
+    )
+    error_message = "ai_provider_api_keys에는 비어 있지 않은 AI_OPENAI_API_KEY와 AI_*_API_KEY 형식의 키만 지정해야 합니다."
+  }
+}
+
+variable "ai_provider_secret_version" {
+  description = "AI provider key 변경을 Secrets Manager 새 version으로 반영하는 단조 증가 정수"
+  type        = number
+
+  validation {
+    condition     = var.ai_provider_secret_version >= 1 && var.ai_provider_secret_version == floor(var.ai_provider_secret_version)
+    error_message = "ai_provider_secret_version은 1 이상의 정수여야 합니다."
+  }
+}
+
+variable "discord_webhook_url" {
+  description = "Discord 알림 Lambda가 사용할 webhook URL"
+  type        = string
+  sensitive   = true
+  ephemeral   = true
+
+  validation {
+    condition = (
+      (
+        startswith(var.discord_webhook_url, "https://discord.com/api/webhooks/") ||
+        startswith(var.discord_webhook_url, "https://discordapp.com/api/webhooks/")
+      ) &&
+      length(regexall("[[:space:]]", var.discord_webhook_url)) == 0
+    )
+    error_message = "discord_webhook_url은 Discord HTTPS webhook URL이어야 합니다."
+  }
+}
+
+variable "discord_webhook_secret_version" {
+  description = "Discord webhook 변경을 Secrets Manager 새 version으로 반영하는 단조 증가 정수"
+  type        = number
+
+  validation {
+    condition     = var.discord_webhook_secret_version >= 1 && var.discord_webhook_secret_version == floor(var.discord_webhook_secret_version)
+    error_message = "discord_webhook_secret_version은 1 이상의 정수여야 합니다."
   }
 }

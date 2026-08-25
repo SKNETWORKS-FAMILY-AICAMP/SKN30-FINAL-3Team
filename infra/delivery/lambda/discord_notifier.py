@@ -13,14 +13,11 @@ secretsmanager = boto3.client("secretsmanager")
 
 
 def secret_url() -> str:
-    value = secretsmanager.get_secret_value(
-        SecretId=os.environ["DISCORD_SECRET_ARN"]
-    )["SecretString"]
-    try:
-        payload = json.loads(value)
-    except json.JSONDecodeError:
-        return value
-    return str(payload["webhook_url"])
+    return str(
+        secretsmanager.get_secret_value(SecretId=os.environ["DISCORD_SECRET_ARN"])[
+            "SecretString"
+        ]
+    )
 
 
 def pipeline_message(detail: dict[str, Any]) -> str:
@@ -45,8 +42,7 @@ def pipeline_message(detail: dict[str, Any]) -> str:
         failed = [item for item in actions if item.get("status") == "Failed"]
         if failed:
             failed_stage = (
-                f"{failed[0].get('stageName', '?')}/"
-                f"{failed[0].get('actionName', '?')}"
+                f"{failed[0].get('stageName', '?')}/{failed[0].get('actionName', '?')}"
             )
 
     region = os.environ["AWS_REGION"]

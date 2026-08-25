@@ -2,8 +2,6 @@ name: brokerage-dev
 
 x-application: &application
   image: "${BACKEND_IMAGE:?BACKEND_IMAGE must be an immutable ECR digest}"
-  env_file:
-    - "${RUNTIME_ENV_FILE:?RUNTIME_ENV_FILE is required}"
   init: true
   read_only: true
   tmpfs:
@@ -21,9 +19,12 @@ x-application: &application
 services:
   api:
     <<: *application
+    env_file:
+      - path: "${API_ENV_FILE:?API_ENV_FILE is required}"
+        format: raw
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${APP_PORT:?APP_PORT is required}:${APP_PORT:?APP_PORT is required}"
     logging:
       driver: awslogs
       options:
@@ -36,7 +37,7 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${APP_PORT}${APP_READINESS_PATH}', timeout=3)"
       interval: 15s
       timeout: 5s
       retries: 4
@@ -44,6 +45,9 @@ services:
 
   worker:
     <<: *application
+    env_file:
+      - path: "${WORKER_ENV_FILE:?WORKER_ENV_FILE is required}"
+        format: raw
     command: ["python", "src/worker.py"]
     restart: unless-stopped
     logging:
@@ -54,7 +58,7 @@ services:
         awslogs-stream: "${INSTANCE_ID:?INSTANCE_ID is required}/worker"
         awslogs-create-group: "false"
     healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/brokerage-worker-ready"]
+      test: ["CMD-SHELL", "test -f \"$${WORKER_READY_FILE:-/tmp/brokerage-worker-ready}\""]
       interval: 15s
       timeout: 3s
       retries: 4
@@ -64,7 +68,8 @@ services:
     <<: *application
     profiles: ["migration"]
     env_file:
-      - "${MIGRATION_ENV_FILE:?MIGRATION_ENV_FILE is required}"
+      - path: "${MIGRATION_ENV_FILE:?MIGRATION_ENV_FILE is required}"
+        format: raw
     command: ["python", "src/migration_guard.py"]
     restart: "no"
     logging:

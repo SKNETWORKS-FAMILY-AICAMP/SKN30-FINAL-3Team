@@ -12,9 +12,7 @@ from sqlmodel import Session
 from core.config import Config
 
 
-def _store_feedback_targets(
-    session: Session, brokerage_id: int, user_id: int
-) -> tuple[int, int]:
+def _store_feedback_targets(session: Session, brokerage_id: int, user_id: int) -> tuple[int, int]:
     party_id = session.execute(
         text(
             "INSERT INTO party (brokerage_id, party_type, name)"
@@ -176,9 +174,7 @@ def test_feedback_hides_another_brokerages_target(config: Config) -> None:
             ),
             {"b": other_brokerage_id, "login": f"feedback-{uuid4().hex}"},
         ).scalar_one()
-        foreign_card_id, _ = _store_feedback_targets(
-            session, other_brokerage_id, other_user_id
-        )
+        foreign_card_id, _ = _store_feedback_targets(session, other_brokerage_id, other_user_id)
 
         response = client.post(
             "/api/v1/f3/feedback",

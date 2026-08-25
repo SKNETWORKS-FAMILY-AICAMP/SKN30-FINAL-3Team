@@ -43,9 +43,7 @@ class F2Runtime:
 def _client_options(config: AiConfig, endpoint: ProviderEndpointConfig) -> dict[str, object]:
     return {
         "api_key": (
-            endpoint.api_key.get_secret_value()
-            if endpoint.api_key is not None
-            else "not-required"
+            endpoint.api_key.get_secret_value() if endpoint.api_key is not None else "not-required"
         ),
         "base_url": str(endpoint.base_url),
         "timeout": config.request_timeout_seconds,

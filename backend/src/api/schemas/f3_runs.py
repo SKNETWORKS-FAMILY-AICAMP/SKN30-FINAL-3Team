@@ -56,9 +56,7 @@ class F3FeedbackResponse(BaseModel):
     created_at: datetime | None
 
     @classmethod
-    def from_domain(
-        cls, stored: AiDecisionFeedback
-    ) -> F3FeedbackResponse:
+    def from_domain(cls, stored: AiDecisionFeedback) -> F3FeedbackResponse:
         target, target_id = feedback_target_of(stored)
         return cls(
             feedback_id=stored.id or 0,

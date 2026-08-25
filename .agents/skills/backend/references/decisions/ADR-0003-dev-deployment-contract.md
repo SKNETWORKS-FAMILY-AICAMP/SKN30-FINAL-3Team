@@ -8,10 +8,13 @@ updated: 2026-08-24
 - 상태: 승인됨
 - 결정일: 2026-08-20
 - 상위 결정: [프로젝트 ADR-0011](../../../project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md)
+- 환경 설정 보완: [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)
 
 ## 결정
 
 - API와 Worker는 Backend와 `brokerage-ai`를 lockfile 기반 non-editable 설치한 같은 immutable image digest를 사용한다.
+- Backend image의 API entrypoint는 설정 로더가 검증한 `APP_HOST`와 `APP_PORT`로 Uvicorn listener를 시작한다.
+- Worker의 활성화, ready file과 worker ID도 Backend 설정 로더가 같은 입력 mapping에서 검증하며 dotenv를 전역 프로세스 환경에 복사하지 않는다.
 - API·Worker runtime에는 `DB_URL`만 필요하고 `DB_MIGRATION_URL`은 선택값이다. 전진 migration one-shot에서만 migration URL을 필수 검증한다.
 - migration은 PostgreSQL advisory lock을 획득한 뒤 Yoyo를 실행한다.
 - runtime·migration DB 연결은 RDS CA `verify-full`을 사용한다. root 전용 host config directory는 컨테이너에 노출하지 않고 공개 CA bundle 파일만 read-only로 mount한다.

@@ -13,6 +13,24 @@ locals {
     frontend        = "${local.name_prefix}-frontend-build"
     frontend_deploy = "${local.name_prefix}-frontend-deploy"
   }
+
+  backend_build_environment = {
+    AI_PROVIDER_SECRET_ID              = aws_secretsmanager_secret.application["ai_provider"].arn
+    API_LOG_GROUP                      = aws_cloudwatch_log_group.runtime["api"].name
+    APP_PARAMETER_PREFIX               = "/${local.name_prefix}"
+    APP_PORT                           = tostring(local.application_port)
+    APP_READINESS_PATH                 = local.application_ready_path
+    AWS_REGION                         = var.aws_region
+    BACKEND_RUNTIME_DATABASE_SECRET_ID = aws_secretsmanager_secret.application["backend_runtime_database"].arn
+    ECR_REPOSITORY_NAME                = aws_ecr_repository.backend_ai.name
+    ECR_REPOSITORY_URI                 = aws_ecr_repository.backend_ai.repository_url
+    WORKER_LOG_GROUP                   = aws_cloudwatch_log_group.runtime["worker"].name
+  }
+
+  frontend_build_environment = {
+    VITE_API_BASE_URL  = local.frontend_api_base_path
+    VITE_LEDGER_SOURCE = "api"
+  }
 }
 
 resource "aws_codeconnections_connection" "github" {
@@ -304,6 +322,11 @@ resource "aws_codebuild_project" "admission" {
     compute_type = "BUILD_GENERAL1_SMALL"
     image        = "aws/codebuild/standard:7.0"
     type         = "LINUX_CONTAINER"
+
+    environment_variable {
+      name  = "APP_READINESS_PATH"
+      value = local.application_ready_path
+    }
   }
 
   source {
@@ -334,19 +357,13 @@ resource "aws_codebuild_project" "backend" {
     type            = "LINUX_CONTAINER"
     privileged_mode = true
 
-    environment_variable {
-      name  = "AWS_REGION"
-      value = var.aws_region
-    }
+    dynamic "environment_variable" {
+      for_each = local.backend_build_environment
 
-    environment_variable {
-      name  = "ECR_REPOSITORY_NAME"
-      value = aws_ecr_repository.backend_ai.name
-    }
-
-    environment_variable {
-      name  = "ECR_REPOSITORY_URI"
-      value = aws_ecr_repository.backend_ai.repository_url
+      content {
+        name  = environment_variable.key
+        value = environment_variable.value
+      }
     }
   }
 
@@ -420,6 +437,15 @@ resource "aws_codebuild_project" "frontend" {
     compute_type = "BUILD_GENERAL1_SMALL"
     image        = "aws/codebuild/standard:7.0"
     type         = "LINUX_CONTAINER"
+
+    dynamic "environment_variable" {
+      for_each = local.frontend_build_environment
+
+      content {
+        name  = environment_variable.key
+        value = environment_variable.value
+      }
+    }
   }
 
   source {
@@ -495,6 +521,11 @@ resource "aws_codebuild_project" "frontend_deploy" {
     environment_variable {
       name  = "CLOUDFRONT_DOMAIN"
       value = aws_cloudfront_distribution.frontend.domain_name
+    }
+
+    environment_variable {
+      name  = "APP_READINESS_PATH"
+      value = local.application_ready_path
     }
   }
 
@@ -1093,8 +1124,14 @@ resource "aws_iam_user_policy_attachment" "pipeline_operator" {
 
 resource "aws_secretsmanager_secret" "discord_webhook" {
   name                    = "/${local.name_prefix}/delivery/discord-webhook"
-  description             = "Container for a Discord webhook URL; value is populated outside Terraform"
+  description             = "Discord webhook managed from the ignored secrets.auto.tfvars input"
   recovery_window_in_days = 7
+}
+
+resource "aws_secretsmanager_secret_version" "discord_webhook" {
+  secret_id                = aws_secretsmanager_secret.discord_webhook.id
+  secret_string_wo         = var.discord_webhook_url
+  secret_string_wo_version = var.discord_webhook_secret_version
 }
 
 data "archive_file" "discord_notifier" {
@@ -1274,13 +1311,13 @@ resource "aws_sns_topic_policy" "runtime_alerts" {
 output "delivery" {
   description = "CI/CD pipeline, deploy, notification, and operator attachment identifiers"
   value = {
-    pipelines               = local.delivery_pipeline_names
-    codebuild_projects      = local.codebuild_projects
-    codedeploy_application  = aws_codedeploy_app.backend.name
-    codedeploy_group        = aws_codedeploy_deployment_group.backend.deployment_group_name
-    discord_secret_arn      = aws_secretsmanager_secret.discord_webhook.arn
-    operator_policy_arn     = aws_iam_policy.pipeline_operator.arn
-    operator_user_names     = sort(tolist(var.pipeline_operator_user_names))
-    automatic_main_delivery = var.integrated_pipeline_detect_changes
+    pipelines              = local.delivery_pipeline_names
+    codebuild_projects     = local.codebuild_projects
+    codedeploy_application = aws_codedeploy_app.backend.name
+    codedeploy_group       = aws_codedeploy_deployment_group.backend.deployment_group_name
+    discord_secret_arn     = aws_secretsmanager_secret.discord_webhook.arn
+    operator_policy_arn    = aws_iam_policy.pipeline_operator.arn
+    operator_user_names    = sort(tolist(var.pipeline_operator_user_names))
+    automatic_dev_delivery = var.integrated_pipeline_detect_changes
   }
 }

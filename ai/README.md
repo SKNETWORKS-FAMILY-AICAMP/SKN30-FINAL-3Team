@@ -11,7 +11,15 @@ cd ai
 uv sync --frozen
 ```
 
-모델 API 비밀값이 필요한 경우 [`.env.example`](.env.example)에 선언된 변수 이름을 참고해 Git에서 제외된 `ai/.env` 또는 실행 프로세스 환경변수로 주입합니다.
+## 환경 설정
+
+팀 공통 endpoint와 timeout은 Git에서 추적하는 [`.env.local`](.env.local)에 있습니다. 모델 API 비밀값과 개인별 재정의는 예제를 복사해 Git에서 제외되는 `.env`에 둡니다.
+
+```bash
+cp .env.example .env
+```
+
+`AiProfile.LOCAL`은 `.env.local`, 개인 `.env`, 실행 프로세스 환경변수 순서로 병합합니다. `AiProfile.TEST`와 `AiProfile.PROD`는 dotenv 파일을 읽지 않고 CI·배포가 주입한 프로세스 환경변수만 사용합니다. 실제 비밀값은 `.env.example`, `.env.local` 또는 다른 추적 파일에 기록하지 않습니다.
 
 ## F2 음성메모 파이프라인
 

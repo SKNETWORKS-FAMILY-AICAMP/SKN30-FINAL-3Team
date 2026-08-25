@@ -29,7 +29,23 @@ phases:
         cp infra/deploy/appspec.yml _backend_release/appspec.yml
         cp infra/deploy/compose.dev.yml _backend_release/compose.dev.yml
         cp -R infra/deploy/scripts _backend_release/scripts
-        printf 'BACKEND_IMAGE=%s@%s\n' "${ECR_REPOSITORY_URI}" "${IMAGE_DIGEST}" > _backend_release/backend-image.env
+        deployment_metadata=(
+          AI_PROVIDER_SECRET_ID
+          API_LOG_GROUP
+          APP_PARAMETER_PREFIX
+          APP_PORT
+          APP_READINESS_PATH
+          AWS_REGION
+          BACKEND_RUNTIME_DATABASE_SECRET_ID
+          WORKER_LOG_GROUP
+        )
+        {
+          printf 'BACKEND_IMAGE=%q\n' "${ECR_REPOSITORY_URI}@${IMAGE_DIGEST}"
+          for metadata_name in "${deployment_metadata[@]}"; do
+            [[ -n "${!metadata_name:-}" ]]
+            printf '%s=%q\n' "${metadata_name}" "${!metadata_name}"
+          done
+        } > _backend_release/backend-image.env
         python infra/delivery/scripts/write_release_manifest.py \
           --output _backend_release/release-manifest.json \
           --pipeline "${PIPELINE_KIND}" \

@@ -5,9 +5,8 @@
 .env.*
 !.env.example
 !ai/.env.local
-!ai/.env.prod
 !backend/.env.local
-!backend/.env.prod
+!frontend/.env.local
 *.pem
 *.key
 *.cert

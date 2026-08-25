@@ -162,9 +162,7 @@ def advance_with_error(
 def test_retry_releases_the_lease_without_changing_the_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    outcome, session, failure_calls = advance_with_error(
-        monkeypatch, ProviderTimeoutError()
-    )
+    outcome, session, failure_calls = advance_with_error(monkeypatch, ProviderTimeoutError())
 
     assert outcome is pipeline.StepOutcome.RETRY
     assert session.commits == 1
@@ -209,9 +207,7 @@ def test_late_worker_result_is_treated_as_a_lost_lease(
     kind: str,
 ) -> None:
     error: BaseException = (
-        ProviderTimeoutError()
-        if kind == "retry"
-        else PositionCardContractError("invalid")
+        ProviderTimeoutError() if kind == "retry" else PositionCardContractError("invalid")
     )
     outcome, session, _ = advance_with_error(
         monkeypatch,

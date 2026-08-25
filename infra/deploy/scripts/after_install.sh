@@ -28,7 +28,8 @@ ca_download=""
 test -s "${RDS_CA_FILE}"
 
 python3 "${REVISION_DIR}/scripts/render_env.py" \
-  --runtime-output "${RUNTIME_ENV_FILE}" \
+  --api-output "${API_ENV_FILE}" \
+  --worker-output "${WORKER_ENV_FILE}" \
   --migration-output "${MIGRATION_ENV_FILE}"
 
 compose --profile migration config --quiet

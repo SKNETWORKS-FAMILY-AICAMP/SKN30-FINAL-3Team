@@ -253,9 +253,7 @@ def advance_run(
         if outcome is StepOutcome.RETRY:
             return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
         return (
-            outcome
-            if record_failure(session, run, worker_id, outcome)
-            else StepOutcome.LEASE_LOST
+            outcome if record_failure(session, run, worker_id, outcome) else StepOutcome.LEASE_LOST
         )
 
 
@@ -274,9 +272,7 @@ def drive_run(
             return outcome
         if should_stop is not None and should_stop():
             return outcome
-        current = repository.find_root_cross_judgment_run(
-            session, run.brokerage_id, run.id or 0
-        )
+        current = repository.find_root_cross_judgment_run(session, run.brokerage_id, run.id or 0)
         if current is None:  # pragma: no cover - FK와 claim 조건을 통과한 행의 방어 경계
             return outcome
         run = current
