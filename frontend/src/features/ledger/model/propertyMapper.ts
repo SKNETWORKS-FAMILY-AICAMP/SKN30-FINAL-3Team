@@ -18,12 +18,22 @@ import type {
   PropertyUnitRowDto,
   PropertyUnitUpdateDto,
   UnitPartyRelationDto,
+  UnitPartyWriteDto,
 } from "./dto.ts";
 import type { PropertyRow } from "./row.ts";
 import { SYNCED } from "./row.ts";
 
 /** 공동명의 표시 구분자. F1-GR-06이 `박이서, 송경련` 형태를 지정한다. */
 const NAME_SEPARATOR = ", ";
+
+/**
+ * `property_unit_party_relation.role` 코드.
+ *
+ * 서버가 쓰는 값이 정본이다. 임대인은 `OWNER`가 아니라 `LANDLORD`이며,
+ * `client_interaction.counterparty_role`도 같은 코드를 쓴다.
+ * 여기가 서버와 어긋나면 필터가 아무것도 못 골라 임대인·임차인 열이 조용히 빈다.
+ */
+const ROLE = { landlord: "LANDLORD", tenant: "TENANT" } as const;
 
 /** 전용 컬럼이 없어 custom_fields에 실리는 열. */
 const CUSTOM_KEYS = { spec: "spec", brokerageName: "brokerage_name" } as const;
@@ -85,8 +95,8 @@ function consentLabel(relation: UnitPartyRelationDto | undefined): string {
 /**
  * 목록 행을 화면 행으로.
  *
- * 목록 응답에는 인물과 상담 로그가 없다. 해당 열은 비어 있고 `partiesLoaded`가 false다.
- * 상세를 열 때 `applyUnitDetail`로 채운다.
+ * 인물은 목록 응답에 함께 실려 오므로 여기서 바로 채운다. 상담 로그는 최신 1건만 실리고,
+ * 상세를 열면 `applyLatestInteraction`이 같은 열을 서버 값으로 다시 맞춘다.
  */
 export function toPropertyRow(dto: PropertyUnitRowDto, assigneeName = ""): PropertyRow {
   const listing = dto.current_listing;
@@ -161,14 +171,7 @@ export function toPropertyRow(dto: PropertyUnitRowDto, assigneeName = ""): Prope
     log: textOrEmpty(dto.latest_interaction_content),
     memo: textOrEmpty(dto.memo),
 
-    owner: "",
-    ownerPhone: "",
-    tenant: "",
-    tenantPhone: "",
-    consent: "미확인",
-    parties: [],
-    isCoOwned: false,
-    partiesLoaded: false,
+    ...partyFields(dto.parties),
 
     type: textOrEmpty(dto.unit_type),
     spec: readCustomText(dto.custom_fields, CUSTOM_KEYS.spec),
@@ -183,22 +186,36 @@ export function toPropertyRow(dto: PropertyUnitRowDto, assigneeName = ""): Prope
   };
 }
 
-/** 상세 응답으로 인물 정보를 채운다. 목록 행에는 인물이 없기 때문에 별도 단계가 필요하다. */
-export function applyUnitDetail(row: PropertyRow, detail: PropertyUnitDetailDto): PropertyRow {
-  const owners = relationsWithRole(detail.parties, "OWNER");
-  const tenants = relationsWithRole(detail.parties, "TENANT");
+/**
+ * 인물 관계를 화면 열로 접는다.
+ *
+ * 목록과 상세가 같은 모양의 `parties`를 주므로 두 경로가 이 함수 하나를 함께 쓴다.
+ * 조립 규칙이 갈라지면 목록과 상세가 서로 다른 임대인을 보여주게 된다.
+ */
+function partyFields(
+  relations: readonly UnitPartyRelationDto[],
+): Pick<
+  PropertyRow,
+  "owner" | "ownerPhone" | "tenant" | "tenantPhone" | "consent" | "parties" | "isCoOwned" | "partiesLoaded"
+> {
+  const owners = relationsWithRole(relations, ROLE.landlord);
+  const tenants = relationsWithRole(relations, ROLE.tenant);
 
   return {
-    ...row,
     owner: joinNames(owners),
     ownerPhone: primaryContact(owners[0]),
     tenant: joinNames(tenants),
     tenantPhone: primaryContact(tenants[0]),
     consent: consentLabel(owners[0]),
-    parties: detail.parties,
+    parties: [...relations],
     isCoOwned: owners.length > 1 || owners.some((relation) => relation.is_co_owner),
     partiesLoaded: true,
   };
+}
+
+/** 상세 응답으로 인물 정보를 덮어쓴다. 목록 행과 같은 규칙으로 접는다. */
+export function applyUnitDetail(row: PropertyRow, detail: PropertyUnitDetailDto): PropertyRow {
+  return { ...row, ...partyFields(detail.parties) };
 }
 
 /**
@@ -225,6 +242,35 @@ export function applyServerIdentity(
 /** 상담 로그 최신 1건을 행에 반영한다(F1-GR-05). */
 export function applyLatestInteraction(row: PropertyRow, content: string): PropertyRow {
   return { ...row, log: content };
+}
+
+/**
+ * 화면의 임대인·임차인 열을 인물 쓰기 요청으로 되돌린다.
+ *
+ * 한 칸에 접혀 있던 공동명의를 다시 나누고, 순서를 그대로 `role_index`로 쓴다. 서버는
+ * (role, role_index)로 기존 관계를 찾으므로 순서가 곧 사람의 신원이다. 전화 열은 한 칸뿐이라
+ * 대표 인물(`role_index` 1)에만 붙는다.
+ *
+ * 이름이 비면 그 역할의 인물이 없다는 뜻이고, 서버는 기존 관계를 종료 처리한다.
+ */
+export function toPartyWritePayload(row: PropertyRow): UnitPartyWriteDto[] {
+  const entries: UnitPartyWriteDto[] = [];
+
+  const push = (role: string, names: string[], phone: string) => {
+    names.forEach((name, index) => {
+      entries.push({
+        role,
+        role_index: index + 1,
+        name,
+        phone: index === 0 ? emptyToNull(phone) : null,
+        is_co_owner: role === ROLE.landlord && names.length > 1,
+      });
+    });
+  };
+
+  push(ROLE.landlord, splitNames(row.owner), row.ownerPhone);
+  push(ROLE.tenant, splitNames(row.tenant), row.tenantPhone);
+  return entries;
 }
 
 /** 세대 생성 요청. `complex_id`와 `unit_number`가 서버 필수값이다. */
@@ -257,6 +303,7 @@ export function toUnitCreatePayload(row: PropertyRow): PropertyUnitCreateDto | n
       [CUSTOM_KEYS.spec]: row.spec,
       [CUSTOM_KEYS.brokerageName]: row.brokerage,
     },
+    parties: toPartyWritePayload(row),
   };
 }
 
@@ -286,6 +333,12 @@ export function toUnitUpdatePayload(row: PropertyRow): PropertyUnitUpdateDto | n
       [CUSTOM_KEYS.spec]: row.spec,
       [CUSTOM_KEYS.brokerageName]: row.brokerage,
     },
+    /*
+     * 인물은 상세를 한 번이라도 읽어 현재 값을 아는 행에서만 보낸다. 이 요청은 "보낸 목록이
+     * 곧 전체"라는 뜻이라, 아직 인물을 모르는 행에서 빈 배열을 보내면 서버에 있는 임대인이
+     * 지워진다. 지금은 목록 응답이 인물을 함께 실어 주므로 사실상 항상 참이다.
+     */
+    parties: row.partiesLoaded ? toPartyWritePayload(row) : undefined,
   };
 }
 

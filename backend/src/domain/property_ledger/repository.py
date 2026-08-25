@@ -404,6 +404,19 @@ def find_property_listing(
 def list_unit_party_relations(
     session: Session, brokerage_id: int, unit_id: int
 ) -> list[tuple[PropertyUnitPartyRelation, Party]]:
+    return list_unit_party_relations_for_units(session, brokerage_id, [unit_id])
+
+
+def list_unit_party_relations_for_units(
+    session: Session, brokerage_id: int, unit_ids: Sequence[int]
+) -> list[tuple[PropertyUnitPartyRelation, Party]]:
+    """여러 세대의 현재 인물 관계를 한 번에 읽는다.
+
+    매물장 목록이 임대인·임차인 열을 채우려면 페이지에 실린 모든 세대의 인물이 필요하다.
+    세대마다 따로 조회하면 한 페이지에 최대 500번의 추가 왕복이 생기므로 `IN`으로 묶는다.
+    """
+    if not unit_ids:
+        return []
     statement = (
         select(PropertyUnitPartyRelation, Party)
         .join(
@@ -413,10 +426,11 @@ def list_unit_party_relations(
         )
         .where(
             col(PropertyUnitPartyRelation.brokerage_id) == brokerage_id,
-            col(PropertyUnitPartyRelation.unit_id) == unit_id,
+            col(PropertyUnitPartyRelation.unit_id).in_(list(unit_ids)),
             col(PropertyUnitPartyRelation.valid_to).is_(None),
         )
         .order_by(
+            col(PropertyUnitPartyRelation.unit_id).asc(),
             col(PropertyUnitPartyRelation.role).asc(),
             col(PropertyUnitPartyRelation.role_index).asc(),
         )

@@ -11,7 +11,8 @@
  * 2. 금액은 원 단위 정수이고 억·만 표시 변환은 클라이언트가 한다.
  * 3. 목록 응답 봉투는 `items`, `total`, `limit`, `offset`이다.
  * 4. `brokerage_id`는 세션에서만 도출하며 주고받지 않는다.
- * 5. 매물장 목록 행에는 인물과 상담 로그가 **없다**. 상세와 별도 엔드포인트에서 가져온다.
+ * 5. 매물장 목록 행에는 현재 유효한 인물 관계(`parties`)가 실린다. 상담 로그는 최신 1건만 실리며
+ *    전체 이력은 `GET /client-interactions`에서 따로 가져온다.
  * 6. `limit`은 최대 500이다. 전량 로드는 불가능하며 페이징이 필수다.
  */
 
@@ -106,8 +107,9 @@ export interface PropertyListingDto {
 /**
  * 매물장 그리드 한 행.
  *
- * 주의: 임대인·임차인·상담 로그는 이 응답에 없다.
- * 인물은 `GET /property-units/{id}`, 상담 로그는 `GET /client-interactions`로 따로 가져온다.
+ * 임대인·임차인은 `parties`에 실려 온다. 그리드가 두 열을 고정으로 갖고 있어 행마다 상세를
+ * 다시 부르면 목록 한 번에 N번의 추가 요청이 생기기 때문이다.
+ * 상담 로그는 최신 1건만 실리고 전체 이력은 `GET /client-interactions`로 따로 가져온다.
  */
 export interface PropertyUnitRowDto {
   id: number;
@@ -138,6 +140,8 @@ export interface PropertyUnitRowDto {
   current_listing: PropertyListingDto | null;
   /** 가장 최근 상담 로그 본문. 목록의 로그 열을 채운다. */
   latest_interaction_content: string | null;
+  /** 현재 유효한(`valid_to`가 비어 있는) 인물 관계. 임대인·임차인 열을 채운다. */
+  parties: UnitPartyRelationDto[];
 }
 
 export interface PropertyUnitDetailDto {
@@ -216,6 +220,20 @@ export interface ColumnValuesDto {
 /* 쓰기 요청 본문                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 세대에 붙일 인물 한 명.
+ *
+ * 그리드는 인물을 이름 한 칸과 전화 한 칸으로만 다루므로 요청도 그 범위만 보낸다.
+ * 서버는 보낸 목록을 그 세대의 현재 인물 전체로 보고, 빠진 자리는 관계가 끝난 것으로 처리한다.
+ */
+export interface UnitPartyWriteDto {
+  role: string;
+  role_index: number;
+  name: string;
+  phone: string | null;
+  is_co_owner: boolean;
+}
+
 export interface PropertyUnitCreateDto {
   complex_id: number;
   unit_number: string;
@@ -236,6 +254,8 @@ export interface PropertyUnitCreateDto {
   assigned_user_id: number | null;
   memo: string | null;
   custom_fields: Record<string, unknown>;
+  /** 생략하면 인물을 건드리지 않는다. 빈 배열은 "인물 없음"이라는 뜻이다. */
+  parties?: UnitPartyWriteDto[];
 }
 
 /** 부분 수정. `row_version`이 필수이며 값이 다르면 409로 거절된다. */

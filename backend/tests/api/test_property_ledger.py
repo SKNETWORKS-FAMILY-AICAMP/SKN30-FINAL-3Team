@@ -237,3 +237,317 @@ def test_non_numeric_value_for_an_integer_filter_is_rejected(config: Config) -> 
 
         assert response.status_code == 422
         assert response.json()["code"] == "VALIDATION_FAILED"
+
+
+@requires_database
+def test_list_carries_the_current_parties_of_each_row(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "인물단지")
+        create_unit(
+            client,
+            complex_id,
+            unit_number="101",
+            parties=[
+                {"role": "LANDLORD", "role_index": 2, "name": "송경련", "is_co_owner": True},
+                {
+                    "role": "LANDLORD",
+                    "role_index": 1,
+                    "name": "박이서",
+                    "phone": "010-1111-2222",
+                    "is_co_owner": True,
+                },
+                {"role": "TENANT", "role_index": 1, "name": "김세입", "phone": "010-3333-4444"},
+            ],
+        )
+
+        response = client.get("/api/v1/property-units")
+
+        assert response.status_code == 200, response.text
+        parties = response.json()["items"][0]["parties"]
+        assert [(entry["role"], entry["role_index"]) for entry in parties] == [
+            ("LANDLORD", 1),
+            ("LANDLORD", 2),
+            ("TENANT", 1),
+        ]
+        assert [entry["party"]["name"] for entry in parties] == ["박이서", "송경련", "김세입"]
+        assert [entry["is_co_owner"] for entry in parties] == [True, True, False]
+        assert [contact["contact_value"] for contact in parties[0]["party"]["contacts"]] == [
+            "010-1111-2222"
+        ]
+
+
+@requires_database
+def test_list_and_detail_assemble_parties_the_same_way(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "동일조립단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="102",
+            parties=[
+                {"role": "LANDLORD", "role_index": 1, "name": "박이서", "phone": "010-1111-2222"},
+                {"role": "TENANT", "role_index": 1, "name": "김세입"},
+            ],
+        )
+        unit_id = created["unit"]["id"]
+
+        listed = client.get("/api/v1/property-units").json()["items"][0]["parties"]
+        detailed = client.get(f"/api/v1/property-units/{unit_id}").json()["parties"]
+
+        assert listed == detailed
+
+
+@requires_database
+def test_list_drops_a_party_slot_that_the_last_write_left_out(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "관계종료단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="103",
+            parties=[
+                {"role": "LANDLORD", "role_index": 1, "name": "박이서"},
+                {"role": "TENANT", "role_index": 1, "name": "김세입"},
+            ],
+        )
+        unit = created["unit"]
+
+        patched = client.patch(
+            f"/api/v1/property-units/{unit['id']}",
+            json={
+                "row_version": unit["row_version"],
+                "parties": [{"role": "LANDLORD", "role_index": 1, "name": "박이서"}],
+            },
+        )
+        assert patched.status_code == 200, patched.text
+
+        listed = client.get("/api/v1/property-units").json()["items"][0]["parties"]
+        assert [entry["party"]["name"] for entry in listed] == ["박이서"]
+
+
+@requires_database
+def test_list_party_summary_carries_only_the_fields_the_grid_draws(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "노출범위단지")
+        create_unit(
+            client,
+            complex_id,
+            unit_number="104",
+            parties=[{"role": "LANDLORD", "role_index": 1, "name": "박이서"}],
+        )
+
+        party = client.get("/api/v1/property-units").json()["items"][0]["parties"][0]["party"]
+
+        assert set(party) == {
+            "id",
+            "party_type",
+            "name",
+            "alternate_name",
+            "privacy_consent_at",
+            "contacts",
+        }
+
+
+@requires_database
+def test_list_does_not_carry_the_parties_of_another_brokerage(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "우리단지")
+        create_unit(
+            client,
+            complex_id,
+            unit_number="105",
+            parties=[{"role": "LANDLORD", "role_index": 1, "name": "우리임대인"}],
+        )
+
+        other_brokerage_id = session.execute(
+            text("INSERT INTO brokerage (name) VALUES ('남의 사무소') RETURNING id")
+        ).scalar_one()
+        other_complex_id = create_complex(client, session, other_brokerage_id, "남의단지")
+        other_unit_id = session.execute(
+            text(
+                "INSERT INTO property_unit (brokerage_id, complex_id, unit_number)"
+                " VALUES (:b, :c, '999') RETURNING id"
+            ),
+            {"b": other_brokerage_id, "c": other_complex_id},
+        ).scalar_one()
+        other_party_id = session.execute(
+            text(
+                "INSERT INTO party (brokerage_id, party_type, name)"
+                " VALUES (:b, 'PERSON', '남의임대인') RETURNING id"
+            ),
+            {"b": other_brokerage_id},
+        ).scalar_one()
+        session.execute(
+            text(
+                "INSERT INTO property_unit_party_relation"
+                " (brokerage_id, unit_id, party_id, role, role_index)"
+                " VALUES (:b, :u, :p, 'LANDLORD', 1)"
+            ),
+            {"b": other_brokerage_id, "u": other_unit_id, "p": other_party_id},
+        )
+
+        items = client.get("/api/v1/property-units").json()["items"]
+
+        assert [item["unit_number"] for item in items] == ["105"]
+        assert [entry["party"]["name"] for item in items for entry in item["parties"]] == [
+            "우리임대인"
+        ]
+
+
+@requires_database
+def test_invalid_party_leaves_no_unit_behind(config: Config) -> None:
+    """인물 검증이 실패하면 세대도 남지 않는다.
+
+    인물 없는 세대 자체는 정상이다. 문제는 화면이 한 요청을 전부 아니면 전무로 보고
+    성공했을 때만 서버 id를 기록한다는 점이다. 세대만 커밋되면 화면은 그것을 모른 채
+    재시도해 같은 세대를 다시 만든다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "부분저장단지")
+
+        response = client.post(
+            "/api/v1/property-units",
+            json={
+                "complex_id": complex_id,
+                "unit_number": "101",
+                "parties": [
+                    {"role": "LANDLORD", "role_index": 1, "name": "박이서"},
+                    {"role": "LANDLORD", "role_index": 1, "name": "송경련"},
+                ],
+            },
+        )
+
+        assert response.status_code == 422, response.text
+        assert client.get("/api/v1/property-units").json()["total"] == 0
+
+
+@requires_database
+def test_failed_party_save_leaves_the_row_version_retryable(config: Config) -> None:
+    """인물 저장이 실패하면 세대 `row_version`도 오르지 않아 같은 요청을 다시 보낼 수 있다.
+
+    세대를 먼저 커밋하면 버전만 오른 채 인물이 빠진다. 화면은 실패를 봤으므로 낡은 버전을
+    그대로 들고 재시도하고, 그 재시도는 409가 되어 새로고침 말고는 빠져나갈 길이 없다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "재시도단지")
+        created = create_unit(client, complex_id, unit_number="101")
+        unit_id = created["unit"]["id"]
+        row_version = created["unit"]["row_version"]
+
+        rejected = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": row_version,
+                "orientation": "남향",
+                "parties": [
+                    {"role": "TENANT", "role_index": 1, "name": "김세입"},
+                    {"role": "TENANT", "role_index": 1, "name": "이세입"},
+                ],
+            },
+        )
+
+        assert rejected.status_code == 422, rejected.text
+
+        # 세대 필드도 함께 되돌아갔는지 본다. 인물만 롤백되고 방향이 남으면 부분 저장이다.
+        assert client.get(f"/api/v1/property-units/{unit_id}").json()["unit"]["orientation"] is None
+
+        retried = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": row_version,
+                "orientation": "남향",
+                "parties": [{"role": "TENANT", "role_index": 1, "name": "김세입"}],
+            },
+        )
+
+        assert retried.status_code == 200, retried.text
+        body = retried.json()
+        assert body["unit"]["orientation"] == "남향"
+        assert [entry["party"]["name"] for entry in body["parties"]] == ["김세입"]
+
+
+@requires_database
+def test_parties_only_patch_rejects_a_stale_row_version(config: Config) -> None:
+    """인물만 바꾸는 PATCH도 낡은 `row_version`을 거절한다.
+
+    세대 필드가 비어 있으면 조건부 UPDATE가 실행되지 않아 버전 검사가 통째로 건너뛰어졌다.
+    그 사이 다른 사람이 인물을 바꿔도 충돌이 잡히지 않고 나중 저장이 덮어썼다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "동시편집단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="101",
+            parties=[{"role": "LANDLORD", "role_index": 1, "name": "박이서"}],
+        )
+        unit_id = created["unit"]["id"]
+        stale_row_version = created["unit"]["row_version"]
+
+        first = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": stale_row_version,
+                "parties": [{"role": "LANDLORD", "role_index": 1, "name": "먼저 저장한 사람"}],
+            },
+        )
+        assert first.status_code == 200, first.text
+
+        second = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": stale_row_version,
+                "parties": [{"role": "LANDLORD", "role_index": 1, "name": "나중 저장한 사람"}],
+            },
+        )
+
+        assert second.status_code == 409, second.text
+        detail = client.get(f"/api/v1/property-units/{unit_id}").json()
+        assert [entry["party"]["name"] for entry in detail["parties"]] == ["먼저 저장한 사람"]
+
+
+@requires_database
+def test_parties_only_change_bumps_the_unit_row_version(config: Config) -> None:
+    """인물만 바뀌어도 세대 버전이 오른다. 올리지 않으면 다음 동시 편집을 잡을 수 없다."""
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "버전증가단지")
+        created = create_unit(
+            client,
+            complex_id,
+            unit_number="102",
+            parties=[{"role": "TENANT", "role_index": 1, "name": "김세입"}],
+        )
+        unit_id = created["unit"]["id"]
+        before = created["unit"]["row_version"]
+
+        response = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": before,
+                "parties": [{"role": "TENANT", "role_index": 1, "name": "이세입"}],
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["unit"]["row_version"] == before + 1
+
+
+@requires_database
+def test_resending_the_same_parties_keeps_the_row_version(config: Config) -> None:
+    """같은 인물을 다시 보낸 것은 변경이 아니다. 버전을 올리면 남의 화면을 헛되이 충돌시킨다."""
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "무변경단지")
+        parties = [
+            {"role": "LANDLORD", "role_index": 1, "name": "박이서", "phone": "010-1111-2222"}
+        ]
+        created = create_unit(client, complex_id, unit_number="103", parties=parties)
+        unit_id = created["unit"]["id"]
+        before = created["unit"]["row_version"]
+
+        response = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={"row_version": before, "parties": parties},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["unit"]["row_version"] == before

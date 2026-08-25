@@ -10,7 +10,19 @@
   --dw-control-min-size: 24px;
 }
 
+/*
+ * 닫기 버튼 자리.
+ *
+ * PatternFly는 닫기 버튼을 헤더 기본 여백(24px)을 기준으로 절대 배치한다.
+ * 헤더를 6px까지 좁힌 뒤에는 37px짜리 버튼이 헤더 밖으로 내려가고,
+ * 바로 아래 본문이 position: relative여서 그 위를 덮어 버튼이 잘려 보인다.
+ * 좁아진 헤더 안에 버튼을 다시 앉히고, 헤더 내용이 버튼 자리를 비켜 가게 한다.
+ */
 .detail-workspace-modal.pf-v6-c-modal-box {
+  --pf-v6-c-modal-box__close--InsetBlockStart: 1px;
+  --pf-v6-c-modal-box__close--InsetInlineEnd: 8px;
+  --pf-v6-c-modal-box__close--sibling--MarginInlineEnd: 50px;
+
   z-index: 501 !important;
   width: min(1456px, calc(100vw - 40px));
   max-width: min(1456px, calc(100vw - 40px));
@@ -24,6 +36,8 @@
 
 .detail-workspace-modal .pf-v6-c-modal-box__header,
 .detail-workspace-modal > .pf-v6-c-modal-box__header {
+  /* 헤더가 더 낮아지면 절대 배치된 닫기 버튼(37px)이 다시 본문에 덮인다. 버튼 높이를 하한으로 둔다. */
+  min-height: 39px;
   padding: 6px 10px;
   background: #ffffff;
   border-bottom: 1px solid var(--dw-border);
@@ -993,6 +1007,63 @@
 
 .decision-card__error {
   margin: -8px 0 18px;
+}
+
+/*
+ * 덮어쓸 칸 목록.
+ *
+ * 무엇이 사라지는지가 결정의 근거라, 현재값과 제안값을 화살표 대신 이름표로 나란히 둔다.
+ * 화면 낭독에서도 "현재 X, 음성 메모 Y"로 그대로 읽힌다.
+ */
+.decision-card__replacements {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  margin: -6px 0 18px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.decision-card__replacements li {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--dw-border-subtle);
+  background: var(--dw-surface-subtle);
+}
+
+.decision-card__replacements strong {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+
+.decision-card__replacements span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.decision-card__replacements em {
+  color: var(--dw-text-subtle);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* 현재값은 사라지는 쪽이므로 제안값보다 뒤로 물린다. */
+.decision-card__replacements li > span:first-of-type {
+  color: var(--dw-text-subtle);
+}
+
+.detail-workspace__decision-card p.decision-card__kept {
+  margin: -8px 0 18px;
+  color: var(--dw-text-subtle);
+  font-size: 13px;
 }
 
 .detail-workspace__delete-modal-body > p:first-child {

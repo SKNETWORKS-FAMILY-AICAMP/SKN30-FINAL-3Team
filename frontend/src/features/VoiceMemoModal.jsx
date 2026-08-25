@@ -39,7 +39,7 @@ function formatSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
-export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType = "property", onClose, onApply, onDraftChange }) {
+export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType = "property", appendTo, onClose, onApply, onDraftChange }) {
   const [state, setState] = useState(() => initialDraft?.state || "empty");
   const [source, setSource] = useState(() => initialDraft?.audioSource || null);
   const [file, setFile] = useState(null);
@@ -167,15 +167,25 @@ export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType
 
   const applySelected = () => {
     const selected = proposals.filter((proposal) => proposal.selected && proposal.fieldKey);
+    const isAppendOnly = (proposal) => proposal.fieldKey === "log" || proposal.fieldKey === "content";
     const patch = selected.reduce((result, proposal) => {
-      const appendOnlyField = proposal.fieldKey === "log" || proposal.fieldKey === "content";
       const current = draft[proposal.fieldKey];
-      return { ...result, [proposal.fieldKey]: appendOnlyField && current ? `${current}\n${proposal.proposal}` : proposal.proposal };
+      return { ...result, [proposal.fieldKey]: isAppendOnly(proposal) && current ? `${current}\n${proposal.proposal}` : proposal.proposal };
     }, {});
+    /*
+     * 기존 값을 지우는 칸만 따로 알린다.
+     *
+     * 어떤 제안이 기존 값을 덮어쓰는지는 여기서만 정확히 안다. 상담 로그는
+     * 이어 붙이므로 값이 있어도 사라지는 것이 없고, 빈 칸은 채우기일 뿐이다.
+     * 부모가 patch만 보고 되짚으려면 이 구분을 다시 추측해야 한다.
+     */
+    const replacements = selected
+      .filter((proposal) => !isAppendOnly(proposal) && String(draft[proposal.fieldKey] ?? "").trim())
+      .map((proposal) => ({ fieldKey: proposal.fieldKey, field: proposal.field, current: String(draft[proposal.fieldKey]), next: proposal.proposal }));
     const nextProposals = proposals.map((proposal) => proposal.selected ? { ...proposal, selected: false, status: "반영됨" } : proposal);
     setProposals(nextProposals);
     setReviewComplete(true);
-    onApply?.(patch, { ...f2Draft, state: "review", proposals: nextProposals, reviewComplete: true });
+    onApply?.(patch, { ...f2Draft, state: "review", proposals: nextProposals, reviewComplete: true }, { replacements });
     onClose?.();
   };
 
@@ -218,5 +228,5 @@ export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType
     <div className="f2-review">{analysis?.ledgerMismatch ? <Alert variant="warning" isInline title="현재 장부와 상담 유형이 다릅니다">상담 유형은 {analysis.consultationType}입니다. 필드 제안은 만들지 않고 상담 로그만 검토할 수 있습니다.</Alert> : <Alert variant="info" isInline isPlain title={`${analysis?.consultationType || "상담"} 분석 결과`}>현재값과 다른 제안은 `변경` 상태로 표시되며 기본 선택되지 않습니다.</Alert>}{analysis?.uncertainties?.length > 0 && <Alert variant="warning" isInline isPlain title="추가 확인이 필요한 내용"><ul>{analysis.uncertainties.map((item) => <li key={item}>{item}</li>)}</ul></Alert>}<div className="f2-review__summary" role="status" aria-live="polite"><div><span>전체 제안</span><strong>{proposals.length}건</strong></div><div><span>선택</span><strong>{proposals.filter((item) => item.selected).length}건</strong></div><div><span>변경</span><strong>{proposals.filter((item) => item.status === "변경").length}건</strong></div></div><div className="f2-review-table-wrap"><table className="pf-v6-c-table pf-m-grid-md pf-m-compact f2-review-table" aria-label="음성메모 분석 제안"><thead><tr><th scope="col">반영</th><th scope="col">필드</th><th scope="col">현재값</th><th scope="col">제안</th><th scope="col">상태</th><th scope="col">근거</th></tr></thead><tbody>{proposals.map((proposal) => <tr key={proposal.id}><td><Checkbox id={`proposal-${proposal.id}`} aria-label={`${proposal.field} 제안 반영`} isChecked={proposal.selected} isDisabled={!proposal.fieldKey} onChange={(_event, checked) => toggleProposal(proposal.id, checked)} /></td><th scope="row">{proposal.field}</th><td>{proposal.current}</td><td>{proposal.proposal}</td><td><Label isCompact status={proposal.status === "반영됨" ? "success" : proposal.status === "변경" ? "warning" : "info"}>{proposal.status}</Label></td><td className="f2-review-table__evidence">{proposal.evidence}</td></tr>)}</tbody></table></div><div className="f2-review__action-bar"><span>선택한 항목만 부모 상세의 작성값에 반영하고 저장하지 않습니다.</span><Button variant="primary" icon={<CheckCircleIcon />} onClick={applySelected} isDisabled={!proposals.some((item) => item.selected && item.fieldKey)}>선택 항목 반영</Button></div><div className="f2-review__footer"><Button variant="secondary" icon={<RedoIcon />} onClick={() => { setStep(0); setState("sourceReady"); }}>원본부터 다시 분석</Button>{reviewComplete && <Label status="success" icon={<CheckCircleIcon />}>검토 완료</Label>}</div></div>
   );
 
-  return <Modal id="f2-modal" isOpen={isOpen} onClose={requestClose} variant="large" aria-label="음성메모·AI 제안 검토" className="voice-memo-modal"><ModalHeader title="음성메모·AI 제안 검토" description="F1 상세 위에서 파일을 분석하고 선택한 제안만 작성값에 반영합니다." /><ModalBody><div className="voice-memo-modal__content" data-screen-id="F2-MOD-010" data-requirement-ids="F1-ST-01~05, F1-ST-06~11, F1-ST-12~15, F1-ST-15~18, F2-LIST-01~04, F2-POP-03, F2-REV-01~04"><Alert variant="warning" isInline title="개인정보 포함 음성 주의"><div className="f2-privacy-copy">주민등록번호·계좌번호·비밀번호가 포함된 음성은 업로드하지 마세요. 패턴이 감지되어도 자동 마스킹하거나 저장을 차단하지 않으며, 사용자가 내용을 확인한 뒤 그대로 저장할 수 있습니다.</div><Checkbox id="f2-privacy-confirm" label="주의 문구를 확인했으며 상담 후 만든 음성 파일만 사용합니다." isChecked={confirmed} onChange={(_event, checked) => setConfirmed(checked)} /></Alert>{!confirmed && <Alert variant="info" isInline isPlain title="파일 선택 전 확인 필요">주의 문구 확인 후 파일 선택과 분석이 활성화됩니다.</Alert>}{body}</div></ModalBody><ModalFooter><Button variant="link" onClick={requestClose}>닫기</Button></ModalFooter></Modal>;
+  return <Modal id="f2-modal" isOpen={isOpen} onClose={requestClose} appendTo={appendTo} variant="large" aria-label="음성메모·AI 제안 검토" className="voice-memo-modal"><ModalHeader title="음성메모·AI 제안 검토" description="F1 상세 위에서 파일을 분석하고 선택한 제안만 작성값에 반영합니다." /><ModalBody><div className="voice-memo-modal__content" data-screen-id="F2-MOD-010" data-requirement-ids="F1-ST-01~05, F1-ST-06~11, F1-ST-12~15, F1-ST-15~18, F2-LIST-01~04, F2-POP-03, F2-REV-01~04"><Alert variant="warning" isInline title="개인정보 포함 음성 주의"><div className="f2-privacy-copy">주민등록번호·계좌번호·비밀번호가 포함된 음성은 업로드하지 마세요. 패턴이 감지되어도 자동 마스킹하거나 저장을 차단하지 않으며, 사용자가 내용을 확인한 뒤 그대로 저장할 수 있습니다.</div><Checkbox id="f2-privacy-confirm" label="주의 문구를 확인했으며 상담 후 만든 음성 파일만 사용합니다." isChecked={confirmed} onChange={(_event, checked) => setConfirmed(checked)} /></Alert>{!confirmed && <Alert variant="info" isInline isPlain title="파일 선택 전 확인 필요">주의 문구 확인 후 파일 선택과 분석이 활성화됩니다.</Alert>}{body}</div></ModalBody><ModalFooter><Button variant="link" onClick={requestClose}>닫기</Button></ModalFooter></Modal>;
 }

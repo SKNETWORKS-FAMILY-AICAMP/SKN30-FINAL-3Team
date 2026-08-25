@@ -19,13 +19,13 @@ import type {
   PropertyRequirementRowDto,
   PropertyUnitDetailDto,
   PropertyUnitRowDto,
+  UnitPartyWriteDto,
 } from "../model/dto.ts";
 import {
   MOCK_COMPLEXES,
   createRequirementRowDtos,
   createUnitRowDtos,
   interactionFor,
-  relationsFor,
 } from "./fixtures.ts";
 
 interface MockState {
@@ -169,11 +169,59 @@ function byBuildingAndUnit(left: PropertyUnitRowDto, right: PropertyUnitRowDto):
 }
 
 function detailFor(unit: PropertyUnitRowDto): PropertyUnitDetailDto {
+  // 서버와 마찬가지로 목록 행과 상세가 같은 인물 목록을 본다.
   return {
     unit,
     listings: unit.current_listing == null ? [] : [unit.current_listing],
-    parties: relationsFor(unit.id),
+    parties: unit.parties,
   };
+}
+
+/**
+ * 인물 쓰기 요청을 mock 상태에 반영한다.
+ *
+ * 서버와 같은 "보낸 목록이 곧 전체" 규칙을 따른다. 여기서 규칙이 갈라지면 mock으로 확인한
+ * 화면 동작이 실제 API에서 재현되지 않는다.
+ */
+function applyPartyWrites(
+  unit: PropertyUnitRowDto,
+  entries: UnitPartyWriteDto[] | undefined,
+): void {
+  if (entries == null) return;
+  unit.parties = entries.map((entry) => {
+    const existing = unit.parties.find(
+      (relation) => relation.role === entry.role && relation.role_index === entry.role_index,
+    );
+    // (role, role_index)가 사람의 신원이다. 같은 자리면 기존 인물의 id와 동의 기록을 잇는다.
+    const previousContact = existing?.party.contacts[0];
+    return {
+      role: entry.role,
+      role_index: entry.role_index,
+      is_primary: entry.role_index === 1,
+      is_co_owner: entry.is_co_owner,
+      valid_from: existing?.valid_from ?? null,
+      party: {
+        id: existing?.party.id ?? nextId(),
+        party_type: existing?.party.party_type ?? "INDIVIDUAL",
+        name: entry.name,
+        alternate_name: null,
+        privacy_consent_at: existing?.party.privacy_consent_at ?? null,
+        contacts:
+          entry.phone == null
+            ? []
+            : [
+                {
+                  id: previousContact?.id ?? nextId(),
+                  contact_method: "PHONE",
+                  contact_value: entry.phone,
+                  contact_label: null,
+                  is_primary: true,
+                  contactability_status: previousContact?.contactability_status ?? "UNKNOWN",
+                },
+              ],
+      },
+    };
+  });
 }
 
 function requireUnit(unitId: number): PropertyUnitRowDto {
@@ -314,7 +362,9 @@ export const mockTransport: LedgerTransport = {
       row_version: 1,
       current_listing: null,
       latest_interaction_content: null,
+      parties: [],
     };
+    applyPartyWrites(created, payload.parties);
     // 새 행은 그리드 최상단에 보이도록 앞에 넣는다(F1-GR-30).
     state.units.unshift(created);
     return structuredClone(detailFor(created));
@@ -348,6 +398,7 @@ export const mockTransport: LedgerTransport = {
       row_version: unit.row_version + 1,
     });
     unit.complex = MOCK_COMPLEXES.find((entry) => entry.id === complexId) ?? unit.complex;
+    applyPartyWrites(unit, payload.parties);
     return structuredClone(detailFor(unit));
   },
 

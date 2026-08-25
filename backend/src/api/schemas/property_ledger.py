@@ -96,88 +96,6 @@ class PropertyListingResponse(BaseModel):
         )
 
 
-class PropertyUnitRow(BaseModel):
-    """매물장 그리드 한 행. 매물이 아닌 세대는 current_listing이 null이다."""
-
-    id: int
-    complex: PropertyComplexSummary
-    building_number: str | None
-    unit_number: str
-    floor_number: str | None
-    orientation: str | None
-    unit_type: str | None
-    pyeong: Decimal | None
-    exclusive_area_sqm: Decimal | None
-    supply_area_sqm: Decimal | None
-    tenancy_status: str | None
-    current_deposit_amount: int | None
-    current_monthly_rent_amount: int | None
-    loan_amount: int | None
-    tenancy_expiry_date: date | None
-    tenancy_raw_text: str | None
-    is_expanded: bool | None
-    built_in_features: str | None
-    facility_condition: str | None
-    lifecycle_status: str
-    assigned_user_id: int | None
-    memo: str | None
-    custom_fields: dict[str, object]
-    last_contact_at: datetime | None
-    row_version: int
-    current_listing: PropertyListingResponse | None
-    """가장 최근 상담 로그 본문. 목록의 로그 열을 채우기 위한 값이며 없으면 null이다."""
-    latest_interaction_content: str | None = None
-
-    @classmethod
-    def from_domain(
-        cls,
-        unit: PropertyUnit,
-        complex_row: PropertyComplex,
-        listing: PropertyListing | None,
-        interaction: ClientInteraction | None = None,
-    ) -> PropertyUnitRow:
-        return cls(
-            id=unit.id or 0,
-            complex=PropertyComplexSummary.from_domain(complex_row),
-            building_number=unit.building_number,
-            unit_number=unit.unit_number,
-            floor_number=unit.floor_number,
-            orientation=unit.orientation,
-            unit_type=unit.unit_type,
-            pyeong=unit.pyeong,
-            exclusive_area_sqm=unit.exclusive_area_sqm,
-            supply_area_sqm=unit.supply_area_sqm,
-            tenancy_status=unit.tenancy_status,
-            current_deposit_amount=unit.current_deposit_amount,
-            current_monthly_rent_amount=unit.current_monthly_rent_amount,
-            loan_amount=unit.loan_amount,
-            tenancy_expiry_date=unit.tenancy_expiry_date,
-            tenancy_raw_text=unit.tenancy_raw_text,
-            is_expanded=unit.is_expanded,
-            built_in_features=unit.built_in_features,
-            facility_condition=unit.facility_condition,
-            lifecycle_status=unit.lifecycle_status,
-            assigned_user_id=unit.assigned_user_id,
-            memo=unit.memo,
-            custom_fields=unit.custom_fields,
-            last_contact_at=unit.last_contact_at,
-            row_version=unit.row_version,
-            current_listing=(
-                PropertyListingResponse.from_domain(listing) if listing is not None else None
-            ),
-            latest_interaction_content=(
-                interaction.interaction_content if interaction is not None else None
-            ),
-        )
-
-
-class PropertyUnitListResponse(BaseModel):
-    items: list[PropertyUnitRow]
-    total: int
-    limit: int
-    offset: int
-
-
 class PartyContactResponse(BaseModel):
     id: int
     contact_method: str
@@ -243,10 +161,110 @@ class UnitPartyRelationResponse(BaseModel):
         )
 
 
+class PropertyUnitRow(BaseModel):
+    """매물장 그리드 한 행. 매물이 아닌 세대는 current_listing이 null이다."""
+
+    id: int
+    complex: PropertyComplexSummary
+    building_number: str | None
+    unit_number: str
+    floor_number: str | None
+    orientation: str | None
+    unit_type: str | None
+    pyeong: Decimal | None
+    exclusive_area_sqm: Decimal | None
+    supply_area_sqm: Decimal | None
+    tenancy_status: str | None
+    current_deposit_amount: int | None
+    current_monthly_rent_amount: int | None
+    loan_amount: int | None
+    tenancy_expiry_date: date | None
+    tenancy_raw_text: str | None
+    is_expanded: bool | None
+    built_in_features: str | None
+    facility_condition: str | None
+    lifecycle_status: str
+    assigned_user_id: int | None
+    memo: str | None
+    custom_fields: dict[str, object]
+    last_contact_at: datetime | None
+    row_version: int
+    current_listing: PropertyListingResponse | None
+    """가장 최근 상담 로그 본문. 목록의 로그 열을 채우기 위한 값이며 없으면 null이다."""
+    latest_interaction_content: str | None = None
+    """현재 유효한 인물 관계. 목록의 임대인·임차인 열을 채운다."""
+    parties: list[UnitPartyRelationResponse] = Field(default_factory=list)
+
+    @classmethod
+    def from_domain(
+        cls,
+        unit: PropertyUnit,
+        complex_row: PropertyComplex,
+        listing: PropertyListing | None,
+        interaction: ClientInteraction | None = None,
+        parties: list[UnitPartyRelationResponse] | None = None,
+    ) -> PropertyUnitRow:
+        return cls(
+            id=unit.id or 0,
+            complex=PropertyComplexSummary.from_domain(complex_row),
+            building_number=unit.building_number,
+            unit_number=unit.unit_number,
+            floor_number=unit.floor_number,
+            orientation=unit.orientation,
+            unit_type=unit.unit_type,
+            pyeong=unit.pyeong,
+            exclusive_area_sqm=unit.exclusive_area_sqm,
+            supply_area_sqm=unit.supply_area_sqm,
+            tenancy_status=unit.tenancy_status,
+            current_deposit_amount=unit.current_deposit_amount,
+            current_monthly_rent_amount=unit.current_monthly_rent_amount,
+            loan_amount=unit.loan_amount,
+            tenancy_expiry_date=unit.tenancy_expiry_date,
+            tenancy_raw_text=unit.tenancy_raw_text,
+            is_expanded=unit.is_expanded,
+            built_in_features=unit.built_in_features,
+            facility_condition=unit.facility_condition,
+            lifecycle_status=unit.lifecycle_status,
+            assigned_user_id=unit.assigned_user_id,
+            memo=unit.memo,
+            custom_fields=unit.custom_fields,
+            last_contact_at=unit.last_contact_at,
+            row_version=unit.row_version,
+            current_listing=(
+                PropertyListingResponse.from_domain(listing) if listing is not None else None
+            ),
+            latest_interaction_content=(
+                interaction.interaction_content if interaction is not None else None
+            ),
+            parties=list(parties or []),
+        )
+
+
+class PropertyUnitListResponse(BaseModel):
+    items: list[PropertyUnitRow]
+    total: int
+    limit: int
+    offset: int
+
+
 class PropertyUnitDetailResponse(BaseModel):
     unit: PropertyUnitRow
     listings: list[PropertyListingResponse]
     parties: list[UnitPartyRelationResponse]
+
+
+class UnitPartyWriteRequest(BaseModel):
+    """세대에 붙일 인물 한 명.
+
+    매물장 그리드는 인물을 이름 한 칸과 전화 한 칸으로만 다룬다. 이 요청도 같은 범위만 받고,
+    메모나 별칭처럼 그리드가 만들지 않는 값은 기존 인물의 것을 건드리지 않는다.
+    """
+
+    role: str = Field(max_length=20)
+    role_index: int = Field(default=1, ge=1)
+    name: str = Field(min_length=1, max_length=150)
+    phone: str | None = Field(default=None, max_length=320)
+    is_co_owner: bool = False
 
 
 class PropertyUnitCreateRequest(BaseModel):
@@ -271,6 +289,7 @@ class PropertyUnitCreateRequest(BaseModel):
     assigned_user_id: int | None = None
     memo: str | None = None
     custom_fields: dict[str, object] = Field(default_factory=dict)
+    parties: list[UnitPartyWriteRequest] | None = None
 
 
 class PropertyUnitUpdateRequest(BaseModel):
@@ -296,6 +315,7 @@ class PropertyUnitUpdateRequest(BaseModel):
     assigned_user_id: int | None = None
     memo: str | None = None
     custom_fields: dict[str, object] | None = None
+    parties: list[UnitPartyWriteRequest] | None = None
 
 
 class PropertyListingCreateRequest(BaseModel):
