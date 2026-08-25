@@ -716,7 +716,7 @@ resource "aws_codepipeline" "integrated" {
       configuration = {
         BranchName           = "dev"
         ConnectionArn        = aws_codeconnections_connection.github.arn
-        DetectChanges        = false
+        DetectChanges        = tostring(var.dev_edge_enabled && var.integrated_pipeline_detect_changes)
         FullRepositoryId     = var.github_full_repository_id
         OutputArtifactFormat = "CODE_ZIP"
       }
@@ -1318,6 +1318,6 @@ output "delivery" {
     discord_secret_arn     = aws_secretsmanager_secret.discord_webhook.arn
     operator_policy_arn    = aws_iam_policy.pipeline_operator.arn
     operator_user_names    = sort(tolist(var.pipeline_operator_user_names))
-    automatic_dev_delivery = var.integrated_pipeline_detect_changes
+    automatic_dev_delivery = var.dev_edge_enabled && var.integrated_pipeline_detect_changes
   }
 }

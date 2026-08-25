@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Infra 결정 인덱스
@@ -15,8 +15,9 @@ updated: 2026-08-24
 | [ADR-0006](ADR-0006-team-readonly-iam-group.md) | 부분 대체됨 | `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결 관리 |
 | [ADR-0007](ADR-0007-dev-db-tunnel-access.md) | 승인됨 | `team-db-tunnel` 그룹과 태그 제한 SSM remote-host 포트 포워딩 권한 관리 |
 | [ADR-0008](ADR-0008-dev-database-access-management.md) | 승인됨 | runtime Secret, IAM DB migration과 개인 개발자 DB 역할 운영 기준 |
-| [ADR-0009](ADR-0009-dev-power-lifecycle.md) | 승인됨 | 지정 Infra 운영자의 ASG 0↔1·RDS start/stop 운영과 Terraform 소유권 경계 |
+| [ADR-0009](ADR-0009-dev-power-lifecycle.md) | 부분 대체됨 | 지정 Infra 운영자의 ASG 0↔1·RDS start/stop 운영과 Terraform 소유권 경계 |
 | [ADR-0010](ADR-0010-dev-ec2-instance-class.md) | 승인됨 | 개발 환경 EC2 instance class를 `t3.small`로 축소 |
 | [ADR-0011](ADR-0011-dev-delivery-implementation.md) | 부분 대체됨 | 통합·Backend·Frontend Pipeline, CodeDeploy, rollback과 Discord delivery 구현 |
 | [ADR-0012](ADR-0012-existing-iam-operators.md) | 승인됨 | 기존 IAM 운영자에 최소 권한 Pipeline policy 직접 연결 |
 | [ADR-0013](ADR-0013-dev-environment-materialization.md) | 승인됨 | Terraform 설정 정본, write-only 수동 비밀과 프로세스별 환경파일 사용 |
+| [ADR-0014](ADR-0014-dev-deep-power-lifecycle.md) | 승인됨 | ALB 삭제·CloudFront 비활성화를 포함한 검토 가능한 dev deep 전원 운영 |

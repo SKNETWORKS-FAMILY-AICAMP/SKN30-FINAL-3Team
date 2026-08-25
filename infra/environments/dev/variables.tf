@@ -51,6 +51,12 @@ variable "owner" {
   default     = "infra-team"
 }
 
+variable "dev_edge_enabled" {
+  description = "dev ALB·CloudFront API edge를 활성화할지 여부; deep lifecycle 전용 명령에서만 false로 오버라이드"
+  type        = bool
+  default     = true
+}
+
 variable "pipeline_operator_user_names" {
   description = "Delivery Pipeline을 수동 운영할 기존 계정 IAM 사용자 이름 집합"
   type        = set(string)
