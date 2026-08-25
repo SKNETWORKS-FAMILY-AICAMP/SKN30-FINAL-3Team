@@ -392,3 +392,75 @@ def test_list_does_not_carry_the_parties_of_another_brokerage(config: Config) ->
         assert [entry["party"]["name"] for item in items for entry in item["parties"]] == [
             "우리임대인"
         ]
+
+
+@requires_database
+def test_invalid_party_leaves_no_unit_behind(config: Config) -> None:
+    """인물 검증이 실패하면 세대도 남지 않는다.
+
+    인물 없는 세대 자체는 정상이다. 문제는 화면이 한 요청을 전부 아니면 전무로 보고
+    성공했을 때만 서버 id를 기록한다는 점이다. 세대만 커밋되면 화면은 그것을 모른 채
+    재시도해 같은 세대를 다시 만든다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "부분저장단지")
+
+        response = client.post(
+            "/api/v1/property-units",
+            json={
+                "complex_id": complex_id,
+                "unit_number": "101",
+                "parties": [
+                    {"role": "LANDLORD", "role_index": 1, "name": "박이서"},
+                    {"role": "LANDLORD", "role_index": 1, "name": "송경련"},
+                ],
+            },
+        )
+
+        assert response.status_code == 422, response.text
+        assert client.get("/api/v1/property-units").json()["total"] == 0
+
+
+@requires_database
+def test_failed_party_save_leaves_the_row_version_retryable(config: Config) -> None:
+    """인물 저장이 실패하면 세대 `row_version`도 오르지 않아 같은 요청을 다시 보낼 수 있다.
+
+    세대를 먼저 커밋하면 버전만 오른 채 인물이 빠진다. 화면은 실패를 봤으므로 낡은 버전을
+    그대로 들고 재시도하고, 그 재시도는 409가 되어 새로고침 말고는 빠져나갈 길이 없다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _):
+        complex_id = create_complex(client, session, brokerage_id, "재시도단지")
+        created = create_unit(client, complex_id, unit_number="101")
+        unit_id = created["unit"]["id"]
+        row_version = created["unit"]["row_version"]
+
+        rejected = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": row_version,
+                "orientation": "남향",
+                "parties": [
+                    {"role": "TENANT", "role_index": 1, "name": "김세입"},
+                    {"role": "TENANT", "role_index": 1, "name": "이세입"},
+                ],
+            },
+        )
+
+        assert rejected.status_code == 422, rejected.text
+
+        # 세대 필드도 함께 되돌아갔는지 본다. 인물만 롤백되고 방향이 남으면 부분 저장이다.
+        assert client.get(f"/api/v1/property-units/{unit_id}").json()["unit"]["orientation"] is None
+
+        retried = client.patch(
+            f"/api/v1/property-units/{unit_id}",
+            json={
+                "row_version": row_version,
+                "orientation": "남향",
+                "parties": [{"role": "TENANT", "role_index": 1, "name": "김세입"}],
+            },
+        )
+
+        assert retried.status_code == 200, retried.text
+        body = retried.json()
+        assert body["unit"]["orientation"] == "남향"
+        assert [entry["party"]["name"] for entry in body["parties"]] == ["김세입"]

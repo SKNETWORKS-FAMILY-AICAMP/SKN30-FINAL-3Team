@@ -246,11 +246,9 @@ def create_property_unit(
     _: None = Depends(require_csrf),
 ) -> PropertyUnitDetailResponse:
     fields = payload.model_dump()
-    # 인물은 property_unit 열이 아니라 별도 테이블이다. 세대 payload에서 떼어내 따로 저장한다.
-    parties = fields.pop("parties", None)
-    unit_id = service.create_property_unit(db, user.brokerage_id, fields)
-    if parties is not None:
-        service.replace_unit_parties(db, user.brokerage_id, unit_id, parties)
+    # 인물은 property_unit 열이 아니라 별도 테이블이지만 화면에서는 한 번의 저장이다.
+    # 따로 커밋하면 인물이 실패했을 때 화면이 모르는 세대가 서버에 남는다.
+    unit_id = service.save_property_unit(db, user.brokerage_id, fields)
     return get_property_unit(unit_id, user, db)
 
 
@@ -263,10 +261,7 @@ def update_property_unit(
     _: None = Depends(require_csrf),
 ) -> PropertyUnitDetailResponse:
     fields = changed_fields(payload)
-    parties = fields.pop("parties", None)
-    service.update_property_unit(db, user.brokerage_id, unit_id, fields)
-    if parties is not None:
-        service.replace_unit_parties(db, user.brokerage_id, unit_id, parties)
+    service.save_property_unit(db, user.brokerage_id, fields, unit_id)
     return get_property_unit(unit_id, user, db)
 
 
