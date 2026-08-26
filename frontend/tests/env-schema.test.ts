@@ -19,6 +19,7 @@ test("parses the complete public frontend environment", () => {
   assert.deepEqual(parsed, {
     apiBaseUrl: "/api/v1",
     ledgerSource: "mock",
+    f3Source: "mock",
     mockRowCount: 7200,
     mockLatencyMs: 350,
   });
@@ -62,6 +63,26 @@ test("rejects missing and invalid ledger sources", () => {
     () => parseAppEnv(validEnv({ VITE_LEDGER_SOURCE: undefined })),
     /VITE_LEDGER_SOURCE/,
   );
+});
+
+test("F3 source defaults to the ledger source when unset", () => {
+  // 백엔드가 없는 환경에서 F3만 실서버를 부르지 않게 한다.
+  assert.equal(parseAppEnv(validEnv({ VITE_LEDGER_SOURCE: "api" })).f3Source, "api");
+  assert.equal(parseAppEnv(validEnv({ VITE_LEDGER_SOURCE: "mock" })).f3Source, "mock");
+  for (const unset of [undefined, "", "  "]) {
+    assert.equal(parseAppEnv(validEnv({ VITE_F3_SOURCE: unset })).f3Source, "mock");
+  }
+});
+
+test("F3 source can differ from the ledger source", () => {
+  // Backend는 살아 있어도 Worker가 꺼져 있으면 실행이 QUEUED에 머문다. 그때 쓰는 조합이다.
+  const parsed = parseAppEnv(validEnv({ VITE_LEDGER_SOURCE: "api", VITE_F3_SOURCE: "mock" }));
+  assert.equal(parsed.ledgerSource, "api");
+  assert.equal(parsed.f3Source, "mock");
+});
+
+test("rejects an invalid F3 source instead of falling back", () => {
+  assert.throws(() => parseAppEnv(validEnv({ VITE_F3_SOURCE: "fixture" })), /VITE_F3_SOURCE/);
 });
 
 test("rejects invalid mock numeric settings instead of silently falling back", () => {
