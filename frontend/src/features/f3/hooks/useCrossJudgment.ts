@@ -12,8 +12,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, isCanceled } from "../../../shared/api/index.ts";
 import { f3Transport } from "../api/f3Transport.ts";
 import { DEFAULT_CANDIDATE_LIMIT } from "../api/limits.ts";
-import type { CandidateSummary, RunAnchor } from "../api/transport.ts";
+import type { RunAnchor } from "../api/transport.ts";
 import type { AnchorCardDto, AnchorType, RunResultDto } from "../model/dto.ts";
+import { EMPTY_LEDGER_INDEX } from "../model/candidateLabel.ts";
+import type { LedgerIndex } from "../model/candidateLabel.ts";
 import { describeCriteria, isTerminal, toCandidateView, toPanelState } from "../model/viewModel.ts";
 import type { CandidateView, PanelState } from "../model/viewModel.ts";
 
@@ -35,19 +37,14 @@ const PAUSE_AFTER_MS = 60_000;
  */
 const runRegistry = new Map<string, number>();
 
-/** 후보 요약 임시 캐시. Backend가 후보 응답에 표시 필드를 실어주면 함께 사라진다. */
-const summaryCache = new Map<number, CandidateSummary>();
-
 /**
- * 세션이 끝나면 두 캐시를 비운다.
+ * 세션이 끝나면 확보한 실행 캐시를 비운다.
  *
- * 사무소 공용 PC를 전제하므로 같은 브라우저에서 계정이 바뀔 수 있다. 실행 식별자와 장부
- * 식별자는 중개사무소 안에서만 유효하므로, 남겨 두면 앞 사용자의 실행을 조회해 404를 맞거나
- * 앞 사용자의 희망 단지를 화면에 그린다.
+ * 사무소 공용 PC를 전제하므로 같은 브라우저에서 계정이 바뀔 수 있다. 실행 식별자는
+ * 중개사무소 안에서만 유효하므로, 남겨 두면 앞 사용자의 실행을 조회해 404를 맞는다.
  */
 export function resetCrossJudgmentCache(): void {
   runRegistry.clear();
-  summaryCache.clear();
 }
 
 /**
@@ -70,6 +67,13 @@ export interface CrossJudgmentInput {
   dataVersion: number | null;
   /** 패널이 열려 있는 동안만 확인한다. */
   enabled: boolean;
+  /**
+   * 후보 표시 이름을 찾을 F1 장부 색인.
+   *
+   * 결과 응답이 표시 이름을 주지 않으므로 이미 화면에 올라와 있는 장부에서 찾는다. 색인에
+   * 없는 후보는 식별자만 보여주고 판정 내용은 그대로 그린다.
+   */
+  ledger?: LedgerIndex;
   limit?: number;
 }
 
@@ -113,7 +117,7 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
   const [snapshot, setSnapshot] = useState<Snapshot>(IDLE);
   const [offset, setOffset] = useState(0);
   const [attempt, setAttempt] = useState(0);
-  const [summaries, setSummaries] = useState<Map<number, CandidateSummary>>(summaryCache);
+  const ledger = input.ledger ?? EMPTY_LEDGER_INDEX;
 
   // 늦게 도착한 이전 앵커의 응답이 현재 패널을 덮지 않게 하는 세대 번호.
   const generation = useRef(0);
@@ -166,41 +170,7 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
         result,
         error: null,
       });
-      void hydrateSummaries(result);
       return result;
-    }
-
-    /**
-     * 후보 제목을 장부에서 채운다.
-     *
-     * 임시 우회이며 실패해도 판정 표시를 막지 않는다. 제목 하나 때문에 이미 받은 판정을 감추면
-     * 사용자가 잃는 것이 더 크다.
-     */
-    async function hydrateSummaries(result: RunResultDto) {
-      if (result.anchor_type !== "LISTING") return;
-      const missing = result.candidates
-        .map((candidate) => candidate.candidate_id)
-        .filter((id) => !summaryCache.has(id));
-      if (missing.length === 0) return;
-
-      const loaded = await Promise.all(
-        missing.map(async (id) => {
-          try {
-            return await f3Transport.fetchCandidateSummary(id, controller.signal);
-          } catch {
-            return null;
-          }
-        }),
-      );
-      if (!isCurrent()) return;
-
-      let changed = false;
-      for (const summary of loaded) {
-        if (summary == null) continue;
-        summaryCache.set(summary.requirementId, summary);
-        changed = true;
-      }
-      if (changed) setSummaries(new Map(summaryCache));
     }
 
     /** 실행을 새로 접수하고 registry에 기록한다. */
@@ -308,7 +278,7 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
   const candidates = result == null
     ? []
     : result.candidates.map((candidate) =>
-        toCandidateView(candidate, summaries.get(candidate.candidate_id), result.anchor_type),
+        toCandidateView(candidate, ledger, result.anchor_type),
       );
 
   return {

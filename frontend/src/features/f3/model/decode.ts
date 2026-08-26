@@ -134,6 +134,7 @@ export function decodeCandidate(value: unknown, path = "candidate"): CandidateDt
     price_amount: asNullableNumber(item["price_amount"], `${path}.price_amount`),
     monthly_amount: asNullableNumber(item["monthly_amount"], `${path}.monthly_amount`),
     received_at: asNullableString(item["received_at"], `${path}.received_at`),
+    judgment_id: asNullableNumber(item["judgment_id"], `${path}.judgment_id`),
     match_grade: asNullableString(item["match_grade"], `${path}.match_grade`),
     evaluation_basis: asNullableString(item["evaluation_basis"], `${path}.evaluation_basis`),
     primary_obstacle: asNullableString(item["primary_obstacle"], `${path}.primary_obstacle`),

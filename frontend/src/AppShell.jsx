@@ -520,6 +520,9 @@ export function AppShell() {
     onClose={() => setCrossMatchOpen(false)}
     row={detailRow}
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
+    /* 후보 표시 이름은 판정 응답에 없다. 이미 불러온 반대편 장부에서 찾는다. */
+    propertyRows={propertyLedger.state.rows}
+    buyerRows={buyerLedger.state.rows}
     onComposeMessage={openMessageComposer}
     onOpenEvidence={handleEvidenceOpen}
     onLater={() => { closeDetail(); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}

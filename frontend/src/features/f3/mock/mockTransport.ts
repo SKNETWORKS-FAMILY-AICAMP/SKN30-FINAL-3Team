@@ -20,8 +20,8 @@ import { ApiError } from "../../../shared/api/index.ts";
 import { decodeFeedback, decodeRun, decodeRunResult, decodeRunStatus } from "../model/decode.ts";
 import type { AnchorType } from "../model/dto.ts";
 import { DEFAULT_CANDIDATE_LIMIT, MAX_CANDIDATE_LIMIT } from "../api/limits.ts";
-import type { CandidateSummary, F3Transport } from "../api/transport.ts";
-import { resultPayload, runPayload, statusAt, statusPayload, summaryFor } from "./scenario.ts";
+import type { F3Transport } from "../api/transport.ts";
+import { resultPayload, runPayload, statusAt, statusPayload } from "./scenario.ts";
 import type { MockRun } from "./scenario.ts";
 
 const runsByAnchor = new Map<string, MockRun>();
@@ -111,10 +111,5 @@ export const mockTransport: F3Transport = {
       field_name: input.fieldName ?? null,
       created_at: new Date().toISOString(),
     });
-  },
-
-  async fetchCandidateSummary(requirementId, signal): Promise<CandidateSummary> {
-    await delay(signal);
-    return summaryFor(requirementId);
   },
 };

@@ -10,7 +10,6 @@
  */
 
 import type { AnchorType } from "../model/dto.ts";
-import type { CandidateSummary } from "../api/transport.ts";
 
 /**
  * 단계 전환 시각(ms).
@@ -35,14 +34,6 @@ export const TOTAL_CANDIDATES = 23;
 
 const COMPLETED_AT = 10_500;
 const STARTED_AT = 1_200;
-
-const COMPLEX_NAMES = [
-  "래미안 원베일리",
-  "아크로리버파크",
-  "반포자이",
-  "헬리오시티",
-  "파크리오",
-] as const;
 
 export interface MockRun {
   runId: number;
@@ -103,6 +94,8 @@ export function candidateEntry(
     price_amount: 2_500_000_000 + ((index * 7) % 12) * 100_000_000,
     monthly_amount: null,
     received_at: `2026-0${(index % 8) + 1}-1${index % 10}`,
+    // 판정된 후보만 피드백 대상을 갖는다. 서버와 같은 규칙이다.
+    judgment_id: grade == null ? null : run.runId * 1000 + rank,
     match_grade: grade,
     evaluation_basis: null,
     primary_obstacle: null,
@@ -239,18 +232,5 @@ export function resultPayload(
     candidates_total: all.length,
     limit: page.limit,
     offset: page.offset,
-  };
-}
-
-export function summaryFor(requirementId: number): CandidateSummary {
-  const seed = requirementId % 7;
-  return {
-    requirementId,
-    demandType: "SALE",
-    // 일부는 희망 단지가 없다. 단지를 가리지 않는 손님도 정상이며 화면이 그 사실을 그린다.
-    desiredComplexNames: seed === 0 ? [] : [COMPLEX_NAMES[seed % COMPLEX_NAMES.length] as string],
-    desiredPyeongs: seed % 3 === 0 ? [33] : [25, 33],
-    maxBudgetAmount: 2_600_000_000 + seed * 100_000_000,
-    budgetRawText: null,
   };
 }

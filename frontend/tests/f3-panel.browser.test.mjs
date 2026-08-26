@@ -132,7 +132,54 @@ test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 1
   await page.close();
 });
 
-test("관심없음은 판정 식별자가 없어 잠겨 있다", { timeout: 120_000 }, async () => {
+test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 잠긴다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage();
+  const failures = [];
+  page.on("pageerror", (error) => failures.push(String(error)));
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+
+  const links = page.locator(".ledger-grid__detail-link");
+  await links.first().waitFor();
+  await links.nth(1).click();
+  await page
+    .locator(".cross-match-panel__grade-heading h4")
+    .first()
+    .waitFor({ timeout: COMPLETION_TIMEOUT_MS });
+
+  // 판정된 후보. `judgment_id`가 있으므로 피드백을 보낼 수 있다.
+  await page.locator(".cross-match-panel__more-actions summary").first().click();
+  const button = page.getByRole("button", { name: "관심없음" });
+  assert.equal(await button.isDisabled(), false);
+
+  await button.click();
+  const modal = page.getByLabel("관심없음 사유");
+  await modal.waitFor();
+  // 자유 메모 입력란이 없다. 서버가 `detail`을 받지 않으므로 쓸 자리를 두지 않는다.
+  assert.equal(await modal.locator("textarea").count(), 0);
+
+  await modal.getByRole("button", { name: "피드백 기록" }).click();
+  // 성공한 뒤에만 닫힌다. 보내자마자 닫으면 서버가 거절해도 기록된 줄 안다.
+  await modal.waitFor({ state: "hidden", timeout: 10_000 });
+  await page.getByText("관심없음 피드백을 기록했습니다").first().waitFor();
+
+  // 카드화되지 않은 후보는 판정 행이 없어 잠긴 채로 남는다.
+  await page.locator(".cross-match-panel__grade.is-collapsed summary").first().click();
+  await page
+    .locator(".cross-match-panel__grade.is-collapsed .cross-match-panel__candidate")
+    .first()
+    .click();
+  // `details`는 후보를 바꿔도 열린 채로 남는다. 다시 누르면 닫히므로 상태를 직접 맞춘다.
+  await page.locator(".cross-match-panel__more-actions").first().evaluate((el) => {
+    el.open = true;
+  });
+  assert.equal(await page.getByRole("button", { name: "관심없음" }).isDisabled(), true);
+  assert.ok((await page.getByText("아직 판정하지 않은 후보").count()) > 0);
+
+  assert.deepEqual(failures, []);
+  await page.close();
+});
+
+test("장부에 없는 후보는 식별자만 보여준다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
 
@@ -144,13 +191,11 @@ test("관심없음은 판정 식별자가 없어 잠겨 있다", { timeout: 120_
     .first()
     .waitFor({ timeout: COMPLETION_TIMEOUT_MS });
 
-  await page.locator(".cross-match-panel__more-actions summary").first().click();
-
-  // `match_candidate_evaluation_id`가 공개 계약에 없다. 장부 ID로 추측해 보내면 서버 검증은
-  // 통과하고 엉뚱한 판정 행에 저장되므로 화면이 버튼을 잠근다.
-  const button = page.getByRole("button", { name: "관심없음" });
-  assert.equal(await button.isDisabled(), true);
-  assert.ok((await page.getByText("판정 식별자 연동 후").count()) > 0);
+  // mock F3의 후보 식별자는 mock 장부에 없는 값이다. 표시 이름을 지어내지 않고 식별자만
+  // 보여주며, 판정 내용은 그대로 그린다.
+  const title = await page.locator(".cross-match-panel__candidate-title").first().innerText();
+  assert.match(title, /^구입장 #\d+$/);
+  assert.ok((await page.getByText("장부 행을 찾지 못했습니다").count()) > 0);
 
   await page.close();
 });

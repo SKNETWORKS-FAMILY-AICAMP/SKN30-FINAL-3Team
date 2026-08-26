@@ -309,6 +309,21 @@
   gap: 0.75rem;
 }
 
+/* 판정 근거. 인용은 따옴표로, 정황 판단은 그대로 나열한다. */
+.cross-match-panel__evidence {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1rem;
+  font-size: 0.8125rem;
+}
+
+.cross-match-panel__evidence-field {
+  margin-inline-end: 0.375rem;
+  color: var(--cross-match-muted);
+  font-weight: 600;
+}
+
 .cross-match-panel__reason-grid section {
   min-height: 7rem;
   padding: 0.875rem;

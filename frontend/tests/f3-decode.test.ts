@@ -17,7 +17,13 @@ import {
   decodeRun,
   decodeRunResult,
 } from "../src/features/f3/model/decode.ts";
-import { isTerminal, toGradeLabel, toPanelState } from "../src/features/f3/model/viewModel.ts";
+import {
+  isTerminal,
+  toCandidateView,
+  toGradeLabel,
+  toPanelState,
+} from "../src/features/f3/model/viewModel.ts";
+import { EMPTY_LEDGER_INDEX } from "../src/features/f3/model/candidateLabel.ts";
 
 function runResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -41,6 +47,7 @@ function candidateResponse(overrides: Record<string, unknown> = {}) {
     price_amount: 2880000000,
     monthly_amount: null,
     received_at: "2026-08-01",
+    judgment_id: 35,
     match_grade: "STRONG",
     evaluation_basis: "예산과 희망 평형이 모두 맞는다",
     primary_obstacle: null,
@@ -101,11 +108,33 @@ test("서버가 열어둔 status는 좁히지 않는다", () => {
 
 test("판정 전 후보는 등급이 비어 있고 판정 실패가 아니다", () => {
   const candidate = decodeCandidate(
-    candidateResponse({ selected_for_cards: false, match_grade: null, evaluation_basis: null }),
+    candidateResponse({
+      selected_for_cards: false,
+      judgment_id: null,
+      match_grade: null,
+      evaluation_basis: null,
+    }),
   );
   assert.equal(candidate.selected_for_cards, false);
   assert.equal(candidate.match_grade, null);
   assert.equal(toGradeLabel(null), null);
+});
+
+test("피드백 대상은 장부 ID가 아니라 판정 ID다", () => {
+  const judged = decodeCandidate(candidateResponse());
+  // 두 값은 다른 테이블의 식별자다. 바꿔 넣으면 서버 검증은 통과하고 엉뚱한 판정에 저장된다.
+  assert.equal(judged.candidate_id, 81);
+  assert.equal(judged.judgment_id, 35);
+  assert.equal(
+    toCandidateView(judged, EMPTY_LEDGER_INDEX, "LISTING").feedbackTargetId,
+    35,
+  );
+
+  const pending = decodeCandidate(candidateResponse({ judgment_id: null, match_grade: null }));
+  assert.equal(
+    toCandidateView(pending, EMPTY_LEDGER_INDEX, "LISTING").feedbackTargetId,
+    null,
+  );
 });
 
 test("등급은 계약값만 화면 표기로 옮긴다", () => {
@@ -182,11 +211,20 @@ test("피드백 응답은 계약 어휘만 받는다", () => {
 
 test("종료 상태는 진행 중과 구분한다", () => {
   // polling을 멈출 기준이다. 여기서 빠지면 끝난 실행을 영원히 다시 조회한다.
-  for (const status of ["COMPLETED", "FAILED_TERMINAL", "SUPERSEDED", "CANCELLED"]) {
+  for (const status of ["COMPLETED", "FAILED_TERMINAL", "SUPERSEDED"]) {
     assert.equal(isTerminal(status), true, status);
   }
   for (const status of ["QUEUED", "RUNNING", "ANCHOR_READY", "JUDGING"]) {
     assert.equal(isTerminal(status), false, status);
+  }
+});
+
+test("아직 구현되지 않은 종료 상태를 미리 종료로 다루지 않는다", () => {
+  // `contracts/api.md`에서 `CANCELLED`와 `FAILED_RETRYABLE`은 제안 · 미구현이다. 화면 상태
+  // 대응이 없는 값을 종료로 다루면 polling만 멈추고 화면은 진행 중 문구에 붙박인다.
+  for (const status of ["CANCELLED", "FAILED_RETRYABLE"]) {
+    assert.equal(isTerminal(status), false, status);
+    assert.equal(toPanelState(status, 0), "running", status);
   }
 });
 

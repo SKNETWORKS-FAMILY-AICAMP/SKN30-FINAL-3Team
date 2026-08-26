@@ -9,21 +9,13 @@
  */
 
 import { request } from "../../../shared/api/index.ts";
-import {
-  asArray,
-  asNullableNumber,
-  asNullableString,
-  asRecord,
-  asString,
-} from "../../../shared/decode/index.ts";
 import { decodeFeedback, decodeRun, decodeRunResult, decodeRunStatus } from "../model/decode.ts";
 import { DEFAULT_CANDIDATE_LIMIT } from "./limits.ts";
-import type { CandidateSummary, F3Transport } from "./transport.ts";
+import type { F3Transport } from "./transport.ts";
 
 const PATHS = {
   runs: "/f3/runs",
   feedback: "/f3/feedback",
-  requirements: "/property-requirements",
 } as const;
 
 export const httpTransport: F3Transport = {
@@ -61,9 +53,9 @@ export const httpTransport: F3Transport = {
   },
 
   /**
-   * `target_id`는 장부 `candidate_id`가 아니라 `match_candidate_evaluation.id`다. 두 값을 잇는
-   * 정보가 아직 결과 응답에 없으므로 화면은 그 ID를 확보하기 전까지 이 함수를 부르지 않는다.
-   * `candidate_id`를 넣어 추측하면 서버 검증은 통과하고 엉뚱한 판정 행에 저장된다.
+   * `target_id`는 장부 `candidate_id`가 아니라 `match_candidate_evaluation.id`이며 결과 조회의
+   * `judgment_id`로 온다. `candidate_id`를 넣어 추측하면 서버 검증은 통과하고 엉뚱한 판정 행에
+   * 저장된다. 판정 전 후보는 `judgment_id`가 없어 화면이 버튼을 잠근다.
    *
    * `feedback_type`은 서버가 `NOT_INTERESTED`로 고정하므로 보내지 않는다. 자유 메모와 정정값을
    * 받는 입력란도 없다.
@@ -83,43 +75,4 @@ export const httpTransport: F3Transport = {
       decode: (value) => decodeFeedback(value),
     });
   },
-
-  async fetchCandidateSummary(requirementId, signal) {
-    return request(`${PATHS.requirements}/${requirementId}`, {
-      signal,
-      decode: (value) => decodeCandidateSummary(value, requirementId),
-    });
-  },
 };
-
-function decodeCandidateSummary(value: unknown, requirementId: number): CandidateSummary {
-  const body = asRecord(value, "response");
-  const requirement = asRecord(body["requirement"], "response.requirement");
-  const complexes = asArray(body["desired_complexes"], "response.desired_complexes");
-
-  const pyeongs = requirement["desired_pyeongs"];
-  return {
-    requirementId,
-    demandType: asString(requirement["demand_type"], "response.requirement.demand_type"),
-    desiredComplexNames: complexes.map((entry, index) => {
-      const path = `response.desired_complexes[${index}]`;
-      const complex = asRecord(asRecord(entry, path)["complex"], `${path}.complex`);
-      return asString(complex["name"], `${path}.complex.name`);
-    }),
-    // 서버가 NUMERIC 배열을 숫자 또는 숫자 문자열로 보낼 수 있다. 둘 다 받는다.
-    desiredPyeongs:
-      pyeongs == null
-        ? []
-        : asArray(pyeongs, "response.requirement.desired_pyeongs")
-            .map((entry) => Number(entry))
-            .filter((entry) => Number.isFinite(entry)),
-    maxBudgetAmount: asNullableNumber(
-      requirement["max_budget_amount"],
-      "response.requirement.max_budget_amount",
-    ),
-    budgetRawText: asNullableString(
-      requirement["budget_raw_text"],
-      "response.requirement.budget_raw_text",
-    ),
-  };
-}

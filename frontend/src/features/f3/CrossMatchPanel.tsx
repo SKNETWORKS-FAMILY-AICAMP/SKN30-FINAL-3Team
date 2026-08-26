@@ -47,10 +47,12 @@ import {
 } from "./model/viewModel.ts";
 import type {
   CandidateView,
+  EvidenceView,
   GradeLabel,
   PanelState,
   ParentContext,
 } from "./model/viewModel.ts";
+import { describeForUser } from "../ledger/index.ts";
 import type { CrossJudgment } from "./hooks/useCrossJudgment.ts";
 import type { FeedbackReason } from "./model/dto.ts";
 import "./CrossMatchPanel.css";
@@ -94,7 +96,16 @@ interface CrossMatchPanelProps {
   onComposeMessage?: (payload: ComposeMessagePayload) => void;
   onOpenEvidence?: (payload: ActionPayload) => void;
   onLater?: (payload: ActionPayload) => void;
-  onNotInterested?: (payload: { candidate: CandidateView; reason: FeedbackReason }) => void;
+  /**
+   * 관심없음 기록. 성공하면 resolve하고 실패하면 reject한다.
+   *
+   * 모달은 이 약속이 지켜진 뒤에만 닫는다. 요청을 보내자마자 닫으면 서버가 거절해도 사용자는
+   * 기록된 줄 안다.
+   */
+  onNotInterested?: (payload: {
+    candidate: CandidateView;
+    reason: FeedbackReason;
+  }) => Promise<void>;
   onSchedule?: (payload: ActionPayload) => void;
   focusRequest?: number;
 }
@@ -432,6 +443,33 @@ function FailureState({
   );
 }
 
+/**
+ * 판정 근거 목록.
+ *
+ * 인용(`quote`)은 카드가 실제로 갖고 있던 상담 원문이고, 인용이 없으면 카드 값들을 비교한
+ * 정황 판단(`note`)이다. 둘 다 없는 근거는 보여줄 것이 없으므로 거른다.
+ *
+ * `interactionId`는 화면 이동에 쓰지 않는다. 상담 로그 단건 조회 경로가 아직 없어 어느 로그인지
+ * 짚어 줄 수 없다. 값은 모델에 그대로 남겨 두고, 그 경로가 생기면 여기서 연결한다.
+ */
+function EvidenceList({ evidence }: { evidence: EvidenceView[] }) {
+  const shown = evidence.filter((item) => item.quote != null || item.note != null);
+  if (shown.length === 0) return null;
+
+  return (
+    <ul className="cross-match-panel__evidence" aria-label="판정 근거 목록">
+      {shown.map((item, index) => (
+        <li key={`${item.fieldName ?? "evidence"}-${index}`}>
+          {item.fieldName != null && (
+            <span className="cross-match-panel__evidence-field">{item.fieldName}</span>
+          )}
+          <span>{item.quote != null ? `“${item.quote}”` : item.note}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface CandidateDetailProps {
   candidate: CandidateView;
   anchorRow: AnchorRowView | null;
@@ -456,10 +494,29 @@ function CandidateDetail({
   const [notice, setNotice] = useState("");
   const [interestOpen, setInterestOpen] = useState(false);
   const [interestReason, setInterestReason] = useState<FeedbackReason>(DEFAULT_FEEDBACK_REASON);
+  /** 피드백 전송 상태. 실패하면 모달을 열어 둔 채 사유를 보여주고 다시 시도하게 한다. */
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
 
   useEffect(() => {
     setNotice("");
+    setFeedbackError("");
   }, [candidate]);
+
+  const submitNotInterested = async () => {
+    if (onNotInterested == null) return;
+    setFeedbackSending(true);
+    setFeedbackError("");
+    try {
+      await onNotInterested({ candidate, reason: interestReason });
+      setInterestOpen(false);
+      setNotice("관심없음 피드백을 기록했습니다");
+    } catch (cause) {
+      setFeedbackError(describeForUser(cause));
+    } finally {
+      setFeedbackSending(false);
+    }
+  };
 
   const recordAction = (label: string, callback: ((payload: ActionPayload) => void) | undefined) => {
     callback?.({ candidate, anchorRow });
@@ -481,6 +538,12 @@ function CandidateDetail({
         <GradeBadge grade={candidate.grade} />
       </div>
 
+      {candidate.unlabeled && (
+        <Alert variant="info" isInline title="현재 목록에서 이 후보의 장부 행을 찾지 못했습니다">
+          판정 내용은 그대로 보여줍니다. 이름과 연락처는 해당 장부를 불러온 뒤에 표시됩니다.
+        </Alert>
+      )}
+
       {candidate.recommendedAction && (
         <div className="cross-match-panel__recommendation">
           <span>추천 다음 행동</span>
@@ -497,6 +560,11 @@ function CandidateDetail({
           <dt>접수일</dt>
           <dd>{candidate.receivedAt || "미기재"}</dd>
         </div>
+        <div>
+          <dt>연락처</dt>
+          {/* 판정 응답이 아니라 장부 행에서 온다. 목록에 인물이 없는 매물 후보는 비어 있다. */}
+          <dd>{candidate.phone || "연락처 없음"}</dd>
+        </div>
       </dl>
 
       <Divider />
@@ -505,6 +573,7 @@ function CandidateDetail({
         <section>
           <h4>판정 근거</h4>
           <p>{candidate.evaluationBasis || "아직 판정하지 않았습니다."}</p>
+          <EvidenceList evidence={candidate.evidence} />
           {candidate.evaluationBasis && (
             <Button
               variant="link"
@@ -514,7 +583,7 @@ function CandidateDetail({
                 else setNotice("원본 상담 로그 위치를 F1 연동 대상으로 기록했습니다");
               }}
             >
-              원본 상담 로그 열기
+              상세의 상담 로그로 이동
             </Button>
           )}
         </section>
@@ -585,7 +654,7 @@ function CandidateDetail({
           </div>
           {!canGiveFeedback && (
             <p className="cross-match-panel__grade-note">
-              관심없음은 판정 식별자 연동 후 사용할 수 있습니다.
+              아직 판정하지 않은 후보에는 관심없음을 남길 수 없습니다.
             </p>
           )}
         </details>
@@ -615,18 +684,21 @@ function CandidateDetail({
               <FormSelectOption key={choice.value} value={choice.value} label={choice.label} />
             ))}
           </FormSelect>
+          {feedbackError !== "" && (
+            <Alert variant="danger" isInline title={feedbackError}>
+              기록되지 않았습니다. 사유를 확인하고 다시 시도해 주세요.
+            </Alert>
+          )}
         </ModalBody>
         <ModalFooter>
           <Button
             variant="primary"
-            onClick={() => {
-              onNotInterested?.({ candidate, reason: interestReason });
-              setInterestOpen(false);
-            }}
+            isDisabled={feedbackSending}
+            onClick={() => void submitNotInterested()}
           >
-            피드백 기록
+            {feedbackSending ? "기록 중" : "피드백 기록"}
           </Button>
-          <Button variant="link" onClick={() => setInterestOpen(false)}>
+          <Button variant="link" isDisabled={feedbackSending} onClick={() => setInterestOpen(false)}>
             취소
           </Button>
         </ModalFooter>

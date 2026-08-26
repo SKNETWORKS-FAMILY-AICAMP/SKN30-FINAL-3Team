@@ -8,11 +8,13 @@
  * 값이 매물장과 F3 패널에서 다르게 보인다.
  */
 
-import { formatMoney, formatPyeongList } from "../../../shared/format/index.ts";
-import type { CandidateSummary } from "../api/transport.ts";
+import { formatMoney } from "../../../shared/format/index.ts";
+import { labelFor } from "./candidateLabel.ts";
+import type { LedgerIndex } from "./candidateLabel.ts";
 import type {
   AnchorType,
   CandidateDto,
+  EvidenceDto,
   FeedbackReason,
   RunResultDto,
   RunStatus,
@@ -52,13 +54,15 @@ export type PanelState =
   /** 장기 대기로 자동 polling을 멈췄다. 실패가 아니다. */
   | "paused";
 
-/** 더 기다려도 상태가 바뀌지 않는 종료 상태. polling을 멈출 기준이다. */
-const TERMINAL_STATUSES: readonly string[] = [
-  "COMPLETED",
-  "FAILED_TERMINAL",
-  "SUPERSEDED",
-  "CANCELLED",
-];
+/**
+ * 더 기다려도 상태가 바뀌지 않는 종료 상태. polling을 멈출 기준이다.
+ *
+ * `contracts/api.md`에서 Backend가 실제로 기록하는 종료 상태 셋만 넣는다. `CANCELLED`와
+ * `FAILED_RETRYABLE`은 아직 **제안 · 미구현**이라 여기 넣지 않는다. 화면 상태 대응이 없는
+ * 값을 종료로 다루면 polling만 멈추고 화면은 "판정을 시작했습니다"에 붙박인다. 정본에서
+ * 두 상태가 구현되면 `toPanelState`의 대응 화면과 함께 추가한다.
+ */
+const TERMINAL_STATUSES: readonly string[] = ["COMPLETED", "FAILED_TERMINAL", "SUPERSEDED"];
 
 export function isTerminal(status: RunStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
@@ -191,9 +195,25 @@ export const FEEDBACK_REASON_CHOICES: readonly { label: string; value: FeedbackR
 /** 사유 선택의 초기값. 목록 첫 항목을 인덱스로 꺼내면 `undefined` 가능성이 따라붙는다. */
 export const DEFAULT_FEEDBACK_REASON: FeedbackReason = "CONDITION_MISMATCH";
 
+/**
+ * 화면이 그리는 판정 근거 한 건.
+ *
+ * `interactionId`를 버리지 않는다. 지금은 상담 로그 단건으로 이동하는 경로가 없어 화면 이동에
+ * 쓰지 않지만, 값을 여기서 지우면 그 경로가 생겼을 때 계약부터 다시 봐야 한다.
+ */
+export interface EvidenceView {
+  fieldName: string | null;
+  /** 카드가 실제로 갖고 있던 인용. 없으면 정황 판단이다. */
+  quote: string | null;
+  note: string | null;
+  /** 어느 쪽 카드에서 나온 근거인지. 카드 근거에서는 `null`이다. */
+  side: string | null;
+  interactionId: number | null;
+}
+
 /** 화면이 그리는 후보 한 건. */
 export interface CandidateView {
-  /** 앵커 반대편 장부 ID. React key와 요약 조회에 쓴다. */
+  /** 앵커 반대편 장부 ID. React key와 장부 조인에 쓴다. */
   candidateId: number;
   /** 표시용 순위. 정렬에 쓰지 않는다. */
   rank: number;
@@ -202,10 +222,16 @@ export interface CandidateView {
   /** false면 카드화되지 않은 SQL 후보다. 판정 실패와 구분해 표시한다. */
   judged: boolean;
   title: string;
+  /** 장부에서 후보를 찾지 못해 식별자만 표시하는 후보인지. 화면이 그 사실을 밝힌다. */
+  unlabeled: boolean;
   summary: string;
+  /** 문자 작성에 넘길 연락처. 장부 목록에 인물이 없으면 빈 문자열이다. */
+  phone: string;
   budget: string;
   receivedAt: string;
   evaluationBasis: string | null;
+  /** 판정 근거. 판정 전 후보는 빈 배열이다. */
+  evidence: EvidenceView[];
   blocker: string | null;
   concession: string | null;
   exclusionReason: string | null;
@@ -220,8 +246,9 @@ export interface CandidateView {
   /**
    * 관심없음 피드백 대상 ID.
    *
-   * 결과 응답이 `match_candidate_evaluation.id`를 주지 않는 동안에는 항상 `null`이고 화면은
-   * 버튼을 비활성화한다. `candidateId`로 대신하지 않는다.
+   * 결과 응답의 `judgment_id`(`match_candidate_evaluation.id`)다. 판정 전 후보는 `null`이고
+   * 화면은 버튼을 비활성화한다. `candidateId`로 대신하지 않는다. 두 값은 다른 테이블의
+   * 식별자라 바꿔 넣으면 서버 검증은 통과하고 엉뚱한 판정 행에 저장된다.
    */
   feedbackTargetId: number | null;
 }
@@ -229,47 +256,44 @@ export interface CandidateView {
 /**
  * 후보 DTO를 화면 모델로.
  *
- * `summaries`는 임시 우회로 장부에서 따로 읽은 요약이다. 아직 도착하지 않았거나 조회에
- * 실패했으면 제목만 대체 문구가 되고 나머지 판정 내용은 그대로 보여준다. 제목 하나 때문에
- * 판정 결과를 감추지 않는다.
+ * 표시 이름은 이미 불러온 장부에서 찾는다. 찾지 못하면 식별자만 대체 문구가 되고 나머지 판정
+ * 내용은 그대로 보여준다. 제목 하나 때문에 판정 결과를 감추지 않는다.
  */
 export function toCandidateView(
   dto: CandidateDto,
-  summary: CandidateSummary | undefined,
+  ledger: LedgerIndex,
   anchorType: AnchorType,
 ): CandidateView {
+  const label = labelFor(dto.candidate_id, anchorType, ledger);
   return {
     candidateId: dto.candidate_id,
     rank: dto.rank,
     grade: toGradeLabel(dto.match_grade),
     judged: dto.selected_for_cards && dto.match_grade != null,
-    title: summary == null ? fallbackTitle(dto.candidate_id, anchorType) : summarizeTitle(summary),
-    summary: summary == null ? "" : formatPyeongList(summary.desiredPyeongs),
+    title: label.title,
+    unlabeled: !label.found,
+    summary: label.subtitle,
+    phone: label.phone,
     budget: formatMoney(dto.price_amount),
     receivedAt: dto.received_at ?? "",
     evaluationBasis: dto.evaluation_basis,
+    evidence: dto.evidence.map(toEvidenceView),
     blocker: dto.primary_obstacle,
     concession: dto.possible_concession,
     exclusionReason: dto.exclusion_reason,
     recommendedAction: readActionMessage(dto.recommended_action),
-    feedbackTargetId: null,
+    feedbackTargetId: dto.judgment_id,
   };
 }
 
-/**
- * 제목을 못 채웠을 때의 대체 표기.
- *
- * 후보는 앵커 반대편 장부의 행이다. 매물 앵커의 후보는 구입장이고 손님 앵커의 후보는 매물이다.
- * 한쪽 표기를 양쪽에 쓰면 손님 상세에서 매물을 "구입장"이라고 부르게 된다.
- */
-function fallbackTitle(candidateId: number, anchorType: AnchorType): string {
-  return anchorType === "LISTING" ? `구입장 #${candidateId}` : `매물 #${candidateId}`;
-}
-
-/** 희망 단지가 없는 손님은 단지를 가리지 않는다. 빈 제목 대신 그 사실을 보여준다. */
-function summarizeTitle(summary: CandidateSummary): string {
-  if (summary.desiredComplexNames.length === 0) return "희망 단지 없음";
-  return summary.desiredComplexNames.join(" · ");
+function toEvidenceView(dto: EvidenceDto): EvidenceView {
+  return {
+    fieldName: dto.field_name,
+    quote: dto.quote_text,
+    note: dto.note,
+    side: dto.evidence_side,
+    interactionId: dto.interaction_id,
+  };
 }
 
 /** 공개 schema가 고정되지 않은 객체에서 화면이 쓰는 한 필드만 꺼낸다. */

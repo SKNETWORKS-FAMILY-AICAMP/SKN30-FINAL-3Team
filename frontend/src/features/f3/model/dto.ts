@@ -100,6 +100,13 @@ export interface CandidateDto {
   price_amount: number | null;
   monthly_amount: number | null;
   received_at: string | null;
+  /**
+   * 저장된 중개 판정의 식별자. 관심없음 피드백의 `target_id`다.
+   *
+   * 판정 전 후보와 카드화되지 않은 후보는 `null`이다. 장부 `candidate_id`로 대신하지 않는다.
+   * 두 값은 다른 테이블의 식별자라 바꿔 넣으면 서버 검증은 통과하고 엉뚱한 판정 행에 저장된다.
+   */
+  judgment_id: number | null;
   match_grade: string | null;
   evaluation_basis: string | null;
   primary_obstacle: string | null;

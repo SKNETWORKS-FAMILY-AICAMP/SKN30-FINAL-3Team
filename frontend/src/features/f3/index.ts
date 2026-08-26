@@ -13,9 +13,9 @@ export { CrossMatchSection } from "./CrossMatchSection.tsx";
 export type { CrossMatchSectionProps, DetailRow } from "./CrossMatchSection.tsx";
 
 /**
- * 세션이 끝날 때 실행 registry와 후보 요약 캐시를 비운다.
+ * 세션이 끝날 때 확보한 실행 registry를 비운다.
  *
- * 사무소 공용 PC를 전제하므로 같은 브라우저에서 계정이 바뀔 수 있다. 두 캐시의 식별자는
+ * 사무소 공용 PC를 전제하므로 같은 브라우저에서 계정이 바뀔 수 있다. 실행 식별자는
  * 중개사무소 안에서만 유효하다.
  */
 export { resetCrossJudgmentCache } from "./hooks/useCrossJudgment.ts";

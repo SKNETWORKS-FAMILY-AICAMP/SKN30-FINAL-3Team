@@ -17,7 +17,6 @@ import {
   resultPayload,
   statusAt,
   statusPayload,
-  summaryFor,
 } from "../src/features/f3/mock/scenario.ts";
 import type { MockRun } from "../src/features/f3/mock/scenario.ts";
 import { toPanelState } from "../src/features/f3/model/viewModel.ts";
@@ -124,17 +123,25 @@ test("페이지는 전체 후보를 자르고 순서를 유지한다", () => {
   assert.deepEqual(ids, [...ids].sort((a, b) => a - b));
 });
 
-test("후보 요약은 인물 정보를 담지 않는다", () => {
-  const summary = summaryFor(900_102);
-  // 성명·연락처가 들어갈 자리가 애초에 없다.
-  assert.deepEqual(Object.keys(summary).sort(), [
-    "budgetRawText",
-    "demandType",
-    "desiredComplexNames",
-    "desiredPyeongs",
-    "maxBudgetAmount",
-    "requirementId",
-  ]);
-  // 희망 단지가 없는 손님도 정상이다.
-  assert.ok(summaryFor(7).desiredComplexNames.length === 0);
+test("판정된 후보만 피드백 대상을 갖는다", () => {
+  const done = resultAt(12_000);
+  const judged = done.candidates.filter((candidate) => candidate.match_grade != null);
+  const pending = done.candidates.filter((candidate) => candidate.match_grade == null);
+
+  // 판정 행이 있어야 관심없음을 보낼 수 있다. 서버와 같은 규칙이다.
+  assert.ok(judged.length > 0);
+  assert.ok(judged.every((candidate) => candidate.judgment_id != null));
+  assert.ok(pending.length > 0);
+  assert.ok(pending.every((candidate) => candidate.judgment_id === null));
+});
+
+test("mock 후보는 계약에 없는 표시 필드를 만들지 않는다", () => {
+  const [candidate] = resultAt(12_000).candidates;
+  assert.ok(candidate != null);
+  // decoder가 통과시킨 뒤에도 이름·연락처·희망 단지가 후보에 없다. 표시 이름은 화면이 자기
+  // 사무소의 F1 장부에서 찾는다.
+  assert.deepEqual(
+    Object.keys(candidate).filter((key) => /name|phone|contact|complex|title/i.test(key)),
+    [],
+  );
 });

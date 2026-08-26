@@ -10,7 +10,10 @@
  * 않는다. 여기서는 잡힌다.
  */
 
+import { useMemo } from "react";
+import type { BuyerRow, PropertyRow } from "../ledger/index.ts";
 import { useCrossJudgment } from "./hooks/useCrossJudgment.ts";
+import { indexLedgerRows } from "./model/candidateLabel.ts";
 import { f3Transport } from "./api/f3Transport.ts";
 import { CrossMatchPanel } from "./CrossMatchPanel.tsx";
 import type {
@@ -46,6 +49,14 @@ export interface CrossMatchSectionProps {
   onOpenEvidence?: (payload: ActionPayload) => void;
   onLater?: (payload: ActionPayload) => void;
   onSchedule?: (payload: ActionPayload) => void;
+  /**
+   * 후보 표시 이름을 찾을 F1 장부 행.
+   *
+   * 결과 조회 응답은 후보의 표시 이름을 싣지 않는다. 후보마다 장부를 단건 조회하면 화면이
+   * 쓰지 않는 인물 정보까지 받게 되므로, 이미 불러온 행에서만 찾는다.
+   */
+  propertyRows?: readonly PropertyRow[];
+  buyerRows?: readonly BuyerRow[];
   /** 피드백 결과를 사용자에게 알리는 책임은 앱 셸에 있다. */
   onFeedbackResult?: (result: { ok: boolean; cause?: unknown }) => void;
 }
@@ -87,9 +98,17 @@ export function CrossMatchSection({
   onOpenEvidence,
   onLater,
   onSchedule,
+  propertyRows,
+  buyerRows,
   onFeedbackResult,
 }: CrossMatchSectionProps) {
   const anchor = anchorOf(row, parentContext);
+
+  // 목록이 다시 로드될 때만 색인을 새로 만든다. 후보 수만큼 선형 탐색하지 않기 위한 것이다.
+  const ledger = useMemo(
+    () => indexLedgerRows(propertyRows ?? [], buyerRows ?? []),
+    [propertyRows, buyerRows],
+  );
 
   const judgment = useCrossJudgment({
     anchorType: anchor.anchorType,
@@ -97,23 +116,31 @@ export function CrossMatchSection({
     dataVersion: anchor.dataVersion,
     // 패널을 닫으면 브라우저 확인만 멈춘다. 서버 작업을 취소한 것이 아니다.
     enabled: isOpen && row != null,
+    ledger,
   });
 
+  /**
+   * 관심없음 기록.
+   *
+   * 실패를 삼키지 않고 그대로 던진다. 모달이 이 결과를 보고 닫을지 사유를 보여줄지 정한다.
+   * 여기서 잡아 버리면 서버가 거절해도 화면은 기록된 것처럼 닫힌다.
+   */
   const recordNotInterested = async ({
     candidate,
     reason,
   }: {
     candidate: CandidateView;
     reason: FeedbackReason;
-  }) => {
+  }): Promise<void> => {
     // 버튼이 잠겨 있어 여기까지 오지 않지만, 식별자가 열린 뒤에도 같은 조건을 지킨다.
     if (candidate.feedbackTargetId == null) return;
     try {
       await f3Transport.sendNotInterested({ targetId: candidate.feedbackTargetId, reason });
-      onFeedbackResult?.({ ok: true });
     } catch (cause) {
       onFeedbackResult?.({ ok: false, cause });
+      throw cause;
     }
+    onFeedbackResult?.({ ok: true });
   };
 
   return (
@@ -127,7 +154,7 @@ export function CrossMatchSection({
       onComposeMessage={onComposeMessage}
       onOpenEvidence={onOpenEvidence}
       onLater={onLater}
-      onNotInterested={(payload) => void recordNotInterested(payload)}
+      onNotInterested={recordNotInterested}
       onSchedule={onSchedule}
     />
   );
