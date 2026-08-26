@@ -10,14 +10,15 @@ import {
   UserIcon,
 } from "@patternfly/react-icons";
 import { useBuyerLedger, useComplexOptions, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser } from "./features/ledger/api/errors.ts";
+import { describeForUser } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
 import { BuyerLedgerGrid } from "./features/BuyerLedgerGrid.jsx";
 import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
-import { CrossMatchPanel } from "./features/CrossMatchPanel.jsx";
+import { CrossMatchPanel } from "./features/CrossMatchPanel.tsx";
+import { sendNotInterested, useCrossJudgment } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -459,6 +460,36 @@ export function AppShell() {
   };
 
   const isBuyerDetail = detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer";
+
+  /*
+   * F3 앵커.
+   *
+   * 매물 앵커는 세대가 아니라 **매물 건**이다. 세대와 매물 건은 각자 `row_version`을 갖고
+   * 서버도 매물 ID로 앵커를 찾으므로, 세대 ID를 넘기면 다른 행을 판정하거나 404가 된다.
+   * 저장 전 draft(`serverId`/`listingId`가 없음)는 판정 대상이 아니다.
+   */
+  const anchorType = detailRow == null ? null : isBuyerDetail ? "REQUIREMENT" : "LISTING";
+  const anchorId = detailRow == null ? null : isBuyerDetail ? detailRow.serverId : detailRow.listingId;
+  const anchorVersion = detailRow == null ? null : isBuyerDetail ? detailRow.rowVersion : detailRow.listingRowVersion;
+
+  const crossJudgment = useCrossJudgment({
+    anchorType: anchorId == null ? null : anchorType,
+    anchorId: anchorId ?? null,
+    dataVersion: anchorVersion ?? null,
+    // 패널을 닫으면 브라우저 확인만 멈춘다. 서버 작업을 취소한 것이 아니다.
+    enabled: crossMatchOpen && Boolean(detailRow),
+  });
+
+  const recordNotInterested = async ({ candidate, reason }) => {
+    if (candidate?.feedbackTargetId == null) return;
+    try {
+      await sendNotInterested({ targetId: candidate.feedbackTargetId, reason });
+      setToast({ variant: "success", title: "관심없음 피드백을 기록했습니다." });
+    } catch (cause) {
+      setToast({ variant: "danger", title: describeForUser(cause) });
+    }
+  };
+
   const closeDetail = () => { setCrossMatchOpen(false); setDetailRow(null); };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
@@ -514,11 +545,12 @@ export function AppShell() {
     focusRequest={crossMatchFocusRequest}
     onClose={() => setCrossMatchOpen(false)}
     anchorRow={detailRow}
+    judgment={crossJudgment}
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
     onComposeMessage={openMessageComposer}
     onOpenEvidence={handleEvidenceOpen}
     onLater={() => { closeDetail(); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}
-    onInterest={({ reason }) => setToast({ variant: "info", title: `관심없음 피드백을 기록했습니다 · ${reason}` })}
+    onNotInterested={recordNotInterested}
     onSchedule={({ candidate }) => setScheduleSuggestion({ candidate, anchorRow: detailRow })}
   />;
 
