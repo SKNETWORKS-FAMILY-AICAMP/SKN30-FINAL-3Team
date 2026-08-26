@@ -42,6 +42,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--poc-root", type=Path, required=True)
     parser.add_argument("--training-template", type=Path, required=True)
     parser.add_argument("--model-template", type=Path, required=True)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Output directory. Defaults to <PoC root>/documents.",
+    )
+    parser.add_argument(
+        "--version-suffix",
+        default="",
+        help="Optional suffix appended before .docx, for example _v2.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow replacing an existing output. Disabled by default.",
+    )
     parser.add_argument("--submission-date", default="2026. 08. 20.")
     return parser.parse_args()
 
@@ -146,6 +162,12 @@ def set_repeat_table_header(row: Any) -> None:
     tr_pr.append(tbl_header)
 
 
+def set_table_row_cant_split(row: Any) -> None:
+    tr_pr = row._tr.get_or_add_trPr()
+    if tr_pr.find(qn("w:cantSplit")) is None:
+        tr_pr.append(OxmlElement("w:cantSplit"))
+
+
 def set_table_fixed(table: Any, widths_cm: Sequence[float] | None = None) -> None:
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
@@ -186,6 +208,7 @@ def format_table(table: Any, widths_cm: Sequence[float] | None = None) -> None:
     set_table_borders(table)
     set_repeat_table_header(table.rows[0])
     for row_index, row in enumerate(table.rows):
+        set_table_row_cant_split(row)
         for cell in row.cells:
             cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
             set_cell_margins(cell)
@@ -196,6 +219,10 @@ def format_table(table: Any, widths_cm: Sequence[float] | None = None) -> None:
             for paragraph in cell.paragraphs:
                 paragraph.paragraph_format.space_after = Pt(0)
                 paragraph.paragraph_format.line_spacing = 1.1
+                if row_index < len(table.rows) - 1:
+                    # All generated tables fit on one page. Keeping each row
+                    # with the following row avoids orphaned last/first rows.
+                    paragraph.paragraph_format.keep_with_next = True
                 for run in paragraph.runs:
                     set_run_font(run)
                     run.font.size = Pt(8.8)
@@ -287,6 +314,7 @@ def add_figure(doc: DocumentObject, image_path: Path, caption: str, width_inches
         return
     paragraph = doc.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.keep_with_next = True
     run = paragraph.add_run()
     run.add_picture(str(image_path), width=Inches(width_inches))
     caption_paragraph = doc.add_paragraph()
@@ -389,7 +417,7 @@ def create_training_result_document(
     add_cover(
         doc,
         "머신러닝 / 딥러닝 학습 결과서",
-        "F2 Field Proposal Review Risk Model - 합성 대리 라벨 기반 ML PoC",
+        "F2 Field Proposal Review Risk Model - 강사 피드백 반영 v2",
         submission_date,
     )
 
@@ -397,24 +425,24 @@ def create_training_result_document(
     add_heading(doc, "1.1 실험 목적", 2)
     add_body(
         doc,
-        "F2의 sLLM이 만든 장부 필드 제안 중 사용자의 추가 검토가 필요한 제안을 정형 Feature 기반 이진 분류 문제로 구분할 수 있는지 확인하였다. 본 실험은 sLLM을 대체하거나 자동 저장을 수행하지 않으며, 제출을 위한 최소 ML 적용 가능성 확인에 한정한다.",
+        "F2의 sLLM이 만든 장부 필드 제안에 대해 데이터 생성·전처리·분류 Pipeline을 재현할 수 있는지 확인하였다. 현재 needs_review는 실제 사용자 행동이 아니라 입력 Feature로 만든 대리 Target이므로, 현 단계의 평가 질문은 ‘규칙으로 정의한 위험도를 단순 모델이 재현할 수 있는가’이다. 실제 사용자의 수정·거절 행동 예측은 독립 라벨을 확보한 후 수행할 차기 실험으로 분리한다.",
     )
     add_table(
         doc,
         ["구분", "정의"],
         [
             ["Task", "Binary Classification"],
-            ["Target 0", "LOW_RISK - 제안값을 그대로 사용할 가능성이 높은 항목"],
-            ["Target 1", "NEEDS_REVIEW - 충돌·부정·낮은 confidence·파싱 실패 등으로 검토가 필요한 항목"],
+            ["Target 0", "LOW_RISK - field_type별 proxy risk score 하위 8건"],
+            ["Target 1", "NEEDS_REVIEW - field_type별 proxy risk score 상위 7건"],
             ["Positive class", "needs_review=1"],
-            ["주요 선정 지표", "Recall → F1 → Train/Test 차이 → 단순성"],
+            ["PoC 선정 순서", "Test Recall → Test F1 → |Train-Test Accuracy 차이| → 단순성"],
         ],
         [4.0, 12.2],
     )
     add_callout(
         doc,
         "중요 해석",
-        "Target과 confidence는 실제 운영 로그가 아니라 규칙과 고정 난수로 만든 대리 값이다. 따라서 결과는 생성 규칙을 학습할 수 있는지에 대한 초기 확인이며 실제 중개 상담 성능이 아니다.",
+        "Target 생성에 사용한 confidence·충돌·부정·언급 수·파싱 성공 여부를 다시 모델 입력으로 사용하였다. 따라서 현재 지표는 사용자 행동 예측력이 아니라 대리 라벨 생성 규칙의 재현 정도를 보여준다.",
     )
 
     add_heading(doc, "1.2 작업 범위", 2)
@@ -451,6 +479,15 @@ def create_training_result_document(
         source_rows,
         [6.6, 2.0, 2.3, 5.5],
     )
+    add_callout(
+        doc,
+        "50건을 제거한 이유",
+        "50행 파일 f2_sell_request_scenarios.privacy_safe.v0.2.jsonl 전체가 200행 파일 f2_sllm_data_small.jsonl의 매도의뢰 50행과 완전히 같다. 50건 모두 scenario_id, source_group_id, transcript SHA-256과 전체 JSON 내용이 각각 일치해 별도 관측치가 아니므로 첫 출현만 남겼다.",
+    )
+    add_body(
+        doc,
+        "이 처리는 이상치나 내용 오류를 이유로 행을 버린 것이 아니다. 동일 상담이 후보 선택에서 두 번 가중되거나 Train/Test 양쪽에 나뉘는 중복 누수를 막기 위한 파일 간 중복 제거이며, 50행의 정보는 먼저 읽은 200행 파일에 그대로 보존되어 있다. 결과적으로 원천 1,250행은 고유 상담 1,200건으로 정리되었다. 현재 생성기는 세 키 중 하나만 겹쳐도 뒤 행을 제외하므로, 향후 일부 키만 충돌하고 내용이 다른 경우에는 자동 제거하지 않고 충돌 목록으로 격리해 확인하도록 개선한다.",
+    )
     add_body(
         doc,
         "모든 원천 레코드는 contains_real_personal_data=false로 표시된 합성 문장이다. 다만 사람 검수된 운영 데이터가 아니므로 실제 상담 분포를 대표한다고 가정하지 않았다.",
@@ -462,11 +499,17 @@ def create_training_result_document(
             "상담 문장에서 금액·거래유형·동·호·평형·날짜·명도 관련 후보 근거를 정규식과 키워드로 탐지한다.",
             "각 field_type마다 서로 다른 상담 15건을 선택하고 같은 원천 그룹과 같은 transcript hash를 중복 사용하지 않는다.",
             "근거 길이, 후보 수, 충돌·부정 여부, 파싱 성공 여부와 모사 confidence를 산출한다.",
-            "필드별 proxy risk score 상위 7건을 NEEDS_REVIEW로 지정하여 총 70건의 positive class를 구성한다.",
+            "proxy risk score를 계산하고 field_type별 상위 7건을 NEEDS_REVIEW로 지정하여 총 70건의 positive class를 구성한다.",
         ),
         start=1,
     ):
         add_numbered(doc, f"{index}. {step}")
+
+    add_body(
+        doc,
+        "proxy risk score = 2×(1-confidence) + 1.5×has_conflict + 1.2×has_negation + 0.35×(mention_count-1) + 1.4×(1-parse_success) + 0.75×no_fill_context + N(0, 0.35)",
+        bold_prefix="proxy risk score",
+    )
 
     add_table(
         doc,
@@ -484,7 +527,45 @@ def create_training_result_document(
         [4.2, 3.0, 9.2],
     )
 
-    add_heading(doc, "2.3 데이터 품질과 분포", 2)
+    add_heading(doc, "2.3 Target 생성 변수와 Feature 중첩", 2)
+    add_table(
+        doc,
+        ["구분", "현재 설계", "영향"],
+        [
+            [
+                "직접 중첩",
+                "confidence, mention_count, has_conflict, has_negation, parse_success",
+                "7개 모델 입력 중 5개가 Target 점수식에 직접 사용됨",
+            ],
+            [
+                "간접 중첩",
+                "confidence 자체도 parse_success·conflict·negation·mention_count로 생성",
+                "같은 신호가 confidence와 점수식에 반복 반영됨",
+            ],
+            [
+                "층화 규칙",
+                "field_type별 점수 상위 7건을 class 1로 지정",
+                "field_type도 라벨 배정 과정에 관여함",
+            ],
+            [
+                "직접 미사용",
+                "evidence_length",
+                "점수식에는 없지만 합성 원천에서 다른 신호와 연관될 수 있음",
+            ],
+        ],
+        [3.2, 7.2, 6.0],
+    )
+    add_body(
+        doc,
+        "원천 그룹과 transcript의 Train/Test 교차가 0건이라는 검사는 행 중복 누수는 막지만, 위와 같은 Target 정의의 순환성은 해소하지 못한다. 이는 미래 정보가 입력에 섞인 전형적인 시점 누수라기보다 ‘라벨 생성 규칙과 입력 변수의 중첩’이며, 모델이 독립적인 정답 대신 알려진 규칙을 근사하도록 만든다.",
+    )
+    add_callout(
+        doc,
+        "현재 성능이 의미하는 범위",
+        "Accuracy 0.8000은 실제 사용자의 검토 행동을 맞힌 비율이 아니다. 규칙 기반 합성 Target을 고정된 30건 Test Set에서 재현한 비율이며, Pipeline 동작 확인용 기준선으로만 사용한다.",
+    )
+
+    add_heading(doc, "2.4 데이터 품질과 분포", 2)
     add_table(
         doc,
         ["검사 항목", "결과"],
@@ -553,6 +634,11 @@ def create_training_result_document(
         [4.0, 2.5, 2.5, 2.4, 2.2, 2.2],
     )
     add_body(doc, "모든 수치는 고정된 30건 합성 Test Set에서 실제 실행한 결과이며, 일반화된 실서비스 성능이 아니다.")
+    add_callout(
+        doc,
+        "정확도 해석",
+        "Random Forest가 더 높은 값은 Train Accuracy(0.9750 대 0.7917)이다. Test Accuracy는 두 모델 모두 0.8000이고 Precision 0.9000, Recall 0.6429, F1 0.7500, 혼동행렬(TN 15·FP 1·FN 5·TP 9)도 동일하다. 높은 학습 정확도만으로 일반화 성능이 더 좋다고 판단하지 않았다.",
+    )
 
     add_heading(doc, "4.2 혼동행렬", 2)
     add_figure(
@@ -582,14 +668,36 @@ def create_training_result_document(
         add_table(doc, ["상위 Feature", "Importance"], importance_rows, [11.0, 5.2])
     add_body(
         doc,
-        "Feature Importance는 이 규칙 기반 합성 데이터 안에서의 분할 기여도이며 인과관계나 실제 업무 중요도를 의미하지 않는다.",
+        "Feature Importance는 이 규칙 기반 합성 데이터 안에서의 분할 기여도이며 인과관계나 실제 업무 중요도를 의미하지 않는다. Target 점수식에 직접 사용된 다섯 입력(confidence·has_conflict·mention_count·parse_success·has_negation)의 중요도 합이 약 0.7100이므로, 중요도 순위 역시 사용자 행동의 원인이 아니라 규칙 재현 구조를 주로 반영한다.",
     )
 
-    add_heading(doc, "5. 최종 모델 선정", 1)
+    add_heading(doc, "5. PoC 기준 모델 선정(임시)", 1)
     final_name = metrics["final_model"]["name"]
     final_result = metrics["models"][final_name]
-    add_callout(doc, "선정 모델", final_name)
-    add_body(doc, metrics["final_model"]["selection_reason"])
+    add_callout(doc, "PoC 기준 모델", final_name)
+    add_body(
+        doc,
+        "사전에 정한 우선순위는 Test Recall, Test F1, |Train-Test Accuracy 차이|, 모델 단순성 순이다. 두 후보의 Test Recall과 F1뿐 아니라 Test Accuracy와 혼동행렬까지 같았으므로, 학습 정확도가 아니라 일반화 차이와 단순성을 다음 판단 근거로 사용하였다.",
+    )
+    logistic_result = metrics["models"]["Logistic Regression"]
+    forest_result = metrics["models"]["Random Forest"]
+    add_table(
+        doc,
+        ["판단 항목", "Logistic Regression", "Random Forest", "판단"],
+        [
+            ["Test Accuracy", f"{logistic_result['test_accuracy']:.4f}", f"{forest_result['test_accuracy']:.4f}", "동일"],
+            ["Test Recall", f"{logistic_result['recall']:.4f}", f"{forest_result['recall']:.4f}", "동일"],
+            ["Test F1", f"{logistic_result['f1']:.4f}", f"{forest_result['f1']:.4f}", "동일"],
+            ["Train Accuracy", f"{logistic_result['train_accuracy']:.4f}", f"{forest_result['train_accuracy']:.4f}", "RF가 높음"],
+            ["|Train-Test Acc. 차이|", f"{abs(logistic_result['train_test_accuracy_gap']):.4f}", f"{abs(forest_result['train_test_accuracy_gap']):.4f}", "LR이 작음"],
+            ["구조", "선형·단순·계수 확인 가능", "비선형·상대적으로 복잡", "LR 우선"],
+        ],
+        [4.6, 4.3, 4.0, 3.3],
+    )
+    add_body(
+        doc,
+        "따라서 Logistic Regression은 현재 규칙 재현 PoC의 저장 artifact로 임시 선택하였다. Test 30건과 순환적 대리 Target만으로 Random Forest보다 실제 성능이 우수하다고 결론 내린 것은 아니며, 독립적인 사용자 라벨 데이터에서는 모델 선정부터 다시 수행한다.",
+    )
     add_table(
         doc,
         ["선정 모델 Test 지표", "값"],
@@ -598,35 +706,55 @@ def create_training_result_document(
             ["Precision", f"{final_result['precision']:.4f}"],
             ["Recall", f"{final_result['recall']:.4f}"],
             ["F1", f"{final_result['f1']:.4f}"],
-            ["Train/Test Accuracy 차이", f"{final_result['train_test_accuracy_gap']:.4f}"],
+            ["|Train-Test Accuracy 차이|", f"{abs(final_result['train_test_accuracy_gap']):.4f}"],
         ],
         [9.0, 7.2],
     )
     add_body(doc, "선정된 전처리·모델 Pipeline 전체는 field_proposal_review_risk_model.joblib로 저장했으며 재로드 후 알려진 입력과 미지 field_type 입력 모두에서 0/1 예측을 확인하였다.")
 
-    add_heading(doc, "6. 한계 및 향후 개선", 1)
+    add_heading(doc, "6. 한계 및 개선 방향", 1)
+    add_heading(doc, "6.1 현재 결과의 한계", 2)
     for limitation in (
         "실제 사용자 데이터가 아닌 합성 상담 시나리오를 사용하였다.",
-        "needs_review와 confidence가 실제 관측값이 아니라 규칙 기반 대리 값이다.",
+        "needs_review와 confidence가 실제 관측값이 아니며, Target 생성 변수와 모델 입력이 중첩된다.",
         "데이터 150건, Test 30건으로 표본이 매우 작다.",
         "실제 F2 sLLM 오류 및 사용자 검토 분포와 다를 수 있다.",
-        "현재 결과는 제출용 PoC이며 실서비스 환경에서 검증되지 않았다.",
-        "향후 사용자 수락·수정·거절 이력을 Target으로 전환하고 시간·사용자 그룹 누수를 차단해 재학습해야 한다.",
+        "현재 지표는 규칙 재현 성능이며 실제 사용자 행동 예측 또는 실서비스 성능이 아니다.",
+        "현재 모델은 제출용 PoC이며 F2 서비스의 자동 반영 판단에 사용할 수 없다.",
         "딥러닝 모델은 이번 범위에서 학습하지 않았다.",
     ):
         add_bullet(doc, limitation)
+
+    add_heading(doc, "6.2 차기 실험 계획(미실행)", 2)
+    for index, step in enumerate(
+        (
+            "F2 검토 화면에서 제안별 사용자 최종 행동을 수집한다. 변경 없이 승인한 항목은 0, 수정 또는 거절한 항목은 1로 두고, 검토 중단·미확인 항목은 unknown으로 분리해 학습에서 제외한다.",
+            "needs_review를 confidence·충돌·파싱 규칙으로 생성하지 않는다. 이 값들은 사용자 검토 전에 관측되는 후보 Feature로만 사용하며 Target과 독립시킨다.",
+            "현재 proxy risk 수식을 명시적 Rule Baseline으로 구현하고, Logistic Regression·Random Forest 및 규칙 변수 제거 ablation을 같은 평가셋에서 비교한다.",
+            "운영 사용자 라벨을 바로 확보할 수 없으면 규칙과 Feature 값을 보지 않은 복수 검수자가 독립 판정하고, 판정 불가와 불일치 해소 절차 및 평가자 일치도를 함께 기록한다.",
+            "동일 사용자·원천 상담·파생 제안이 분할을 넘지 않도록 group split을 적용하고, 개발 비교에는 반복 group validation을, 최종 판정에는 시간 순서 Holdout을 사용해 변동 범위도 보고한다.",
+            "Accuracy만으로 선택하지 않고 needs_review Recall, Precision, F1, 혼동행렬과 사용자 검토 부담을 함께 보고 임계값을 결정한다.",
+        ),
+        start=1,
+    ):
+        add_numbered(doc, f"{index}. {step}")
+    add_callout(
+        doc,
+        "v2 반영 범위",
+        "이번 v2는 기존 실험을 재해석하고 다음 검증 설계를 명시한 문서 개선본이다. 실제 사용자 라벨 수집·재학습·재평가는 아직 수행하지 않았다.",
+    )
 
     add_heading(doc, "7. 주요 산출물", 1)
     add_table(
         doc,
         ["분류", "파일"],
         [
-            ["데이터", "data/synthetic_field_proposals.csv"],
-            ["Notebook", "notebooks/field_proposal_review_risk_poc_output.ipynb"],
-            ["모델", "artifacts/field_proposal_review_risk_model.joblib"],
-            ["메타데이터", "artifacts/model_metadata.json"],
-            ["지표", "reports/model_comparison.csv, reports/metrics.json"],
-            ["요약", "reports/experiment_summary.md"],
+            ["데이터", "ml/field_proposal_reliability/data/synthetic_field_proposals.csv"],
+            ["Notebook", "ml/field_proposal_reliability/notebooks/field_proposal_review_risk_poc_output.ipynb"],
+            ["모델", "ml/field_proposal_reliability/artifacts/field_proposal_review_risk_model.joblib"],
+            ["메타데이터", "ml/field_proposal_reliability/artifacts/model_metadata.json"],
+            ["지표", "ml/field_proposal_reliability/reports/model_comparison.csv, metrics.json"],
+            ["요약", "ml/field_proposal_reliability/reports/experiment_summary.md"],
         ],
         [4.0, 12.2],
     )
@@ -634,7 +762,10 @@ def create_training_result_document(
     add_table(
         doc,
         ["변경일", "변경자", "변경내용", "버전"],
-        [[submission_date.rstrip("."), "3팀 전체", "합성 대리 라벨 기반 제출용 ML PoC 결과서 작성", "v1.0"]],
+        [
+            ["2026. 08. 20", "3팀 전체", "합성 대리 라벨 기반 제출용 ML PoC 결과서 작성", "v1.0"],
+            [submission_date.rstrip("."), "3팀 전체", "중복 제거 근거, Target-Feature 중첩, 모델 선정 근거와 차기 실험 계획 보완", "v2.0"],
+        ],
         [3.1, 3.2, 7.8, 2.1],
     )
 
@@ -658,7 +789,7 @@ def create_model_document(
     add_cover(
         doc,
         "학습한 ML / DL 모델",
-        "Field Proposal Review Risk Model - 최종 모델 설명서",
+        "Field Proposal Review Risk Model - 강사 피드백 반영 v2",
         submission_date,
     )
 
@@ -670,8 +801,10 @@ def create_model_document(
         ["항목", "내용"],
         [
             ["모델명", final_name],
+            ["선정 상태", "규칙 재현 PoC의 임시 기준 모델 - 운영 최종 모델 아님"],
             ["기능명", "Field Proposal Review Risk Model"],
-            ["목적", "F2 sLLM 필드 제안 중 추가 검토가 필요한 항목을 구분하는 제출용 PoC"],
+            ["현재 목적", "규칙 기반 proxy Target을 재현하는 학습·평가 Pipeline 확인"],
+            ["차기 목적", "독립적인 사용자 수정·거절 라벨을 이용한 검토 필요 행동 예측"],
             ["문제 유형", "Binary Classification"],
             ["Positive class", "needs_review=1 (NEEDS_REVIEW)"],
             ["데이터", "기존 합성 상담에서 파생한 규칙 기반 대리 라벨 150건"],
@@ -680,7 +813,7 @@ def create_model_document(
     )
 
     add_heading(doc, "2. 모델 구조", 1)
-    add_body(doc, "합성 상담 → 필드 후보 탐지 → 정형 Feature 생성 → 80:20 층화 분할 → 모델 비교 → Recall/F1 기반 최종 선택 → Pipeline joblib 저장")
+    add_body(doc, "합성 상담 → 필드 후보 탐지 → 정형 Feature 생성 및 proxy Target 생성 → 80:20 층화 분할 → Rule 재현 모델 비교 → PoC 기준 모델 임시 선택 → Pipeline joblib 저장")
 
     add_heading(doc, "3. 입력 / 출력 정의", 1)
     add_table(
@@ -700,8 +833,29 @@ def create_model_document(
     )
 
     add_heading(doc, "4. Target 정의", 1)
-    add_body(doc, "needs_review는 실제 사용자 피드백이 아니라 충돌·부정·낮은 confidence·복수 후보·파싱 실패 및 공동중개/단순문의 문맥을 조합한 proxy risk score로 생성하였다.")
-    add_callout(doc, "라벨 한계", "실제 사용자 수락·수정·거절 데이터가 아니며 모델 성능을 실서비스에 일반화할 수 없다.")
+    add_body(doc, "needs_review는 실제 사용자 피드백이 아니라 아래 proxy risk score의 field_type별 상위 7건으로 생성하였다. 각 field_type 15건 중 7건이 class 1, 8건이 class 0이어서 전체 분포는 70:80이다.")
+    add_body(
+        doc,
+        "proxy risk score = 2×(1-confidence) + 1.5×has_conflict + 1.2×has_negation + 0.35×(mention_count-1) + 1.4×(1-parse_success) + 0.75×no_fill_context + N(0, 0.35)",
+        bold_prefix="proxy risk score",
+    )
+    add_heading(doc, "4.1 Target-Feature 중첩과 해석 제한", 2)
+    add_table(
+        doc,
+        ["구분", "내용"],
+        [
+            ["직접 재사용", "confidence, mention_count, has_conflict, has_negation, parse_success가 Target 생성과 모델 입력에 모두 사용됨"],
+            ["간접 재사용", "confidence도 parse_success·conflict·negation·mention_count로 모사되어 같은 신호가 반복 반영됨"],
+            ["층화 관여", "field_type별 점수 순위로 class를 배정하므로 field_type도 라벨 생성 과정에 관여함"],
+            ["직접 미사용", "evidence_length는 점수식에 직접 사용되지 않음"],
+        ],
+        [4.0, 12.2],
+    )
+    add_callout(
+        doc,
+        "라벨 한계",
+        "현재 모델은 독립적인 사용자 정답을 예측한 것이 아니라 입력 변수로 만든 규칙을 근사하였다. 따라서 Accuracy 0.8000은 사용자 행동 예측 성능이나 실서비스 성능으로 일반화할 수 없다.",
+    )
 
     add_heading(doc, "5. 전처리와 사용 프레임워크", 1)
     add_table(
@@ -724,7 +878,12 @@ def create_model_document(
         metric_rows(comparison),
         [4.0, 2.5, 2.5, 2.4, 2.2, 2.2],
     )
-    add_body(doc, f"검토 필요 항목 누락을 줄이기 위해 Recall을 우선했고, 실제 실행 결과에 따라 {final_name}을 최종 선택하였다.")
+    add_body(doc, "검토 필요 항목 누락을 줄이기 위해 Test Recall을 우선하였다. 두 후보 모델은 Test Accuracy 0.8000, Precision 0.9000, Recall 0.6429, F1 0.7500과 혼동행렬(TN 15·FP 1·FN 5·TP 9)이 모두 같았다.")
+    add_callout(
+        doc,
+        "Random Forest 정확도에 대한 설명",
+        "Random Forest가 더 높은 것은 Train Accuracy(0.9750)이며 Test Accuracy는 Logistic Regression과 같은 0.8000이다. 학습 정확도 상승은 일반화 성능 향상의 근거가 아니고, Random Forest의 |Train-Test Accuracy 차이| 0.1750은 Logistic Regression의 0.0083보다 크다.",
+    )
     add_figure(
         doc,
         poc_root
@@ -737,9 +896,27 @@ def create_model_document(
         4.6,
     )
 
-    add_heading(doc, "7. 최종 모델", 1)
-    add_callout(doc, "선정 모델", final_name)
-    add_body(doc, metrics["final_model"]["selection_reason"])
+    add_heading(doc, "7. PoC 기준 최종 모델(임시)", 1)
+    add_callout(doc, "PoC 기준 모델", final_name)
+    logistic_result = metrics["models"]["Logistic Regression"]
+    forest_result = metrics["models"]["Random Forest"]
+    add_table(
+        doc,
+        ["판단 항목", "Logistic Regression", "Random Forest", "선택 해석"],
+        [
+            ["Test Accuracy", f"{logistic_result['test_accuracy']:.4f}", f"{forest_result['test_accuracy']:.4f}", "동일"],
+            ["Test Recall", f"{logistic_result['recall']:.4f}", f"{forest_result['recall']:.4f}", "동일"],
+            ["Test F1", f"{logistic_result['f1']:.4f}", f"{forest_result['f1']:.4f}", "동일"],
+            ["Train Accuracy", f"{logistic_result['train_accuracy']:.4f}", f"{forest_result['train_accuracy']:.4f}", "RF가 높음"],
+            ["|Train-Test Acc. 차이|", f"{abs(logistic_result['train_test_accuracy_gap']):.4f}", f"{abs(forest_result['train_test_accuracy_gap']):.4f}", "LR이 작음"],
+            ["복잡도·설명", "선형·계수 확인 가능", "비선형·상대적으로 복잡", "LR 우선"],
+        ],
+        [4.4, 4.2, 4.0, 3.6],
+    )
+    add_body(
+        doc,
+        "Test 성능이 동률이므로 더 높은 Train Accuracy를 선택 근거로 사용하지 않았다. |Train-Test Accuracy 차이|가 작고 구조가 단순한 Logistic Regression을 현재 규칙 재현 PoC의 저장 artifact로 임시 선택하였다. 이 선택은 실제 사용자 라벨 데이터에서 다시 검증해야 한다.",
+    )
     add_table(
         doc,
         ["Test 지표", "값"],
@@ -757,19 +934,23 @@ def create_model_document(
     for item in (
         "현재 모델은 제출용 오프라인 artifact로만 보관한다.",
         "F2 서비스 API나 사용자 승인·저장 흐름에는 연결하지 않는다.",
-        "실제 승인 전후 데이터가 축적되면 대리 라벨을 폐기하고 실제 피드백 Target으로 재학습한다.",
-        "새 데이터로 평가할 때 동일 그룹·동일 문장 파생본의 Train/Test 누수를 차단한다.",
+        "차기 Target은 변경 없는 승인=0, 사용자 수정 또는 거절=1로 정의하고 검토 중단·미확인은 unknown으로 분리한다.",
+        "confidence·충돌·부정·언급 수·파싱 성공 여부는 Target 생성 규칙이 아니라 검토 전 관측 Feature로만 사용한다.",
+        "현재 proxy risk 수식을 Rule Baseline으로 분리하고 ML 모델 및 규칙 변수 제거 ablation과 비교한다.",
+        "동일 사용자·원천 상담·파생 제안의 group 누수를 막고 반복 group validation과 시간 순서 Holdout에서 변동 범위를 함께 평가한다.",
+        "Accuracy만이 아니라 Recall·Precision·F1·혼동행렬과 사용자 검토 부담으로 모델과 임계값을 고른다.",
     ):
         add_bullet(doc, item)
+    add_callout(doc, "계획 상태", "사용자 라벨 수집·재학습·재평가는 이번 v2 문서 범위에서 아직 실행하지 않았다.")
 
     add_heading(doc, "9. 한계 및 향후 개선", 1)
     for item in (
-        "세 원천 파일 총 1,250행 중 중복 제거 후 1,200개의 합성 상담만 후보로 사용하였다.",
+        "50행 원천 파일은 200행 원천 파일과 세 중복 키가 모두 일치하는 완전 부분집합이어서 중복 누수 방지를 위해 제거하였다.",
         "학습 데이터는 150건, Test Set은 30건으로 작다.",
-        "confidence와 needs_review가 실제 관측값이 아니다.",
+        "confidence와 needs_review가 실제 관측값이 아니고 Target 생성 변수와 입력 Feature가 중첩된다.",
         "실제 F2 sLLM 오류 분포 및 사용자의 검토 행동과 다를 수 있다.",
-        "본 결과는 소규모 합성 Test Set 결과이며 실서비스 성능을 의미하지 않는다.",
-        "향후 실제 사용자 수락·수정·거절 데이터와 시간 기반 평가셋으로 재검증해야 한다.",
+        "본 결과는 규칙 재현용 소규모 합성 Test Set 결과이며 사용자 행동 예측 또는 실서비스 성능을 의미하지 않는다.",
+        "실제 사용자 수정·거절 라벨과 독립적인 시간 기반 평가셋에서 모델 선정부터 재검증해야 한다.",
         "딥러닝은 이번 PoC 범위에서 수행하지 않았다.",
     ):
         add_bullet(doc, item)
@@ -786,6 +967,17 @@ def create_model_document(
         [9.0, 7.2],
     )
 
+    add_heading(doc, "11. 변경 이력", 1)
+    add_table(
+        doc,
+        ["변경일", "변경자", "변경내용", "버전"],
+        [
+            ["2026. 08. 20", "3팀 전체", "규칙 기반 대리 라벨 ML PoC 모델 설명서 작성", "v1.0"],
+            [submission_date.rstrip("."), "3팀 전체", "Target-Feature 중첩과 Logistic Regression 임시 선정 근거 보완", "v2.0"],
+        ],
+        [3.1, 3.2, 7.8, 2.1],
+    )
+
     output.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output))
 
@@ -799,9 +991,27 @@ def main() -> None:
     eda = load_json(poc_root / "reports/eda_summary.json")
     comparison = load_comparison(poc_root / "reports/model_comparison.csv")
 
-    documents_dir = poc_root / "documents"
-    detailed_output = documents_dir / "[데이터 전처리] 머신러닝_딥러닝 학습 결과서_30기_3팀.docx"
-    model_output = documents_dir / "[데이터 전처리] 학습한 ML_DL 모델_30기_3팀.docx"
+    if any(character in args.version_suffix for character in ("/", "\\")):
+        raise ValueError("--version-suffix must not contain path separators")
+    documents_dir = (args.output_dir or poc_root / "documents").resolve()
+    detailed_output = documents_dir / (
+        f"[데이터 전처리] 머신러닝_딥러닝 학습 결과서_30기_3팀{args.version_suffix}.docx"
+    )
+    model_output = documents_dir / (
+        f"[데이터 전처리] 학습한 ML_DL 모델_30기_3팀{args.version_suffix}.docx"
+    )
+
+    output_pairs = (
+        (args.training_template.resolve(), detailed_output),
+        (args.model_template.resolve(), model_output),
+    )
+    for template, output in output_pairs:
+        if template == output:
+            raise ValueError(f"Refusing to overwrite the template: {template}")
+        if output.exists() and not args.overwrite:
+            raise FileExistsError(
+                f"Output already exists: {output}. Pass --overwrite to replace it."
+            )
 
     create_training_result_document(
         args.training_template.resolve(),
