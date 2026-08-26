@@ -549,3 +549,15 @@ async def test_the_prompt_carries_no_run_or_tenant_identifier() -> None:
     body = "".join(message.content for message in provider.calls[0].messages)
     for forbidden in ("brokerage_id", "run_id", "lease_owner", "requested_by", "attempt_count"):
         assert forbidden not in body
+
+
+async def test_the_prompt_requires_unused_evidence_fields_to_be_null() -> None:
+    source = request()
+    provider = FakeProvider(model_output(model_candidate(2, 1), model_candidate(3, 2)))
+    generator = generator_for(provider)
+
+    await generator.judge_candidates(source)
+
+    body = "".join(message.content for message in provider.calls[0].messages)
+    for rule in ("kind=QUOTE", "kind=INFERENCE", "해당하지 않는 필드는 반드시 null"):
+        assert rule in body

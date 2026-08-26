@@ -50,7 +50,11 @@ _RULES = """규칙을 모두 지킨다.
     연락처를 note 에 쓰지 않는다.
 13. 처분 결정권 제약(임차인이라 결정권이 없음, 공동명의라 단독 결정 불가, 의뢰인이 실질
     결정권자가 아님)은 별도 항목이 아니라 inflexible 에 근거와 함께 적는다.
-14. 입력이 길더라도 과거 로그를 조용히 버리지 않는다. 전부 읽고 판단한다."""
+14. 입력이 길더라도 과거 로그를 조용히 버리지 않는다. 전부 읽고 판단한다.
+15. 근거의 네 필드는 항상 모두 출력하되 해당하지 않는 필드는 null 로 둔다.
+    - kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고 note 는 null 이다.
+    - kind=INFERENCE 이면 note 만 채우고 interaction_id 와 quote_text 는 null 이다.
+    해당하지 않는 필드는 반드시 null 로 출력하고 임의 값을 채우지 않는다."""
 
 
 def _log_line(log: ConsultationLogInput) -> str:
