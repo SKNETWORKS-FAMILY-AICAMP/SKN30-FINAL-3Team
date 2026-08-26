@@ -44,15 +44,15 @@ import {
   collapsedGrades as collapsedGradesFor,
   describePanelState,
   hiddenGrades as hiddenGradesFor,
-} from "./f3/index.ts";
+} from "./model/viewModel.ts";
 import type {
   CandidateView,
-  CrossJudgment,
-  FeedbackReason,
   GradeLabel,
   PanelState,
   ParentContext,
-} from "./f3/index.ts";
+} from "./model/viewModel.ts";
+import type { CrossJudgment } from "./hooks/useCrossJudgment.ts";
+import type { FeedbackReason } from "./model/dto.ts";
 import "./CrossMatchPanel.css";
 
 /**
@@ -73,18 +73,25 @@ export interface AnchorRowView {
   budget?: string;
 }
 
-interface ActionPayload {
+export interface ActionPayload {
   candidate: CandidateView;
   anchorRow: AnchorRowView | null;
 }
 
-export interface CrossMatchPanelProps {
+/** 문자 작성 화면으로 넘기는 값. 실제 발송은 F1이 대상·동의·번호를 다시 확인한 뒤에 한다. */
+export interface ComposeMessagePayload extends ActionPayload {
+  mode: string;
+  title: string;
+  draft: string;
+}
+
+interface CrossMatchPanelProps {
   isOpen: boolean;
   onClose: () => void;
   anchorRow: AnchorRowView | null;
   judgment: CrossJudgment;
   parentContext?: ParentContext;
-  onComposeMessage?: (payload: ActionPayload & { mode: string; title: string; draft: string }) => void;
+  onComposeMessage?: (payload: ComposeMessagePayload) => void;
   onOpenEvidence?: (payload: ActionPayload) => void;
   onLater?: (payload: ActionPayload) => void;
   onNotInterested?: (payload: { candidate: CandidateView; reason: FeedbackReason }) => void;
