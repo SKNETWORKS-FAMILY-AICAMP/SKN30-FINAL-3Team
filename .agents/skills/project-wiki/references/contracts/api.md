@@ -388,6 +388,14 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 `carded_count`, `remaining_count`를 싣는다. 후보는 장부 `candidate_id`, SQL 순위·점수·금액·접수일,
 카드화 여부와 저장된 경우에만 중개 판정 및 근거를 싣는다. 빈 후보 결과도 같은 형태로 200을 반환한다.
 
+후보의 `candidate_id`는 반대편 장부 레코드 식별자다. `LISTING` 앵커의 후보는 `property_requirement.id`,
+`REQUIREMENT` 앵커의 후보는 `property_listing.id`다. 이 경로는 후보의 성명, 연락처와 표시 이름을 싣지
+않으므로 화면은 자기 사무소의 F1 조회 결과로 표시 이름을 만든다.
+
+후보의 `judgment_id`는 저장된 중개 판정의 식별자이며 관심없음 피드백의 `target_id`로 쓴다. 판정 전
+후보와 카드화되지 않은 후보는 `null`이다. 실행 내부 식별자가 아니라 사무소 범위 피드백 대상 식별자이며,
+피드백 경로가 같은 사무소 소유를 다시 확인한다.
+
 ### 관심없음 피드백
 
 `POST /api/v1/f3/feedback`은 F3-TR-03의 [관심없음]만 기록하는 상태 변경 경로이므로 세션과 CSRF를
@@ -404,7 +412,8 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 ```
 
 - `target`: `POSITION_ANALYSIS` 또는 `MATCH_CANDIDATE`
-- `target_id`: 1 이상의 숫자 식별자
+- `target_id`: 1 이상의 숫자 식별자. `POSITION_ANALYSIS`이면 결과 조회의
+  `anchor_card.position_analysis_id`, `MATCH_CANDIDATE`이면 후보의 `judgment_id`다
 - `reason`: `CONDITION_MISMATCH`, `ALREADY_CONTACTED`, `WRONG_JUDGMENT`, `OTHER`
 - `field_name`: 선택값. `negotiation_intent`, `urgency`, `preferred_timing`,
   `flexible_conditions`, `inflexible_conditions`, `contactability_status`, `price`,

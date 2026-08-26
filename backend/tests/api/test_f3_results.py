@@ -296,7 +296,38 @@ def test_completed_result_contains_all_sql_candidates_and_judgment(config: Confi
         uncarded = next(item for item in body["candidates"] if item["candidate_id"] == 999999)
         assert uncarded["selected_for_cards"] is False
         assert uncarded["match_grade"] is None
+        # 판정 전 후보에는 피드백 대상이 없다. 화면은 이 값으로 [관심없음]을 막는다.
+        assert uncarded["judgment_id"] is None
         assert body["candidates_total"] == 2
+
+
+@requires_database
+def test_candidate_judgment_id_is_usable_as_a_feedback_target(config: Config) -> None:
+    """결과 조회의 ``judgment_id``가 관심없음 피드백의 ``target_id``와 같은 식별자다."""
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        anchor_card_id = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        requirement_id = _store_completed_judgment(
+            session, brokerage_id, user_id, run["run_id"], anchor_card_id
+        )
+
+        result = client.get(f"/api/v1/f3/runs/{run['run_id']}/result").json()
+        judged = next(
+            item for item in result["candidates"] if item["candidate_id"] == requirement_id
+        )
+
+        response = client.post(
+            "/api/v1/f3/feedback",
+            json={
+                "target": "MATCH_CANDIDATE",
+                "target_id": judged["judgment_id"],
+                "reason": "WRONG_JUDGMENT",
+                "field_name": "match_grade",
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["target_id"] == judged["judgment_id"]
 
 
 @requires_database
