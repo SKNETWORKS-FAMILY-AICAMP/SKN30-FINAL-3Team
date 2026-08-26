@@ -1,7 +1,7 @@
 import { APP_ENV } from "../../../config/env.ts";
 import { getCsrfToken } from "../../../shared/api/index.ts";
-
-type LedgerType = "property" | "buyer";
+import type { LedgerType } from "../model/consultationRouting.ts";
+import { routeConsultation } from "../model/consultationRouting.ts";
 
 interface AnalyzeVoiceMemoInput {
   audio: File;
@@ -187,4 +187,51 @@ export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<Vo
   );
   if (!response.ok) throw new Error(await errorMessage(response));
   return decodeAnalysis(await response.json(), input.ledgerType, input.draft);
+}
+
+export interface IntakeAnalysis extends VoiceAnalysis {
+  /** 이 분석 결과로 신규 행을 만들 장부. */
+  ledgerType: LedgerType;
+  /**
+   * 상담 유형이 매도·매수 의뢰가 아니어서 장부를 판정하지 못하고 기본 장부를 쓴 경우.
+   * 화면은 이 값이 true면 사용자에게 직접 확인하라고 알린다.
+   */
+  usedFallbackLedger: boolean;
+}
+
+/**
+ * 장부를 정하지 않은 신규 접수의 기준 장부.
+ *
+ * 어떤 장부로 보낼지는 분석 결과를 봐야 알 수 있으므로 한쪽을 먼저 정해 보낸다.
+ * 매도의뢰가 매물장 기본 흐름이라 매물장을 기준으로 둔다.
+ */
+const PROBE_LEDGER: LedgerType = "property";
+
+/**
+ * 장부를 정하지 않은 신규 음성메모 접수.
+ *
+ * 상담 유형으로 장부를 고르고 그 장부의 필드 제안을 돌려준다.
+ * 계약상 장부와 상담 유형이 어긋난 분석은 필드 제안을 만들지 않으므로,
+ * 기준 장부와 판정이 다르면 판정된 장부로 한 번 더 분석해야 손님·세대 정보를 제안으로 받는다.
+ * 매수문의 한 유형에서만 요청이 두 번 나간다.
+ */
+export async function analyzeNewIntake(input: { audio: File; signal?: AbortSignal }): Promise<IntakeAnalysis> {
+  const probe = await analyzeVoiceMemo({
+    audio: input.audio,
+    ledgerType: PROBE_LEDGER,
+    draft: {},
+    signal: input.signal,
+  });
+
+  const routed = routeConsultation(probe.consultationType);
+  if (routed == null) return { ...probe, ledgerType: PROBE_LEDGER, usedFallbackLedger: true };
+  if (routed === PROBE_LEDGER) return { ...probe, ledgerType: routed, usedFallbackLedger: false };
+
+  const matched = await analyzeVoiceMemo({
+    audio: input.audio,
+    ledgerType: routed,
+    draft: {},
+    signal: input.signal,
+  });
+  return { ...matched, ledgerType: routed, usedFallbackLedger: false };
 }
