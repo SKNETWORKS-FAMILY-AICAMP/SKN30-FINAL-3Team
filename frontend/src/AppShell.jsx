@@ -10,14 +10,14 @@ import {
   UserIcon,
 } from "@patternfly/react-icons";
 import { useBuyerLedger, useComplexOptions, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser } from "./features/ledger/api/errors.ts";
+import { describeForUser } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
 import { BuyerLedgerGrid } from "./features/BuyerLedgerGrid.jsx";
 import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
-import { CrossMatchPanel } from "./features/CrossMatchPanel.jsx";
+import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -130,6 +130,9 @@ export function AppShell() {
   const buyerLoadError = buyerLedger.state.error;
   useEffect(() => {
     if (propertyLoadError?.kind === "unauthorized" || buyerLoadError?.kind === "unauthorized") {
+      // 실행 식별자와 후보 요약은 중개사무소 안에서만 유효하다. 사무소 공용 PC를 전제하므로
+      // 세션이 끊긴 자리에 남겨 두면 다음 사용자가 앞 사용자의 실행을 조회하게 된다.
+      resetCrossJudgmentCache();
       markSessionExpired();
     }
   }, [propertyLoadError, buyerLoadError, markSessionExpired]);
@@ -459,6 +462,7 @@ export function AppShell() {
   };
 
   const isBuyerDetail = detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer";
+
   const closeDetail = () => { setCrossMatchOpen(false); setDetailRow(null); };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
@@ -509,16 +513,22 @@ export function AppShell() {
     setCrossMatchFocusRequest((current) => current + 1);
   };
 
-  const crossMatchPanel = <CrossMatchPanel
+  /* 앵커 도출과 실행 확보는 타입 검사를 받는 `CrossMatchSection`이 소유한다. */
+  const crossMatchPanel = <CrossMatchSection
     isOpen={crossMatchOpen}
     focusRequest={crossMatchFocusRequest}
     onClose={() => setCrossMatchOpen(false)}
-    anchorRow={detailRow}
+    row={detailRow}
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
+    /* 후보 표시 이름은 판정 응답에 없다. 이미 불러온 반대편 장부에서 찾는다. */
+    propertyRows={propertyLedger.state.rows}
+    buyerRows={buyerLedger.state.rows}
     onComposeMessage={openMessageComposer}
     onOpenEvidence={handleEvidenceOpen}
     onLater={() => { closeDetail(); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}
-    onInterest={({ reason }) => setToast({ variant: "info", title: `관심없음 피드백을 기록했습니다 · ${reason}` })}
+    onFeedbackResult={({ ok, cause }) => setToast(ok
+      ? { variant: "success", title: "관심없음 피드백을 기록했습니다." }
+      : { variant: "danger", title: describeForUser(cause) })}
     onSchedule={({ candidate }) => setScheduleSuggestion({ candidate, anchorRow: detailRow })}
   />;
 
@@ -553,7 +563,7 @@ export function AppShell() {
                 variant="secondary"
                 size="sm"
                 isDisabled={authSubmitting}
-                onClick={() => void signOut()}
+                onClick={() => { resetCrossJudgmentCache(); void signOut(); }}
                 style={{ marginLeft: "8px" }}
               >
                 로그아웃
