@@ -1066,6 +1066,7 @@
   font-size: 13px;
 }
 
+.detail-workspace__close-modal-body > p:first-child,
 .detail-workspace__delete-modal-body > p:first-child,
 .detail-workspace__duplicate-modal-body > p:first-child {
   margin: 0 0 22px;
