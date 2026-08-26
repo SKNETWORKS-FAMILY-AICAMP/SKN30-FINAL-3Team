@@ -253,6 +253,9 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
           // 단계가 바뀔 때만 결과를 다시 읽는다.
           if (status !== lastStatus) {
             lastStatus = status;
+            // 방금 움직였으니 다음 단계도 곧 온다. 간격을 처음으로 되돌린다. 이것이 없으면
+            // 마지막 대기가 상한까지 늘어난 채로 완료를 만나 결과가 최대 5초 늦게 보인다.
+            interval = FIRST_INTERVAL_MS;
             await loadResult(runId, status);
             if (!isCurrent()) return;
           }

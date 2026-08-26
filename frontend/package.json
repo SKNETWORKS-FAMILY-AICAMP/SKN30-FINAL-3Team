@@ -13,6 +13,7 @@
     "test:ledger": "node --test tests/ledger-mappers.test.ts tests/ledger-fixtures.test.ts",
     "test:auth": "node --test tests/auth-session.test.ts",
     "test:f3": "node --test tests/f3-decode.test.ts tests/f3-mock.test.ts",
+    "test:browser": "node --test tests/f3-panel.browser.test.mjs",
     "test:env": "node --test tests/env-cli.test.mjs tests/env-schema.test.ts tests/vite-config.test.mjs",
     "typecheck": "tsc --noEmit",
     "test:release": "node --env-file=.env.local --env-file-if-exists=.env --test tests/release-build.test.mjs"
