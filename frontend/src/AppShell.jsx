@@ -18,7 +18,7 @@ import { BuyerLedgerGrid } from "./features/BuyerLedgerGrid.jsx";
 import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
 import { CrossMatchPanel } from "./features/CrossMatchPanel.tsx";
-import { sendNotInterested, useCrossJudgment } from "./features/f3/index.ts";
+import { resetCrossJudgmentCache, sendNotInterested, useCrossJudgment } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -131,6 +131,9 @@ export function AppShell() {
   const buyerLoadError = buyerLedger.state.error;
   useEffect(() => {
     if (propertyLoadError?.kind === "unauthorized" || buyerLoadError?.kind === "unauthorized") {
+      // 실행 식별자와 후보 요약은 중개사무소 안에서만 유효하다. 사무소 공용 PC를 전제하므로
+      // 세션이 끊긴 자리에 남겨 두면 다음 사용자가 앞 사용자의 실행을 조회하게 된다.
+      resetCrossJudgmentCache();
       markSessionExpired();
     }
   }, [propertyLoadError, buyerLoadError, markSessionExpired]);
@@ -585,7 +588,7 @@ export function AppShell() {
                 variant="secondary"
                 size="sm"
                 isDisabled={authSubmitting}
-                onClick={() => void signOut()}
+                onClick={() => { resetCrossJudgmentCache(); void signOut(); }}
                 style={{ marginLeft: "8px" }}
               >
                 로그아웃

@@ -9,7 +9,7 @@
  */
 
 import { formatMoney, formatPyeongList } from "../../../shared/format/index.ts";
-import type { CandidateSummary } from "../api/f3Api.ts";
+import type { CandidateSummary } from "../api/transport.ts";
 import type {
   AnchorType,
   CandidateDto,

@@ -10,14 +10,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, isCanceled } from "../../../shared/api/index.ts";
-import {
-  DEFAULT_CANDIDATE_LIMIT,
-  createRun,
-  fetchCandidateSummary,
-  getRunResult,
-  getRunStatus,
-} from "../api/f3Api.ts";
-import type { CandidateSummary, RunAnchor } from "../api/f3Api.ts";
+import { f3Transport } from "../api/f3Transport.ts";
+import { DEFAULT_CANDIDATE_LIMIT } from "../api/limits.ts";
+import type { CandidateSummary, RunAnchor } from "../api/transport.ts";
 import type { AnchorCardDto, AnchorType, RunResultDto } from "../model/dto.ts";
 import { describeCriteria, isTerminal, toCandidateView, toPanelState } from "../model/viewModel.ts";
 import type { CandidateView, PanelState } from "../model/viewModel.ts";
@@ -42,6 +37,18 @@ const runRegistry = new Map<string, number>();
 
 /** 후보 요약 임시 캐시. Backend가 후보 응답에 표시 필드를 실어주면 함께 사라진다. */
 const summaryCache = new Map<number, CandidateSummary>();
+
+/**
+ * 세션이 끝나면 두 캐시를 비운다.
+ *
+ * 사무소 공용 PC를 전제하므로 같은 브라우저에서 계정이 바뀔 수 있다. 실행 식별자와 장부
+ * 식별자는 중개사무소 안에서만 유효하므로, 남겨 두면 앞 사용자의 실행을 조회해 404를 맞거나
+ * 앞 사용자의 희망 단지를 화면에 그린다.
+ */
+export function resetCrossJudgmentCache(): void {
+  runRegistry.clear();
+  summaryCache.clear();
+}
 
 /**
  * 훅 입력은 원시값으로 받는다.
@@ -149,10 +156,12 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
       });
 
     async function loadResult(runId: number, status: string): Promise<RunResultDto | null> {
-      const result = await getRunResult(runId, { limit, offset }, controller.signal);
+      const result = await f3Transport.getRunResult(runId, { limit, offset }, controller.signal);
       if (!isCurrent()) return null;
       publish({
-        state: toPanelState(status, result.candidates.length),
+        // 페이지 길이가 아니라 전체 건수로 본다. 뒷 페이지를 보는 중에 앞 페이지가 비면
+        // 후보가 있는 실행을 "후보 없음"으로 그리게 된다.
+        state: toPanelState(status, result.candidates_total),
         runId,
         result,
         error: null,
@@ -177,7 +186,7 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
       const loaded = await Promise.all(
         missing.map(async (id) => {
           try {
-            return await fetchCandidateSummary(id, controller.signal);
+            return await f3Transport.fetchCandidateSummary(id, controller.signal);
           } catch {
             return null;
           }
@@ -194,20 +203,46 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
       if (changed) setSummaries(new Map(summaryCache));
     }
 
+    /** 실행을 새로 접수하고 registry에 기록한다. */
+    async function queueRun(): Promise<number> {
+      publish({ state: "queueing", runId: null, result: null, error: null });
+      const run = await f3Transport.createRun(anchor, controller.signal);
+      runRegistry.set(key as string, run.run_id);
+      return run.run_id;
+    }
+
+    /**
+     * 실행을 확보하고 현재 단계를 함께 읽는다.
+     *
+     * 캐시된 실행 식별자를 그대로 믿지 않는다. 실행은 중개사무소 안에서만 유효한데 registry는
+     * 브라우저 메모리에 남으므로, 계정이 바뀐 뒤 같은 앵커를 열면 서버가 404로 답한다. 그때는
+     * 캐시를 버리고 새로 접수한 뒤 **그 실행 식별자를 돌려준다.** 옛 식별자를 그대로 들고
+     * polling을 이어가면 이후 조회가 전부 없는 실행을 향한다.
+     */
+    async function resolveRun(): Promise<{ runId: number; status: string }> {
+      const cached = runRegistry.get(key as string);
+      if (cached == null) {
+        const runId = await queueRun();
+        return { runId, status: (await f3Transport.getRunStatus(runId, controller.signal)).status };
+      }
+
+      try {
+        return { runId: cached, status: (await f3Transport.getRunStatus(cached, controller.signal)).status };
+      } catch (cause) {
+        if (!(cause instanceof ApiError) || cause.kind !== "notFound") throw cause;
+        runRegistry.delete(key as string);
+        const runId = await queueRun();
+        return { runId, status: (await f3Transport.getRunStatus(runId, controller.signal)).status };
+      }
+    }
+
     async function drive() {
       try {
-        let runId = runRegistry.get(key as string);
-        if (runId == null) {
-          publish({ state: "queueing", runId: null, result: null, error: null });
-          const run = await createRun(anchor, controller.signal);
-          if (!isCurrent()) return;
-          runId = run.run_id;
-          runRegistry.set(key as string, runId);
-        }
-
         // 확보한 실행의 현재 단계를 먼저 그린다. 이미 끝난 실행이면 여기서 끝난다.
-        let status = (await getRunStatus(runId, controller.signal)).status;
+        const resolved = await resolveRun();
         if (!isCurrent()) return;
+        const runId = resolved.runId;
+        let status = resolved.status;
         let lastStatus = "";
         const startedAt = Date.now();
         let interval = FIRST_INTERVAL_MS;
@@ -233,7 +268,7 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
           await wait(interval);
           if (!isCurrent()) return;
           interval = Math.min(interval * 2, MAX_INTERVAL_MS);
-          status = (await getRunStatus(runId, controller.signal)).status;
+          status = (await f3Transport.getRunStatus(runId, controller.signal)).status;
         }
       } catch (cause) {
         if (isCanceled(cause) || !isCurrent()) return;
