@@ -8,8 +8,10 @@ from pydantic import BaseModel, ValidationError
 
 from brokerage_ai.core.errors import (
     ProviderConfigurationError,
+    ProviderOutputInvalidError,
     ProviderRefusalError,
     ProviderResponseError,
+    describe_validation_error,
     translate_openai_error,
 )
 from brokerage_ai.core.types import (
@@ -58,16 +60,23 @@ class OpenAIAdapter:
             response = await self._client.responses.parse(**parameters)
         except OpenAIError as exc:
             raise translate_openai_error(exc) from None
-        except (ValidationError, ValueError):
-            raise ProviderResponseError() from None
+        except ValidationError as exc:
+            # 모델이 계약을 어긴 출력을 냈다. 설정 오류가 아니라 다시 부르면 달라질 수 있는
+            # 실패다. 원인을 `from None`으로 버리지 않는다. 버리면 무엇이 어긋났는지 알 방법이
+            # 사라져 계측을 새로 붙이기 전에는 진단할 수 없다.
+            raise ProviderOutputInvalidError(describe_validation_error(exc)) from exc
+        except ValueError as exc:
+            raise ProviderOutputInvalidError() from exc
         latency_ms = (perf_counter() - started_at) * 1000
 
         parsed = response.output_parsed
         if parsed is None:
             if self._contains_refusal(response.output):
                 raise ProviderRefusalError()
-            raise ProviderResponseError()
+            # 잘린 응답(`max_output_tokens` 초과)이 여기로 온다. 다시 부르면 통과할 수 있다.
+            raise ProviderOutputInvalidError(_incomplete_reason(response))
         if not isinstance(parsed, output_schema):
+            # 선언한 schema와 다른 타입이 돌아왔다. 다시 불러도 같으므로 재시도하지 않는다.
             raise ProviderResponseError()
 
         usage = response.usage
@@ -148,3 +157,10 @@ class OpenAIAdapter:
         if len(dimensions) != 1:
             raise ProviderResponseError("provider returned inconsistent embedding dimensions")
         return vectors
+
+
+def _incomplete_reason(response: object) -> str:
+    """왜 본문을 못 읽었는지. 모델이 만든 문장이 아니라 Provider의 종료 사유만 옮긴다."""
+    details = getattr(response, "incomplete_details", None)
+    reason = getattr(details, "reason", None)
+    return f"response is incomplete: {reason}" if reason else "response has no parsed output"
