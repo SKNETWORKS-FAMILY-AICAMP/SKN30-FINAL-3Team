@@ -179,3 +179,51 @@ test("피드백 응답은 계약 어휘만 받는다", () => {
     DecodeError,
   );
 });
+
+test("종료 상태는 진행 중과 구분한다", () => {
+  // polling을 멈출 기준이다. 여기서 빠지면 끝난 실행을 영원히 다시 조회한다.
+  for (const status of ["COMPLETED", "FAILED_TERMINAL", "SUPERSEDED", "CANCELLED"]) {
+    assert.equal(isTerminal(status), true, status);
+  }
+  for (const status of ["QUEUED", "RUNNING", "ANCHOR_READY", "JUDGING"]) {
+    assert.equal(isTerminal(status), false, status);
+  }
+});
+
+test("영구 실패는 서버가 준 공개 문구를 그대로 싣는다", () => {
+  const result = decodeRunResult(
+    resultResponse({
+      status: "FAILED_TERMINAL",
+      completed_at: null,
+      failure_code: "LEASE_EXPIRED_MAX_ATTEMPTS",
+      failure_message: "실행이 최대 시도 횟수를 초과해 종료되었습니다",
+      candidates: [],
+      candidates_total: 0,
+    }),
+  );
+
+  assert.equal(toPanelState(result.status, result.candidates_total), "failed");
+  // 화면이 문구를 새로 짓지 않는다. 서버가 allowlist로 만든 값만 보여준다.
+  assert.equal(result.failure_message, "실행이 최대 시도 횟수를 초과해 종료되었습니다");
+  assert.equal(result.failure_code, "LEASE_EXPIRED_MAX_ATTEMPTS");
+});
+
+test("입력이 바뀐 실행은 실패가 아니라 교체로 다룬다", () => {
+  // 후보가 이미 있어도 결과를 반영하지 않았다는 뜻이므로 완료로 그리면 안 된다.
+  const result = decodeRunResult(
+    resultResponse({
+      status: "SUPERSEDED",
+      failure_code: "INPUT_SUPERSEDED",
+      failure_message: "실행 중 입력 데이터가 변경되어 결과를 반영하지 않았습니다",
+    }),
+  );
+
+  assert.equal(result.candidates_total, 2);
+  assert.equal(toPanelState(result.status, result.candidates_total), "superseded");
+});
+
+test("실패 코드가 없으면 실패 문구도 없다", () => {
+  const result = decodeRunResult(resultResponse());
+  assert.equal(result.failure_code, null);
+  assert.equal(result.failure_message, null);
+});
