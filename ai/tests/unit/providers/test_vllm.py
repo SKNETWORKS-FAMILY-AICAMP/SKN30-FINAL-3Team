@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock
 import pytest
 from openai import AsyncOpenAI
 
-from brokerage_ai.core.errors import ProviderConfigurationError, ProviderResponseError
+from brokerage_ai.core.errors import (
+    ProviderConfigurationError,
+    ProviderOutputInvalidError,
+    ProviderResponseError,
+)
 from brokerage_ai.core.types import ProviderKind
 from brokerage_ai.providers.vllm import VllmAdapter
 from conftest import Answer, embedding_request, generation_request
@@ -47,25 +51,53 @@ async def test_missing_llm_endpoint_is_explicit() -> None:
         await adapter.generate_structured(generation_request(ProviderKind.VLLM), Answer)
 
 
-@pytest.mark.asyncio
-async def test_missing_or_invalid_parsed_output_is_rejected() -> None:
-    parse = AsyncMock(
+def _parsed_response(parsed: object) -> AsyncMock:
+    return AsyncMock(
         return_value=SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(parsed=None, refusal=None))],
+            choices=[SimpleNamespace(message=SimpleNamespace(parsed=parsed, refusal=None))],
             usage=None,
             model="served-model",
             id="chatcmpl_123",
         )
     )
+
+
+@pytest.mark.asyncio
+async def test_missing_parsed_output_is_retryable() -> None:
+    """본문을 못 읽은 것은 다시 부르면 될 수 있다. 잘린 응답이 여기로 온다."""
     client = cast(
         AsyncOpenAI,
-        SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(parse=parse))),
+        SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(parse=_parsed_response(None)))
+        ),
     )
 
-    with pytest.raises(ProviderResponseError):
+    with pytest.raises(ProviderOutputInvalidError) as caught:
         await VllmAdapter(llm_client=client, embedding_client=None).generate_structured(
             generation_request(ProviderKind.VLLM), Answer
         )
+
+    assert caught.value.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_wrong_schema_type_is_not_retryable() -> None:
+    """선언한 schema 와 다른 타입은 다시 불러도 같다."""
+    client = cast(
+        AsyncOpenAI,
+        SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(parse=_parsed_response(SimpleNamespace(value="ok")))
+            )
+        ),
+    )
+
+    with pytest.raises(ProviderResponseError) as caught:
+        await VllmAdapter(llm_client=client, embedding_client=None).generate_structured(
+            generation_request(ProviderKind.VLLM), Answer
+        )
+
+    assert caught.value.retryable is False
 
 
 @pytest.mark.asyncio

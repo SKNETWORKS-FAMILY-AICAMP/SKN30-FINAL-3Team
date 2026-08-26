@@ -50,6 +50,7 @@ from brokerage_ai.f3 import (
     validate_generation_result,
 )
 from brokerage_ai.f3.model_output import ModelPriceOpinion, PositionCardModelOutput
+from brokerage_ai.f3.prompts import build_position_card_messages
 
 OLD_AT = datetime(2026, 8, 10, 1, 0, tzinfo=UTC)
 NEW_AT = datetime(2026, 8, 19, 4, 0, tzinfo=UTC)
@@ -362,7 +363,7 @@ async def test_prompt_and_workflow_versions_are_always_recorded() -> None:
 
     result = await subject.generate_position_card(listing_request())
 
-    assert result.prompt_version == POSITION_CARD_PROMPT_VERSION == "position-card-prompt:v1"
+    assert result.prompt_version == POSITION_CARD_PROMPT_VERSION == "position-card-prompt:v2"
     assert result.workflow_version == POSITION_CARD_WORKFLOW_VERSION == "position-card-workflow:v1"
     # Backend 는 cache key 를 계산하기 전에 같은 값을 알 수 있어야 한다.
     assert subject.versions.prompt_version == result.prompt_version
@@ -569,3 +570,27 @@ def test_model_output_rejects_a_repeated_price_kind() -> None:
                 ModelPriceOpinion(price_kind=PriceKind.SALE),
             )
         )
+
+
+async def test_prompt_states_the_rules_the_schema_cannot_express() -> None:
+    """JSON schema 로 표현되지 않는 교차 필드 규칙은 프롬프트가 책임진다.
+
+    계약(`PositionCardModelOutput`)은 이 규칙들을 `model_validator` 로 강제하지만 strict schema
+    에는 담기지 않는다. 프롬프트에도 없으면 모델은 규칙의 존재조차 모른 채 어기고, 그 출력이
+    검증에서 걸려 실행이 실패한다. 실제로 `hard_deadline` 규칙이 빠져 있어 후보 카드 생성이
+    반복 실패했다.
+
+    새 교차 필드 규칙을 계약에 추가하면 이 테스트가 그것을 여기에 적도록 상기시킨다.
+    """
+    messages = build_position_card_messages(listing_request())
+    prompt = "\n".join(message.content for message in messages)
+
+    assert "hard_deadline" in prompt
+    # 근거 없는 마감일을 세우지 말라는 규칙 (F3-PC-04).
+    assert "null 이다" in prompt
+    # 같은 price_kind 를 두 번 담지 말라는 규칙.
+    assert "price_kind 를 두 번" in prompt
+    # 월 차임은 MONTHLY_RENT 에서만 쓰라는 규칙.
+    assert "MONTHLY_RENT" in prompt
+    # 로그가 없으면 인용할 원문도 없다는 규칙. 실제로 모델이 앵커 장부 값을 인용으로 냈다.
+    assert "kind=QUOTE 를 쓰지 않는다" in prompt
