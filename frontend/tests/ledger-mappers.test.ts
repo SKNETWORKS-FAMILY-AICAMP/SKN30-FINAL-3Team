@@ -20,6 +20,7 @@ import {
   hasListingValues,
   newInteractionContent,
   toListingCreatePayload,
+  toPartyWritePayload,
   toPropertyRow,
   toUnitCreatePayload,
   toUnitUpdatePayload,
@@ -33,7 +34,6 @@ import {
 import {
   createRequirementRowDtos,
   createUnitRowDtos,
-  relationsFor,
 } from "../src/features/ledger/mock/fixtures.ts";
 
 const EOK = 100_000_000;
@@ -150,29 +150,82 @@ test("매물장 DTO를 화면 행으로 바꾼다", () => {
   assert.equal(row.listingRowVersion, dto.current_listing?.row_version);
 });
 
-test("목록 행에는 인물과 상담 로그가 없다", () => {
-  // 계약상 목록 응답에 포함되지 않는다. 상세를 열어야 채워진다.
-  const row = toPropertyRow(saleUnit());
-  assert.equal(row.owner, "");
-  assert.equal(row.log, "");
-  assert.equal(row.partiesLoaded, false);
+test("목록 행이 임대인·임차인 열을 채운다", () => {
+  /*
+   * 그리드가 임대인·임차인을 고정 열로 갖고 있어 목록 응답이 인물을 함께 싣는다.
+   * 이 열이 비면 값이 없는 것인지 아직 안 불러온 것인지 화면에서 구분할 수 없다.
+   */
+  const unit = createUnitRowDtos(30).find((row) => row.parties.length > 0);
+  assert.ok(unit != null);
+  const landlords = unit.parties.filter((relation) => relation.role === "LANDLORD");
+  const row = toPropertyRow(unit);
+
+  assert.equal(row.partiesLoaded, true);
+  assert.equal(row.owner, landlords.map((relation) => relation.party.name).join(", "));
+  assert.equal(row.parties.length, unit.parties.length);
 });
 
-test("상세를 적용하면 공동명의가 한 행으로 접힌다", () => {
-  // F1-GR-06: 명의자가 2인 이상이어도 세대당 1행
-  const unit = createUnitRowDtos(30)[26];
+test("임대인 역할 코드는 LANDLORD다", () => {
+  // 서버가 쓰는 코드와 어긋나면 필터가 아무것도 못 골라 임대인 열이 조용히 빈다.
+  const unit = createUnitRowDtos(30).find((row) =>
+    row.parties.some((relation) => relation.role === "LANDLORD"),
+  );
   assert.ok(unit != null);
-  const relations = relationsFor(unit.id);
-  const owners = relations.filter((relation) => relation.role === "OWNER");
+  assert.notEqual(toPropertyRow(unit).owner, "");
+});
+
+test("공동명의는 한 행으로 접힌다", () => {
+  // F1-GR-06: 명의자가 2인 이상이어도 세대당 1행
+  const unit = createUnitRowDtos(30).find(
+    (row) => row.parties.filter((relation) => relation.role === "LANDLORD").length > 1,
+  );
+  assert.ok(unit != null);
+  const landlords = unit.parties.filter((relation) => relation.role === "LANDLORD");
   const row = applyUnitDetail(toPropertyRow(unit), {
     unit,
     listings: [],
-    parties: relations,
+    parties: unit.parties,
   });
 
   assert.equal(row.partiesLoaded, true);
-  assert.equal(row.owner, owners.map((relation) => relation.party.name).join(", "));
-  assert.equal(row.isCoOwned, owners.length > 1);
+  assert.equal(row.owner, landlords.map((relation) => relation.party.name).join(", "));
+  assert.equal(row.isCoOwned, true);
+});
+
+test("임대인·임차인 입력이 인물 쓰기 요청으로 나간다", () => {
+  /*
+   * 이 열들이 payload에 실리지 않으면 저장은 성공하고 값만 사라진다.
+   * 화면은 "저장 완료"를 보여주므로 사용자가 손실을 알아차릴 방법이 없다.
+   */
+  const row = {
+    ...createPropertyDraftRow("DRAFT-1"),
+    complexId: 1,
+    unit: "203",
+    owner: "박이서, 송경련",
+    ownerPhone: "010-1234-5678",
+    tenant: "김임차",
+    tenantPhone: "010-2222-3333",
+  };
+
+  assert.deepEqual(toPartyWritePayload(row), [
+    { role: "LANDLORD", role_index: 1, name: "박이서", phone: "010-1234-5678", is_co_owner: true },
+    { role: "LANDLORD", role_index: 2, name: "송경련", phone: null, is_co_owner: true },
+    { role: "TENANT", role_index: 1, name: "김임차", phone: "010-2222-3333", is_co_owner: false },
+  ]);
+
+  const created = toUnitCreatePayload(row);
+  assert.ok(created != null);
+  assert.equal(created.parties?.length, 3);
+});
+
+test("인물을 비우면 빈 목록을 보내 관계를 끊는다", () => {
+  // 보낸 목록이 곧 전체다. 빈 배열은 "인물 없음"이고, 생략은 "건드리지 않음"이다.
+  const loaded = { ...createPropertyDraftRow("DRAFT-2"), rowVersion: 3, owner: "", tenant: "" };
+  assert.deepEqual(toUnitUpdatePayload(loaded)?.parties, []);
+
+  // 아직 인물을 모르는 행은 보내지 않는다. 빈 배열이면 서버의 임대인이 지워진다.
+  const unloaded = { ...loaded, partiesLoaded: false };
+  assert.equal(toUnitUpdatePayload(unloaded)?.parties, undefined);
 });
 
 test("매물이 없는 세대도 행으로 표시한다", () => {

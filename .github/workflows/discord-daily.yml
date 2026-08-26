@@ -1,0 +1,23 @@
+name: Discord Daily Reminder
+
+on:
+  schedule:
+    - cron: '37 0 * * 1-5'
+
+  workflow_dispatch:
+
+jobs:
+  send-daily-reminder:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Discord daily reminder
+        env:
+          DISCORD_DAILY_WEBHOOK_URL: ${{ secrets.DISCORD_DAILY_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{
+              "content": "📅 **데일리 업무 공유**\n\n원활한 업무 파악과 협업을 위해 매일 작업 시작 전 데일리 내용을 공유해주세요.\n\n**작성 규칙**\n\n1. 매일 작업 시작할 때 **3~5분 안에 작성**해주세요.\n2. `어제 한 일`은 **완료한 것만** 작성해주세요.\n3. `오늘 할 일`은 가능하면 **2~4개 이하**로 작성해주세요.\n4. 막힌 점이 없다면 `없음`으로 작성해주세요.\n5. 자세한 논의가 필요한 내용은 해당 메시지의 **스레드에서 진행**해주세요.\n\n**아래 템플릿을 사용해주세요.**\n\n## ✅ **어제 한 일**\n-\n\n## 🎯 **오늘 할 일**\n-\n\n## 🚧 **막힌 점 / 공유할 점**\n-"
+            }' \
+            "$DISCORD_DAILY_WEBHOOK_URL"

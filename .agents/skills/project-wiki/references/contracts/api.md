@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # API 계약 규칙
@@ -52,6 +52,7 @@ updated: 2026-08-20
 - 같은 필터 파라미터를 반복하면 OR로 결합한다.
 - 예약값 `__EMPTY__`는 해당 컬럼이 비어 있는 행을 뜻하며 다른 값과 함께 선택할 수 있다. `column-values` 응답도 같은 예약값과 건수를 목록에 포함한다. 값이 비어 있는 파라미터는 필터로 취급하지 않는다.
 - 부분 수정은 PATCH를 사용하고 본문에 `row_version`을 요구한다. 값이 다르면 409로 거절하며 마지막 저장이 앞 변경을 덮어쓰지 않게 한다.
+- 매물과 구입장 PATCH에서 요청값이 저장값과 모두 같으면 쓰기와 `row_version` 증가를 생략한다. 같은 값이어도 요청 `row_version`이 이미 낡았으면 409로 거절한다. 구입장의 `desired_complex_ids`는 순서가 아닌 단지 집합으로 비교하며 집합이 바뀌면 구입장 `row_version`도 올린다.
 - 다른 중개사무소가 소유한 식별자는 403이 아니라 404로 응답해 존재 여부를 드러내지 않는다.
 
 ### 매물장
@@ -59,6 +60,14 @@ updated: 2026-08-20
 목록의 기준 행은 세대이며 매물이 아닌 세대도 반환한다. 매매·전세·월세 값이 비어 있는 행이 다수인 상태가 정상이다.
 
 목록 응답의 각 행은 가장 최근 상담 로그 본문을 `latest_interaction_content`로 함께 싣는다. 행마다 별도 질의를 보내지 않도록 lateral join으로 붙이며, 로그가 없으면 null이다.
+
+목록 응답의 각 행은 현재 유효한 인물 관계를 `parties`로 함께 싣는다. 매물장 33개 컬럼에 임대인·임대인 전화·임차인·임차인 전화가 있고(F1-GR-02), 공동명의도 세대당 한 행에 접어 표시해야 하므로(F1-GR-06) 목록이 인물을 빼면 행마다 상세를 다시 불러야 한다. 각 항목은 `role`, `role_index`, `is_primary`, `is_co_owner`, `valid_from`과 인물 요약(`id`, `party_type`, `name`, `alternate_name`, `privacy_consent_at`, `contacts`)을 갖는다. `valid_to`가 채워진 종료된 관계는 제외하고 `role`, `role_index` 순으로 정렬해 공동명의 표시 순서를 서버가 고정한다. 인물이 없는 세대가 정상이므로 `parties`는 빈 목록일 수 있으며, 목록과 상세는 같은 조립 규칙과 같은 필드를 쓴다.
+
+세대 생성·수정 요청이 `parties`를 함께 실으면 세대 필드와 인물 관계는 한 트랜잭션에 저장한다. 인물 검증이 실패하면 세대 필드도 저장하지 않고 `row_version`도 올리지 않는다. 인물 없는 세대 자체는 정상이지만, 화면은 한 번의 요청을 전부 아니면 전무로 보고 성공했을 때만 서버 id와 새 `row_version`을 기록하므로, 세대만 저장되면 화면이 그 사실을 모른 채 PATCH는 낡은 버전으로 409를 받고 POST는 같은 세대를 다시 만든다.
+
+세대 PATCH는 바꿀 필드가 하나도 없어도 시작에서 `row_version`을 검증한다. `parties`만 보내는 요청도 마찬가지이며 낡은 버전은 409로 거절한다. 인물 관계가 실제로 바뀌면 같은 트랜잭션에서 세대 `row_version`을 올린다. 인물은 별도 테이블이지만 화면에서는 세대 행의 칸이므로, 올리지 않으면 두 사람이 같은 세대의 임대인을 동시에 고쳐도 충돌이 잡히지 않고 나중 저장이 앞 변경을 조용히 덮어쓴다. 같은 인물을 다시 보낸 요청은 변경이 아니므로 버전을 올리지 않는다.
+
+인물 요약은 화면이 실제로 그리는 범위로 한정한다. 성명, 별칭, 연락처와 동의 시각까지만 싣고 `party.memo`는 목록·상세 어느 쪽에도 싣지 않는다.
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
@@ -95,9 +104,9 @@ updated: 2026-08-20
 | PATCH | /api/v1/property-requirements/{requirement_id} | 세션·CSRF | 구입장 부분 수정 |
 | DELETE | /api/v1/property-requirements/{requirement_id} | 세션·CSRF | 구입장 행 삭제. `row_version` 질의 변수 필수 |
 
-구입장은 인물이 행의 주체이고 화면 표에 손님과 연락처가 고정 컬럼으로 있으므로, 목록 응답이 `party`와 그 안의 `contacts`를 함께 싣는다. 행마다 상세를 다시 부르면 목록 한 번에 N번의 추가 요청이 생기고 다중 문자 발송처럼 여러 행을 한꺼번에 다루는 기능이 성립하지 않는다. 인물이 없는 구입장 행은 존재할 수 없으므로 `party`는 목록과 상세 모두에서 필수이며, 클라이언트는 이를 선택 필드로 다루지 않는다. 반대로 매물장 목록은 인물을 싣지 않고 세대 상세에서만 인물 관계를 제공한다. 두 장부의 차이는 인물이 행의 주체인지 여부에서 온다.
+구입장은 인물이 행의 주체이고 화면 표에 손님과 연락처가 고정 컬럼으로 있으므로, 목록 응답이 `party`와 그 안의 `contacts`를 함께 싣는다. 행마다 상세를 다시 부르면 목록 한 번에 N번의 추가 요청이 생기고 다중 문자 발송처럼 여러 행을 한꺼번에 다루는 기능이 성립하지 않는다. 인물이 없는 구입장 행은 존재할 수 없으므로 `party`는 목록과 상세 모두에서 필수이며, 클라이언트는 이를 선택 필드로 다루지 않는다. 매물장 목록도 같은 이유로 인물을 싣는다. 두 장부의 차이는 인물의 필수 여부에서만 온다. 인물이 없는 세대는 정상이므로 매물장의 `parties`는 빈 목록을 허용한다.
 
-개인정보 최소 노출은 장부 사이의 경계가 아니라 중개사무소 경계와 동의 여부로 지킨다. 세션의 `brokerage_id`가 소유하지 않은 인물은 어떤 경로로도 나오지 않고, 동의가 없는 인물은 애초에 구입장으로 저장되지 않는다.
+개인정보 최소 노출은 장부 사이의 경계나 목록·상세 사이의 경계가 아니라 세션, 중개사무소 경계, 동의 여부와 응답 필드 범위로 지킨다. 두 장부의 목록과 상세는 모두 서버 세션을 요구하므로 로그인하지 않은 요청에는 인물이 나오지 않는다. 세션의 `brokerage_id`가 소유하지 않은 인물은 어떤 경로로도 나오지 않고, 동의가 없는 인물은 애초에 구입장으로 저장되지 않는다. 목록을 상세보다 좁게 두는 방식은 화면이 요구하는 인물 열을 채우지 못하면서 행마다 상세 조회를 부르게 해, 같은 개인정보를 더 많은 요청으로 흘리는 결과가 된다.
 
 현재 구현된 필터는 `demand_type`, `status`, `classification`, `workflow_stage`, `assigned_user_id`다.
 
@@ -116,6 +125,28 @@ updated: 2026-08-20
 
 상담 로그는 추가 전용이므로 수정과 삭제 경로를 두지 않는다. 로그를 추가하면 서버가 대상 세대 또는 구입장의 최종접촉일을 갱신한다. 무효 처리와 AI 생성 로그의 승인 경로는 현재 범위에 포함하지 않는다.
 
+## F2 음성 분석 계약 (구현됨 · 1차 연동)
+
+| Method | Path | 인증 | 동작 |
+|---|---|---|---|
+| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod Whisper로 전사하고 Qwen으로 분석해 검토용 제안을 동기 반환 |
+
+요청은 `multipart/form-data`이며 `audio`, `ledger_type`, `current_fields`,
+`privacy_confirmed`를 받는다. `audio`는 비어 있지 않은 WAV·MP3·M4A이고 현재 상한은 25 MiB다.
+`ledger_type`은 `매물장` 또는 `구입장`, `current_fields`는 필드명에서 문자열 또는 null로 가는 JSON
+객체다. `privacy_confirmed`가 true가 아니면 422로 거절한다. Backend는 세션에서 사용자 문맥을
+검증하지만 사용자·사무소 식별자는 모델에 보내지 않는다.
+
+응답은 상담 유형, 장부 불일치 여부, 필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
+상담 로그 초안과 서버가 확인한 주의 문구 확인 시각을 반환한다. 전사 전문, 모델 진단, 요청자와
+Provider 오류 원문은 반환하지 않는다. 제안 응답만으로 장부를 저장하지 않으며 Frontend가 선택한 값을
+부모 상세의 미저장 draft에 반영한다.
+
+이 경로는 RunPod base model 연결을 검증하는 1차 동기 수직 슬라이스다. 영속 작업, Worker 재개,
+SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 구현하지 않았으며
+`docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
+음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
+
 ### 오류 코드
 
 | code | HTTP | 발생 조건 |
@@ -127,19 +158,28 @@ updated: 2026-08-20
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
+| F2_UNAVAILABLE | 503 | F2가 비활성화됐거나 RunPod STT·LLM Provider를 사용할 수 없음 |
+| F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
 
-## F3 실행 계약 (제안)
+## F3 실행 계약
 
-이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 현재 구현 범위는 실행 요청을 검증해
-`agent_run`에 `QUEUED`로 적재하고 그 실행의 현재 상태를 조회하는 것까지다. 결과와 후보 조회, 피드백
-경로는 아직 없다.
+이 절은 현재 구현된 브라우저–Backend 공개 계약의 정본이다. 실행 요청을 `agent_run`에 `QUEUED`로
+적재하고 현재 상태와 마지막 안전 결과를 조회하며, 저장된 카드·판정에 구조화 피드백을 남긴다.
+
+이 절은 브라우저와 Backend 사이의 HTTP 계약만 다룬다. Backend와 AI 사이의 포지션 카드 입력·결과,
+어휘와 근거 규칙은 [F3 AI 계약](f3-ai.md)이 소유하며 그 계약은 이 HTTP 경로로 노출되지 않는다.
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 대기 상태로 적재하고 실행 식별자를 반환 |
+| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 적재하거나 같은 입력의 활성 실행 식별자를 반환 |
 | GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
+| GET | /api/v1/f3/runs/{run_id}/result | 세션 | 실행의 앵커 카드·후보 조회 조건·후보별 판정 결과를 현재 저장 단계까지 조회 |
+| POST | /api/v1/f3/feedback | 세션·CSRF | 포지션 카드 또는 후보 판정에 구조화된 관심없음 사유를 기록 |
+
+위 네 경로는 모두 현재 Backend에 **구현됨**이다. 결과 조회와 관심없음 피드백은 더 이상 미구현
+후속 경로가 아니며 아래 각 절이 공개 계약의 정본이다. 상담 로그를 만드는 정정 피드백만 후속 범위다.
 
 요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
 정수다. 선언하지 않은 필드가 있으면 422로 거절한다.
@@ -166,15 +206,68 @@ updated: 2026-08-20
 `input_data_version`은 앵커가 된 매물 또는 구입장의 `row_version`이다. 같은 화면을 다시 열었을 때
 같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
 
-같은 앵커·입력 버전의 활성 실행을 재사용하는 중복 실행 정책(F3-CR-12)은 아직 구현하지 않았다.
-요청마다 새 `QUEUED` 실행이 생긴다. `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고
-`agent_run` 적재까지만 하므로 F3 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+`POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만 하므로 F3
+실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
+
+### 활성 실행 중복 방지
+
+같은 `(brokerage_id, anchor_type, anchor_id, input_data_version)`의 활성 루트
+`CROSS_JUDGMENT` 실행이 있으면 새 행을 만들지 않고 기존 실행을 반환한다. 재사용 대상 상태는
+`QUEUED`, `RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`이다.
+재사용과 신규 접수 모두 `202 Accepted`와 같은 응답 형태를 사용하며 별도 `reused` 필드는 공개하지
+않는다.
+
+동시 요청은 PostgreSQL transaction advisory lock으로 사무소·앵커 단위 직렬화한다. 프로세스
+메모리 lock은 여러 API 인스턴스 사이의 중복 생성을 막지 못하므로 사용하지 않는다. 잠금을 잡은 뒤
+앵커와 최신 `row_version`을 다시 읽고 재사용 조회와 신규 적재를 같은 transaction에서 수행한다.
+
+재사용할 때 기존 실행의 `requested_by`와 `trigger_type`은 바꾸지 않는다. 두 값은 실행 행을 최초로
+만든 요청자와 접수 계기를 나타내며 이후 같은 실행을 조회한 사용자 목록이 아니다. 후속 재사용 호출
+이력은 현재 별도로 저장하지 않는다.
+
+`COMPLETED`, `FAILED_TERMINAL`, `SUPERSEDED` 실행은 재사용하지 않는다. 특히 완료 결과는 앵커
+`row_version`만 같다고 재사용하지 않는다. 상담 로그 집합, 세대·단지·당사자 관계와 AI 구성이
+그대로인지 접수 시점에 증명할 identity가 아직 없기 때문이다. 따라서 F3-CR-12 중 **활성 실행
+중복 방지**만 구현됐고, 변경 없는 완료 판정 결과 재사용은 후속 범위다.
 
 `LISTING` 앵커는 사무소가 같고 `property_listing.is_deleted = false`이며 **부모 세대도
 `property_unit.is_deleted = false`** 여야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물
 행을 건드리지 않으므로 매물 자신의 삭제 표시만으로는 부족하다. 세 조건 중 하나라도 어긋나면 다른
 사무소의 식별자와 똑같이 404로 답해 삭제 여부와 존재 여부를 구분해서 드러내지 않는다.
 `REQUIREMENT` 앵커는 사무소와 `property_requirement.is_deleted = false`를 본다.
+
+### F1 저장 후 자동 접수
+
+다음 네 저장이 성공하면 Backend가 F3 실행을 자동 접수한다 (F3-CR-01, F3-CR-02).
+
+| 저장 경로 | 앵커 | 접수 조건 |
+|---|---|---|
+| `POST /api/v1/property-units/{unit_id}/listings` | 매물 | 신규 등록 |
+| `PATCH /api/v1/property-listings/{listing_id}` | 매물 | 거래 유형·가격·명도 조건·상태·의뢰인 등 판정 입력의 실제 변경 |
+| `POST /api/v1/property-requirements` | 구입장 | 신규 등록 |
+| `PATCH /api/v1/property-requirements/{requirement_id}` | 구입장 | 거래 유형·예산·면적·평형·이사일·만료일·상태·공동중개·희망 단지 등 판정 입력의 실제 변경 |
+
+자동 접수는 F1 저장 transaction이 commit된 뒤 별도 transaction으로 실행한다. 접수 중 오류가
+발생해도 이미 성공한 F1 저장과 응답을 되돌리거나 실패로 바꾸지 않는다 (F3-CM-06, F3-NF-07).
+요청 처리 중 Worker나 AI를 호출하지 않고 기존 `queue_cross_judgment_run`으로 `agent_run` 적재까지만
+수행한다.
+
+F1 응답 형태에는 실행 ID나 F3 상태를 추가하지 않는다. 화면은 `POST /api/v1/f3/runs`로 실행을
+확인하며, 같은 앵커·입력 버전의 활성 실행이면 저장 시 자동 생성된 실행 ID를 그대로 돌려받는다.
+자동 실행의 `trigger_type`은 `LEDGER_SAVE`이고 직접 실행 요청의 `USER_REQUEST`와 구분한다. 기존
+활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다.
+
+PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 서비스가 저장 직전에 비교한 **실제 변경
+필드**로 판단한다. 메모·담당자 같은 운영 필드만 바꾸거나 가격·예산 등 기존과 같은 값을 다시
+보내면 새 실행을 만들지 않는다. 희망 단지는 순서가 아니라 집합 변경을 판정 입력 변경으로 본다.
+자동 접수 실패 로그에는 앵커 종류·ID와 예외 타입만 남기고 상담 원문·연락처·성명은 남기지 않는다.
+
+자동 접수와 AI 처리는 별도 경계다. 접수된 실행은 검토된 합성 전용 환경에서
+`WORKER_ENABLED=true`와 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 모두 명시한 경우에만 현재 Worker가
+처리한다. 합성 opt-in이 없으면 Worker는 DB·Provider 접근과 작업 선점 전에 기동을 거절한다. 현재
+Infra 기본값은 두 설정 모두 `false`다. `MASKED` 입력 조립은 아직 구현되지 않았으므로 실제 F1
+사용자 데이터를 처리하는 근거로 합성 opt-in을 사용할 수 없다. 실사용 연결 전에는 ADR-0014에 따라
+Backend 마스킹을 구현하고 `input_privacy_mode=MASKED`로 전환해야 한다.
 
 ### 요청자 기록
 
@@ -219,6 +312,7 @@ allowlist 기반으로만 만든다.
 |---|---|---|
 | 없음 | `null` | `null` |
 | `LEASE_EXPIRED_MAX_ATTEMPTS` | `LEASE_EXPIRED_MAX_ATTEMPTS` | 실행이 최대 시도 횟수를 초과해 종료되었습니다 |
+| `INPUT_SUPERSEDED` | `INPUT_SUPERSEDED` | 실행 중 입력 데이터가 변경되어 결과를 반영하지 않았습니다 |
 | 그 밖의 모든 값 | `EXECUTION_FAILED` | 실행에 실패했습니다. 잠시 후 다시 시도해 주세요 |
 
 allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개인정보, 외부 서비스 오류 원문과
@@ -234,36 +328,146 @@ allowlist에 없는 내부 실패는 `EXECUTION_FAILED`로 일반화한다. 개�
 |---|---|---|---|
 | `QUEUED` | 실행 제어 | 실행 적재 완료, Worker 대기 | 구현됨 |
 | `RUNNING` | 실행 제어 | Worker가 lease를 걸고 선점함 | 구현됨 |
-| `ANCHOR_READY` | 업무 처리 | 앵커 카드 저장 완료 | 제안 · 미구현 |
-| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 제안 · 미구현 |
-| `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 제안 · 미구현 |
-| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 제안 · 미구현 |
-| `COMPLETED` | 업무 처리 | 검증을 통과한 최종 결과 저장 | 제안 · 미구현 |
+| `ANCHOR_READY` | 업무 처리 | 앵커 카드 검증·저장 완료 | 구현됨 |
+| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 구현됨 |
+| `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 구현됨 |
+| `JUDGING` | 업무 처리 | 전체 후보 중개 판정 실행 중 | 구현됨 |
+| `COMPLETED` | 업무 처리 | 검증을 통과한 최종 결과 저장 | 구현됨 |
 | `FAILED_RETRYABLE` | 종료 | 재시도 가능한 일시 오류 | 제안 · 미구현 |
 | `FAILED_TERMINAL` | 종료 | 재시도해도 성공하지 않는 영구 오류 | 구현됨 |
 | `CANCELLED` | 종료 | 현재 화면에서 더 실행할 필요 없음 | 제안 · 미구현 |
-| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 제안 · 미구현 |
+| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 구현됨 |
 
-Backend가 실제로 기록하는 상태는 세 가지뿐이다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
-lease 최대 시도 초과 시 `FAILED_TERMINAL`이다. 나머지는 아직 만들지 않는다.
+Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 `QUEUED`, Worker 선점 시 `RUNNING`,
+검증된 앵커 카드 확보 시 `ANCHOR_READY`, 결정적 SQL 후보 스냅샷 저장 시 `CANDIDATES_READY`,
+상위 후보 카드 ID 저장 시 `CANDIDATE_CARDS_READY`, 중개 판정 호출 중 `JUDGING`, 검증된 결과를
+원자 저장하면 `COMPLETED`, 입력 버전·상담 범위가 실행 중 바뀌면 `SUPERSEDED`, lease 최대 시도
+초과나 영구 오류이면 `FAILED_TERMINAL`이다. `ANCHOR_READY`,
+`CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`은 중간 상태라 `completed_at`을 채우지
+않고 `COMPLETED`에서 채운다. 후보가 0건이면 모델 호출과 `JUDGING` 없이 빈 결과를 확정하고
+`CANDIDATE_CARDS_READY`에서 바로 `COMPLETED`로 간다. Worker polling·handler가 이 유스케이스를
+상태 순서대로 호출한다. 그 밖의 상태는 아직 만들지 않는다.
+
+후보 조회 조건, 전체 후보 집합과 상위 후보의 `position_analysis_id`는
+`match_evaluation.candidate_selection_snapshot`에 저장한다. 상태 조회 경로는 이 내부 snapshot을
+노출하지 않으며 아래 결과 조회 경로만 허용된 필드로 변환한다.
 
 상태 집합의 의미 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)이고, 서버는 이 값을 고정
 열거형으로 검증하지 않는다. 이 경로는 polling용 상태 조회이며 SSE 진행 구독은 아직 없다.
 
+### 실행 결과 조회
+
+`GET /api/v1/f3/runs/{run_id}/result`는 상태를 변경하지 않으므로 CSRF 토큰을 요구하지 않는다.
+상태 조회와 동일하게 세션의 `brokerage_id`, 루트 `CROSS_JUDGMENT`, 숫자 `run_id >= 1` 조건으로
+격리하며 없는 실행·다른 사무소 실행·하위 실행·다른 실행 유형은 모두 404로 답한다.
+
+후보 목록은 `limit`과 `offset`으로 페이지 처리한다. `limit` 기본값은 20이고 범위는 1..100,
+`offset` 기본값은 0이며 0 이상이다. 범위를 벗어나면 422로 답한다. 페이지 대상은 카드화된 상위
+15건만이 아니라 결정적 SQL에 포함된 **전체 후보**다. 카드화·판정되지 않은 후보도 목록에 남고
+`selected_for_cards=false`, 판정·근거 필드는 `null` 또는 빈 목록으로 반환한다.
+
+진행 중인 실행은 완료를 가장하지 않고 마지막으로 영속화된 안전 단계까지만 반환한다.
+
+- `QUEUED`·`RUNNING`: 실행 정보, 빈 카드·후보 결과
+- `ANCHOR_READY`: 앵커 카드의 공개 `analysis`와 카드 근거
+- `CANDIDATES_READY` 이후: 실제 SQL 조회 조건, 전체·카드화·잔여 건수와 페이지 후보
+- `COMPLETED`: 후보별 등급·순위·비교 근거·걸림돌·양보·추천 행동·기각 사유·판정 근거
+
+앵커 카드 snapshot 전체를 반환하지 않고 `analysis`만 반환한다. 계약 버전, 프롬프트·워크플로 버전,
+Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청자·모델 설정·입출력 snapshot·토큰 수,
+`run_group_id`, `parent_run_id`, lease 값과 내부 실패 원문도 싣지 않는다. 실패 정보는 상태 조회와
+같은 allowlist 변환을 적용한다. 카드·판정 근거의 `quote_text`는 현재 승인된
+`SYNTHETIC_PROTOTYPE` 입력에서 저장된 공개 근거만 반환하며 실제 F1 데이터 연결은 마스킹 구현 전까지
+허용하지 않는다. 카드 저장 단계가 실행 snapshot에 기록한 `input_privacy_mode`가
+`SYNTHETIC_PROTOTYPE`인 실행만 카드·후보·근거 내용을 공개한다. 표식이 없거나 다른 값이면 실행
+상태와 안전한 실패 정보만 반환하고 나머지 결과는 빈 값으로 둔다.
+
+응답 최상위는 실행·앵커 정보와 `anchor_card`, `candidate_selection`, `candidates`,
+`candidates_total`, `limit`, `offset`이다. `candidate_selection`은 `criteria`, `total_count`,
+`carded_count`, `remaining_count`를 싣는다. 후보는 장부 `candidate_id`, SQL 순위·점수·금액·접수일,
+카드화 여부와 저장된 경우에만 중개 판정 및 근거를 싣는다. 빈 후보 결과도 같은 형태로 200을 반환한다.
+
+### 관심없음 피드백
+
+`POST /api/v1/f3/feedback`은 F3-TR-03의 [관심없음]만 기록하는 상태 변경 경로이므로 세션과 CSRF를
+요구한다. 응답은 `201 Created`다. 요청은 다음 네 필드만 허용하며 선언하지 않은 필드는 422로
+거절한다.
+
+```json
+{
+  "target": "MATCH_CANDIDATE",
+  "target_id": 81,
+  "reason": "WRONG_JUDGMENT",
+  "field_name": "match_grade"
+}
+```
+
+- `target`: `POSITION_ANALYSIS` 또는 `MATCH_CANDIDATE`
+- `target_id`: 1 이상의 숫자 식별자
+- `reason`: `CONDITION_MISMATCH`, `ALREADY_CONTACTED`, `WRONG_JUDGMENT`, `OTHER`
+- `field_name`: 선택값. `negotiation_intent`, `urgency`, `preferred_timing`,
+  `flexible_conditions`, `inflexible_conditions`, `contactability_status`, `price`,
+  `match_grade`, `evaluation_basis`, `primary_obstacle`, `possible_concession`,
+  `recommended_action`, `exclusion_reason` 중 하나
+
+| 화면 사유 | reason |
+|---|---|
+| 조건 안 맞음 | `CONDITION_MISMATCH` |
+| 이미 연락함 | `ALREADY_CONTACTED` |
+| 판정이 틀림 | `WRONG_JUDGMENT` |
+| 기타 | `OTHER` |
+
+`feedback_type`은 클라이언트 입력이 아니라 서버가 `NOT_INTERESTED`로 고정한다. `detail`,
+`original_value`, `corrected_value`, `correction_interaction_id`, `brokerage_id`, `created_by`도 받지
+않는다. 따라서 이 경로에는 상담 원문, 이름, 연락처와 자유문자를 저장할 입력란이 없다.
+
+대상은 세션의 `brokerage_id`로 조회한다. 없거나 다른 사무소 소유이면 모두 404로 답하고,
+`brokerage_id`와 `created_by`는 세션에서만 도출한다. 응답은 아래 필드만 포함하며 사무소와 작성자
+식별자를 싣지 않는다.
+
+```json
+{
+  "feedback_id": 12,
+  "target": "MATCH_CANDIDATE",
+  "target_id": 81,
+  "feedback_type": "NOT_INTERESTED",
+  "reason": "WRONG_JUDGMENT",
+  "field_name": "match_grade",
+  "created_at": "2026-08-24T12:00:00+09:00"
+}
+```
+
+F3-TR-02의 정정은 이번 계약에 포함하지 않는다. 정정은 값을 저장하는 것만으로 끝나지 않고 추가 전용
+상담 로그를 생성해 다음 판정 입력에 포함해야 한다. 그 유스케이스와 권한·개인정보 경계를 함께
+구현하기 전까지 `CORRECTION`이나 임의 정정값을 공개 입력으로 받지 않는다. 작성자 식별자의 처리
+정본은 [개인정보 정책](../privacy/policy.md)의 `ai_decision_feedback.created_by` 절이다.
+
 ### Worker 선점과 lease
 
 Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
-`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 `RUNNING`이다.
-선점하면 `RUNNING`으로 바꾸고 5분짜리 lease와 시도 횟수를 기록하며, 만료됐는데 시도 횟수가 3회
-이상이면 `FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
+`CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 구현된 진행
+상태(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다. 최초
+`QUEUED`만 `RUNNING`으로 바꾸고
+재선점한 진행 상태는 보존한다. `JUDGING`을 재선점하면 최초 판정 바인딩과 후보 집합을 다시
+검증한 뒤 중개 판정 호출부터 안전하게 재실행한다. 5분짜리 lease와 시도 횟수를 기록하며,
+만료됐는데 시도 횟수가 3회 이상이면
+`FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
 
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
 않는다.
 
-`claim_next_run` 유스케이스와 배포용 Worker 프로세스(`backend/src/worker.py`)는 둘 다 있지만 서로
-연결되어 있지 않다. Worker는 `WORKER_ENABLED=false`로만 뜨고 실행을 하나도 claim하지 않는다.
-polling loop, `claim_next_run` 호출 연결과 실제 F3 handler는 아직 없다. 구현됨·미구현의 정본은
+배포용 Worker 프로세스(`backend/src/worker.py`)는 `claim_next_run`을 RDS polling으로 호출하고,
+저장된 상태를 기준으로 앵커 카드 → 후보 SQL → 후보 카드 → 중개 판정 유스케이스를 같은 lease
+아래에서 진행한다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
+일시 Provider 오류는 상태를 보존하고 lease를 즉시 만료시켜 다음 선점이 재시도하며, 영구 계약·
+설정 오류는 `FAILED_TERMINAL`, 입력 변경은 `SUPERSEDED`로 기록한다. raw 예외와 Provider 원문은
+failure 컬럼에 저장하지 않는다.
+
+`WORKER_ENABLED=false`는 기존처럼 readiness만 제공하고 실행을 claim하지 않는다. `true`는 DB와
+LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코드가 Provider·모델 기본값을 정하지
+않고 사무소별 `ai_model_config`의 capability별 최신 활성 설정을 사용한다. 실제 배포 설정 기본값은
+계속 `false`이며 운영 Provider 선택과 활성화는 별도 운영 결정이다. 구현됨·미구현의 정본은
 [온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)의 현재 구현 절이고,
 배포 계약은 [백엔드 ADR-0003](../../../backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 

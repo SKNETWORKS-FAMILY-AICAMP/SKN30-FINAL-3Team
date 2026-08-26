@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # 개인정보 정책
@@ -32,9 +32,45 @@ updated: 2026-08-20
 - OpenAI API, RunPod 또는 다른 외부 처리자에게 전송되는 데이터를 별도로 검토한다.
 - 개인정보가 포함된 실패 메시지를 DLQ에 장기간 방치하지 않는다.
 
+### PR Policy Agent 외부 전송
+
+권고형 PR 정책 리뷰는 내부 non-Draft PR에 한해 OpenAI Responses API를 사용한다.
+
+| 항목 | 결정 |
+|---|---|
+| 목적 | 저장소 정책·아키텍처·문서 일관성 검토와 오탐 교차 검증 |
+| OpenAI 전송 | PR 번호·제목·작성자명·본문, 변경 파일 metadata와 patch, base SHA에서 선택한 정책, 변경된 허용 정책·설정 파일의 제한된 PR head 전체 내용, 정제된 부분 리뷰 결과 |
+| 전체 파일 허용 범위 | `.gitignore`, `.gitattributes`, `AGENTS.md`, `CLAUDE.md`, `.github/pr-review-policy.json`, `.agents-rule/**/*.md`, 모듈 `SKILL.md`와 `references/**/*.md`; 허용 경로의 `.env*`, `*.tfvars*`, private-key·certificate 확장자와 script·asset·일반 구현 파일 전체 내용은 제외 |
+| 최소화 | 전체 파일당 20,000자·80,000바이트, PR당 20개·60,000자, UTF-8·Contents/PR/content Git blob SHA 일치·NUL 없음 확인, symlink target 제외, private-key block을 포함한 secret-like redaction |
+| 저장 | Responses API `store: false`; diff·전체 파일 원문·전체 프롬프트·모델 원문 응답을 Actions log, artifact, GitHub sticky state와 Discord에 저장하지 않음 |
+| Discord 전송 | 정제된 요약·finding, PR·Check·Actions 링크와 실행 metadata만 전송; 전체 diff·전체 파일·프롬프트는 전송하지 않음 |
+| 실행 통제 | 외부 fork와 Draft 제외, base SHA 코드만 실행, PR head는 GitHub API의 신뢰할 수 없는 텍스트로만 읽고 checkout·실행하지 않음 |
+| 보존 | OpenAI 기본 abuse monitoring 데이터가 서비스 정책의 제한 기간 보존될 수 있음; prompt cache는 서비스 TTL 30분 사용 |
+
+PR에 개인정보나 비밀이 포함되어서는 안 된다. redaction은 우발 노출의 방어선이며 저장소에 비밀을 커밋해도 된다는 허용이 아니다. 감지 시 원문을 결과에 재현하지 않고 자격 증명 폐기·회전과 Git 이력 제거를 요구한다.
+
 ## 필드별 확정 처리
 
 아직 확정되지 않은 개인정보는 [OQ-007](../open-questions.md)에 남긴다. 이 표에 있는 항목은 결정됐다.
+
+### F3 프로토타입 합성 입력 예외
+
+[ADR-0014](../decisions/ADR-0014-f3-prototype-synthetic-input.md)에 따라 F3 프로토타입은
+실제 인물을 나타내지 않는 seed·fixture·수기 합성 데이터만 사용하며, 이 합성 본문에는 별도
+마스킹 변환을 적용하지 않아도 된다.
+
+| 항목 | 결정 |
+|---|---|
+| 목적 | 포지션 카드 생성 품질과 F3 실행 흐름의 프로토타입 검증 |
+| 허용 데이터 | 실제 인물과 연결되지 않는 합성 장부·상담 로그 |
+| 금지 데이터 | 운영 DB 상담 원문, 실사용자 성명·로그인 ID·연락처·생년월일, 인증·세션 정보와 Secret |
+| 실행 통제 | 요청의 `SYNTHETIC_PROTOTYPE` 표시와 생성기 조립 지점의 명시적 opt-in을 모두 요구 |
+| 외부 전송 | 이 예외만으로 승인하지 않음. Provider·리전·저장 여부는 별도 결정 대상 |
+| 로그·저장 | 전체 프롬프트·모델 원문 응답·상담 본문을 로그에 남기지 않음. 별도 원문 사본을 만들지 않음 |
+| 종료 조건 | 실제 F1 사용자 데이터를 F3 Worker에 연결하기 전에 Backend 마스킹을 구현하고 `MASKED` 모드로 전환 |
+
+이 예외는 실제 개인정보를 무마스킹으로 처리하자는 결정이 아니다. 합성 여부는 문자열 validator가
+증명할 수 없으므로 케이스 데이터 검토 책임은 유지한다.
 
 ### `agent_run.requested_by`
 
@@ -57,6 +93,26 @@ F3 실행을 요청한 내부 `app_user.id`다. 성명, 연락처와 로그인 I
   Infra 운영자가 그 snapshot을 폐기할 때 함께 제거한다.
 
 API 관점의 계약은 [API 계약](../contracts/api.md)에 있고 보존·삭제의 정본은 이 문서다.
+
+### `ai_decision_feedback.created_by`
+
+F3 관심없음 피드백을 등록한 내부 `app_user.id`다. 성명, 연락처, 로그인 ID와 자유문자 피드백은
+저장하지 않는다.
+
+| 항목 | 결정 |
+|---|---|
+| 목적 | 피드백 작성자 식별, 오용 조사와 판정 품질 감사 |
+| 처리 위치 | `ap-northeast-2`의 암호화된 RDS PostgreSQL |
+| 접근 주체 | Backend와 승인된 DB·Infra 운영자 |
+| 외부 전송 | 없음. API 응답, 애플리케이션 로그, AI 입력과 Queue 메시지에 싣지 않는다 |
+| 보존 기간 | 서비스 운영 기간 동안 `ai_decision_feedback` 감사 이력으로 계속 보존한다. `app_user` 비활성화는 보존 종료 조건이 아니다 |
+| 삭제 | 개별 삭제·익명화하지 않는다. 서비스 또는 환경의 최종 데이터 폐기 승인을 받아 피드백을 제거할 때 함께 제거한다 |
+
+- `created_by`만 따로 삭제하는 경로는 만들지 않는다.
+- RDS 자동 백업에는 포함될 수 있고 원본 폐기 후 현재 인프라 정책인 최대 7일 동안 잔존할 수 있다.
+- 종료 시 final snapshot에 포함되면 서비스 데이터 최종 폐기 승인을 받은 Infra 운영자가 snapshot을
+  폐기할 때 함께 제거한다.
+- 브라우저에는 피드백 식별자·대상·고정 유형·고정 사유·선택 필드명·생성 시각만 반환한다.
 
 ## 변경 검토
 

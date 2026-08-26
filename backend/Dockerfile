@@ -1,5 +1,4 @@
-# syntax=docker/dockerfile:1.7
-FROM python:3.13-slim-bookworm AS builder
+FROM public.ecr.aws/docker/library/python:3.13-slim-bookworm AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /uvx /bin/
 
@@ -13,7 +12,7 @@ COPY backend/pyproject.toml backend/uv.lock backend/README.md /workspace/backend
 COPY backend/src /workspace/backend/src
 RUN cd /workspace/backend && uv sync --frozen --no-dev --no-editable
 
-FROM python:3.13-slim-bookworm AS runtime
+FROM public.ecr.aws/docker/library/python:3.13-slim-bookworm AS runtime
 
 ENV PATH="/workspace/backend/.venv/bin:${PATH}" \
     PYTHONPATH="/workspace/backend/src" \
@@ -33,9 +32,5 @@ COPY --chown=brokerage:brokerage backend/yoyo.ini /workspace/backend/yoyo.ini
 COPY --chown=brokerage:brokerage docs/db/migrate /workspace/docs/db/migrate
 
 USER brokerage
-EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"]
-
-CMD ["uvicorn", "main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "src/server.py"]

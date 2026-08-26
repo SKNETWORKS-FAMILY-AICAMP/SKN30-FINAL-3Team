@@ -8,6 +8,7 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2.3",
+    "python-multipart>=0.0.22",
     "sqlmodel>=0.0.39",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.52.3",

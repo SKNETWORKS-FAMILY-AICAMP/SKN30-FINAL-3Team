@@ -4,6 +4,10 @@
     "maxFiles": 200,
     "maxChangedLines": 10000,
     "maxContextChars": 200000,
+    "headFileMaxChars": 20000,
+    "headFileMaxBytes": 80000,
+    "headEvidenceMaxChars": 60000,
+    "headEvidenceMaxFiles": 20,
     "chunkChangedLines": 2000,
     "chunkPatchChars": 80000,
     "maxChunks": 10,
@@ -11,7 +15,8 @@
     "chunkMaxFindings": 3,
     "maxMergeContextChars": 300000,
     "maxFindings": 5,
-    "maxOutputTokens": 4000
+    "leafMaxOutputTokens": 2500,
+    "mergeMaxOutputTokens": 4000
   },
   "ignored": {
     "basenames": [
@@ -33,18 +38,44 @@
       "frontend/dist/"
     ],
     "suffixes": [
-      ".png",
-      ".jpg",
-      ".jpeg",
-      ".gif",
-      ".webp",
-      ".ico",
+      ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico",
       ".pdf",
-      ".zip",
-      ".gz",
-      ".woff",
-      ".woff2",
-      ".ttf"
+      ".doc", ".docx",
+      ".xls", ".xlsx",
+      ".ppt", ".pptx",
+      ".odt", ".ods", ".odp",
+      ".hwp", ".hwpx",
+      ".zip", ".gz",
+      ".woff", ".woff2", ".ttf"
+    ]
+  },
+  "headFileEvidence": {
+    "files": [
+      ".gitignore",
+      ".gitattributes",
+      "AGENTS.md",
+      "CLAUDE.md",
+      ".github/pr-review-policy.json"
+    ],
+    "includePolicyDocuments": true,
+    "suffixes": [],
+    "excludedBasenamePrefixes": [
+      ".env"
+    ],
+    "excludedBasenameFragments": [
+      ".tfvars"
+    ],
+    "excludedSuffixes": [
+      ".pem",
+      ".key",
+      ".p12",
+      ".pfx",
+      ".pkcs8",
+      ".pkcs12",
+      ".jks",
+      ".der",
+      ".crt",
+      ".cer"
     ]
   },
   "always": {
@@ -66,7 +97,9 @@
     "prefixes": [
       ".github/",
       ".agents-rule/",
-      ".agents/skills/project-wiki/",
+      ".agents/skills/",
+      ".gitignore",
+      ".gitattributes",
       "AGENTS.md",
       "CLAUDE.md"
     ],
@@ -80,6 +113,7 @@
   "modules": {
     "frontend": {
       "prefixes": ["frontend/", "docs/screen/"],
+      "policyPrefixes": [".agents/skills/frontend/"],
       "files": [
         ".agents/skills/frontend/SKILL.md",
         ".agents/skills/frontend/references/index.md"
@@ -91,6 +125,7 @@
     },
     "backend": {
       "prefixes": ["backend/", "docs/db/"],
+      "policyPrefixes": [".agents/skills/backend/"],
       "files": [
         ".agents/skills/backend/SKILL.md",
         ".agents/skills/backend/references/index.md",
@@ -104,6 +139,7 @@
     },
     "ai": {
       "prefixes": ["ai/", "docs/architecture/f2/", "docs/architecture/f3/"],
+      "policyPrefixes": [".agents/skills/ai/"],
       "files": [
         ".agents/skills/ai/SKILL.md",
         ".agents/skills/ai/references/index.md",
@@ -115,6 +151,7 @@
     },
     "data": {
       "prefixes": ["data/"],
+      "policyPrefixes": [".agents/skills/data/"],
       "files": [
         ".agents/skills/data/SKILL.md",
         ".agents/skills/data/references/index.md",
@@ -128,6 +165,7 @@
     },
     "infra": {
       "prefixes": ["infra/", "docs/architecture/infra/"],
+      "policyPrefixes": [".agents/skills/infra/"],
       "files": [
         ".agents/skills/infra/SKILL.md",
         ".agents/skills/infra/references/index.md",

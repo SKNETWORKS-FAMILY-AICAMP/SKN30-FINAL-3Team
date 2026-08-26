@@ -46,6 +46,15 @@ class VllmConfig(BaseModel):
 
     llm: ProviderEndpointConfig | None = None
     embedding: ProviderEndpointConfig | None = None
+    stt: ProviderEndpointConfig | None = None
+
+
+class F2Config(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    llm_model: str = Field(default="Qwen/Qwen3-4B", min_length=1)
+    stt_model: str = Field(default="openai/whisper-large-v3-turbo", min_length=1)
+    stt_language: str = Field(default="ko", min_length=1)
 
 
 class AiConfig(BaseModel):
@@ -55,6 +64,7 @@ class AiConfig(BaseModel):
     request_timeout_seconds: float = Field(default=60, gt=0)
     openai: OpenAIConfig | None = None
     vllm: VllmConfig = Field(default_factory=VllmConfig)
+    f2: F2Config = Field(default_factory=F2Config)
 
 
 def _optional(source: Mapping[str, str], name: str) -> str | None:
@@ -128,6 +138,16 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
                     base_url_name="AI_VLLM_EMBEDDING_BASE_URL",
                     api_key_name="AI_VLLM_EMBEDDING_API_KEY",
                 ),
+                stt=_vllm_endpoint(
+                    source,
+                    base_url_name="AI_VLLM_STT_BASE_URL",
+                    api_key_name="AI_VLLM_STT_API_KEY",
+                ),
+            ),
+            f2=F2Config(
+                llm_model=_optional(source, "AI_F2_LLM_MODEL") or "Qwen/Qwen3-4B",
+                stt_model=(_optional(source, "AI_F2_STT_MODEL") or "openai/whisper-large-v3-turbo"),
+                stt_language=_optional(source, "AI_F2_STT_LANGUAGE") or "ko",
             ),
         )
     except ValidationError:
@@ -135,7 +155,11 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
 
 
 def _dotenv_mapping(path: Path) -> dict[str, str]:
-    return {key: value for key, value in dotenv_values(path).items() if value is not None}
+    return {
+        key: value
+        for key, value in dotenv_values(path, interpolate=False).items()
+        if value is not None
+    }
 
 
 def load_ai_config(
@@ -148,8 +172,8 @@ def load_ai_config(
         raise ConfigurationError("AI profile must be local, test, or prod") from exc
 
     values: dict[str, str] = {}
-    if selected_profile is not AiProfile.TEST:
-        values.update(_dotenv_mapping(AI_ROOT / f".env.{selected_profile.value}"))
+    if selected_profile is AiProfile.LOCAL:
+        values.update(_dotenv_mapping(AI_ROOT / ".env.local"))
         values.update(_dotenv_mapping(AI_ROOT / ".env"))
     values.update(dict(os.environ if environ is None else environ))
     return bind_ai_config(values, selected_profile)

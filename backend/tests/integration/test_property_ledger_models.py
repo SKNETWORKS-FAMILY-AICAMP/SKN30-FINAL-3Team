@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from domain.property_ledger import models
@@ -60,9 +60,9 @@ def test_numeric_array_json_and_bigint_values_survive_a_round_trip() -> None:
     engine = create_engine(os.environ["TEST_DB_URL"])
 
     with Session(engine) as session:
-        brokerage_id = session.exec(select(PropertyComplex.brokerage_id).limit(1)).first()
-        if brokerage_id is None:
-            brokerage_id = 1
+        brokerage_id = session.execute(
+            text("INSERT INTO brokerage (name) VALUES ('모델 왕복 검증 사무소') RETURNING id")
+        ).scalar_one()
 
         complex_row = PropertyComplex(brokerage_id=brokerage_id, name="왕복 검증 단지")
         session.add(complex_row)
@@ -113,7 +113,10 @@ def test_server_defaults_fill_required_timestamps_and_received_date() -> None:
     engine = create_engine(os.environ["TEST_DB_URL"])
 
     with Session(engine) as session:
-        complex_row = PropertyComplex(brokerage_id=1, name="기본값 검증 단지")
+        brokerage_id = session.execute(
+            text("INSERT INTO brokerage (name) VALUES ('모델 기본값 검증 사무소') RETURNING id")
+        ).scalar_one()
+        complex_row = PropertyComplex(brokerage_id=brokerage_id, name="기본값 검증 단지")
         session.add(complex_row)
         session.flush()
         session.refresh(complex_row)
@@ -121,12 +124,12 @@ def test_server_defaults_fill_required_timestamps_and_received_date() -> None:
         assert complex_row.created_at is not None
         assert complex_row.updated_at is not None
 
-        party = Party(brokerage_id=1, party_type="PERSON", name="기본값 손님")
+        party = Party(brokerage_id=brokerage_id, party_type="PERSON", name="기본값 손님")
         session.add(party)
         session.flush()
 
         requirement = PropertyRequirement(
-            brokerage_id=1, party_id=party.id or 0, demand_type="매수"
+            brokerage_id=brokerage_id, party_id=party.id or 0, demand_type="매수"
         )
         session.add(requirement)
         session.flush()

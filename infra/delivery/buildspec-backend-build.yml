@@ -1,0 +1,60 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+  pre_build:
+    commands:
+      - test "${#CODEBUILD_RESOLVED_SOURCE_VERSION}" -eq 40
+      - mkdir -p _backend_release
+      - touch _backend_release/BUILD_INCOMPLETE
+      - aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REPOSITORY_URI%%/*}"
+  build:
+    commands:
+      - export REVISION_SHA="${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+      - |
+        IMAGE_DIGEST="$(aws ecr describe-images --repository-name "${ECR_REPOSITORY_NAME}" --image-ids imageTag="${REVISION_SHA}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+        if [[ "${IMAGE_DIGEST}" != sha256:* ]]; then
+          docker build --file backend/Dockerfile --tag "${ECR_REPOSITORY_URI}:${REVISION_SHA}" .
+          if ! docker push "${ECR_REPOSITORY_URI}:${REVISION_SHA}"; then
+            IMAGE_DIGEST="$(aws ecr describe-images --repository-name "${ECR_REPOSITORY_NAME}" --image-ids imageTag="${REVISION_SHA}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+            [[ "${IMAGE_DIGEST}" == sha256:* ]]
+          fi
+          IMAGE_DIGEST="$(aws ecr describe-images --repository-name "${ECR_REPOSITORY_NAME}" --image-ids imageTag="${REVISION_SHA}" --query 'imageDetails[0].imageDigest' --output text)"
+        fi
+        [[ "${IMAGE_DIGEST}" == sha256:* ]]
+        export IMAGE_DIGEST
+        cp infra/deploy/appspec.yml _backend_release/appspec.yml
+        cp infra/deploy/compose.dev.yml _backend_release/compose.dev.yml
+        cp -R infra/deploy/scripts _backend_release/scripts
+        deployment_metadata=(
+          AI_PROVIDER_SECRET_ID
+          API_LOG_GROUP
+          APP_PARAMETER_PREFIX
+          APP_PORT
+          APP_READINESS_PATH
+          AWS_REGION
+          BACKEND_RUNTIME_DATABASE_SECRET_ID
+          WORKER_LOG_GROUP
+        )
+        {
+          printf 'BACKEND_IMAGE=%q\n' "${ECR_REPOSITORY_URI}@${IMAGE_DIGEST}"
+          for metadata_name in "${deployment_metadata[@]}"; do
+            [[ -n "${!metadata_name:-}" ]]
+            printf '%s=%q\n' "${metadata_name}" "${!metadata_name}"
+          done
+        } > _backend_release/backend-image.env
+        python infra/delivery/scripts/write_release_manifest.py \
+          --output _backend_release/release-manifest.json \
+          --pipeline "${PIPELINE_KIND}" \
+          --revision "${REVISION_SHA}" \
+          --execution "${PIPELINE_EXECUTION_ID}" \
+          --image-digest "${IMAGE_DIGEST}" \
+          --migration validated
+        rm _backend_release/BUILD_INCOMPLETE
+artifacts:
+  base-directory: _backend_release
+  files:
+    - '**/*'

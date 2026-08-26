@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from core.errors import ConfigurationError
@@ -90,12 +90,31 @@ class LogConfig(BaseModel):
     format: str = "console"
 
 
+class WorkerConfig(BaseModel):
+    enabled: bool = False
+    ready_file: Path = Path("/tmp/brokerage-worker-ready")
+    worker_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_ready_file(self) -> WorkerConfig:
+        if not self.ready_file.is_absolute():
+            raise ValueError("WORKER_READY_FILE must be an absolute path")
+        return self
+
+
+class F2Config(BaseModel):
+    enabled: bool = False
+    max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
+
+
 class Config(BaseModel):
     app: AppConfig
     db: DbConfig
     auth: AuthConfig
     http: HttpConfig
     log: LogConfig
+    worker: WorkerConfig
+    f2: F2Config
 
     @model_validator(mode="after")
     def validate_environment_boundaries(self) -> Config:
@@ -220,20 +239,48 @@ def bind_config(source: Mapping[str, str]) -> Config:
             level=source.get("LOG_LEVEL", "INFO").upper(),
             format=source.get("LOG_FORMAT", "console").lower(),
         ),
+        worker=WorkerConfig(
+            enabled=_boolean(source, "WORKER_ENABLED", False),
+            ready_file=Path(source.get("WORKER_READY_FILE", "/tmp/brokerage-worker-ready")),
+            worker_id=_optional(source, "WORKER_ID"),
+        ),
+        f2=F2Config(
+            enabled=_boolean(source, "F2_ENABLED", False),
+            max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
+        ),
     )
 
 
-def load_config(profile: str | None = None) -> Config:
-    selected_profile = profile or os.getenv("APP_PROFILE") or os.getenv("APP_ENV") or "local"
-    allowed_profiles = {item.value for item in AppEnvironment}
-    if selected_profile not in allowed_profiles:
-        raise ConfigurationError("APP_PROFILE must be local, test, or prod")
-    if selected_profile != AppEnvironment.TEST:
-        load_dotenv(BACKEND_ROOT / ".env", override=False)
-        load_dotenv(BACKEND_ROOT / f".env.{selected_profile}", override=False)
-    config = bind_config(os.environ)
-    if config.app.environment.value != selected_profile:
-        raise ConfigurationError("APP_PROFILE and APP_ENV must match")
+def _dotenv_mapping(path: Path) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in dotenv_values(path, interpolate=False).items()
+        if value is not None
+    }
+
+
+def load_config(
+    environment: AppEnvironment | str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Config:
+    process_values = dict(os.environ if environ is None else environ)
+    selected_value = (
+        environment if environment is not None else process_values.get("APP_ENV", "local")
+    )
+    try:
+        selected_environment = AppEnvironment(selected_value)
+    except ValueError as exc:
+        raise ConfigurationError("APP_ENV must be local, test, or prod") from exc
+
+    values: dict[str, str] = {}
+    if selected_environment is AppEnvironment.LOCAL:
+        values.update(_dotenv_mapping(BACKEND_ROOT / ".env.local"))
+        values.update(_dotenv_mapping(BACKEND_ROOT / ".env"))
+    values.update(process_values)
+
+    config = bind_config(values)
+    if config.app.environment is not selected_environment:
+        raise ConfigurationError("selected environment and APP_ENV must match")
     return config
 
 

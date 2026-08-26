@@ -212,6 +212,45 @@ resource "aws_ecr_lifecycle_policy" "backend_ai" {
   })
 }
 
+resource "aws_ecr_repository" "ci_pgvector" {
+  name                 = "${local.name_prefix}-ci-pgvector"
+  image_tag_mutability = "IMMUTABLE"
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-ci-pgvector"
+  }
+}
+
+resource "aws_ecr_lifecycle_policy" "ci_pgvector" {
+  repository = aws_ecr_repository.ci_pgvector.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged CI database images after one day"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
 output "workload_bucket_names" {
   description = "런타임과 전달 구성이 참조할 목적별 S3 bucket 이름"
   value       = { for purpose, bucket in aws_s3_bucket.workload : purpose => bucket.id }
@@ -228,5 +267,14 @@ output "backend_ai_ecr" {
     arn            = aws_ecr_repository.backend_ai.arn
     name           = aws_ecr_repository.backend_ai.name
     repository_url = aws_ecr_repository.backend_ai.repository_url
+  }
+}
+
+output "ci_pgvector_ecr" {
+  description = "Backend 검증 전용 PostgreSQL+pgvector 이미지 저장소 식별자"
+  value = {
+    arn            = aws_ecr_repository.ci_pgvector.arn
+    name           = aws_ecr_repository.ci_pgvector.name
+    repository_url = aws_ecr_repository.ci_pgvector.repository_url
   }
 }

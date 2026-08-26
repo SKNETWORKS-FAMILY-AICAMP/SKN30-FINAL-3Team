@@ -93,7 +93,11 @@ flowchart LR
 - AI가 요청하는 조회나 부수 효과는 Backend가 주입한 제한된 capability를 거쳐 검증됩니다.
 - Data는 재현 가능한 학습·평가 입력을, Infra는 Terraform 기반 계정·배포 기반과 비밀값 주입 경계를 담당합니다.
 
-> 위 다이어그램은 승인된 모듈 경계와 현재 설계 방향을 함께 보여줍니다. F2/F3의 Worker, 큐, 모델 서빙 및 운영 배포 구성은 아직 최종 확정되지 않았습니다. 현재 Infra 구현 범위도 AWS 계정 baseline과 원격 Terraform state 연결까지이며, 애플리케이션 운영 자원을 생성하지 않습니다.
+> 위 다이어그램은 승인된 모듈 경계와 현재 설계 방향을 함께 보여줍니다.
+>
+> - **현재 AWS에 적용됨:** 공유 dev 네트워크·RDS·EC2/ALB·CloudFront와 기존 `main` source delivery 자원
+> - **이번 PR의 목표 구성·아직 미적용:** `dev` source 전환, Verify/Build 분리와 환경설정 materialization. 별도 Terraform plan·승인·apply가 필요합니다.
+> - **미확정:** 운영 Provider 선택과 조건부 SQS/ECS 분리
 
 ### 기술 스택
 
@@ -104,7 +108,7 @@ flowchart LR
 | AI | Python 3.13, LangGraph, OpenAI-compatible provider adapter | 기반 구현; F2/F3 workflow 진행 예정 |
 | Database | PostgreSQL 15 | 결정·구현 |
 | Data | 재현 가능한 수집·정제·평가 파이프라인 | 계획 |
-| Infrastructure | Terraform 1.15.x, AWS Provider 6.x | 계정 baseline 구현 |
+| Infrastructure | Terraform 1.15.x, AWS Provider 6.x | 계정·공유 dev 기반 적용; 후속 변경 plan 대기 |
 | 운영 후보 | RunPod, AWS SQS, ECS Fargate | 미확정 또는 제안 |
 
 ### 저장소 구조
@@ -115,7 +119,7 @@ flowchart LR
 ├── backend/    # FastAPI, 인증, 장부 API, DB·트랜잭션
 ├── ai/         # 모델 Adapter, AI 실행 계약과 workflow 기반
 ├── data/       # 데이터 수집·가공·품질 검증
-├── infra/      # Terraform 기반 AWS 계정·state 구성
+├── infra/      # Terraform 기반 AWS 계정·공유 dev·delivery 구성
 └── docs/       # 요구사항, 화면, 아키텍처, DB 문서
 ```
 
@@ -146,6 +150,19 @@ cd SKN30-FINAL-3Team
 - [Backend README](backend/README.md)
 - [AI README](ai/README.md)
 - [Infra README](infra/README.md)
+
+### 2. 커밋 전 자동 포맷 설정
+
+저장소를 받은 뒤 루트에서 Git pre-commit hook을 한 번 설치합니다.
+
+```bash
+uv run --locked --project backend pre-commit install
+```
+
+이후 커밋할 때 staged 상태의 `ai/`·`backend/` Python 파일에 Ruff 안전 수정과 포맷이
+자동 적용되고 해당 모듈의 Pyright가 실행됩니다. hook이 파일을 바꾸면 변경분을 다시 `git add`한
+뒤 커밋합니다. 로컬 hook은 `git commit --no-verify`로 우회할 수 있으므로 CodeBuild의
+format·lint·type 검사는 계속 유지합니다.
 
 ---
 

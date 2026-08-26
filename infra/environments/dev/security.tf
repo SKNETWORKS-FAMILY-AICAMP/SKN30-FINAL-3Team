@@ -46,8 +46,8 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_app" {
   description                  = "Application traffic to the app security group"
   referenced_security_group_id = aws_security_group.app.id
   ip_protocol                  = "tcp"
-  from_port                    = 8000
-  to_port                      = 8000
+  from_port                    = local.application_port
+  to_port                      = local.application_port
 }
 
 resource "aws_vpc_security_group_ingress_rule" "app_from_alb" {
@@ -55,8 +55,8 @@ resource "aws_vpc_security_group_ingress_rule" "app_from_alb" {
   description                  = "Application traffic from the ALB security group"
   referenced_security_group_id = aws_security_group.alb.id
   ip_protocol                  = "tcp"
-  from_port                    = 8000
-  to_port                      = 8000
+  from_port                    = local.application_port
+  to_port                      = local.application_port
 }
 
 resource "aws_vpc_security_group_egress_rule" "app_https" {

@@ -1,7 +1,7 @@
 ---
 status: 결정
-implementation: workload 적용·delivery 코드 구현
-updated: 2026-08-20
+implementation: workload·기존 delivery 적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-08-25
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -10,9 +10,9 @@ updated: 2026-08-20
 
 - **이 문서가 답하는 질문:** 공유 개발·시연 환경을 AWS와 RunPod에 어떤 자원과 경계로 배치하는가?
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
-- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md)
+- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront와 DB migration은 적용됐다. 세 delivery Pipeline은 코드 구현 후 plan·apply 승인 전이고 RunPod Terraform은 보류 상태다.
+- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. deep lifecycle, Verify/Build 분리는 plan 검증 후 apply 승인 전이고 RunPod Terraform은 보류 상태다.
 
 ## 결정 요약
 
@@ -35,19 +35,19 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 네트워크 | ALB·App·DB security group | 결정 | 적용됨 | ALB HTTP는 CloudFront origin-facing prefix만, App은 ALB SG만, DB는 App SG만 허용 |
 | 네트워크 | S3 Gateway Endpoint | 결정 | 적용됨 | app route table의 S3 트래픽에 사용 |
 | 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | 적용됨 | AL2023 x86_64, t3.small, gp3 40 GiB, 현재 EC2 health |
-| 컴퓨팅 | ALB, target group, health check | 결정 | 적용됨 | `/health/ready`; delivery 전 unhealthy 예상, 직접 EC2 ingress 없음 |
+| 컴퓨팅 | ALB, target group, health check | 결정 | 적용됨·deep lifecycle 미적용 | `/health/ready`; deep suspend는 ALB를 제거하고 target group은 유지 |
 | 운영 접속 | SSM Session Manager | 결정 | 적용됨 | SSH·22번 차단, IMDSv2 강제 |
 | 이미지 | ECR | 결정 | 적용됨 | immutable tag, untagged image만 7일 후 만료 |
 | 데이터베이스 | RDS PostgreSQL 15.18 Single-AZ, pgvector | 결정 | 적용됨 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일; vector는 최초 migration에서 활성화 |
 | 파일 | Frontend private S3 origin | 결정 | 적용됨 | OAC distribution SourceArn만 object read, public website 금지 |
 | 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
 | 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
-| CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨 | 기본 도메인, `/api/*` cache disabled, managed security headers |
-| 보안 | Secrets Manager, Parameter Store | 결정 | 적용됨 | runtime DB·migration DB·AI secret container 분리, value는 외부 주입 |
-| 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 5개; SNS 구독 없음 |
+| CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨·deep lifecycle 미적용 | deep suspend는 ID·기본 도메인을 유지한 채 distribution 비활성화·ALB origin 제거 |
+| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·Discord ignored tfvars→write-only 전환은 plan·apply 전 |
+| 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 6개; deep suspend는 ALB alarm 2개 제거, SNS 구독 없음 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
-| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 코드 구현됨·미적용 | 통합 main 자동, Backend·Frontend 수동, QUEUED |
-| 전달 | CodeBuild, CodeDeploy | 결정 | 코드 구현됨·미적용 | 병렬 Build, 승인 단계 없음, migration·rollback·health |
+| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
+| 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |
 | 전달 | Pipeline artifact 전용 S3 | 결정 | 적용됨 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
 | DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
 | 비동기 작업 | SQS, DLQ | 조건부 | 미확정 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |
@@ -65,7 +65,7 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 ```mermaid
 flowchart LR
     user["개발자·시연 사용자"]
-    github["GitHub main 또는 지정 commit"]
+    github["GitHub dev 또는 지정 commit"]
 
     subgraph aws["AWS ap-northeast-2"]
         cf["CloudFront"]
@@ -86,7 +86,7 @@ flowchart LR
         openai["OpenAI API"]
     end
 
-    github -->|"main 자동 또는 수동 SHA"| pipeline
+    github -->|"dev 자동 또는 수동 SHA"| pipeline
     pipeline --> artifact
     pipeline --> ecr
     pipeline --> webS3
@@ -107,6 +107,12 @@ flowchart LR
 ```
 
 Frontend 정적 파일은 private S3 origin에서 CloudFront OAC를 통해서만 제공한다. S3 website hosting은 사용하지 않는다. CloudFront `/api/*` behavior는 caching을 끄고 API에 필요한 cookie, CSRF header와 query를 ALB custom origin으로 전달한다. ALB HTTP ingress는 CloudFront origin-facing managed prefix list에서만 허용하며 브라우저의 직접 ALB 진입은 제공하지 않는다.
+
+## 개발 환경 전원 모드
+
+일상 `dev-stop`은 ASG desired capacity를 0으로 내리고 RDS만 정지해 빠르게 복구한다. 여러 날 이상 미사용하는 deep suspend는 여기에 CloudFront 비활성화와 ALB·listener·ALB alarm 삭제를 추가한다. ALB가 관리하는 public IPv4 두 개는 ALB와 함께 반납한다.
+
+Deep suspend에서도 CloudFront distribution·OAC·Frontend S3, target group, security group, ASG·Launch Template·IAM, CodeDeploy와 데이터 자원은 유지한다. 따라서 CloudFront 기본 URL과 배포 연결점은 보존하면서 새 ALB와 새 public IPv4만 만들어 복구한다. 상태 전환은 Terraform saved plan 검토와 승인을 거치며, suspend 상태의 drift는 `dev_edge_enabled=false`를 명시한 전용 명령으로 확인한다.
 
 ## AWS VPC 배치
 

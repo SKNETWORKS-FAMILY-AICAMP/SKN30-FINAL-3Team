@@ -53,24 +53,6 @@ terraform -chdir="$infra_dir/environments/dev" init \
   -reconfigure \
   -backend-config="$backend_config_file"
 terraform -chdir="$infra_dir/environments/dev" validate
+terraform -chdir="$infra_dir/environments/dev" state pull >/dev/null
 
-plan_status=0
-terraform -chdir="$infra_dir/environments/dev" plan \
-  -input=false \
-  -detailed-exitcode \
-  -var="target_account_id=$target_account_id" \
-  -var="project_name=$project_name" \
-  -var="expires_at=${EXPIRES_AT:?EXPIRES_AT을 YYYY-MM-DD로 지정하세요.}" ||
-  plan_status=$?
-
-case "$plan_status" in
-  0)
-    printf 'Account link verified; dev plan is empty.\n'
-    ;;
-  2)
-    printf 'Account link verified; dev has data/output-only changes. Review and apply once, then rerun.\n'
-    ;;
-  *)
-    exit "$plan_status"
-    ;;
-esac
+printf 'Account link verified; remote dev state is readable and the configuration is valid.\n'

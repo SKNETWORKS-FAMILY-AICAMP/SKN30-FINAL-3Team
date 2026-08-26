@@ -12,12 +12,15 @@
 |---|---|---|
 | archive/ | 전달받은 대형 DDL과 과거 설계의 보존본 | 실행하지 않음 |
 | migrate/ | 새 환경과 기존 환경에 순서대로 적용할 전진 migration | 번호순 적용 |
+| seed/ | 로컬 F3 파이프라인 검증용 합성 장부 | 수동 적용 · 운영 제외 |
+
+seed/의 파일은 migration이 아니다. 실행기가 적용 여부를 관리하지 않고, 번호도 migrate/와 무관하며, 운영 환경에 적용하지 않는다. 아래의 파일 이름·불변성·검증 규칙은 migrate/에만 적용된다. 상세는 [seed/README.md](seed/README.md)에 있다.
 
 archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migration과 신규 DB 객체에는 원장, 상담 자동화, 에이전트 실행, 협상 포지션, 매칭 평가 등 업무 용어를 사용한다.
 
 ## 현재 기준선
 
-현재 기준선은 26개 테이블과 11개 전진 migration이다.
+현재 기준선은 27개 테이블과 16개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -32,6 +35,11 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 009_ALTER_PROPERTY_LEDGER_FIELDS.sql | 매물·수요 원장 확장 | 0 | 세대 스펙, 공동중개, 현 거주지 만기, 분류·진행단계 |
 | 010_ALTER_PARTY_PRIVACY_CONSENT.sql | 매물·수요 원장 확장 | 0 | 인물 개인정보 활용 동의 |
 | 011_ALTER_AGENT_EXECUTION_LEASE.sql | 에이전트 실행 확장 | 0 | Worker 선점 lease와 시도 횟수 |
+| 012_CREATE_NEGOTIATION_POSITION_PRICE.sql | 협상 포지션 확장 | 1 | 카드의 거래 유형별 표기·추정 금액 |
+| 013_ALTER_AGENT_EXECUTION_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 중간 진행 상태 lease 회수용 선점 인덱스 |
+| 014_ALTER_AGENT_EXECUTION_CANDIDATE_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 후보 추출 완료 상태 lease 회수용 선점 인덱스 |
+| 015_ALTER_AGENT_EXECUTION_CANDIDATE_CARD_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 후보 카드 완료 상태 lease 회수용 선점 인덱스 |
+| 016_ALTER_AGENT_EXECUTION_JUDGMENT_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 중개 판정 중 상태 lease 회수용 선점 인덱스 |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 

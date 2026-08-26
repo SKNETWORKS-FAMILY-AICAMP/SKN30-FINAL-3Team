@@ -13,11 +13,11 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 ## 구조와 소유 범위
 
 - `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결, state bucket
-- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 현재 코드 구현만 완료되고 미적용
+- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 기존 dev 자원은 적용됐고 deep lifecycle과 이번 환경설정·delivery 변경은 plan·apply 전
 - `justfile`: 반복되는 검증, plan/apply와 DB 운영 명령의 진입점
 - `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
-- `scripts/verify-account-link.sh`: state bucket 읽기와 dev init/validate/plan 검증
+- `scripts/verify-account-link.sh`: state bucket·원격 state 읽기와 dev init/validate 검증
 - `scripts/manage_db_access.py`: DB 역할, runtime Secret, IAM migration과 검증 관리
 - `scripts/manage_dev_power.py`: 지정 Infra 운영자의 dev RDS·ASG start/stop/status 관리
 
@@ -76,6 +76,21 @@ just setup-existing 2026-09-23
 
 이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다.
 
+### 수동 비밀값 준비
+
+Setup과 `just verify-account`는 비밀값 없이 실행할 수 있다. 실제 dev plan 전에 AI provider key와 Discord webhook처럼 사람이 제공하는 비밀값을 별도 ignored tfvars에 준비한다.
+
+```bash
+cp environments/dev/secrets.example.tfvars environments/dev/secrets.auto.tfvars
+chmod 600 environments/dev/secrets.auto.tfvars
+```
+
+- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`는 필수이고 vLLM API key는 필요한 항목만 추가한다.
+- `discord_webhook_url`: Discord webhook HTTPS URL을 입력한다.
+- 각 `*_secret_version`: 비밀값을 바꿀 때 함께 1씩 증가시킨다.
+
+Terraform은 `.auto.tfvars`를 plan과 saved-plan apply에서 자동으로 다시 읽는다. Ephemeral 비밀값은 plan/state에 저장되지 않으므로 승인된 plan과 apply 사이에 이 파일을 수정하지 않는다.
+
 ### Terraform 변경
 
 ```bash
@@ -84,9 +99,22 @@ just dev-plan
 just dev-show
 just dev-apply
 just dev-drift
+just dev-deep-stop-plan
+just dev-deep-stop-show
+just dev-deep-stop
+just dev-deep-drift
+just dev-deep-start-plan
+just dev-deep-start-show
+just dev-deep-start
+just dev-deep-status
+just dev-destroy-plan
+just dev-destroy-show
+just dev-destroy
 ```
 
-`dev-show`로 저장된 plan의 자원, 교체, 삭제와 비용을 검토하고 승인을 받은 뒤에만 `dev-apply`를 실행한다. bootstrap root 변경에는 같은 순서의 `bootstrap-plan`, `bootstrap-show`, `bootstrap-apply`, `bootstrap-drift`를 사용한다. apply recipe는 실행 전에 추가 확인을 요구한다.
+`dev-show`로 저장된 plan의 자원, 교체, 삭제와 비용을 검토하고 승인을 받은 뒤에만 `dev-apply`를 실행한다. deep 전원 명령도 전용 saved plan을 먼저 만들고 `show`로 전체 변경을 검토해야 하며, 실행 시 다른 시점에 만든 일반 `dev.tfplan`을 사용하지 않는다. dev root가 소유한 환경을 영구 삭제할 때는 `dev-destroy-plan`으로 `dev-destroy.tfplan`을 생성하고 `dev-destroy-show`로 삭제 대상과 보존 대상을 검토한 뒤 `dev-destroy`를 실행한다. bootstrap root의 state bucket과 계정 baseline은 이 destroy plan의 대상이 아니다. bootstrap root 변경에는 같은 순서의 `bootstrap-plan`, `bootstrap-show`, `bootstrap-apply`, `bootstrap-drift`를 사용한다. apply와 destroy recipe는 실행 전에 추가 확인을 요구한다.
+
+`dev-plan`, `dev-apply`, `dev-drift`, 모든 deep plan/apply/drift 명령, `dev-destroy-plan`, `dev-destroy`는 `secrets.auto.tfvars`가 비어 있지 않은 일반 파일이고 group/other 권한 bit가 모두 꺼져 있을 때만 시작한다(`0600` 또는 `0400` 계열). Setup, `verify-account`, 저장된 plan의 `show`와 상태 조회에는 이 gate를 적용하지 않는다. AI·Discord 평문이 `dev.tfplan`, `terraform show -json` 또는 state에 나타나면 apply하지 않는다.
 
 `just fmt`는 Terraform 파일을 수정하므로 포맷이 필요할 때만 실행한다. `just verify-account`는 state와 AWS 계정 연결을 읽기 전용으로 검증한다.
 
@@ -118,6 +146,34 @@ ASG 축소는 EC2 정지가 아니라 종료이며 다음 시작에는 Launch Te
 
 RDS 정지는 임시 개발 비용 절감 기능이다. 데이터, endpoint와 설정은 유지되지만 스토리지와 백업, ALB, public IPv4 등 잔여 비용은 계속 발생한다. RDS는 7일 연속 정지 후 자동으로 시작되므로 장기 휴무에는 상태를 다시 확인한다. 자세한 제한은 [AWS RDS 정지 문서](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html)를 따른다.
 
+여러 날 이상 사용하지 않을 때는 별도의 deep lifecycle로 ALB 고정비와 ALB가 사용하는 public IPv4 두 개의 비용까지 중지한다. CloudFront distribution은 삭제하지 않고 비활성화하므로 distribution ID와 기본 domain, private S3 origin은 유지된다. ALB target group, security group, ASG, Launch Template, IAM, CodeDeploy와 저장 데이터도 유지된다.
+
+Deep stop은 다음 순서로 실행한다.
+
+```bash
+just dev-deep-stop-plan
+just dev-deep-stop-show
+just dev-deep-stop
+just dev-deep-status
+just dev-deep-drift
+```
+
+`dev-deep-stop`은 먼저 ASG를 0으로 내리고 RDS를 정지한 다음, 검토한 `dev-deep-stop.tfplan`으로 CloudFront를 비활성화하고 ALB·listener·ALB alarm 두 개를 제거한다. CloudFront의 ALB origin과 API behavior, Backend `HTTP_ALLOWED_HOSTS`의 ALB DNS도 함께 제거되며 ALB service-managed public IPv4는 AWS가 자동 반납한다. 정상 active 상태라면 네 edge 자원이 `destroy`여야 한다. 이미 원격에서 수동 삭제된 자원은 refresh drift로 plan에서 생략될 수 있으므로 실제 존재 여부와 state 정리를 확인하고, 다른 add·change·destroy가 보이면 기존 미적용 root 변경이나 provider의 dependency 재계산인지 `show`에서 개별 검토한다.
+
+Deep start는 다음 순서로 실행한다.
+
+```bash
+just dev-deep-start-plan
+just dev-deep-start-show
+just dev-deep-start
+just dev-deep-status
+just dev-drift
+```
+
+`dev-deep-start`는 검토한 `dev-deep-start.tfplan`으로 ALB·listener·alarm을 만들고 새 ALB DNS를 CloudFront와 Backend 설정에 반영해 distribution 배포가 끝날 때까지 기다린 뒤 RDS·ASG·SSM을 복구한다. 정상 suspended 상태라면 같은 네 edge 자원이 `create`여야 하며, drift로 alarm만 남았다면 alarm은 새 ALB dimension으로 `update`될 수 있다. 새 ALB에는 새 service-managed public IPv4가 할당되며 이전 주소 보존을 전제로 하지 않는다.
+
+Deep suspend 중에는 기본값이 active인 일반 `dev-plan`, `dev-apply`, `dev-drift`를 사용하지 않는다. 일반 plan은 ALB 재생성과 CloudFront 재활성화를 제안한다. suspended 상태 검증에는 `dev-deep-drift`를 사용하고, 통합·Backend·Frontend Pipeline과 DB migration도 실행하지 않는다. 중단이나 timeout이 발생하면 Console에서 임의로 생성·삭제하지 말고 `dev-deep-status`와 해당 모드의 새 plan을 확인한 뒤 실패한 단계만 재시도한다.
+
 중단되거나 예상과 다른 상태가 보이면 start/stop을 반복하기 전에 `just dev-status`로 현재 상태를 확인한다. 전원 전환 중에는 Terraform plan/apply와 DB migration을 병행하지 않는다.
 
 ## DB 계정 초기화와 migration
@@ -144,7 +200,8 @@ just db-sync
 just db-migrate
 ```
 
-적용 후 운영자는 runtime credential과 필수 DB 역할을 검증한다.
+적용 후 운영자는 runtime credential·RDS endpoint metadata와 고정 DB 역할의 로그인 속성 및
+필수 role membership을 검증한다.
 
 ```bash
 just db-verify

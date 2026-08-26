@@ -1,12 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-17
+updated: 2026-08-24
 ---
 
 # ADR-0002: 백엔드 런타임·DB·인증 기반
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
 - 결정일: 2026-08-17
+- 대체 범위: 환경 파일·dotenv 우선순위와 로컬·운영 비밀값 주입 방식은 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)와 [Infra ADR-0013](../../../infra/references/decisions/ADR-0013-dev-environment-materialization.md)이 대체
 
 ## 맥락
 
@@ -22,9 +23,8 @@ updated: 2026-08-17
 - DB 스키마는 docs/db/migrate/의 순수 SQL을 Yoyo로 전진 적용한다. 애플리케이션 시작 시 migration을 실행하지 않는다.
 - 사용자의 명시적 폴더 규칙에 따라 DB engine과 요청 세션을 src/domain/에 둔다. 이는 순수 domain 권장안의 예외이며 공개 DTO와 SQLModel 테이블 모델은 계속 분리한다.
 - 환경변수는 APP_*, DB_*, AUTH_*, HTTP_*, LOG_*로 명시하고 src/core/config.py가 AppConfig, DbConfig, AuthConfig, HttpConfig, LogConfig에 직접 바인딩한다.
-- python-dotenv가 APP_PROFILE 또는 APP_ENV에 따라 .env.local 또는 .env.prod를 읽는다. 프로세스 환경변수가 파일보다 우선한다.
-- .env.local과 .env.prod는 비밀값이 없는 공개 환경 설정으로 Git에서 관리한다. DB URL·비밀번호·토큰과 같은 비밀 변수는 두 파일에서 키 자체를 제외하고 .env.example에 빈 값으로만 선언한다.
-- Backend는 비밀 저장소에 직접 접근하지 않는다. Infra가 로컬·CI·운영 비밀값을 프로세스 환경변수로 주입하며 구체 저장소와 전달 방식은 별도 Infra 결정으로 확정한다.
+- 환경 파일 소유권과 로딩 규칙은 프로젝트 ADR-0015를 따른다.
+- Backend는 비밀 저장소에 직접 접근하지 않는다. 로컬 비밀값은 개인 `.env`, CI·운영 비밀값은 Infra가 조립한 프로세스 환경변수로 받으며 구체 소유권과 전달 방식은 프로젝트 ADR-0015와 Infra ADR-0013을 따른다.
 - 브라우저 인증은 JWT가 아니라 PostgreSQL 서버 세션을 사용한다. 무작위 session·CSRF 원문은 브라우저에만 전달하고 DB에는 SHA-256 해시를 저장한다.
 - 실제 비밀번호 로그인은 구현하지 않는다. local 환경에서 개발자가 생성한 임의 계정에만 개발 세션을 발급한다.
 - 계정 활성 상태와 역할은 매 요청 다시 확인한다. 역할은 OWNER, STAFF, READ_ONLY다.
