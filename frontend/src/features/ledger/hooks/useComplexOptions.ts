@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LedgerApiError, isCanceled } from "../api/errors.ts";
+import { ApiError, isCanceled } from "../../../shared/api/index.ts";
 import { ledgerTransport } from "../api/ledgerTransport.ts";
 import { MAX_PAGE_SIZE } from "../model/dto.ts";
 import type { ComplexSummaryDto } from "../model/dto.ts";
@@ -30,7 +30,7 @@ export interface ComplexCreateInput {
 export interface ComplexOptions {
   options: ComplexOption[];
   status: "loading" | "ready" | "error";
-  error: LedgerApiError | null;
+  error: ApiError | null;
   /** 단지를 만들고 서버가 준 id로 선택지에 더한다. 저장에 바로 쓸 수 있는 값을 돌려준다. */
   createComplex: (input: ComplexCreateInput) => Promise<ComplexOption>;
   /** 단지를 지운다. 세대가 남아 있으면 서버가 거절하고 그 사유가 그대로 올라온다. */
@@ -50,7 +50,7 @@ export function useComplexOptions(options: { enabled?: boolean } = {}): ComplexO
   const enabled = options.enabled ?? true;
   const [items, setItems] = useState<ComplexOption[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<LedgerApiError | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -70,9 +70,9 @@ export function useComplexOptions(options: { enabled?: boolean } = {}): ComplexO
         if (controller.signal.aborted || isCanceled(cause)) return;
         setStatus("error");
         setError(
-          cause instanceof LedgerApiError
+          cause instanceof ApiError
             ? cause
-            : new LedgerApiError({ kind: "server", message: "단지 목록을 불러오지 못했습니다.", cause }),
+            : new ApiError({ kind: "server", message: "단지 목록을 불러오지 못했습니다.", cause }),
         );
       });
 

@@ -14,18 +14,16 @@ export type { ComplexCreateInput, ComplexOption, ComplexOptions } from "./hooks/
 export type { CollectionState, CollectionStatus, LedgerCollection } from "./hooks/useLedgerCollection.ts";
 
 export type { ColumnFilters, ListQuery } from "./api/transport.ts";
-export { LedgerApiError, describeForUser, isCanceled } from "./api/errors.ts";
-export type { LedgerErrorKind } from "./api/errors.ts";
-// CSRF 원문 보관소. 세션을 발급·폐기하는 features/auth가 이 값을 채우고 비운다.
-// 보관소가 둘이면 인증이 받은 토큰을 장부 쓰기가 못 보고 모든 저장이 403이 되므로 여기 하나뿐이다.
-export { canMutate, clearCsrfToken, getCsrfToken, setCsrfToken } from "./api/session.ts";
+// 오류 분류(`ApiError`, `isCanceled`)와 CSRF 보관소는 `shared/api`가 소유한다. 장부를 거쳐
+// 가져가면 다른 기능이 장부에 의존하게 되므로 여기서 다시 내보내지 않는다.
+export { describeForUser } from "./api/errors.ts";
 
 export { EMPTY_VALUE, MAX_PAGE_SIZE } from "./model/dto.ts";
 export type { BuyerRow, LedgerRow, PropertyRow, RowSyncState, SaveState } from "./model/row.ts";
 export { isBuyerRow, isPropertyRow, isUnsavedDraft } from "./model/row.ts";
 
-export { formatMoney, parseMoney } from "./model/money.ts";
-export { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "./model/area.ts";
+export { formatMoney, parseMoney } from "../../shared/format/index.ts";
+export { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "../../shared/format/index.ts";
 export { addYears, todayDate } from "./model/dates.ts";
 export { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "./model/phone.ts";
 export {

@@ -1,65 +1,19 @@
 /**
- * API 오류 분류.
+ * 장부 오류 문구.
  *
- * 화면은 "실패"를 한 덩어리로 다루면 안 된다. 요구사항이 상태별로 다른 화면을 지정한다.
+ * 오류의 **분류**는 `shared/api`가 소유하고, 여기서는 장부 화면이 보여줄 **문구**만 정한다.
+ * 요구사항이 상태별로 다른 화면을 지정하기 때문이다.
  *   - 불러오기 실패는 입력을 건드리지 않고 재시도를 제공한다(F1-GR 로드 오류 화면).
  *   - 저장 충돌은 롤백하고 해당 셀을 표시한다(F1-GR-26).
  *   - 연결 단절은 브라우저에 보관하고 복구 시 재전송한다(F1-GR-35).
  *   - 권한 부족은 재시도할 대상이 아니다.
  *
- * 그래서 전송 실패, JSON 파싱 실패, 계약 위반, 도메인 오류를 서로 다른 종류로 구분한다.
+ * 같은 분류라도 기능마다 사용자에게 할 말이 다르므로 문구를 공통 영역에 올리지 않는다.
+ * 예를 들어 인증은 계정 존재 여부를 드러내지 않으려고 사유를 뭉뚱그린다.
  */
 
-export type LedgerErrorKind =
-  /** 네트워크에 닿지 못했다. 오프라인 처리 대상. */
-  | "offline"
-  /** 요청이 취소되었다. 화면에 오류로 보여주지 않는다. */
-  | "canceled"
-  /** 세션이 없거나 만료됐다(401). */
-  | "unauthorized"
-  /** 권한이 부족하다(403). CSRF 토큰 불일치도 여기에 들어온다. */
-  | "forbidden"
-  /** 대상이 없다(404). */
-  | "notFound"
-  /** row_version 충돌(409). 다른 사용자가 먼저 저장했다. */
-  | "conflict"
-  /** 입력값이 서버 검증을 통과하지 못했다(422 등). */
-  | "validation"
-  /** 서버 내부 오류(5xx). */
-  | "server"
-  /** 응답이 계약과 다르다. 배포 불일치일 가능성이 높다. */
-  | "contract";
-
-export interface LedgerApiErrorOptions {
-  kind: LedgerErrorKind;
-  message: string;
-  status?: number;
-  /** 서버가 준 도메인 오류 코드(api.md의 `code`). */
-  code?: string;
-  /** 추적용 요청 식별자(api.md의 `request_id`). */
-  requestId?: string;
-  cause?: unknown;
-}
-
-export class LedgerApiError extends Error {
-  readonly kind: LedgerErrorKind;
-  readonly status: number | undefined;
-  readonly code: string | undefined;
-  readonly requestId: string | undefined;
-
-  constructor(options: LedgerApiErrorOptions) {
-    super(options.message, options.cause == null ? undefined : { cause: options.cause });
-    this.name = "LedgerApiError";
-    this.kind = options.kind;
-    this.status = options.status;
-    this.code = options.code;
-    this.requestId = options.requestId;
-  }
-}
-
-export function isCanceled(error: unknown): boolean {
-  return error instanceof LedgerApiError && error.kind === "canceled";
-}
+import { ApiError } from "../../../shared/api/index.ts";
+import type { ApiErrorKind } from "../../../shared/api/index.ts";
 
 /**
  * 사용자에게 보여줄 문구.
@@ -68,7 +22,7 @@ export function isCanceled(error: unknown): boolean {
  * 추적이 필요한 `request_id`만 덧붙인다.
  */
 export function describeForUser(error: unknown): string {
-  if (!(error instanceof LedgerApiError)) {
+  if (!(error instanceof ApiError)) {
     return "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
@@ -91,7 +45,7 @@ function messageForCode(code: string | undefined): string | null {
   }
 }
 
-function messageFor(kind: LedgerErrorKind): string {
+function messageFor(kind: ApiErrorKind): string {
   switch (kind) {
     case "offline":
       return "네트워크에 연결하지 못했습니다. 변경 내용은 브라우저에 보관됩니다.";
@@ -112,15 +66,4 @@ function messageFor(kind: LedgerErrorKind): string {
     case "contract":
       return "서버 응답 형식이 예상과 다릅니다. 배포 버전을 확인해 주세요.";
   }
-}
-
-/** HTTP 상태 코드를 오류 종류로. */
-export function kindFromStatus(status: number): LedgerErrorKind {
-  if (status === 401) return "unauthorized";
-  if (status === 403) return "forbidden";
-  if (status === 404) return "notFound";
-  if (status === 409) return "conflict";
-  if (status === 400 || status === 422) return "validation";
-  if (status >= 500) return "server";
-  return "server";
 }
