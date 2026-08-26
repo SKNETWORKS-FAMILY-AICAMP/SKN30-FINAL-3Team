@@ -2,12 +2,16 @@
  * HTTP 경계.
  *
  * 네트워크 호출을 화면 곳곳에 흩뜨리지 않기 위해 요청·응답·오류·취소를 한곳에서 다룬다.
- * 여기가 프론트엔드에서 서버와 닿는 유일한 지점이다.
+ * JSON 요청은 모두 이 함수를 지난다. 기능별 transport는 경로와 DTO만 알면 되고 Cookie,
+ * CSRF 헤더, 상태 코드 분류와 취소 처리를 각자 다시 구현하지 않는다.
+ *
+ * `multipart/form-data`는 아직 여기서 다루지 않는다. F2 음성 업로드가 유일한 예외이며
+ * 두 번째 사용처가 생기면 이 경계로 올린다.
  */
 
-import { APP_ENV } from "../../../config/env.ts";
-import { DecodeError } from "../model/decode.ts";
-import { LedgerApiError, kindFromStatus } from "./errors.ts";
+import { APP_ENV } from "../../config/env.ts";
+import { DecodeError } from "../decode/index.ts";
+import { ApiError, kindFromStatus } from "./errors.ts";
 import { getCsrfToken } from "./session.ts";
 
 export type QueryValue = string | number | boolean | null | undefined | readonly string[];
@@ -52,9 +56,9 @@ export async function request<T>(path: string, options: RequestOptions<T>): Prom
   } catch (cause) {
     // fetch는 네트워크 실패와 취소만 throw한다. HTTP 오류 상태는 throw하지 않는다.
     if (isAbortError(cause)) {
-      throw new LedgerApiError({ kind: "canceled", message: "요청이 취소되었습니다.", cause });
+      throw new ApiError({ kind: "canceled", message: "요청이 취소되었습니다.", cause });
     }
-    throw new LedgerApiError({ kind: "offline", message: "네트워크 요청에 실패했습니다.", cause });
+    throw new ApiError({ kind: "offline", message: "네트워크 요청에 실패했습니다.", cause });
   }
 
   if (!response.ok) throw await toApiError(response);
@@ -69,7 +73,7 @@ export async function request<T>(path: string, options: RequestOptions<T>): Prom
   try {
     parsed = JSON.parse(text);
   } catch (cause) {
-    throw new LedgerApiError({
+    throw new ApiError({
       kind: "contract",
       message: "응답을 JSON으로 해석하지 못했습니다.",
       status: response.status,
@@ -81,7 +85,7 @@ export async function request<T>(path: string, options: RequestOptions<T>): Prom
     return options.decode(parsed);
   } catch (cause) {
     if (cause instanceof DecodeError) {
-      throw new LedgerApiError({
+      throw new ApiError({
         kind: "contract",
         message: `응답이 계약과 다릅니다. ${cause.message}`,
         status: response.status,
@@ -118,7 +122,7 @@ function isAbortError(cause: unknown): boolean {
  * 오류 응답 본문에서 code/message/request_id를 최대한 건져낸다.
  * 본문이 계약을 따르지 않아도 상태 코드로 분류는 유지한다.
  */
-async function toApiError(response: Response): Promise<LedgerApiError> {
+async function toApiError(response: Response): Promise<ApiError> {
   const kind = kindFromStatus(response.status);
   let code: string | undefined;
   let requestId: string | undefined;
@@ -136,5 +140,5 @@ async function toApiError(response: Response): Promise<LedgerApiError> {
     // 오류 응답이 JSON이 아닐 수 있다. 상태 코드 기반 분류만 사용한다.
   }
 
-  return new LedgerApiError({ kind, message, status: response.status, code, requestId });
+  return new ApiError({ kind, message, status: response.status, code, requestId });
 }

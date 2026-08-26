@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { LedgerApiError } from "../api/errors.ts";
+import { ApiError } from "../../../shared/api/index.ts";
 import { ledgerTransport } from "../api/ledgerTransport.ts";
 import type { ListQuery } from "../api/transport.ts";
 import type { PropertyUnitDetailDto } from "../model/dto.ts";
@@ -92,7 +92,7 @@ export function usePropertyLedger(
           const create = toUnitCreatePayload(row);
           if (create == null) {
             // 실패 사유를 뭉뚱그리지 않는다. 둘은 사용자가 할 일이 전혀 다르다.
-            throw new LedgerApiError({
+            throw new ApiError({
               kind: "validation",
               message:
                 row.complexId == null
@@ -183,7 +183,7 @@ export function usePropertyLedger(
         return;
       }
       if (row.rowVersion == null) {
-        throw new LedgerApiError({
+        throw new ApiError({
           kind: "validation",
           message: "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.",
         });

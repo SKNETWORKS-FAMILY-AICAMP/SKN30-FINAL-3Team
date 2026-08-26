@@ -204,6 +204,8 @@ class F3CandidateResponse(BaseModel):
     price_amount: int | None
     monthly_amount: int | None
     received_at: str | None
+    # 관심없음 피드백의 ``target_id``. 판정 전에는 대상이 없으므로 ``null``이다.
+    judgment_id: int | None = None
     match_grade: str | None = None
     evaluation_basis: str | None = None
     primary_obstacle: str | None = None
@@ -223,6 +225,7 @@ class F3CandidateResponse(BaseModel):
             price_amount=view.price_amount,
             monthly_amount=view.monthly_amount,
             received_at=view.received_at,
+            judgment_id=judgment.id if judgment else None,
             match_grade=judgment.match_grade if judgment else None,
             evaluation_basis=judgment.evaluation_basis if judgment else None,
             primary_obstacle=judgment.primary_obstacle if judgment else None,

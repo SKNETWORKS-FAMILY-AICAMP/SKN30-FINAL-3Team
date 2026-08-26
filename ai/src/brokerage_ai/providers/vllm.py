@@ -8,8 +8,10 @@ from pydantic import BaseModel, ValidationError
 
 from brokerage_ai.core.errors import (
     ProviderConfigurationError,
+    ProviderOutputInvalidError,
     ProviderRefusalError,
     ProviderResponseError,
+    describe_validation_error,
     translate_openai_error,
 )
 from brokerage_ai.core.types import (
@@ -74,8 +76,11 @@ class VllmAdapter:
             response = await self._llm_client.chat.completions.parse(**parameters)
         except OpenAIError as exc:
             raise translate_openai_error(exc) from None
-        except (ValidationError, ValueError):
-            raise ProviderResponseError() from None
+        except ValidationError as exc:
+            # 모델이 계약을 어긴 출력이다. OpenAI adapter와 같은 등급으로 다룬다.
+            raise ProviderOutputInvalidError(describe_validation_error(exc)) from exc
+        except ValueError as exc:
+            raise ProviderOutputInvalidError() from exc
         latency_ms = (perf_counter() - started_at) * 1000
 
         if not response.choices:
@@ -84,7 +89,11 @@ class VllmAdapter:
         if message.refusal:
             raise ProviderRefusalError()
         parsed = message.parsed
-        if parsed is None or not isinstance(parsed, output_schema):
+        if parsed is None:
+            # 본문을 못 읽었다. 잘린 응답이 여기로 오며 다시 부르면 통과할 수 있다.
+            raise ProviderOutputInvalidError("response has no parsed output")
+        if not isinstance(parsed, output_schema):
+            # 선언한 schema와 다른 타입이다. 다시 불러도 같으므로 재시도하지 않는다.
             raise ProviderResponseError()
 
         usage = response.usage

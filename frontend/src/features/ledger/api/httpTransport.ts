@@ -17,8 +17,8 @@ import {
   decodeRequirementDetail,
   decodeRequirementRow,
 } from "../model/decode.ts";
-import { expectNoContent, request } from "./httpClient.ts";
-import type { QueryValue } from "./httpClient.ts";
+import { expectNoContent, request } from "../../../shared/api/index.ts";
+import type { QueryValue } from "../../../shared/api/index.ts";
 import type { ColumnFilters, LedgerTransport, ListQuery } from "./transport.ts";
 
 const PATHS = {

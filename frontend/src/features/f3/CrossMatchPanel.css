@@ -309,6 +309,21 @@
   gap: 0.75rem;
 }
 
+/* 판정 근거. 인용은 따옴표로, 정황 판단은 그대로 나열한다. */
+.cross-match-panel__evidence {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1rem;
+  font-size: 0.8125rem;
+}
+
+.cross-match-panel__evidence-field {
+  margin-inline-end: 0.375rem;
+  color: var(--cross-match-muted);
+  font-weight: 600;
+}
+
 .cross-match-panel__reason-grid section {
   min-height: 7rem;
   padding: 0.875rem;
@@ -498,12 +513,7 @@
 }
 
 
-/* UI/UX audit: keep prototype controls secondary and make the suggested action explicit. */
-.cross-match-panel__prototype-tools {
-  position: relative;
-}
-
-.cross-match-panel__prototype-tools > summary,
+/* UI/UX audit: keep the suggested action explicit and secondary work folded away. */
 .cross-match-panel__more-actions > summary {
   color: var(--cross-match-muted);
   font-size: 0.75rem;
@@ -511,29 +521,10 @@
   cursor: pointer;
 }
 
-.cross-match-panel__prototype-tools > summary:focus-visible,
 .cross-match-panel__more-actions > summary:focus-visible {
   border-radius: 2px;
   outline: 2px solid var(--pf-t--global--border--color--clicked, #0066cc);
   outline-offset: 3px;
-}
-
-.cross-match-panel__prototype-tools > div {
-  position: absolute;
-  z-index: 8;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  display: grid;
-  gap: 0.375rem;
-  width: 14rem;
-  padding: 0.75rem;
-  border: 1px solid var(--cross-match-border);
-  background: #fff;
-  box-shadow: 0 0.25rem 1rem rgb(3 3 3 / 16%);
-}
-
-.cross-match-panel__prototype-tools .pf-v6-c-form-control {
-  width: 100%;
 }
 
 .cross-match-panel__recommendation {
@@ -579,13 +570,6 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   padding-top: 0.625rem;
-}
-
-@media (max-width: 64rem) {
-  .cross-match-panel__prototype-tools > div {
-    right: auto;
-    left: 0;
-  }
 }
 
 @media (max-width: 48rem) {

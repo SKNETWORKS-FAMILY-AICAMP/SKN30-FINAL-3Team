@@ -10,7 +10,7 @@
  */
 
 import { APP_ENV } from "../../../config/env.ts";
-import { clearCsrfToken, getCsrfToken, setCsrfToken } from "../../ledger/index.ts";
+import { clearCsrfToken, getCsrfToken, setCsrfToken } from "../../../shared/api/index.ts";
 import { AuthError, kindFromStatus } from "../model/authError.ts";
 import { decodeSessionPayload } from "../model/user.ts";
 import type { AuthUser } from "../model/user.ts";
