@@ -1,0 +1,57 @@
+/* 첫 화면. 상단바 아래를 모두 쓰고, 진입점 세 개를 같은 폭으로 세로로 쌓는다. */
+.home-screen {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 24px;
+  background: #f8fafc;
+}
+
+.home-screen__inner { width: 100%; max-width: 680px; }
+
+.home-screen__heading { margin: 0; color: #0f172a; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.home-screen__lead { margin: 8px 0 28px; color: #475569; font-size: 14px; }
+
+.home-screen__actions { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+
+.home-action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 20px;
+  color: #0f172a;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.home-action:hover { border-color: #94a3b8; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); }
+.home-action:focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
+
+.home-action--primary { color: #f8fafc; background: #0f172a; border-color: #0f172a; }
+.home-action--primary:hover { background: #1e293b; border-color: #334155; }
+.home-action--primary:focus-visible { outline-color: #38bdf8; }
+
+.home-action__icon { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; background: #f1f5f9; color: #334155; font-size: 18px; }
+.home-action--primary .home-action__icon { background: rgba(255, 255, 255, 0.12); color: #f8fafc; }
+
+.home-action__body { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; gap: 4px; }
+.home-action__title { font-size: 16px; font-weight: 700; }
+.home-action__desc { color: #64748b; font-size: 13px; line-height: 1.5; }
+.home-action--primary .home-action__desc { color: #cbd5e1; }
+
+.home-action__meta { flex: 0 0 auto; color: #64748b; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.home-action__go { flex: 0 0 auto; color: #94a3b8; font-size: 14px; }
+.home-action--primary .home-action__go { color: #94a3b8; }
+
+@media (max-width: 640px) {
+  .home-screen { padding: 24px 16px; }
+  .home-action { padding: 16px; gap: 12px; }
+  .home-action__meta { display: none; }
+}

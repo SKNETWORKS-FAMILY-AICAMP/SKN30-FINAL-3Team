@@ -81,16 +81,22 @@ after(async () => {
   server?.kill();
 });
 
+/** 첫 화면은 홈이다. 장부 그리드를 보려면 상단바에서 매물장을 먼저 연다. */
+async function openPropertyLedger(page) {
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "매물장", exact: true }).click();
+  const links = page.locator(".ledger-grid__detail-link");
+  await links.first().waitFor();
+  return links;
+}
+
 test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
 
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-
   // 매물 건이 있는 세대를 연다. mock 장부는 네 세대 중 하나를 매물 없는 세대로 만든다.
-  const links = page.locator(".ledger-grid__detail-link");
-  await links.first().waitFor();
+  const links = await openPropertyLedger(page);
   await links.nth(1).click();
 
   const panel = page.locator("#cross-match-panel");
@@ -136,10 +142,7 @@ test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 �
   const page = await browser.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-
-  const links = page.locator(".ledger-grid__detail-link");
-  await links.first().waitFor();
+  const links = await openPropertyLedger(page);
   await links.nth(1).click();
   await page
     .locator(".cross-match-panel__grade-heading h4")
@@ -181,10 +184,7 @@ test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 �
 
 test("장부에 없는 후보는 식별자만 보여준다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-
-  const links = page.locator(".ledger-grid__detail-link");
-  await links.first().waitFor();
+  const links = await openPropertyLedger(page);
   await links.nth(1).click();
   await page
     .locator(".cross-match-panel__grade-heading h4")

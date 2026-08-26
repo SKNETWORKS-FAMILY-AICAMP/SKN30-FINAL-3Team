@@ -12,3 +12,4 @@ updated: 2026-08-26
 | [ADR-003](ADR-003-static-release-delivery.md) | 결정 | Vite 정적 artifact와 asset-first/index-last 복구 가능한 전달 |
 | [ADR-004](ADR-004-shared-boundary.md) | 결정 | 여러 기능이 실제로 공유하는 전송·검증·표기 경계를 `src/shared`에 두고, 설정에 의존하는 모듈과 순수 모듈을 분리한다. |
 | [ADR-005](ADR-005-feature-data-source.md) | 결정 | 데이터 출처를 기능 단위로 고르고, 지정하지 않으면 장부 출처를 따른다. |
+| [ADR-006](ADR-006-home-voice-intake.md) | 결정 | 첫 화면을 진입점 선택으로 두고, 신규 음성메모 접수가 상담 유형으로 장부를 판정한다. |

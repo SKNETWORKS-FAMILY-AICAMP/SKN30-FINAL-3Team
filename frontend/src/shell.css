@@ -8,6 +8,8 @@ button, input, select, textarea { font: inherit; }
 .app-shell { display: block; width: 100vw; height: 100vh; min-height: 720px; background: #f8fafc; }
 .work-area { position: relative; display: grid; grid-template-rows: 48px auto minmax(260px, 1fr) 28px; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: #fff; }
 .work-area--offline { grid-template-rows: 48px auto auto minmax(260px, 1fr) 28px; }
+.work-area--home { grid-template-rows: 48px minmax(0, 1fr); }
+.work-area--home > .home-screen { min-height: 0; }
 
 /* Backdrop & Modal z-index fix */
 .pf-v6-c-backdrop,
@@ -53,6 +55,14 @@ button, input, select, textarea { font: inherit; }
 .masthead-search input { flex: 1; min-width: 0; height: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; outline: none !important; color: #f8fafc !important; font-size: 13px !important; padding: 0 !important; margin: 0 !important; }
 .masthead-search input::placeholder { color: #64748b !important; }
 .masthead-search:focus-within { border-color: #38bdf8; box-shadow: 0 0 0 1px #38bdf8; }
+
+.f1-topbar__intake.pf-v6-c-button { height: 32px; margin-right: 4px; padding-inline: 12px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #0f172a !important; background: #38bdf8 !important; border: 1px solid #38bdf8; }
+.f1-topbar__intake.pf-v6-c-button:hover { color: #0f172a !important; background: #7dd3fc !important; border-color: #7dd3fc; }
+.f1-topbar__intake.pf-v6-c-button svg,
+.f1-topbar__intake.pf-v6-c-button .pf-v6-c-button__icon,
+.f1-topbar__intake.pf-v6-c-button:hover svg,
+.f1-topbar__intake.pf-v6-c-button:hover .pf-v6-c-button__icon { color: #0f172a !important; fill: #0f172a !important; }
+.f1-topbar__intake.pf-v6-c-button:focus-visible { outline: 2px solid #f8fafc; outline-offset: 2px; }
 
 .f1-topbar__counts { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; color: #94a3b8; font-size: 12px; font-weight: 500; white-space: nowrap; }
 .masthead-actions { display: flex; flex: 0 0 auto; justify-content: flex-end; align-items: center; gap: 4px; margin-left: auto; }
@@ -149,7 +159,8 @@ button, input, select, textarea { font: inherit; }
 .complex-picker__confirm button:first-child { color: #b1380b; border-color: #b1380b; }
 .complex-picker__empty { padding: 10px; color: #4f5255; font-size: 13px; }
 .complex-picker__error { margin: 0; padding: 8px 10px; color: #b1380b; background: #faeae8; font-size: 12px; line-height: 1.5; }
-.f1-control-strip--buyer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* 기본 strip은 위·아래 두 줄을 세로로 쌓는다. 구입장은 한 줄뿐이라 가로 배치로 되돌린다. */
+.f1-control-strip--buyer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 6px 16px; }
 .f1-control-strip--buyer .f1-control-strip__left-group { display: flex; align-items: center; gap: 8px; }
 .message-composer__number-list { display: grid; gap: 6px; max-height: 220px; margin: 0; padding: 12px; overflow: auto; list-style: none; border-top: 1px solid #d2d2d2; }
 .message-composer__number-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 8px; font-size: 13px; border: 1px solid transparent; border-radius: 4px; }
