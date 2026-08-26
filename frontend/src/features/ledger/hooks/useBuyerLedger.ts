@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { LedgerApiError } from "../api/errors.ts";
+import { ApiError } from "../../../shared/api/index.ts";
 import { ledgerTransport } from "../api/ledgerTransport.ts";
 import type { ListQuery } from "../api/transport.ts";
 import {
@@ -88,7 +88,7 @@ export function useBuyerLedger(
         if (row.serverId == null) {
           const create = toRequirementCreatePayload(row);
           if (create == null) {
-            throw new LedgerApiError({
+            throw new ApiError({
               kind: "validation",
               message:
                 row.partyId == null
@@ -166,7 +166,7 @@ export function useBuyerLedger(
         return;
       }
       if (row.rowVersion == null) {
-        throw new LedgerApiError({
+        throw new ApiError({
           kind: "validation",
           message: "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.",
         });

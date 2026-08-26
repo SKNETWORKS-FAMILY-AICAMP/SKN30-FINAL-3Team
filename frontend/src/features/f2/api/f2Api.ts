@@ -1,5 +1,5 @@
 import { APP_ENV } from "../../../config/env.ts";
-import { getCsrfToken } from "../../ledger/api/session.ts";
+import { getCsrfToken } from "../../../shared/api/index.ts";
 
 type LedgerType = "property" | "buyer";
 

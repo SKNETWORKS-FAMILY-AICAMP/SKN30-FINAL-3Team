@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LedgerApiError, isCanceled } from "../api/errors.ts";
+import { ApiError, isCanceled } from "../../../shared/api/index.ts";
 import type { ListQuery } from "../api/transport.ts";
 import type { PageDto } from "../model/dto.ts";
 import { MAX_PAGE_SIZE } from "../model/dto.ts";
@@ -25,7 +25,7 @@ export interface CollectionState<TRow> {
   totalCount: number;
   /** 상한에 걸려 일부만 불러왔는지. 그리드 건수 표기가 오해를 주지 않게 하려고 노출한다. */
   truncated: boolean;
-  error: LedgerApiError | null;
+  error: ApiError | null;
 }
 
 interface RowLike {
@@ -173,9 +173,9 @@ export function useLedgerCollection<TRow extends RowLike, TDto>(
   );
 }
 
-export function toApiError(error: unknown): LedgerApiError {
-  if (error instanceof LedgerApiError) return error;
-  return new LedgerApiError({
+export function toApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+  return new ApiError({
     kind: "server",
     message: error instanceof Error ? error.message : "알 수 없는 오류입니다.",
     cause: error,

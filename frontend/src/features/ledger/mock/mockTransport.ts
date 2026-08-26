@@ -7,7 +7,7 @@
  */
 
 import { APP_ENV } from "../../../config/env.ts";
-import { LedgerApiError } from "../api/errors.ts";
+import { ApiError } from "../../../shared/api/index.ts";
 import type { LedgerTransport, ListQuery } from "../api/transport.ts";
 import { EMPTY_VALUE, MAX_PAGE_SIZE } from "../model/dto.ts";
 import type {
@@ -65,7 +65,7 @@ async function delay(signal?: AbortSignal): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const onAbort = () => {
       clearTimeout(timer);
-      reject(new LedgerApiError({ kind: "canceled", message: "요청이 취소되었습니다." }));
+      reject(new ApiError({ kind: "canceled", message: "요청이 취소되었습니다." }));
     };
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
@@ -227,7 +227,7 @@ function applyPartyWrites(
 function requireUnit(unitId: number): PropertyUnitRowDto {
   const unit = getState().units.find((row) => row.id === unitId);
   if (unit == null) {
-    throw new LedgerApiError({ kind: "notFound", message: "대상 세대를 찾지 못했습니다.", status: 404 });
+    throw new ApiError({ kind: "notFound", message: "대상 세대를 찾지 못했습니다.", status: 404 });
   }
   return unit;
 }
@@ -235,7 +235,7 @@ function requireUnit(unitId: number): PropertyUnitRowDto {
 function assertVersion(current: number, incoming: number | undefined): void {
   // 실제 서버도 같은 규칙으로 409를 돌려주어야 한다(F1-GR-26).
   if (incoming != null && incoming !== current) {
-    throw new LedgerApiError({
+    throw new ApiError({
       kind: "conflict",
       message: "다른 사용자가 먼저 저장했습니다.",
       status: 409,
@@ -281,10 +281,10 @@ export const mockTransport: LedgerTransport = {
     const state = getState();
     const name = payload.name.trim();
     if (name === "") {
-      throw new LedgerApiError({ kind: "validation", message: "단지명을 입력해 주세요." });
+      throw new ApiError({ kind: "validation", message: "단지명을 입력해 주세요." });
     }
     if (state.complexes.some((entry) => entry.name.toLowerCase() === name.toLowerCase())) {
-      throw new LedgerApiError({ kind: "validation", message: `이미 등록된 단지입니다: ${name}` });
+      throw new ApiError({ kind: "validation", message: `이미 등록된 단지입니다: ${name}` });
     }
     const created: ComplexSummaryDto = {
       id: nextId(),
@@ -302,11 +302,11 @@ export const mockTransport: LedgerTransport = {
     const state = getState();
     const found = state.complexes.find((entry) => entry.id === complexId);
     if (found == null) {
-      throw new LedgerApiError({ kind: "notFound", message: "단지를 찾지 못했습니다.", status: 404 });
+      throw new ApiError({ kind: "notFound", message: "단지를 찾지 못했습니다.", status: 404 });
     }
     assertVersion(found.row_version, rowVersion);
     if (state.units.some((unit) => unit.complex.id === complexId)) {
-      throw new LedgerApiError({
+      throw new ApiError({
         kind: "validation",
         message: "이 단지에 등록된 세대가 있어 삭제할 수 없습니다.",
         status: 422,
@@ -331,7 +331,7 @@ export const mockTransport: LedgerTransport = {
     const complex =
       MOCK_COMPLEXES.find((entry) => entry.id === payload.complex_id) ?? MOCK_COMPLEXES[0];
     if (complex == null) {
-      throw new LedgerApiError({ kind: "validation", message: "단지를 찾지 못했습니다.", status: 422 });
+      throw new ApiError({ kind: "validation", message: "단지를 찾지 못했습니다.", status: 422 });
     }
 
     const created: PropertyUnitRowDto = {
@@ -443,7 +443,7 @@ export const mockTransport: LedgerTransport = {
     const unit = getState().units.find((row) => row.current_listing?.id === listingId);
     const listing = unit?.current_listing;
     if (listing == null) {
-      throw new LedgerApiError({ kind: "notFound", message: "대상 매물을 찾지 못했습니다.", status: 404 });
+      throw new ApiError({ kind: "notFound", message: "대상 매물을 찾지 못했습니다.", status: 404 });
     }
     assertVersion(listing.row_version, payload.row_version);
     Object.assign(listing, {
@@ -477,7 +477,7 @@ export const mockTransport: LedgerTransport = {
     await delay(signal);
     const requirement = getState().requirements.find((row) => row.id === requirementId);
     if (requirement == null) {
-      throw new LedgerApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
+      throw new ApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
     }
     const complex = MOCK_COMPLEXES[requirementId % MOCK_COMPLEXES.length] ?? MOCK_COMPLEXES[0];
     return structuredClone({
@@ -530,7 +530,7 @@ export const mockTransport: LedgerTransport = {
     await delay(signal);
     const requirement = getState().requirements.find((row) => row.id === requirementId);
     if (requirement == null) {
-      throw new LedgerApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
+      throw new ApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
     }
     assertVersion(requirement.row_version, payload.row_version);
     Object.assign(requirement, {
@@ -559,7 +559,7 @@ export const mockTransport: LedgerTransport = {
     const state = getState();
     const requirement = state.requirements.find((row) => row.id === requirementId);
     if (requirement == null) {
-      throw new LedgerApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
+      throw new ApiError({ kind: "notFound", message: "대상 손님을 찾지 못했습니다.", status: 404 });
     }
     assertVersion(requirement.row_version, rowVersion);
     state.requirements = state.requirements.filter((row) => row.id !== requirementId);
@@ -569,7 +569,7 @@ export const mockTransport: LedgerTransport = {
     await delay(signal);
     // 범위 없는 전체 조회는 제공하지 않는다.
     if (scope.unitId == null && scope.requirementId == null && scope.partyId == null) {
-      throw new LedgerApiError({
+      throw new ApiError({
         kind: "validation",
         message: "조회 범위를 지정해야 합니다.",
         status: 422,
