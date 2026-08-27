@@ -31,6 +31,7 @@ import {
   toBuyerRow,
   toRequirementCreatePayload,
 } from "../src/features/ledger/model/buyerMapper.ts";
+import { isEmptyDraft } from "../src/features/ledger/model/draft.ts";
 import {
   createRequirementRowDtos,
   createUnitRowDtos,
@@ -361,4 +362,36 @@ test("서버 식별자 반영은 재시도가 같은 레코드를 다시 만들�
   const afterListing = applyServerIdentity(afterUnit, { id: 42, row_version: 3 }, { id: 7, row_version: 1 });
   assert.equal(afterListing.listingId, 7);
   assert.equal(afterListing.listingRowVersion, 1);
+});
+
+/* ------------------------------------------------------------------ */
+/* 빈 행 (F1-GR-30, F1-GR-32)                                          */
+/* ------------------------------------------------------------------ */
+
+test("행 추가만 하고 닫은 행은 빈 행이다", () => {
+  // 값을 하나도 넣지 않은 행은 저장할 것이 없다. 그리드에 남기면 빈 임시저장 행만 쌓인다.
+  assert.equal(isEmptyDraft(createPropertyDraftRow("DRAFT-1")), true);
+  assert.equal(isEmptyDraft(createBuyerDraftRow("BUYER-DRAFT-1")), true);
+});
+
+test("값을 하나라도 적은 행은 빈 행이 아니다", () => {
+  assert.equal(isEmptyDraft({ ...createPropertyDraftRow("DRAFT-1"), unit: "301" }), false);
+  assert.equal(isEmptyDraft({ ...createPropertyDraftRow("DRAFT-1"), log: "집주인 통화" }), false);
+  // 음성메모 접수로 채운 행은 사용자가 다시 열어 저장할 수 있어야 한다.
+  assert.equal(isEmptyDraft({ ...createBuyerDraftRow("BUYER-DRAFT-1"), buyer: "김손님" }), false);
+});
+
+test("저장 상태와 동기화 상태만으로는 빈 행 판단이 흔들리지 않는다", () => {
+  // 저장에 실패해 sync가 남은 빈 행도 여전히 빈 행이다.
+  const failed = {
+    ...createPropertyDraftRow("DRAFT-1"),
+    sync: { status: "failed", reason: "호는 저장 전에 반드시 입력해야 합니다." } as const,
+  };
+  assert.equal(isEmptyDraft(failed), true);
+});
+
+test("서버에 저장된 행은 값이 비어 보여도 빈 행이 아니다", () => {
+  // 이미 서버에 있는 레코드는 화면에서 조용히 지우면 안 된다. 삭제는 별도 경로다.
+  const saved = { ...createPropertyDraftRow("DRAFT-1"), serverId: 42, rowVersion: 1 };
+  assert.equal(isEmptyDraft(saved), false);
 });
