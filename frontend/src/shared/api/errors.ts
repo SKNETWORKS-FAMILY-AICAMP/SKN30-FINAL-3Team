@@ -37,6 +37,18 @@ export interface ApiErrorOptions {
   code?: string;
   /** 추적용 요청 식별자(api.md의 `request_id`). */
   requestId?: string;
+  /**
+   * 사용자에게 그대로 보여도 되는 문구.
+   *
+   * 화면 코드가 직접 만든 오류에만 붙인다. 무엇을 고쳐야 하는지 아는 자리에서 쓴 문장이라
+   * 일반 문구로 덮으면 "입력값을 확인해 주세요"만 남는다.
+   *
+   * 응답에서 만든 오류에는 붙이지 않는다. 서버 원문에는 개인정보, 토큰, 내부 구현이
+   * 섞일 수 있어 분류나 도메인 코드로만 안내한다. 이 필드를 명시적으로 두는 이유가 그것이다.
+   * `status`가 없다는 사실만으로 "화면이 만든 오류"라고 볼 수 없다. mock 전송처럼
+   * 응답을 흉내 내면서 `status`를 싣지 않는 자리가 있다.
+   */
+  userMessage?: string;
   cause?: unknown;
 }
 
@@ -45,6 +57,7 @@ export class ApiError extends Error {
   readonly status: number | undefined;
   readonly code: string | undefined;
   readonly requestId: string | undefined;
+  readonly userMessage: string | undefined;
 
   constructor(options: ApiErrorOptions) {
     super(options.message, options.cause == null ? undefined : { cause: options.cause });
@@ -53,6 +66,7 @@ export class ApiError extends Error {
     this.status = options.status;
     this.code = options.code;
     this.requestId = options.requestId;
+    this.userMessage = options.userMessage;
   }
 }
 
