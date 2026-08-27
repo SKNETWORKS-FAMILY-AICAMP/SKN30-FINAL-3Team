@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.parse import parse_qs, unquote, urlsplit
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "manage_db_access.py"
@@ -139,6 +140,138 @@ class ManageDbAccessTest(unittest.TestCase):
         with self.assertRaises(MODULE.ToolError):
             MODULE.settings_from(wrong_region)
 
+    def test_create_session_account_runs_backend_manage_with_iam_tunnel(self) -> None:
+        settings = MODULE.Settings(
+            account_id="123456789012",
+            profile="skn30-session",
+            region="ap-northeast-2",
+            project="skn30-final-3team",
+            local_port=15432,
+            operator_role="TerraformOperatorRole",
+        )
+        direct = mock.MagicMock()
+        sts = mock.MagicMock()
+        sts.get_caller_identity.return_value = {
+            "Arn": "arn:aws:iam::123456789012:user/team/alice"
+        }
+        rds = mock.MagicMock()
+        rds.generate_db_auth_token.return_value = "signed/token"
+        direct.client.side_effect = lambda service: {"sts": sts, "rds": rds}[service]
+        completed = mock.MagicMock(returncode=0)
+
+        with (
+            mock.patch.object(MODULE, "base_session", return_value=direct),
+            mock.patch.object(MODULE, "describe_database", return_value=self.target()),
+            mock.patch.object(
+                MODULE, "find_app_instance", return_value="i-0123456789abcdef0"
+            ),
+            mock.patch.object(
+                MODULE, "ensure_ca_bundle", return_value=Path("/tmp/rds-ca.pem")
+            ),
+            mock.patch.object(MODULE, "PortForward") as port_forward,
+            mock.patch.object(MODULE.subprocess, "run", return_value=completed) as run,
+        ):
+            MODULE.create_session_account(
+                settings,
+                brokerage_name="개발 중개사무소",
+                login_id="developer",
+                display_name="Developer",
+                role="OWNER",
+                apply=True,
+            )
+
+        port_forward.assert_called_once_with(
+            direct, "i-0123456789abcdef0", self.target(), 15432
+        )
+        command = run.call_args.args[0]
+        self.assertEqual(
+            command[:6],
+            [
+                "uv",
+                "run",
+                "--frozen",
+                "python",
+                "src/manage.py",
+                "create-development-user",
+            ],
+        )
+        self.assertIn("개발 중개사무소", command)
+        environment = run.call_args.kwargs["env"]
+        self.assertEqual(environment["APP_ENV"], "local")
+        self.assertEqual(environment["AUTH_DEVELOPMENT_ENABLED"], "false")
+        self.assertEqual(environment["DB_TARGET"], "development")
+        self.assertEqual(environment["PGOPTIONS"], "-c role=app_owner")
+        self.assertNotIn("signed/token", environment["DB_URL"])
+        self.assertEqual(
+            unquote(urlsplit(environment["DB_URL"]).password or ""), "signed/token"
+        )
+
+    def test_seed_f3_uses_fixed_files_and_private_iam_token(self) -> None:
+        settings = MODULE.Settings(
+            account_id="123456789012",
+            profile="skn30-session",
+            region="ap-northeast-2",
+            project="skn30-final-3team",
+            local_port=15432,
+            operator_role="TerraformOperatorRole",
+        )
+        direct = mock.MagicMock()
+        sts = mock.MagicMock()
+        sts.get_caller_identity.return_value = {
+            "Arn": "arn:aws:iam::123456789012:user/team/alice"
+        }
+        rds = mock.MagicMock()
+        rds.generate_db_auth_token.return_value = "signed/token"
+        direct.client.side_effect = lambda service: {"sts": sts, "rds": rds}[service]
+        applied = mock.MagicMock(returncode=0)
+        verified = mock.MagicMock(
+            returncode=0,
+            stdout="\n".join(f"check-{index}|1|1|PASS" for index in range(29))
+            + "\n",
+        )
+
+        with (
+            mock.patch.object(MODULE.shutil, "which", return_value="/usr/bin/psql"),
+            mock.patch.object(MODULE, "base_session", return_value=direct),
+            mock.patch.object(MODULE, "describe_database", return_value=self.target()),
+            mock.patch.object(
+                MODULE, "find_app_instance", return_value="i-0123456789abcdef0"
+            ),
+            mock.patch.object(
+                MODULE, "ensure_ca_bundle", return_value=Path("/tmp/rds-ca.pem")
+            ),
+            mock.patch.object(MODULE, "PortForward") as port_forward,
+            mock.patch.object(
+                MODULE.subprocess, "run", side_effect=[applied, verified]
+            ) as run,
+        ):
+            MODULE.seed_f3(settings, apply=True)
+
+        port_forward.assert_called_once_with(
+            direct, "i-0123456789abcdef0", self.target(), 15432
+        )
+        apply_command = run.call_args_list[0].args[0]
+        verify_command = run.call_args_list[1].args[0]
+        self.assertEqual(apply_command.count("-f"), 2)
+        self.assertIn(str(MODULE.F3_SEED_RESET), apply_command)
+        self.assertIn(str(MODULE.F3_SEED_DATA), apply_command)
+        self.assertIn(str(MODULE.F3_SEED_VERIFY), verify_command)
+        environment = run.call_args_list[0].kwargs["env"]
+        self.assertEqual(environment["PGPASSWORD"], "signed/token")
+        self.assertEqual(environment["PGHOSTADDR"], "127.0.0.1")
+        self.assertEqual(environment["PGSSLMODE"], "verify-full")
+        self.assertEqual(environment["PGOPTIONS"], "-c role=app_owner")
+        self.assertNotIn("signed/token", " ".join(apply_command))
+        self.assertNotIn("signed/token", " ".join(verify_command))
+
+    def test_seed_f3_verification_rejects_fail_or_wrong_count(self) -> None:
+        passing = "\n".join(f"check-{index}|1|1|PASS" for index in range(29))
+        MODULE.verify_f3_seed_output(passing)
+
+        with self.assertRaisesRegex(MODULE.ToolError, "reported FAIL"):
+            MODULE.verify_f3_seed_output(passing.replace("|PASS", "|FAIL", 1))
+        with self.assertRaisesRegex(MODULE.ToolError, "unexpected check count"):
+            MODULE.verify_f3_seed_output("check|1|1|PASS")
 
     def test_ensure_role_formats_password_as_literal(self) -> None:
         executed: list[tuple[object, ...]] = []
@@ -151,7 +284,9 @@ class ManageDbAccessTest(unittest.TestCase):
                 return None
 
         cursor = DummyCursor()
-        MODULE.ensure_role(cursor, "app_runtime", login=True, password="secret'password")
+        MODULE.ensure_role(
+            cursor, "app_runtime", login=True, password="secret'password"
+        )
         ddl_calls = [
             (q.as_string() if hasattr(q, "as_string") else str(q), p)
             for q, p in executed
@@ -160,7 +295,9 @@ class ManageDbAccessTest(unittest.TestCase):
         self.assertTrue(any("PASSWORD 'secret''password'" in q for q, _ in ddl_calls))
         self.assertTrue(all(p is None for _, p in ddl_calls))
 
-    def test_client_info_prints_token_once_without_embedding_it_in_command(self) -> None:
+    def test_client_info_prints_token_once_without_embedding_it_in_command(
+        self,
+    ) -> None:
         settings = MODULE.Settings(
             account_id="123456789012",
             profile="skn30-session",

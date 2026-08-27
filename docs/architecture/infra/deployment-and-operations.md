@@ -1,7 +1,7 @@
 ---
 status: 결정
 implementation: 기존 delivery 적용됨·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-25
+updated: 2026-08-27
 ---
 
 # 배포 및 운영 구조
@@ -18,7 +18,7 @@ updated: 2026-08-25
 |---|---|---|---|---|
 | `dev-integrated` | 최종 전환 후 `dev` 자동 감지 | Backend+AI와 Frontend 병렬 | Backend image와 Frontend release 병렬 | migration → Backend/Worker → health → Frontend |
 | `dev-backend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | Backend+AI, disposable DB | Backend image | migration → Backend/Worker → health |
-| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
+| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | test:env·test:auth, typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
 
 세 Pipeline은 CodePipeline V2 `QUEUED`다. 독립 Pipeline 실행 권한이 운영자 승인 역할을 하므로 내부 Manual approval은 두지 않는다. 통합 Pipeline도 별도 승인 없이 끝까지 진행한다. 애플리케이션 Pipeline은 Terraform을 실행하지 않는다.
 
@@ -82,7 +82,7 @@ Launch Template은 SSM, Docker, pinned Compose plugin, CodeDeploy agent와 Cloud
 | `ApplicationStart` | API와 Worker 시작 |
 | `ValidateService` | container health와 local `/health/ready` 확인 |
 
-runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. API에는 Backend 설정과 `DB_URL`, Worker에는 Backend·AI 설정과 Provider key·`DB_URL`, migration에는 `DB_MIGRATION_URL`만 담긴 별도 env 파일을 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
+runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. API에는 Backend·AI 공개 설정, F2용 vLLM LLM·STT key와 `DB_URL`, Worker에는 Backend·AI 공개 설정, 전체 Provider key와 `DB_URL`, migration에는 `DB_MIGRATION_URL`만 담긴 별도 env 파일을 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
 
 CodeDeploy deployment group은 ASG와 target group을 사용하고 실패 시 마지막 정상 revision으로 자동 rollback한다. rollback은 image와 application revision만 되돌리고 DB down migration을 실행하지 않는다.
 
@@ -90,9 +90,9 @@ Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM clea
 
 ## Frontend build와 배포
 
-Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
+Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → test:env → test:auth → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
 
-운영 `VITE_*` 공개값은 Terraform의 단일 Frontend build map에서 CodeBuild process env로 동적
+배포별 `VITE_*` 공개값은 Terraform의 단일 Frontend build map에서 CodeBuild process env로 동적
 전달한다. CloudFront의 동일 origin routing을 사용하므로 API base는 절대 domain이 아니라 `/api`
 하위 상대 경로다. 새 build 변수를 release manifest schema에 추가하지 않는다.
 

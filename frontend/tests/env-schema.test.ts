@@ -5,6 +5,7 @@ import { parseAppEnv } from "../src/config/envSchema.ts";
 
 function validEnv(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    VITE_AUTH_DEVELOPMENT_ENABLED: "true",
     VITE_LEDGER_SOURCE: "mock",
     VITE_API_BASE_URL: "/api/v1",
     VITE_MOCK_ROW_COUNT: "7200",
@@ -18,12 +19,46 @@ test("parses the complete public frontend environment", () => {
 
   assert.deepEqual(parsed, {
     apiBaseUrl: "/api/v1",
+    authDevelopmentEnabled: true,
     ledgerSource: "mock",
     f3Source: "mock",
     mockRowCount: 7200,
     mockLatencyMs: 350,
   });
   assert.ok(Object.isFrozen(parsed));
+});
+
+test('accepts the exact public boolean value "true"', () => {
+  assert.equal(
+    parseAppEnv(validEnv({ VITE_AUTH_DEVELOPMENT_ENABLED: "true" }))
+      .authDevelopmentEnabled,
+    true,
+  );
+});
+
+test('accepts the exact public boolean value "false"', () => {
+  assert.equal(
+    parseAppEnv(validEnv({ VITE_AUTH_DEVELOPMENT_ENABLED: "false" }))
+      .authDevelopmentEnabled,
+    false,
+  );
+});
+
+test("rejects a missing development-auth flag", () => {
+  assert.throws(
+    () => parseAppEnv(validEnv({ VITE_AUTH_DEVELOPMENT_ENABLED: undefined })),
+    /VITE_AUTH_DEVELOPMENT_ENABLED/,
+  );
+});
+
+test("rejects non-canonical development-auth flag values", () => {
+  for (const value of ["", " ", "TRUE", "False", "1", "yes", true]) {
+    assert.throws(
+      () => parseAppEnv(validEnv({ VITE_AUTH_DEVELOPMENT_ENABLED: value })),
+      /VITE_AUTH_DEVELOPMENT_ENABLED/,
+      String(value),
+    );
+  }
 });
 
 test("accepts and normalizes any same-origin /api subtree", () => {

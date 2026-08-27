@@ -1,7 +1,27 @@
 version: 1
-updated: "2026-08-24"
+updated: "2026-08-27"
 
 sources:
+  - id: "f3-cross-judgment-manual-trigger-2026-08-27"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-27)"
+    received: "2026-08-27"
+    reflected_in:
+      - "docs/requirements/f3/cross-judgment.md"
+      - "docs/requirements/common/integrations.md"
+      - "docs/requirements/changelog.md"
+      - "docs/requirements/traceability.yaml"
+      - "docs/architecture/f3/overview.md"
+      - "docs/architecture/f3/online-runtime.md"
+      - "docs/architecture/f3/offline-data-evaluation.md"
+      - "docs/screen/SCREEN_MATRIX_F1_F2_F3.md"
+      - "docs/screen/화면구조_분석_F1_F2_F3.md"
+      - "frontend/src/AppShell.jsx"
+      - "frontend/src/features/DetailWorkspace.jsx"
+      - "frontend/src/features/BuyerDetailWorkspace.jsx"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: "F3-CR-03·04를 상세 진입 자동 실행에서 상세의 [교차 판정] 버튼 실행으로 변경하고, F3-CR-01·02의 저장 성공 후 Backend 자동 접수는 유지"
+
   - id: "pr-policy-false-positive-reduction-2026-08-24"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-24)"

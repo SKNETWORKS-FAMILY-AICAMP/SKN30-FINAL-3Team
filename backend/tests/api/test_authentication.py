@@ -72,9 +72,13 @@ def test_development_session_sets_session_and_csrf_cookies(
 ) -> None:
     config = make_config(
         {
+            "APP_ENV": "dev",
+            "DB_TARGET": "development",
             "AUTH_DEVELOPMENT_ENABLED": "true",
             "AUTH_DEVELOPMENT_BROKERAGE_ID": "3",
             "AUTH_DEVELOPMENT_LOGIN_ID": "developer",
+            "AUTH_SESSION_IDLE_TIMEOUT_MINUTES": "30",
+            "AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES": "720",
         }
     )
     issued = IssuedSession(
@@ -95,7 +99,9 @@ def test_development_session_sets_session_and_csrf_cookies(
     assert response.cookies.get(config.auth.session.csrf_cookie_name) == CSRF_TOKEN
     set_cookie_headers = response.headers.get_list("set-cookie")
     assert all("HttpOnly" in header for header in set_cookie_headers)
+    assert all("Secure" in header for header in set_cookie_headers)
     assert all("SameSite=lax" in header for header in set_cookie_headers)
+    assert all("Max-Age=43200" in header for header in set_cookie_headers)
 
 
 def test_logout_clears_session_and_csrf_cookies(
@@ -133,6 +139,22 @@ def test_logout_clears_session_and_csrf_cookies(
 
 
 def test_development_session_route_is_absent_when_disabled(config: Config) -> None:
+    app = create_app(config=config, readiness_probe=lambda request: True)
+
+    with TestClient(app) as client:
+        response = client.post("/api/v1/auth/development-session")
+
+    assert response.status_code == 404
+
+
+def test_development_session_route_is_absent_in_test_even_when_configured(make_config) -> None:
+    config = make_config(
+        {
+            "AUTH_DEVELOPMENT_ENABLED": "true",
+            "AUTH_DEVELOPMENT_BROKERAGE_ID": "3",
+            "AUTH_DEVELOPMENT_LOGIN_ID": "developer",
+        }
+    )
     app = create_app(config=config, readiness_probe=lambda request: True)
 
     with TestClient(app) as client:

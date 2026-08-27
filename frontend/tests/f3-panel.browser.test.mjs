@@ -18,6 +18,7 @@ import { chromium } from "playwright";
 
 /** 실제 사용자 데이터와 무관한 mock 설정. 지연을 0으로 두어 확인 시간을 줄인다. */
 const SERVER_ENV = {
+  VITE_AUTH_DEVELOPMENT_ENABLED: "true",
   VITE_LEDGER_SOURCE: "mock",
   VITE_API_BASE_URL: "/api/v1",
   VITE_MOCK_ROW_COUNT: "40",

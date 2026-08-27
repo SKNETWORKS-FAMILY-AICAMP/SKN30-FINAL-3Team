@@ -21,6 +21,7 @@ export { describeForUser } from "./api/errors.ts";
 export { EMPTY_VALUE, MAX_PAGE_SIZE } from "./model/dto.ts";
 export type { BuyerRow, LedgerRow, PropertyRow, RowSyncState, SaveState } from "./model/row.ts";
 export { isBuyerRow, isPropertyRow, isUnsavedDraft } from "./model/row.ts";
+export { isEmptyDraft } from "./model/draft.ts";
 
 export { formatMoney, parseMoney } from "../../shared/format/index.ts";
 export { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "../../shared/format/index.ts";

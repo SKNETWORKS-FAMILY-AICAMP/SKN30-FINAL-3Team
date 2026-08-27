@@ -1,6 +1,16 @@
 version: 1
-updated: "2026-08-14"
+updated: "2026-08-27"
 
 # 상세 요구사항은 분할 Markdown 정본에만 둔다.
 # 구현 또는 테스트가 생긴 PR에서 요구사항 ID별 경로를 추가한다.
-requirements: []
+requirements:
+  - id: F3-CR-03
+    summary: 손님 상세의 [교차 판정] 버튼으로 실행
+    implementation:
+      - frontend/src/AppShell.jsx
+      - frontend/src/features/BuyerDetailWorkspace.jsx
+  - id: F3-CR-04
+    summary: 세대 상세의 [교차 판정] 버튼으로 실행
+    implementation:
+      - frontend/src/AppShell.jsx
+      - frontend/src/features/DetailWorkspace.jsx

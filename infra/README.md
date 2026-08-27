@@ -2,6 +2,8 @@
 
 Terraform을 AWS 인프라 변경의 정본으로 사용한다. 현재 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없으므로 Billing 자원을 만들지 않는다. 기존 선택적 Budget 입력은 현재 state 호환을 위해 남아 있지만 `create_budget=false`만 허용하며, 2026-09-23까지 누적 300,000원은 자동 집행 없는 운영 참고 상한이다. workload 자원은 plan과 별도 승인 없이 만들지 않는다.
 
+`environments/dev`는 prod를 대신하는 운영 환경이 아니라 공유 애플리케이션 dev 환경이다. CloudFront 주소는 공개되어 있으며 합성·비식별 데이터만 허용한다.
+
 현재 AWS 계정 bootstrap과 S3 원격 state 이관은 완료됐다. 새 PC에서는 bootstrap을 다시 실행하지 않고 아래의 로컬 연결 스크립트를 사용한다.
 
 Terraform 관리는 다음 세 요소를 함께 사용한다. S3 state에는 Terraform 코드가 저장되지 않으므로 항상 저장소의 최신 승인 코드를 먼저 받아야 한다.
@@ -27,7 +29,8 @@ Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. �
 - [just](https://github.com/casey/just)
 - uv
 - [aws cli](https://docs.aws.amazon.com/ko_kr/cli/latest/userguide/getting-started-install.html)
-  - [session manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-debian-and-ubuntu.html): cli 설치 후 세션 매니저 플러그인 설치
+- [session manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-debian-and-ubuntu.html): cli 설치 후 세션 매니저 플러그인 설치
+- PostgreSQL 15 `psql`: 공유 dev F3 합성 seed 적용에 필요
 - python 3.13
 - [terraform](https://developer.hashicorp.com/terraform/install)
 
@@ -74,7 +77,7 @@ just setup 2026-09-23
 just setup-existing 2026-09-23
 ```
 
-이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다.
+이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다. 기존 `dev.tfvars`가 있으면 `target_account_id`와 `expires_at`이 요청값과 같은지만 검증하고 계정 블록을 포함한 전체 내용을 보존한다. 두 기본값이 다르면 `--force`로도 자동 수정하지 않고 중단한다.
 
 ### 수동 비밀값 준비
 
@@ -85,7 +88,7 @@ cp environments/dev/secrets.example.tfvars environments/dev/secrets.auto.tfvars
 chmod 600 environments/dev/secrets.auto.tfvars
 ```
 
-- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`는 필수이고 vLLM API key는 필요한 항목만 추가한다.
+- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`, `AI_VLLM_LLM_API_KEY`, `AI_VLLM_STT_API_KEY`는 필수이고 Embedding 등 다른 vLLM API key는 필요할 때 추가한다.
 - `discord_webhook_url`: Discord webhook HTTPS URL을 입력한다.
 - 각 `*_secret_version`: 비밀값을 바꿀 때 함께 1씩 증가시킨다.
 
@@ -199,6 +202,43 @@ just db-sync
 ```bash
 just db-migrate
 ```
+
+공유 dev에 검토된 F3 합성 장부를 재적재할 때는 migration 적용 후 다음 명령을 사용한다.
+
+```bash
+just dev-seed-f3
+```
+
+이 명령은 개인 IAM 인증과 SSM 터널을 사용해 `F3_SYNTHETIC 합성중개사무소`만 reset하고,
+커밋된 seed를 적용한 뒤 29개 검사가 모두 `PASS`인지 확인한다. IAM token과 DB URL은 출력하지
+않는다. 기존 F3 실행 결과도 reset되므로 공유 dev에서 실행 중인 API 요청과 Worker 작업이 없을 때
+확인 프롬프트를 승인한다. prod 또는 임의 DB를 대상으로 실행할 수 없고 파일 경로도 받지 않는다.
+
+공유 AWS dev DB에 고정 합성 개발 세션 계정을 만들 때는 중개사무소명, 로그인 ID와 표시명을 전달한다.
+역할은 생략하면 `OWNER`이며 `OWNER`, `STAFF`, `READ_ONLY` 중 하나를 사용할 수 있다.
+
+```bash
+just dev-create-session-account "개발 중개사무소" developer "Developer" OWNER
+```
+
+이 명령은 개인 `aws login` 세션으로 SSM 터널과 15분 IAM DB 인증을 만들고 Backend의
+`manage.py create-development-user`를 실행한다. IAM token이나 DB URL은 출력·저장하지 않는다.
+생성 결과의 `brokerage_id`와 `login_id`는 Git에서 제외된
+`environments/dev/dev.tfvars`에 다음과 같이 설정한다.
+
+```hcl
+development_auth = {
+  brokerage_id = 1
+  login_id      = "developer"
+}
+```
+
+`development_auth = null`이면 Backend의 개발 세션 경로는 식별자 설정 없이
+`false`로 주입되고 Frontend 버튼도 숨겨진다. 값이 있으면 하나의 Terraform
+변수에서 Backend의 `AUTH_DEVELOPMENT_*`와 Frontend의
+`VITE_AUTH_DEVELOPMENT_ENABLED=true`를 함께 파생한다. CloudFront dev 주소는 공개되어
+있으므로 이 계정에는 합성·비식별 데이터만 두고, URL을 아는 모든 사용자가
+같은 개발 계정 세션을 발급받을 수 있음을 전제한다.
 
 적용 후 운영자는 runtime credential·RDS endpoint metadata와 고정 DB 역할의 로그인 속성 및
 필수 role membership을 검증한다.

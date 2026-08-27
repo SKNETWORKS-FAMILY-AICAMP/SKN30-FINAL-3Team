@@ -10,7 +10,9 @@ from brokerage_ai.f3.judgment_contracts import (
     JudgmentCard,
 )
 
-BROKERAGE_JUDGMENT_PROMPT_VERSION = "brokerage-judgment-prompt:v1"
+# v2: `each_candidate_appears_once` 가 강제하던 "같은 후보를 두 번 판정하지 않는다"를 규칙 2에
+# 명시했다. JSON schema 로 표현할 수 없어 모델이 그 존재를 알 방법이 없었다.
+BROKERAGE_JUDGMENT_PROMPT_VERSION = "brokerage-judgment-prompt:v2"
 
 _ROLE = (
     "너는 중개 판정자다. 한쪽을 대리하지 않는다. 앵커 포지션 카드 1장과 반대편 후보 카드 "
@@ -22,6 +24,7 @@ _RULES = """규칙을 모두 지킨다.
 1. 출력 언어는 한국어다. 현업 표기(경신·월환·명도·붙박이)를 그대로 쓴다.
 2. 받은 후보를 **전부** 판정한다. 하나도 빠뜨리지 않고, 받지 않은 후보를 만들지 않는다.
    card_id 는 입력에 있는 값을 그대로 쓴다.
+   - 같은 card_id 를 두 번 판정하지 않는다. 후보마다 판정은 한 번뿐이다.
 3. 등급은 STRONG, WEAK, REJECTED 셋뿐이다.
    - STRONG: 지금 연결할 만하다.
    - WEAK: 조건이 움직이면 가능하다.

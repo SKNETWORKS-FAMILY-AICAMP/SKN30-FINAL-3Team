@@ -1,13 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-27
 ---
 
 # ADR-0015: 환경설정과 비밀값의 소유권을 환경별로 분리
 
 - 상태: 승인됨
 - 결정일: 2026-08-24
-- 관련 문서: [개발환경 원칙](../development/environments.md)
+- 관련 문서: [개발환경 원칙](../development/environments.md), [공유 dev 환경](ADR-0017-shared-dev-development-session.md)
 
 ## 맥락
 
@@ -22,9 +22,9 @@ updated: 2026-08-24
 - Git에서 제외한 `.env`는 개발자가 `.env.example`을 복사해 만드는 개인 비밀값·override 파일이다.
   `.env.example`에는 비밀 또는 개인 입력이 필요한 변수 이름만 빈 값으로 둔다.
 - 로컬 설정 우선순위는 `process env > .env > .env.local > 코드 기본값`이다. Backend·AI의
-  test·prod는 저장소 dotenv 파일을 읽지 않고 process env만 사용한다. Frontend build는 공개
+  dev·test·prod는 저장소 dotenv 파일을 읽지 않고 process env만 사용한다. Frontend build는 공개
   공통값인 `.env.local`을 읽되 CI·release의 process env가 배포별 값을 덮는다.
-- `.env.prod`와 모드별 dotenv 파일은 사용하지 않는다. 운영 비민감 Backend·AI 설정은 Terraform
+- `.env.prod`와 모드별 dotenv 파일은 사용하지 않는다. 배포별 비민감 Backend·AI 설정은 Terraform
   map이 Parameter Store에 기록하고, 배포가 프로세스별 env 파일로 주입한다.
 - 수동으로 제공하는 AI Provider key와 Discord webhook은 Git에서 제외한 tfvars에서 받는다.
   Terraform의 ephemeral input과 Secrets Manager write-only version 인자를 사용해 plan과 state에

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from brokerage_ai.core.errors import AiError
+from brokerage_ai.core.errors import OutputContractError
 from brokerage_ai.f3.contracts import (
     ALLOWED_PRICE_KINDS,
     Evidence,
@@ -26,7 +26,7 @@ from brokerage_ai.f3.contracts import (
 )
 
 
-class PositionCardContractError(AiError):
+class PositionCardContractError(OutputContractError):
     """결과가 요청과 맞지 않는다. 이 결과로 카드를 저장하면 안 된다."""
 
 

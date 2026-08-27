@@ -58,6 +58,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn("npm run typecheck", verify_script)
         self.assertIn("npm run test:ledger", verify_script)
         self.assertIn("npm run test:env", verify_script)
+        self.assertIn("npm run test:auth", verify_script)
         self.assertNotIn("npm run build", verify_script)
         self.assertNotIn("npm run test:release", verify_script)
         self.assertIn("npm run build", build_script)
@@ -200,6 +201,15 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         )
         self.assertNotIn("secret_string         =", configuration)
         self.assertIn("ephemeral   = true", variables)
+        for required_key in (
+            "AI_OPENAI_API_KEY",
+            "AI_VLLM_LLM_API_KEY",
+            "AI_VLLM_STT_API_KEY",
+        ):
+            self.assertIn(
+                f'contains(keys(var.ai_provider_api_keys), "{required_key}")',
+                variables,
+            )
         self.assertIn('length(regexall("[[:space:]]", value)) == 0', variables)
         self.assertIn(
             'length(regexall("[[:space:]]", var.discord_webhook_url)) == 0',
@@ -225,6 +235,64 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn('check "frontend_build_environment"', checks)
         self.assertIn('can(regex("^VITE_[A-Z0-9_]+$", name))', checks)
         self.assertIn('trimspace(value) != ""', checks)
+
+    def test_development_auth_drives_backend_and_frontend_together(self) -> None:
+        variables = read("infra/environments/dev/variables.tf")
+        configuration = read("infra/environments/dev/configuration.tf")
+        delivery = read("infra/environments/dev/delivery.tf")
+
+        self.assertIn('variable "development_auth"', variables)
+        self.assertIn("default   = null", variables)
+        self.assertIn("nullable  = true", variables)
+        self.assertIn("sensitive = false", variables)
+        self.assertIn(
+            "condition = var.development_auth == null ? true : (", variables
+        )
+        self.assertIn(
+            "var.development_auth.brokerage_id == "
+            "floor(var.development_auth.brokerage_id)",
+            variables,
+        )
+        self.assertIn(
+            "length(trimspace(var.development_auth.login_id)) >= 1", variables
+        )
+        self.assertIn(
+            "length(trimspace(var.development_auth.login_id)) <= 100", variables
+        )
+        self.assertIn(
+            "development_auth_enabled = var.development_auth != null",
+            configuration,
+        )
+        self.assertIn(
+            "development_auth == null ? tomap({}) : tomap({", configuration
+        )
+        self.assertIn("AUTH_DEVELOPMENT_BROKERAGE_ID", configuration)
+        self.assertIn("AUTH_DEVELOPMENT_LOGIN_ID", configuration)
+        self.assertIn(
+            "AUTH_DEVELOPMENT_ENABLED              = "
+            "tostring(local.development_auth_enabled)",
+            configuration,
+        )
+        self.assertIn(
+            "VITE_AUTH_DEVELOPMENT_ENABLED = "
+            "tostring(local.development_auth_enabled)",
+            delivery,
+        )
+
+    def test_deployed_backend_uses_dev_profile_and_short_session_timeouts(
+        self,
+    ) -> None:
+        configuration = read("infra/environments/dev/configuration.tf")
+
+        for setting in (
+            'APP_ENV                               = "dev"',
+            'DB_TARGET                             = "development"',
+            'AUTH_SESSION_IDLE_TIMEOUT_MINUTES     = "30"',
+            'AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "720"',
+        ):
+            self.assertIn(setting, configuration)
+        self.assertNotIn('APP_ENV                               = "prod"', configuration)
+        self.assertNotIn('DB_TARGET                             = "production"', configuration)
 
     def test_account_link_setup_does_not_require_application_secrets(self) -> None:
         verification = read("infra/scripts/verify-account-link.sh")

@@ -45,6 +45,7 @@ npm run dev       # 개발 서버
 npm run preview   # 빌드 결과 미리보기
 npm run typecheck # TypeScript strict 검사
 npm run test:ledger # 원장 변환 테스트
+npm run test:auth   # 인증 계약·로그인 화면 테스트
 npm run test:env    # 환경변수 우선순위·검증 테스트
 npm run build     # 프로덕션 빌드
 npm run test:release # dist/client release 구조 검사
@@ -56,7 +57,8 @@ npm run test:release # dist/client release 구조 검사
 - 개인 재정의가 필요하면 Git에서 제외된 `frontend/.env`에 바꿀 키만 작성합니다.
 - npm script는 Node의 env-file 기능으로 `.env.local` 다음 선택적 `.env`를 읽습니다. 최종 우선순위는 `process env > .env > .env.local`입니다.
 - `.env.production`, `.env.development`, `.env.prod` 같은 profile 파일은 사용하지 않으며, 존재하면 Vite가 시작을 거부합니다.
-- `VITE_` 변수는 브라우저 번들에 포함되므로 비밀값을 넣지 않습니다. 앱은 승인된 네 개의 `VITE_` 키만 검증해 번들에 넣습니다.
+- `VITE_` 변수는 브라우저 번들에 포함되므로 비밀값을 넣지 않습니다. 앱은 승인된 여섯 개의 `VITE_` 키만 검증해 번들에 넣습니다.
+- `VITE_AUTH_DEVELOPMENT_ENABLED` 는 비밀값이 아닌 편의용 표시 플래그입니다. 문자열 `true` 또는 `false`만 허용하며, `true`일 때만 로그인 화면에 `개발용 세션으로 로그인` 버튼을 표시합니다. 실제 API 활성화 여부는 Backend 설정이 최종 통제합니다.
 - `VITE_API_BASE_URL`은 CloudFront 동일 origin의 `/api` 또는 `/api/...` 상대 경로여야 합니다. 절대 URL과 외부 origin은 빌드 시 거부됩니다.
 - `FRONTEND_BACKEND_ORIGIN`은 로컬 Vite proxy 전용입니다. `VITE_` prefix가 없어 브라우저 번들에 포함되지 않습니다.
 - 기존 개인 `.env`에 `VITE_BACKEND_ORIGIN`이 있다면 `FRONTEND_BACKEND_ORIGIN`으로 이름을 바꿔야 합니다.

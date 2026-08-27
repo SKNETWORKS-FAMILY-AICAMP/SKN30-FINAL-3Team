@@ -8,6 +8,7 @@
 
 import { useCallback, useMemo } from "react";
 import { ApiError } from "../../../shared/api/index.ts";
+import { DELETE_WITHOUT_VERSION } from "../api/errors.ts";
 import { ledgerTransport } from "../api/ledgerTransport.ts";
 import type { ListQuery } from "../api/transport.ts";
 import {
@@ -88,13 +89,12 @@ export function useBuyerLedger(
         if (row.serverId == null) {
           const create = toRequirementCreatePayload(row);
           if (create == null) {
-            throw new ApiError({
-              kind: "validation",
-              message:
-                row.partyId == null
-                  ? "손님(인물)을 먼저 등록해야 저장할 수 있습니다. 인물 등록 API가 아직 없습니다."
-                  : "거래 구분을 확인해 주세요.",
-            });
+            const reason =
+              row.partyId == null
+                ? "손님(인물)을 먼저 등록해야 저장할 수 있습니다. 인물 등록 API가 아직 없습니다."
+                : "거래 구분을 확인해 주세요.";
+            // 화면이 만든 문구다. 그대로 보여도 되므로 userMessage로 표시한다.
+            throw new ApiError({ kind: "validation", message: reason, userMessage: reason });
           }
           const detail = await ledgerTransport.createRequirement(create);
           requirementId = detail.requirement.id;
@@ -168,7 +168,8 @@ export function useBuyerLedger(
       if (row.rowVersion == null) {
         throw new ApiError({
           kind: "validation",
-          message: "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.",
+          message: DELETE_WITHOUT_VERSION,
+          userMessage: DELETE_WITHOUT_VERSION,
         });
       }
 

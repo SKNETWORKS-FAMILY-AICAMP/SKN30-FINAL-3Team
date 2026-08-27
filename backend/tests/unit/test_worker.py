@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from brokerage_ai.core.config import AiProfile
 from brokerage_ai.core.types import ProviderKind
 from brokerage_ai.f3 import InputPrivacyMode
 from brokerage_ai.providers.ports import LlmProvider
@@ -114,6 +115,16 @@ def test_enabled_worker_requires_an_explicit_llm_provider() -> None:
         require_ai_provider("test", {})
 
     configured = require_ai_provider("test", {"AI_VLLM_LLM_BASE_URL": "http://localhost:8000/v1"})
+    assert configured.vllm.llm is not None
+
+
+def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> None:
+    configured = require_ai_provider(
+        "dev",
+        {"AI_VLLM_LLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1"},
+    )
+
+    assert configured.profile is AiProfile.DEV
     assert configured.vllm.llm is not None
 
 

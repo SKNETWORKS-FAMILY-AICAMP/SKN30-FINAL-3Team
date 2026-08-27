@@ -152,11 +152,16 @@ export function useLedgerCollection<TRow extends RowLike, TDto>(
   }, []);
 
   const removeRow = useCallback((rowId: string) => {
-    setState((current) => ({
-      ...current,
-      rows: current.rows.filter((row) => row.id !== rowId),
-      totalCount: Math.max(0, current.totalCount - 1),
-    }));
+    setState((current) => {
+      const target = current.rows.find((row) => row.id === rowId);
+      if (target == null) return current;
+      return {
+        ...current,
+        rows: current.rows.filter((row) => row.id !== rowId),
+        // 빈 행은 서버 전체 건수에 든 적이 없다. 화면에서만 만든 행을 지우고 전체 건수를 줄이면 어긋난다.
+        totalCount: target.serverId == null ? current.totalCount : Math.max(0, current.totalCount - 1),
+      };
+    });
   }, []);
 
   const addDraft = useCallback((): TRow => {

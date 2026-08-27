@@ -57,6 +57,27 @@ variable "dev_edge_enabled" {
   default     = true
 }
 
+variable "development_auth" {
+  description = "공개 합성 dev 세션에 사용할 고정 계정; null이면 Backend 경로와 Frontend 버튼을 모두 비활성화"
+  type = object({
+    brokerage_id = number
+    login_id     = string
+  })
+  default   = null
+  nullable  = true
+  sensitive = false
+
+  validation {
+    condition = var.development_auth == null ? true : (
+      var.development_auth.brokerage_id >= 1 &&
+      var.development_auth.brokerage_id == floor(var.development_auth.brokerage_id) &&
+      length(trimspace(var.development_auth.login_id)) >= 1 &&
+      length(trimspace(var.development_auth.login_id)) <= 100
+    )
+    error_message = "development_auth.brokerage_id는 1 이상의 정수이고 login_id는 공백 제거 후 1~100자여야 합니다."
+  }
+}
+
 variable "pipeline_operator_user_names" {
   description = "Delivery Pipeline을 수동 운영할 기존 계정 IAM 사용자 이름 집합"
   type        = set(string)
@@ -113,6 +134,8 @@ variable "ai_provider_api_keys" {
   validation {
     condition = (
       contains(keys(var.ai_provider_api_keys), "AI_OPENAI_API_KEY") &&
+      contains(keys(var.ai_provider_api_keys), "AI_VLLM_LLM_API_KEY") &&
+      contains(keys(var.ai_provider_api_keys), "AI_VLLM_STT_API_KEY") &&
       alltrue([
         for name, value in var.ai_provider_api_keys :
         can(regex("^AI_[A-Z0-9_]+_API_KEY$", name)) &&
@@ -120,7 +143,7 @@ variable "ai_provider_api_keys" {
         length(regexall("[[:space:]]", value)) == 0
       ])
     )
-    error_message = "ai_provider_api_keys에는 비어 있지 않은 AI_OPENAI_API_KEY와 AI_*_API_KEY 형식의 키만 지정해야 합니다."
+    error_message = "ai_provider_api_keys에는 비어 있지 않은 AI_OPENAI_API_KEY, AI_VLLM_LLM_API_KEY, AI_VLLM_STT_API_KEY와 AI_*_API_KEY 형식의 키만 지정해야 합니다."
   }
 }
 
