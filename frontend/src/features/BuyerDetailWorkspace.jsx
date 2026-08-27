@@ -12,7 +12,7 @@ import {
   TextArea,
   TextInput,
 } from "@patternfly/react-core";
-import { SaveIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
+import { SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
 import { describeForUser } from "./ledger/index.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
@@ -54,7 +54,7 @@ function SelectField({ id, label, value, options, onChange }) {
   return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><FormSelect id={id} value={value} onChange={(_event, next) => onChange(next)}>{options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}</FormSelect></label>;
 }
 
-export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, crossMatchPanel, focusF2Request = 0 }) {
+export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0 }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY_BUYER, ...(row || {}) }));
   const [f2Open, setF2Open] = useState(false);
   const [closeDecision, setCloseDecision] = useState(false);
@@ -220,6 +220,7 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
       <div className="detail-workspace__action-row">
         <Button variant="primary" icon={<SaveIcon />} onClick={() => save()} isLoading={isSaving} isDisabled={isSaving}>저장</Button>
         <Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button>
+        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button>
         <Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button>
       </div>
       <span className="buyer-detail-workspace__save-state" aria-live="polite">{dirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span>
