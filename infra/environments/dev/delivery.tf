@@ -28,8 +28,9 @@ locals {
   }
 
   frontend_build_environment = {
-    VITE_API_BASE_URL  = local.frontend_api_base_path
-    VITE_LEDGER_SOURCE = "api"
+    VITE_API_BASE_URL             = local.frontend_api_base_path
+    VITE_AUTH_DEVELOPMENT_ENABLED = tostring(local.development_auth_enabled)
+    VITE_LEDGER_SOURCE            = "api"
   }
 }
 

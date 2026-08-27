@@ -25,7 +25,7 @@ Options:
   --bootstrap-profile NAME   aws login profile (기본: skn30-bootstrap)
   --session-profile NAME     Terraform credential profile (기본: skn30-session)
   --skip-login               이미 로그인된 세션을 사용
-  --force                    다른 내용의 로컬 backend/dev tfvars를 덮어씀
+  --force                    다른 내용의 로컬 backend.hcl을 덮어씀(dev.tfvars는 항상 보존)
   -h, --help                 도움말 출력
 
 이 스크립트는 로컬 profile, backend.hcl, dev.tfvars, Terraform init과
@@ -36,6 +36,38 @@ EOF
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
+}
+
+read_tfvars_string() {
+  local target="$1"
+  local name="$2"
+  local values=()
+
+  mapfile -t values < <(
+    sed -nE \
+      "s~^[[:space:]]*${name}[[:space:]]*=[[:space:]]*\"([^\"]*)\"[[:space:]]*((#|//).*)?$~\\1~p" \
+      "$target"
+  )
+  ((${#values[@]} == 1)) ||
+    fail "$target에는 하나의 문자열 ${name} 할당이 필요합니다."
+  printf '%s' "${values[0]}"
+}
+
+validate_existing_dev_tfvars() {
+  local target="$infra_dir/environments/dev/dev.tfvars"
+  local existing_account_id
+  local existing_expires_at
+
+  [[ -e "$target" ]] || return 0
+  [[ -f "$target" && ! -L "$target" ]] ||
+    fail "$target은 symbolic link가 아닌 일반 파일이어야 합니다."
+
+  existing_account_id="$(read_tfvars_string "$target" target_account_id)"
+  existing_expires_at="$(read_tfvars_string "$target" expires_at)"
+  [[ "$existing_account_id" == "$target_account_id" ]] ||
+    fail "$target의 target_account_id가 요청값과 다릅니다. --force로 덮어쓰지 않으므로 파일을 직접 검토하세요."
+  [[ "$existing_expires_at" == "$expires_at" ]] ||
+    fail "$target의 expires_at이 요청값과 다릅니다. --force로 덮어쓰지 않으므로 파일을 직접 검토하세요."
 }
 
 while (($# > 0)); do
@@ -92,6 +124,9 @@ done
   fail "--bootstrap-profile에는 영문자, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다."
 [[ "$session_profile" =~ ^[A-Za-z0-9_.-]+$ ]] ||
   fail "--session-profile에는 영문자, 숫자, 점, 밑줄, 하이픈만 사용할 수 있습니다."
+
+# 기존 계정 블록을 보존하고 불일치를 AWS 로그인·로컬 파일 변경 전에 차단한다.
+validate_existing_dev_tfvars
 
 command -v aws >/dev/null 2>&1 || fail "AWS CLI가 필요합니다."
 command -v terraform >/dev/null 2>&1 || fail "Terraform이 필요합니다."
@@ -157,7 +192,9 @@ backend_content="$(printf '%s\n' \
 
 dev_tfvars_content="$(printf '%s\n' \
   "target_account_id = \"$target_account_id\"" \
-  "expires_at        = \"$expires_at\"")"
+  "expires_at        = \"$expires_at\"" \
+  "" \
+  "development_auth = null")"
 
 write_local_file() {
   local target="$1"
@@ -183,9 +220,22 @@ write_local_file() {
   printf '생성: %s\n' "$target"
 }
 
+ensure_dev_tfvars() {
+  local target="$infra_dir/environments/dev/dev.tfvars"
+
+  if [[ -e "$target" ]]; then
+    validate_existing_dev_tfvars
+    printf '유지: %s\n' "$target"
+    return
+  fi
+
+  # --force와 무관하게 이 파일은 없을 때만 생성한다.
+  write_local_file "$target" "$dev_tfvars_content"
+}
+
 write_local_file "$infra_dir/bootstrap/backend.hcl" "$backend_content"
 write_local_file "$infra_dir/environments/dev/backend.hcl" "$backend_content"
-write_local_file "$infra_dir/environments/dev/dev.tfvars" "$dev_tfvars_content"
+ensure_dev_tfvars
 
 AWS_PROFILE="$session_profile" terraform -chdir="$infra_dir/bootstrap" init \
   -input=false \

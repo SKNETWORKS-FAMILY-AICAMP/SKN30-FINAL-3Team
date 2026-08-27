@@ -2,6 +2,8 @@
 
 Terraform을 AWS 인프라 변경의 정본으로 사용한다. 현재 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없으므로 Billing 자원을 만들지 않는다. 기존 선택적 Budget 입력은 현재 state 호환을 위해 남아 있지만 `create_budget=false`만 허용하며, 2026-09-23까지 누적 300,000원은 자동 집행 없는 운영 참고 상한이다. workload 자원은 plan과 별도 승인 없이 만들지 않는다.
 
+`environments/dev`는 prod를 대신하는 운영 환경이 아니라 공유 애플리케이션 dev 환경이다. CloudFront 주소는 공개되어 있으며 합성·비식별 데이터만 허용한다.
+
 현재 AWS 계정 bootstrap과 S3 원격 state 이관은 완료됐다. 새 PC에서는 bootstrap을 다시 실행하지 않고 아래의 로컬 연결 스크립트를 사용한다.
 
 Terraform 관리는 다음 세 요소를 함께 사용한다. S3 state에는 Terraform 코드가 저장되지 않으므로 항상 저장소의 최신 승인 코드를 먼저 받아야 한다.
@@ -74,7 +76,7 @@ just setup 2026-09-23
 just setup-existing 2026-09-23
 ```
 
-이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다.
+이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다. 기존 `dev.tfvars`가 있으면 `target_account_id`와 `expires_at`이 요청값과 같은지만 검증하고 계정 블록을 포함한 전체 내용을 보존한다. 두 기본값이 다르면 `--force`로도 자동 수정하지 않고 중단한다.
 
 ### 수동 비밀값 준비
 
@@ -199,6 +201,32 @@ just db-sync
 ```bash
 just db-migrate
 ```
+
+공유 AWS dev DB에 고정 합성 개발 세션 계정을 만들 때는 중개사무소명, 로그인 ID와 표시명을 전달한다.
+역할은 생략하면 `OWNER`이며 `OWNER`, `STAFF`, `READ_ONLY` 중 하나를 사용할 수 있다.
+
+```bash
+just dev-create-session-account "개발 중개사무소" developer "Developer" OWNER
+```
+
+이 명령은 개인 `aws login` 세션으로 SSM 터널과 15분 IAM DB 인증을 만들고 Backend의
+`manage.py create-development-user`를 실행한다. IAM token이나 DB URL은 출력·저장하지 않는다.
+생성 결과의 `brokerage_id`와 `login_id`는 Git에서 제외된
+`environments/dev/dev.tfvars`에 다음과 같이 설정한다.
+
+```hcl
+development_auth = {
+  brokerage_id = 1
+  login_id      = "developer"
+}
+```
+
+`development_auth = null`이면 Backend의 개발 세션 경로는 식별자 설정 없이
+`false`로 주입되고 Frontend 버튼도 숨겨진다. 값이 있으면 하나의 Terraform
+변수에서 Backend의 `AUTH_DEVELOPMENT_*`와 Frontend의
+`VITE_AUTH_DEVELOPMENT_ENABLED=true`를 함께 파생한다. CloudFront dev 주소는 공개되어
+있으므로 이 계정에는 합성·비식별 데이터만 두고, URL을 아는 모든 사용자가
+같은 개발 계정 세션을 발급받을 수 있음을 전제한다.
 
 적용 후 운영자는 runtime credential·RDS endpoint metadata와 고정 DB 역할의 로그인 속성 및
 필수 role membership을 검증한다.

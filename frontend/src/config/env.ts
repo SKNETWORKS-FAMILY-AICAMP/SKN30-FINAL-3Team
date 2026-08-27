@@ -10,6 +10,7 @@ import { parseAppEnv } from "./envSchema.ts";
 export type { AppEnv, LedgerSource } from "./envSchema.ts";
 
 export const APP_ENV = parseAppEnv({
+  VITE_AUTH_DEVELOPMENT_ENABLED: import.meta.env.VITE_AUTH_DEVELOPMENT_ENABLED,
   VITE_LEDGER_SOURCE: import.meta.env.VITE_LEDGER_SOURCE,
   VITE_F3_SOURCE: import.meta.env.VITE_F3_SOURCE,
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,

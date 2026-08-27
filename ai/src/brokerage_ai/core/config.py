@@ -24,6 +24,7 @@ AI_ROOT = Path(__file__).resolve().parents[3]
 class AiProfile(StrEnum):
     LOCAL = "local"
     TEST = "test"
+    DEV = "dev"
     PROD = "prod"
 
 
@@ -111,7 +112,7 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
     try:
         selected_profile = AiProfile(profile)
     except ValueError as exc:
-        raise ConfigurationError("AI profile must be local, test, or prod") from exc
+        raise ConfigurationError("AI profile must be local, test, dev, or prod") from exc
 
     openai_api_key = _optional(source, "AI_OPENAI_API_KEY")
     openai_config: OpenAIConfig | None = None
@@ -169,7 +170,7 @@ def load_ai_config(
     try:
         selected_profile = AiProfile(profile)
     except ValueError as exc:
-        raise ConfigurationError("AI profile must be local, test, or prod") from exc
+        raise ConfigurationError("AI profile must be local, test, dev, or prod") from exc
 
     values: dict[str, str] = {}
     if selected_profile is AiProfile.LOCAL:

@@ -51,6 +51,7 @@ export default defineConfig(() => {
   const source = Object.fromEntries(APP_ENV_KEYS.map((key) => [key, process.env[key]]));
   const appEnv = parseAppEnv(source);
   const browserEnv = {
+    VITE_AUTH_DEVELOPMENT_ENABLED: String(appEnv.authDevelopmentEnabled),
     VITE_LEDGER_SOURCE: appEnv.ledgerSource,
     // 지정하지 않으면 `parseAppEnv`가 장부 출처로 채운 값이 들어온다.
     VITE_F3_SOURCE: appEnv.f3Source,
