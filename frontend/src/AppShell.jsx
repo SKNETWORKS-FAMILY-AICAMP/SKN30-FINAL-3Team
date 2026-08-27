@@ -697,6 +697,8 @@ export function AppShell() {
         onDiscard={discardDetail}
         onDelete={deleteRowFromDetail}
         onSave={saveDetail}
+        onOpenCrossMatch={openCrossMatch}
+        isCrossMatchOpen={crossMatchOpen}
         crossMatchPanel={crossMatchPanel}
       />
     ) : (
