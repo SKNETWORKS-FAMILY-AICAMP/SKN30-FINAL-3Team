@@ -3,6 +3,7 @@ import { Alert, Button, Checkbox, Divider, FormSelect, FormSelectOption, Label, 
 import { CheckCircleIcon, InfoCircleIcon, MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import { PROTOTYPE_ASSUMPTIONS } from "../config/prototypeAssumptions.js";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
+import { carrySavedIdentity } from "./ledger/index.ts";
 import { DEAL_TYPE_CHOICES, dealTypePatch, dealTypeValue } from "./ledger/model/dealType.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import RelationEditModal from "./RelationEditModal.jsx";
@@ -241,7 +242,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    * 다만 입력한 내용을 붙들어 두는 임시저장까지 막으면 잃는 쪽이 더 크다.
    * 임시저장인 줄 알고 누르는 경로(확인 팝업의 임시저장, 닫기 확인)는 allowDraft로 통과시킨다.
    */
-  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); setDraft(nextDraft); baselineRef.current = nextDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
+  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { const persisted = await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); /* 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다. */ const savedDraft = carrySavedIdentity(nextDraft, persisted); setDraft(savedDraft); baselineRef.current = savedDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
   /* 확인을 닫으면 바로 체크할 수 있도록 초점을 중복 검사 체크박스에 돌려준다. */
   const closeDuplicateBlock = () => {
     setDuplicateBlock(false);
