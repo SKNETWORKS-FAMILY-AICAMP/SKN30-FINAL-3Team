@@ -26,8 +26,23 @@ export function describeForUser(error: unknown): string {
     return "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
-  const base = messageForCode(error.code) ?? messageFor(error.kind);
+  const base = messageForCode(error.code) ?? localValidationMessage(error) ?? messageFor(error.kind);
   return error.requestId == null ? base : `${base} (요청 번호 ${error.requestId})`;
+}
+
+/**
+ * 화면이 직접 만든 저장 전 검증 오류.
+ *
+ * 서버 원문은 개인정보나 토큰이 섞일 수 있어 감추지만, 이 문구는 화면 코드가 쓴 것이고
+ * 무엇을 고쳐야 하는지 이미 알고 있다. 일반 문구로 덮으면 "입력값을 확인해 주세요"만 남아
+ * 어느 칸을 봐야 하는지 알 수 없다.
+ *
+ * 응답에서 온 오류는 `status`를 갖는다. 그것으로 화면이 만든 오류와 구분한다.
+ */
+function localValidationMessage(error: ApiError): string | null {
+  if (error.kind !== "validation" || error.status != null) return null;
+  const message = error.message.trim();
+  return message === "" ? null : message;
 }
 
 /**
