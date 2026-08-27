@@ -1,13 +1,13 @@
 ---
 status: 제안
-updated: 2026-08-24
+updated: 2026-08-27
 ---
 
 # F3 온라인 실행 아키텍처
 
 ## 문서 안내
 
-- **이 문서가 답하는 질문:** 자동 트리거된 F3 교차 판정을 어떻게 비차단으로 실행·복구하고 검증된 최종 결과를 표시하는가?
+- **이 문서가 답하는 질문:** 저장 자동 접수와 사용자의 상세 [교차 판정] 요청을 어떻게 비차단으로 실행·복구하고 검증된 최종 결과를 표시하는가?
 - **관련 요구사항:** [포지션 카드와 캐시](../../requirements/f3/position-card.md) · [대리·중개 판정](../../requirements/f3/delegates-and-brokerage.md) · [후보 추출·도구](../../requirements/f3/candidate-selection-and-tools.md) · [교차 판정](../../requirements/f3/cross-judgment.md) · [신뢰·비기능·개인정보](../../requirements/f3/trust-nfr-privacy.md)
 - **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)
 - **이 문서가 소유하지 않는 상세:** API 경로·전송 스키마, DB 테이블, 큐·Worker 제품, 재시도 횟수, 검색 top-K와 점수 가중치
@@ -22,10 +22,10 @@ MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 |---|---|---|---|
 | 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 | Backend 자동 접수 구현됨 |
 | 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 | Backend 자동 접수 구현됨 |
-| 손님 상세 진입 | 손님 | 현재 데이터 버전 확인 후 | Backend 접수 경계만 구현됨 |
-| 세대 상세 진입 | 매물 | 현재 데이터 버전 확인 후 | Backend 접수 경계만 구현됨 |
+| 손님 상세의 [교차 판정] 버튼 | 손님 | 사용자 버튼 클릭 후 | Frontend 요청·Backend 접수 구현됨 |
+| 세대 상세의 [교차 판정] 버튼 | 매물 | 사용자 버튼 클릭 후 | Frontend 요청·Backend 접수 구현됨 |
 
-Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 상세 진입에서도 F3 패널만 로딩·실패 상태를 표시한다.
+Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 사용자의 [교차 판정] 요청이 실패해도 F3 패널만 로딩·실패 상태를 표시한다. 상세 진입만으로는 패널을 열거나 실행을 접수하지 않는다.
 
 자동 접수는 `backend/src/domain/agent_execution/triggers.py`가 소유한다. 매물·구입장 신규 등록은
 항상 접수하고, 수정은 F1 서비스가 기존 저장값과 비교해 반환한 실제 변경 필드 중 판정 입력이 있을
@@ -34,8 +34,9 @@ Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성
 
 F1 commit 뒤 기존 실행 접수 유스케이스를 호출하므로 요청 중 모델 호출은 없고, 같은 앵커·입력
 버전의 활성 실행은 재사용한다. 자동 실행은 `trigger_type=LEDGER_SAVE`로 기록한다. 접수 예외는 F1
-응답 밖으로 전파하지 않고 앵커 종류·ID·예외 타입만 로그에 남긴다. 상세 진입의 Frontend 호출은
-아직 없으며 화면이 `POST /api/v1/f3/runs`를 호출하면 저장 시 생성된 활성 실행을 재사용할 수 있다.
+응답 밖으로 전파하지 않고 앵커 종류·ID·예외 타입만 로그에 남긴다. 상세 화면은 사용자가
+[교차 판정] 버튼을 누른 경우에만 `POST /api/v1/f3/runs`를 호출하며, 저장 시 생성된 같은 입력
+버전의 활성 실행이 있으면 그 실행을 재사용한다.
 
 작업 생성 시 사용자 권한, 앵커 종류·식별자와 현재 데이터 버전을 확인한다. **목표 정책은** 같은 앵커·입력·AI 구성의 활성 작업이나 완료 결과가 있으면 새 모델 호출을 만들지 않고 기존 작업을 구독하거나 결과를 재사용하는 것이다. 현재는 같은 사무소·앵커·`row_version`의 활성 실행만 재사용한다. 완료 결과는 전체 입력 identity와 AI 구성이 같음을 접수 시점에 증명할 수 없어 재사용하지 않는다. 아래 [현재 구현 범위](#현재-구현-범위)를 함께 본다.
 
@@ -45,7 +46,7 @@ F1 commit 뒤 기존 실행 접수 유스케이스를 호출하므로 요청 중
 
 API와 Worker는 파일럿에서 같은 배포 단위에 둘 수 있지만 역할은 논리적으로 분리한다.
 
-- API는 자동 트리거, 작업·결과 조회, 진행 구독과 사용자 피드백을 처리한다.
+- API는 저장 자동 트리거와 사용자 실행 요청, 작업·결과 조회, 진행 구독과 사용자 피드백을 처리한다.
 - 영속 작업 저장소가 실행 상태와 단계 산출물의 정본이며 프로세스 메모리는 정본이 아니다.
 - Worker는 작업을 획득하고 AI 공개 facade를 호출하며 단계 진행과 최종 결과를 저장한다.
 - AI facade는 워크플로·Agent·모델 호출을 소유하고 주입된 Backend capability만 사용한다.
@@ -75,7 +76,7 @@ API와 Worker는 파일럿에서 같은 배포 단위에 둘 수 있지만 역�
 
 매물 대리와 손님 대리에는 서로 다른 capability 집합을 조립한다. 중개 판정은 카드 이외의 capability를 받지 않는다.
 
-## 자동 트리거부터 최종 표시까지
+## 실행 트리거부터 최종 표시까지
 
 ```mermaid
 sequenceDiagram
@@ -88,7 +89,7 @@ sequenceDiagram
     participant Cap as Backend Capability
     participant Model as Model Adapter
 
-    User->>FE: 손님/매물 저장 또는 상세 진입
+    User->>FE: 손님/매물 저장 또는 상세의 [교차 판정] 클릭
     FE->>API: 현재 화면 컨텍스트 전달
     API->>API: 권한·앵커·입력 버전 확인
     API->>Job: 동일 실행 조회 또는 QUEUED 생성
@@ -204,6 +205,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 항목 | 위치 |
 |---|---|
 | `POST /api/v1/f3/runs`. 활성 실행이 없으면 `QUEUED` 생성, 있으면 같은 실행 반환 | `backend/src/api/f3_runs.py` |
+| 상세 진입 시 패널을 닫고 [교차 판정] 버튼에서만 실행 확인·polling 시작. 활성 실행이 없을 때만 `USER_REQUEST`로 접수 | `frontend/src/AppShell.jsx`, `frontend/src/features/f3/CrossMatchSection.tsx` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | 사무소·앵커·입력 버전의 활성 실행 재사용과 PostgreSQL 동시 접수 직렬화 | `backend/src/domain/agent_execution/service.py`, `repository.py` |
 | F1 매물·구입장 저장 성공 후 `LEDGER_SAVE` 자동 접수와 F3 실패 격리 | `backend/src/domain/agent_execution/triggers.py`, `backend/src/api/property_ledger.py` |
