@@ -65,3 +65,5 @@ uv run python src/server.py
 - API entrypoint는 검증된 `APP_HOST`와 `APP_PORT`로 Uvicorn listener를 시작합니다.
 - Worker 설정도 같은 병합 결과에서 검증되므로 개인 `.env`의 `WORKER_*` 값이 전역 환경변수 변경 없이 적용됩니다.
 - 활성 Worker의 Provider 설정은 AI 모듈 로더가 `ai/.env.local`, `ai/.env`, 프로세스 환경변수 순서로 별도 병합합니다.
+- F2 음성메모 runtime은 Backend 시작 시 항상 초기화됩니다. `ai/.env.local` 또는 개인 `ai/.env`에
+  `AI_VLLM_LLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`을 모두 설정해야 합니다.
