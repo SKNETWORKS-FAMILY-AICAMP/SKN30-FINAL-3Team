@@ -11,10 +11,9 @@
  *     보관 큐가 없다. 지키지 못할 약속을 하지 않는다.
  */
 
-// 공개 배럴(`shared/api/index.ts`)이 아니라 오류 분류 파일을 직접 가져온다. 배럴은 `httpClient`
-// 를 함께 내보내고 그쪽이 `import.meta.env`를 읽는 설정 모듈에 의존한다. 문구 변환은 순수 함수라
-// 브라우저 번들러 없이 테스트할 수 있어야 한다(ADR-004의 "설정 의존 모듈과 순수 모듈을 한 배럴로
-// 묶지 않는다"가 `shared/api` 안에서는 아직 지켜지지 않는다).
+// 오류 분류만 필요하므로 배럴(`shared/api`)이 아니라 순수 진입점을 쓴다(ADR-004). 배럴은
+// `httpClient`를 함께 내보내고 그쪽이 `import.meta.env`를 읽는 설정 모듈에 의존한다. 문구 변환은
+// 순수 함수라 브라우저 번들러 없이 테스트할 수 있어야 한다.
 import { ApiError } from "../../../shared/api/errors.ts";
 import type { ApiErrorKind } from "../../../shared/api/errors.ts";
 
