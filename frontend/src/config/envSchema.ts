@@ -3,6 +3,8 @@ export type LedgerSource = "mock" | "api";
 export interface AppEnv {
   /** 동일 origin의 /api 하위 기본 경로. */
   apiBaseUrl: string;
+  /** 개발 세션 로그인 UI를 공개할지 여부. API 등록 여부는 Backend가 최종 통제한다. */
+  authDevelopmentEnabled: boolean;
   /** 장부 데이터 출처. */
   ledgerSource: LedgerSource;
   /**
@@ -22,12 +24,20 @@ export interface AppEnv {
 type EnvSource = Readonly<Record<string, unknown>>;
 
 export const APP_ENV_KEYS = [
+  "VITE_AUTH_DEVELOPMENT_ENABLED",
   "VITE_LEDGER_SOURCE",
   "VITE_F3_SOURCE",
   "VITE_API_BASE_URL",
   "VITE_MOCK_ROW_COUNT",
   "VITE_MOCK_LATENCY_MS",
 ] as const;
+
+function readRequiredBoolean(source: EnvSource, key: string): boolean {
+  const value = source[key];
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${key} must be exactly "true" or "false"`);
+}
 
 function readRequiredString(source: EnvSource, key: string): string {
   const value = source[key];
@@ -102,6 +112,7 @@ export function parseAppEnv(source: EnvSource): Readonly<AppEnv> {
   const ledgerSource = readLedgerSource(source);
   return Object.freeze({
     apiBaseUrl: readApiBaseUrl(source),
+    authDevelopmentEnabled: readRequiredBoolean(source, "VITE_AUTH_DEVELOPMENT_ENABLED"),
     ledgerSource,
     f3Source: readF3Source(source, ledgerSource),
     mockRowCount: readNonNegativeInteger(source, "VITE_MOCK_ROW_COUNT"),

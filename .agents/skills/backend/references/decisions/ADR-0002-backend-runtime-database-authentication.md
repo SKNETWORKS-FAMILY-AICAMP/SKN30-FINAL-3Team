@@ -1,13 +1,15 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-27
 ---
 
 # ADR-0002: 백엔드 런타임·DB·인증 기반
 
 - 상태: 부분 대체됨
 - 결정일: 2026-08-17
-- 대체 범위: 환경 파일·dotenv 우선순위와 로컬·운영 비밀값 주입 방식은 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)와 [Infra ADR-0013](../../../infra/references/decisions/ADR-0013-dev-environment-materialization.md)이 대체
+- 대체 범위:
+  - 환경 파일·dotenv 우선순위와 로컬·운영 비밀값 주입 방식은 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)와 [Infra ADR-0013](../../../infra/references/decisions/ADR-0013-dev-environment-materialization.md)이 대체
+  - 개발 세션의 `local` 전용 조항은 [프로젝트 ADR-0017](../../../project-wiki/references/decisions/ADR-0017-shared-dev-development-session.md)이 공유 합성 `dev`까지 확장
 
 ## 맥락
 

@@ -33,7 +33,7 @@ export async function fetchCurrentUser(signal?: AbortSignal): Promise<AuthUser> 
 /**
  * 개발 세션 발급.
  *
- * 이 경로는 백엔드가 local 환경에서만 등록한다(`api/authentication.py`의 development_router).
+ * 이 경로는 백엔드가 설정된 local·dev 환경에서만 등록한다(`api/router.py`).
  * 다른 환경에서는 404가 돌아오고 `unavailable`로 분류된다. 실제 아이디·비밀번호 로그인 계약은
  * 아직 정해지지 않았다(contracts/api.md).
  */

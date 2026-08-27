@@ -19,7 +19,11 @@ uv sync --frozen
 cp .env.example .env
 ```
 
-`AiProfile.LOCAL`은 `.env.local`, 개인 `.env`, 실행 프로세스 환경변수 순서로 병합합니다. `AiProfile.TEST`와 `AiProfile.PROD`는 dotenv 파일을 읽지 않고 CI·배포가 주입한 프로세스 환경변수만 사용합니다. 실제 비밀값은 `.env.example`, `.env.local` 또는 다른 추적 파일에 기록하지 않습니다.
+`AiProfile.LOCAL`은 `.env.local`, 개인 `.env`, 실행 프로세스 환경변수 순서로 병합합니다.
+`AiProfile.DEV`, `AiProfile.TEST`, `AiProfile.PROD`는 dotenv 파일을 읽지 않고 CI·배포가 주입한
+프로세스 환경변수만 사용합니다. Backend의 F2 API와 Worker는 `APP_ENV`와 같은 이름의 AI profile을
+사용하므로 공유 AWS 개발 배포에서는 `dev` 설정으로 조립됩니다. 실제 비밀값은 `.env.example`,
+`.env.local` 또는 다른 추적 파일에 기록하지 않습니다.
 
 ## F2 음성메모 파이프라인
 

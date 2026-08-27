@@ -10,7 +10,7 @@ import {
   UserIcon,
 } from "@patternfly/react-icons";
 import { useBuyerLedger, useComplexOptions, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser } from "./features/ledger/index.ts";
+import { describeForUser, isEmptyDraft } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
@@ -490,7 +490,18 @@ export function AppShell() {
 
   const isBuyerDetail = detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer";
 
-  const closeDetail = () => { setCrossMatchOpen(false); setDetailRow(null); };
+  /*
+   * 상세 닫기.
+   *
+   * 값을 하나도 넣지 않은 미저장 행은 그리드에 남기지 않는다(F1-GR-32).
+   * 행 추가만 하고 닫으면 저장할 것이 없는 빈 임시저장 행만 쌓인다.
+   * 값이 있는 미저장 행(예: 음성메모 접수)은 다시 열어 저장할 수 있게 남긴다.
+   */
+  const closeDetail = () => {
+    if (isEmptyDraft(detailRow)) (isBuyerDetail ? buyerLedger : propertyLedger).discardRow(detailRow);
+    setCrossMatchOpen(false);
+    setDetailRow(null);
+  };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
     else if (detailRow) propertyLedger.discardRow(detailRow);
