@@ -690,12 +690,14 @@ export function AppShell() {
           </div>
         </div> : <div className="f1-control-strip f1-control-strip--buyer">
           <div className="f1-control-strip__left-group">
+            {/* 매물장과 같은 자리·같은 순서에 둔다. 장부를 오갈 때 행 추가를 다시 찾지 않게 한다. */}
+            <Button icon={<AddCircleOIcon />} onClick={handleAddBuyerRow}>행 추가</Button>
             <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
           </div>
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
 
-        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onAddRow={handleAddBuyerRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
+        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
         <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>
