@@ -1,9 +1,6 @@
 name: Discord Daily Reminder
 
 on:
-  schedule:
-    - cron: '13 23 * * 0-4'
-
   workflow_dispatch:
 
 jobs:
