@@ -115,7 +115,7 @@ test("AuthError가 아닌 값도 문구를 준다", () => {
 test("상태 코드를 오류 종류로 나눈다", () => {
   assert.equal(kindFromStatus(401), "unauthenticated");
   assert.equal(kindFromStatus(403), "rejected");
-  // 개발 세션 경로는 local 환경에만 등록된다. 다른 환경의 404는 "없는 로그인 방식"이다.
+  // 개발 세션 경로는 설정된 local·dev에만 등록된다. 다른 환경의 404는 "없는 로그인 방식"이다.
   assert.equal(kindFromStatus(404), "unavailable");
   assert.equal(kindFromStatus(422), "rejected");
   assert.equal(kindFromStatus(500), "server");

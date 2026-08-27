@@ -55,7 +55,7 @@ def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment
     assert "AI_CONFIG_SENTINEL" not in os.environ
 
 
-@pytest.mark.parametrize("profile", [AiProfile.TEST, AiProfile.PROD])
+@pytest.mark.parametrize("profile", [AiProfile.TEST, AiProfile.DEV, AiProfile.PROD])
 def test_non_local_profiles_do_not_read_dotenv_files(
     profile: AiProfile,
     tmp_path: Path,
@@ -73,7 +73,13 @@ def test_non_local_profiles_do_not_read_dotenv_files(
 
     config = load_ai_config(profile, environ={})
 
+    assert config.profile is profile
     assert config.openai is None
+
+
+def test_invalid_ai_profile_error_lists_dev() -> None:
+    with pytest.raises(ConfigurationError, match="local, test, dev, or prod"):
+        load_ai_config("preview", environ={})
 
 
 def test_openai_is_disabled_without_api_key() -> None:

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-27
 ---
 
 # 프로젝트 위키 인덱스
@@ -18,7 +18,7 @@ updated: 2026-08-20
 | [인프라 아키텍처](../../../../docs/architecture/infra/overview.md) | 개발·시연용 AWS·RunPod 배치와 자원 상태를 확인할 때 |
 | [인프라 배포·운영](../../../../docs/architecture/infra/deployment-and-operations.md) | 수동 Pipeline, rollback, RunPod·비용 운영 절차를 확인할 때 |
 | [브랜치 및 PR 정책](../../../../.agents-rule/git.md) | 브랜치, 커밋, PR, 병합 방식을 확인할 때 |
-| [development/environments.md](development/environments.md) | 로컬·CI·운영 환경이나 의존성을 변경할 때 |
+| [development/environments.md](development/environments.md) | 로컬·CI·공유 dev·prod 환경이나 의존성을 변경할 때 |
 | [contracts/api.md](contracts/api.md) | HTTP API 계약을 만들거나 바꿀 때 |
 | [contracts/f3-ai.md](contracts/f3-ai.md) | F3 포지션 카드·중개 판정의 Backend–AI 입력·결과, 어휘, 근거와 개인정보 경계를 확인하거나 바꿀 때 |
 | [contracts/events.md](contracts/events.md) | 큐 메시지 또는 이벤트 계약을 만들거나 바꿀 때 |

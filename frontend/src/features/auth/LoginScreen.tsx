@@ -8,34 +8,20 @@
  *
  * 그래서 화면은 세우되 자격증명 입력은 비활성으로 둔다. 입력을 받아놓고 제출 시점에
  * "아직 안 됩니다"라고 답하는 쪽이 더 나쁘기 때문에, 쓸 수 없다는 사실을 입력 전에 알린다.
- * 실제 진입 경로는 개발 세션 하나다. 계약이 확정되면 이 폼에 상태와 제출 핸들러만 붙이면 된다.
+ * 개발 세션을 표시하도록 설정한 환경에서만 그 진입 경로를 보여 준다. 계약이 확정되면 비활성
+ * 폼에 상태와 제출 핸들러만 붙이면 된다.
  */
 
-import {
-  ActionGroup,
-  Alert,
-  Button,
-  Divider,
-  Form,
-  FormGroup,
-  LoginPage,
-  Stack,
-  StackItem,
-  TextInput,
-} from "@patternfly/react-core";
-import type { FormEvent } from "react";
+import { Alert, Button, LoginPage, Stack, StackItem } from "@patternfly/react-core";
+import { APP_ENV } from "../../config/env.ts";
 import { useAuth } from "./AuthContext.tsx";
 import type { AnonymousReason } from "./AuthContext.tsx";
-
-const CREDENTIAL_HELP_ID = "login-credential-unavailable";
+import { LoginMethods } from "./LoginMethods.tsx";
 
 export function LoginScreen() {
   const { state, isSubmitting, notice, signInWithDevelopmentSession, recheck } = useAuth();
   const unreachable = state.status === "unreachable" ? state.message : null;
   const reason = state.status === "anonymous" ? state.reason : null;
-
-  // 폼은 비활성이라 여기까지 오지 않지만, 브라우저 기본 제출로 화면이 새로 뜨는 일은 막는다.
-  const blockSubmit = (event: FormEvent<HTMLFormElement>) => event.preventDefault();
 
   return (
     <LoginPage
@@ -68,72 +54,11 @@ export function LoginScreen() {
           </div>
         </StackItem>
 
-        {/*
-          비활성인 이유를 입력 앞에 둔다. 막힌 칸을 먼저 마주치고 나서 이유를 읽게 되면
-          입력이 고장 난 것처럼 보인다. 보조 기술에는 aria-describedby로도 연결한다.
-        */}
-        <StackItem>
-          <Alert
-            id={CREDENTIAL_HELP_ID}
-            variant="info"
-            isInline
-            title="아이디·비밀번호 로그인은 아직 제공하지 않습니다."
-          >
-            서버에 자격증명 검증 경로가 준비되면 이 입력이 열립니다. 그때까지는 아래 개발 세션으로
-            접속해 주세요.
-          </Alert>
-        </StackItem>
-
-        <StackItem>
-          <Form onSubmit={blockSubmit}>
-            <FormGroup label="아이디" fieldId="login-id" isRequired>
-              <TextInput
-                id="login-id"
-                name="loginId"
-                type="text"
-                value=""
-                onChange={() => undefined}
-                autoComplete="username"
-                isDisabled
-                aria-describedby={CREDENTIAL_HELP_ID}
-              />
-            </FormGroup>
-            <FormGroup label="비밀번호" fieldId="login-password" isRequired>
-              <TextInput
-                id="login-password"
-                name="password"
-                type="password"
-                value=""
-                onChange={() => undefined}
-                autoComplete="current-password"
-                isDisabled
-                aria-describedby={CREDENTIAL_HELP_ID}
-              />
-            </FormGroup>
-            <ActionGroup>
-              <Button type="submit" variant="primary" isBlock isDisabled>
-                로그인
-              </Button>
-            </ActionGroup>
-          </Form>
-        </StackItem>
-
-        <StackItem>
-          <Divider />
-        </StackItem>
-
-        <StackItem>
-          <Button
-            variant="secondary"
-            isBlock
-            isLoading={isSubmitting}
-            isDisabled={isSubmitting}
-            spinnerAriaValueText="로그인하는 중"
-            onClick={() => void signInWithDevelopmentSession()}
-          >
-            개발용 세션으로 로그인
-          </Button>
-        </StackItem>
+        <LoginMethods
+          developmentAuthEnabled={APP_ENV.authDevelopmentEnabled}
+          isSubmitting={isSubmitting}
+          onDevelopmentSession={() => void signInWithDevelopmentSession()}
+        />
       </Stack>
     </LoginPage>
   );
