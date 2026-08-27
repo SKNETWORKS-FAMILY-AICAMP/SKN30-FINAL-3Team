@@ -7,7 +7,11 @@ OpenAI·vLLM adapter 를 직접 분기하지도 않는다. 운영 선택은 호�
 
 from __future__ import annotations
 
-from brokerage_ai.core.types import ModelRoute, StructuredGenerationRequest
+from brokerage_ai.core.types import (
+    ModelRoute,
+    StructuredGenerationRequest,
+    StructuredGenerationResult,
+)
 from brokerage_ai.f3.contracts import (
     InputPrivacyMode,
     PositionCardGenerationRequest,
@@ -22,6 +26,7 @@ from brokerage_ai.f3.prompts import (
 )
 from brokerage_ai.f3.validation import PositionCardContractError, validate_generation_result
 from brokerage_ai.providers.ports import LlmProvider
+from brokerage_ai.providers.repair import generate_with_repair
 
 POSITION_CARD_WORKFLOW_VERSION = "position-card-workflow:v1"
 
@@ -75,14 +80,26 @@ class LlmPositionCardGenerator:
             messages=build_position_card_messages(request),
             temperature=POSITION_CARD_TEMPERATURE,
         )
-        produced = await self._provider.generate_structured(generation, PositionCardModelOutput)
-        versions = self.versions
-        result = PositionCardGenerationResult(
-            target=PositionCardTarget.from_request(request),
-            analysis=assemble_analysis(request, produced.output),
-            prompt_version=versions.prompt_version,
-            workflow_version=versions.workflow_version,
-            diagnostics=produced.diagnostics,
+
+        def finalize(
+            produced: StructuredGenerationResult[PositionCardModelOutput],
+        ) -> PositionCardGenerationResult:
+            versions = self.versions
+            result = PositionCardGenerationResult(
+                target=PositionCardTarget.from_request(request),
+                analysis=assemble_analysis(request, produced.output),
+                prompt_version=versions.prompt_version,
+                workflow_version=versions.workflow_version,
+                diagnostics=produced.diagnostics,
+            )
+            validate_generation_result(request, result)
+            return result
+
+        # 조립과 대조까지 되먹임 범위에 넣는다. 없는 로그를 인용하거나 장부가 열지 않은 거래
+        # 유형을 말한 것도 모델이 원인이며, 지적해 주면 고칠 수 있다.
+        return await generate_with_repair(
+            provider=self._provider,
+            request=generation,
+            output_schema=PositionCardModelOutput,
+            finalize=finalize,
         )
-        validate_generation_result(request, result)
-        return result

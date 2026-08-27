@@ -561,3 +561,48 @@ async def test_the_prompt_requires_unused_evidence_fields_to_be_null() -> None:
     body = "".join(message.content for message in provider.calls[0].messages)
     for rule in ("kind=QUOTE", "kind=INFERENCE", "해당하지 않는 필드는 반드시 null"):
         assert rule in body
+
+
+class SequenceProvider:
+    """호출 순서대로 다른 출력을 내놓는 대역. 되먹임 뒤 모델이 답을 고치는 상황을 흉내 낸다."""
+
+    def __init__(self, *outputs: BrokerageJudgmentModelOutput) -> None:
+        self.outputs = list(outputs)
+        self.calls: list[StructuredGenerationRequest] = []
+
+    @property
+    def kind(self) -> ProviderKind:
+        return ProviderKind.VLLM
+
+    async def generate_structured(
+        self, request: StructuredGenerationRequest, output_schema: type[Any]
+    ) -> StructuredGenerationResult[Any]:
+        self.calls.append(request)
+        return StructuredGenerationResult(
+            output=self.outputs.pop(0),
+            diagnostics=ProviderDiagnostics(
+                provider=self.kind, model="test-broker", latency_ms=1.0
+            ),
+        )
+
+
+async def test_a_rank_gap_is_fed_back_and_the_next_attempt_is_accepted() -> None:
+    """순위가 어긋난 판정은 `validate_judgment_result()` 에서만 걸린다.
+
+    모델이 원인이고 지적하면 고칠 수 있는 실패인데, 지금까지는 첫 시도에 종료됐다.
+    """
+    source = request()
+    provider = SequenceProvider(
+        model_output(model_candidate(2, 1), model_candidate(3, 3)),
+        model_output(model_candidate(2, 1), model_candidate(3, 2)),
+    )
+
+    result = await LlmBrokerageJudgmentGenerator(
+        provider=provider, route=ROUTE, allow_synthetic_prototype=True
+    ).judge_candidates(source)
+
+    assert [candidate.rank for candidate in result.candidates] == [1, 2]
+    assert len(provider.calls) == 2
+    appended = provider.calls[1].messages[len(provider.calls[0].messages) :]
+    assert len(appended) == 1
+    assert "1..N without gaps" in appended[0].content
