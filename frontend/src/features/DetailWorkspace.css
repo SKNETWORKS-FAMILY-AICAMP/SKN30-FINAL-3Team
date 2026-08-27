@@ -1370,7 +1370,8 @@
 }
 
 .detail-section [tabindex="-1"]:focus-visible,
-#cross-match-panel [tabindex="-1"]:focus-visible {
+#cross-match-panel [tabindex="-1"]:focus-visible,
+.buyer-detail-workspace__error:focus-visible {
   border-radius: 2px;
   outline: 2px solid var(--dw-accent);
   outline-offset: 4px;
@@ -1629,12 +1630,9 @@
 /*
  * 저장을 막은 사유.
  *
- * 어느 칸을 고쳐야 하는지 항목으로 읽히게 한다. 초점을 여기로 옮기므로 테두리는 두지 않는다.
+ * 어느 칸을 고쳐야 하는지 항목으로 읽히게 한다. 초점을 여기로 옮기므로
+ * 초점 표시는 상세 안의 다른 [tabindex="-1"] 영역과 같은 규칙을 쓴다(아래 focus-visible).
  */
-.buyer-detail-workspace__error:focus {
-  outline: none;
-}
-
 .buyer-detail-workspace__error ul {
   margin: 0;
   padding-left: 18px;

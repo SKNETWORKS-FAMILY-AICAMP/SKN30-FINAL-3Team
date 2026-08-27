@@ -16,6 +16,14 @@ import { ApiError } from "../../../shared/api/index.ts";
 import type { ApiErrorKind } from "../../../shared/api/index.ts";
 
 /**
+ * row_version 없이 삭제를 시도한 경우. 두 장부가 같은 안내를 쓴다.
+ *
+ * 서버에 보내기 전 화면이 스스로 막는 자리라 사용자에게 그대로 보여준다.
+ */
+export const DELETE_WITHOUT_VERSION =
+  "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.";
+
+/**
  * 사용자에게 보여줄 문구.
  *
  * 개인정보나 토큰이 섞일 수 있는 서버 원문을 그대로 노출하지 않는다.
@@ -26,23 +34,12 @@ export function describeForUser(error: unknown): string {
     return "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
-  const base = messageForCode(error.code) ?? localValidationMessage(error) ?? messageFor(error.kind);
+  /*
+   * `userMessage`는 화면 코드가 "이 문장은 사용자에게 보여도 된다"고 표시한 오류에만 있다.
+   * 응답에서 만든 오류에는 붙지 않으므로 서버 원문이 이 경로로 새지 않는다.
+   */
+  const base = messageForCode(error.code) ?? error.userMessage ?? messageFor(error.kind);
   return error.requestId == null ? base : `${base} (요청 번호 ${error.requestId})`;
-}
-
-/**
- * 화면이 직접 만든 저장 전 검증 오류.
- *
- * 서버 원문은 개인정보나 토큰이 섞일 수 있어 감추지만, 이 문구는 화면 코드가 쓴 것이고
- * 무엇을 고쳐야 하는지 이미 알고 있다. 일반 문구로 덮으면 "입력값을 확인해 주세요"만 남아
- * 어느 칸을 봐야 하는지 알 수 없다.
- *
- * 응답에서 온 오류는 `status`를 갖는다. 그것으로 화면이 만든 오류와 구분한다.
- */
-function localValidationMessage(error: ApiError): string | null {
-  if (error.kind !== "validation" || error.status != null) return null;
-  const message = error.message.trim();
-  return message === "" ? null : message;
 }
 
 /**
