@@ -10,7 +10,7 @@ DB 현재 상태, lease, tenant 와 후보 집합을 다시 검증한다.
 
 from __future__ import annotations
 
-from brokerage_ai.core.errors import AiError
+from brokerage_ai.core.errors import OutputContractError
 from brokerage_ai.f3.contracts import EvidenceKind
 from brokerage_ai.f3.judgment_contracts import (
     BrokerageJudgmentRequest,
@@ -21,7 +21,7 @@ from brokerage_ai.f3.judgment_contracts import (
 )
 
 
-class BrokerageJudgmentContractError(AiError):
+class BrokerageJudgmentContractError(OutputContractError):
     """결과가 요청과 맞지 않는다. 이 결과로 판정을 저장하면 안 된다."""
 
 
