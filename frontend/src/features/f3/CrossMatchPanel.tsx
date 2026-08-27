@@ -52,7 +52,7 @@ import type {
   PanelState,
   ParentContext,
 } from "./model/viewModel.ts";
-import { describeForUser } from "../ledger/index.ts";
+import { describeFeedbackError } from "./api/errors.ts";
 import type { CrossJudgment } from "./hooks/useCrossJudgment.ts";
 import type { FeedbackReason } from "./model/dto.ts";
 import "./CrossMatchPanel.css";
@@ -512,7 +512,7 @@ function CandidateDetail({
       setInterestOpen(false);
       setNotice("관심없음 피드백을 기록했습니다");
     } catch (cause) {
-      setFeedbackError(describeForUser(cause));
+      setFeedbackError(describeFeedbackError(cause));
     } finally {
       setFeedbackSending(false);
     }
