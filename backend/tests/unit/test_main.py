@@ -1,27 +1,47 @@
+from typing import cast
+
+import pytest
+from brokerage_ai.core.config import AiConfig
+from brokerage_ai.f2 import F2Pipeline, F2Runtime
 from fastapi.testclient import TestClient
 
+import main
 from main import create_app
 
 
 class FakeF2Runtime:
     def __init__(self) -> None:
-        self.pipeline = object()
+        self.pipeline = cast(F2Pipeline, object())
         self.closed = False
 
     async def close(self) -> None:
         self.closed = True
 
 
-def test_f2_runtime_is_always_started_and_closed(make_config) -> None:
-    runtime = FakeF2Runtime()
-    app = create_app(
-        config=make_config(),
-        readiness_probe=lambda request: True,
-        f2_runtime_factory=lambda: runtime,  # type: ignore[arg-type, return-value]
+def test_f2_runtime_accepts_dev_ai_profile(make_config, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = make_config(
+        {
+            "APP_ENV": "dev",
+            "DB_TARGET": "development",
+            "F2_ENABLED": "true",
+        }
     )
+    loaded_profiles: list[str] = []
+    ai_config = cast(AiConfig, object())
+    runtime = FakeF2Runtime()
 
-    with TestClient(app):
-        assert app.state.f2_pipeline is runtime.pipeline
-        assert runtime.closed is False
+    def load_config(profile: str) -> AiConfig:
+        loaded_profiles.append(profile)
+        return ai_config
+
+    def create_runtime(received: AiConfig) -> F2Runtime:
+        assert received is ai_config
+        return cast(F2Runtime, runtime)
+
+    monkeypatch.setattr(main, "load_ai_config", load_config)
+    monkeypatch.setattr(main, "create_f2_runtime", create_runtime)
+
+    with TestClient(create_app(config=config, readiness_probe=lambda _request: True)):
+        assert loaded_profiles == ["dev"]
 
     assert runtime.closed is True

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-27
 ---
 
 # ADR-0011: 개발환경 delivery 구현 기준
@@ -37,7 +37,7 @@ updated: 2026-08-24
 
 ### Frontend 배포
 
-- Verify는 clean install, 환경변수 우선순위 계약, typecheck와 원장 테스트까지만 수행한다. 별도 Build가 다시 clean install한 뒤 Vite release와 release 계약 검사를 수행하고 artifact를 만든다.
+- Verify는 clean install, 환경변수 우선순위 계약, 개발 인증 화면·환경 계약, typecheck와 원장 테스트까지만 수행한다. 별도 Build가 다시 clean install한 뒤 Vite release와 release 계약 검사를 수행하고 artifact를 만든다.
 - Frontend는 runtime Dockerfile 없이 Vite `dist/client` artifact를 만든다.
 - 현재 Backend의 CloudFront `/health/ready`를 먼저 확인한다.
 - release manifest에 entry document, asset 목록, 크기와 SHA-256을 기록한다.

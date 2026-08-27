@@ -18,7 +18,7 @@ export type AuthErrorKind =
   | "unauthenticated"
   /** 자격증명이나 권한이 거절됐다(403). CSRF 불일치도 여기에 들어온다. */
   | "rejected"
-  /** 이 환경에 없는 인증 경로다(404). 개발 세션은 local 환경에만 등록된다. */
+  /** 이 환경에 없는 인증 경로다(404). 개발 세션은 설정된 local·dev에만 등록된다. */
   | "unavailable"
   /** 서버 내부 오류(5xx). */
   | "server"

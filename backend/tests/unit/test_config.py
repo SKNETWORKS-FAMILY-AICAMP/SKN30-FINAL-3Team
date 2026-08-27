@@ -59,6 +59,14 @@ def test_environment_and_database_target_must_match() -> None:
         bind_config(values)
 
 
+def test_dev_environment_requires_development_database_and_secure_cookies() -> None:
+    config = bind_config(config_values(APP_ENV="dev", DB_TARGET="development"))
+
+    assert config.app.environment is AppEnvironment.DEV
+    assert config.db.target is DatabaseTarget.DEVELOPMENT
+    assert config.secure_cookie is True
+
+
 def test_production_rejects_development_authentication() -> None:
     values = config_values(
         APP_ENV="prod",
@@ -69,6 +77,31 @@ def test_production_rejects_development_authentication() -> None:
     )
 
     with pytest.raises(ValidationError, match="forbidden in production"):
+        bind_config(values)
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        {"AUTH_DEVELOPMENT_BROKERAGE_ID": "1"},
+        {"AUTH_DEVELOPMENT_LOGIN_ID": "developer"},
+        {
+            "AUTH_DEVELOPMENT_BROKERAGE_ID": "1",
+            "AUTH_DEVELOPMENT_LOGIN_ID": "   ",
+        },
+    ),
+)
+def test_enabled_development_authentication_fails_closed_without_complete_identity(
+    identity: dict[str, str],
+) -> None:
+    values = config_values(
+        APP_ENV="dev",
+        DB_TARGET="development",
+        AUTH_DEVELOPMENT_ENABLED="true",
+        **identity,
+    )
+
+    with pytest.raises(ValidationError, match="requires brokerage_id and login_id"):
         bind_config(values)
 
 
@@ -162,6 +195,10 @@ def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment
     (
         (AppEnvironment.TEST, config_values()),
         (
+            AppEnvironment.DEV,
+            config_values(APP_ENV="dev", DB_TARGET="development"),
+        ),
+        (
             AppEnvironment.PROD,
             config_values(APP_ENV="prod", DB_TARGET="production"),
         ),
@@ -200,7 +237,7 @@ def test_explicit_environment_must_match_app_env() -> None:
 
 
 def test_invalid_app_env_is_rejected_before_binding() -> None:
-    with pytest.raises(ConfigurationError, match="APP_ENV must be local, test, or prod"):
+    with pytest.raises(ConfigurationError, match="APP_ENV must be local, test, dev, or prod"):
         load_config(environ=config_values(APP_ENV="preview"))
 
 

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-25
+updated: 2026-08-27
 ---
 
 # Infra 결정 인덱스
@@ -11,7 +11,7 @@ updated: 2026-08-25
 | [ADR-0002](ADR-0002-dev-demo-aws-runpod-architecture.md) | 부분 대체됨 | NAT 없는 EC2·RDS·S3·RunPod와 초기 전달 구성 |
 | [ADR-0003](ADR-0003-dev-storage-database-and-configuration.md) | 부분 대체됨 | 개발 환경 RDS·업무용 S3·설정 저장소와 보존 기준 |
 | [ADR-0004](ADR-0004-dev-runtime-and-observability-baseline.md) | 부분 대체됨 | 개발 환경 EC2·ALB·ASG runtime과 최소 권한·14일 관측 기준 |
-| [ADR-0005](ADR-0005-dev-frontend-origin-and-api-routing.md) | 승인됨 | private S3·CloudFront OAC와 `/api/*` 동일 origin routing 기준 |
+| [ADR-0005](ADR-0005-dev-frontend-origin-and-api-routing.md) | 부분 대체됨 | private S3·CloudFront OAC와 `/api/*` 동일 origin routing 기준 |
 | [ADR-0006](ADR-0006-team-readonly-iam-group.md) | 부분 대체됨 | `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결 관리 |
 | [ADR-0007](ADR-0007-dev-db-tunnel-access.md) | 승인됨 | `team-db-tunnel` 그룹과 태그 제한 SSM remote-host 포트 포워딩 권한 관리 |
 | [ADR-0008](ADR-0008-dev-database-access-management.md) | 승인됨 | runtime Secret, IAM DB migration과 개인 개발자 DB 역할 운영 기준 |

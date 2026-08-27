@@ -16,6 +16,14 @@ import { ApiError } from "../../../shared/api/index.ts";
 import type { ApiErrorKind } from "../../../shared/api/index.ts";
 
 /**
+ * row_version 없이 삭제를 시도한 경우. 두 장부가 같은 안내를 쓴다.
+ *
+ * 서버에 보내기 전 화면이 스스로 막는 자리라 사용자에게 그대로 보여준다.
+ */
+export const DELETE_WITHOUT_VERSION =
+  "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.";
+
+/**
  * 사용자에게 보여줄 문구.
  *
  * 개인정보나 토큰이 섞일 수 있는 서버 원문을 그대로 노출하지 않는다.
@@ -26,7 +34,11 @@ export function describeForUser(error: unknown): string {
     return "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
-  const base = messageForCode(error.code) ?? messageFor(error.kind);
+  /*
+   * `userMessage`는 화면 코드가 "이 문장은 사용자에게 보여도 된다"고 표시한 오류에만 있다.
+   * 응답에서 만든 오류에는 붙지 않으므로 서버 원문이 이 경로로 새지 않는다.
+   */
+  const base = messageForCode(error.code) ?? error.userMessage ?? messageFor(error.kind);
   return error.requestId == null ? base : `${base} (요청 번호 ${error.requestId})`;
 }
 

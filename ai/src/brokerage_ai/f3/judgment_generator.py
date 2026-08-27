@@ -23,7 +23,11 @@ graph 가 실제로 필요해지는 시점은 한 번의 AI 호출 안에서 도
 
 from __future__ import annotations
 
-from brokerage_ai.core.types import ModelRoute, StructuredGenerationRequest
+from brokerage_ai.core.types import (
+    ModelRoute,
+    StructuredGenerationRequest,
+    StructuredGenerationResult,
+)
 from brokerage_ai.f3.contracts import InputPrivacyMode
 from brokerage_ai.f3.judgment_contracts import (
     BrokerageJudgmentRequest,
@@ -44,6 +48,7 @@ from brokerage_ai.f3.judgment_validation import (
     validate_judgment_result,
 )
 from brokerage_ai.providers.ports import LlmProvider
+from brokerage_ai.providers.repair import generate_with_repair
 
 BROKERAGE_JUDGMENT_WORKFLOW_VERSION = "brokerage-judgment-workflow:v1"
 
@@ -92,17 +97,26 @@ class LlmBrokerageJudgmentGenerator:
             messages=build_brokerage_judgment_messages(request),
             temperature=BROKERAGE_JUDGMENT_TEMPERATURE,
         )
-        produced = await self._provider.generate_structured(
-            generation, BrokerageJudgmentModelOutput
+
+        def finalize(
+            produced: StructuredGenerationResult[BrokerageJudgmentModelOutput],
+        ) -> BrokerageJudgmentResult:
+            versions = self.versions
+            result = BrokerageJudgmentResult(
+                # 대상은 모델이 아니라 요청에서 결정적으로 복사한다.
+                target=BrokerageJudgmentTarget.from_request(request),
+                candidates=assemble_candidates(request, produced.output),
+                prompt_version=versions.prompt_version,
+                workflow_version=versions.workflow_version,
+                diagnostics=produced.diagnostics,
+            )
+            validate_judgment_result(request, result)
+            return result
+
+        # 후보 누락, 순위 어긋남, 근거 위조는 전부 모델이 원인이다. 지적해 주면 고칠 수 있다.
+        return await generate_with_repair(
+            provider=self._provider,
+            request=generation,
+            output_schema=BrokerageJudgmentModelOutput,
+            finalize=finalize,
         )
-        versions = self.versions
-        result = BrokerageJudgmentResult(
-            # 대상은 모델이 아니라 요청에서 결정적으로 복사한다.
-            target=BrokerageJudgmentTarget.from_request(request),
-            candidates=assemble_candidates(request, produced.output),
-            prompt_version=versions.prompt_version,
-            workflow_version=versions.workflow_version,
-            diagnostics=produced.diagnostics,
-        )
-        validate_judgment_result(request, result)
-        return result

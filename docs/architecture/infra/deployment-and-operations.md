@@ -1,7 +1,7 @@
 ---
 status: 결정
 implementation: 기존 delivery 적용됨·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-25
+updated: 2026-08-27
 ---
 
 # 배포 및 운영 구조
@@ -18,7 +18,7 @@ updated: 2026-08-25
 |---|---|---|---|---|
 | `dev-integrated` | 최종 전환 후 `dev` 자동 감지 | Backend+AI와 Frontend 병렬 | Backend image와 Frontend release 병렬 | migration → Backend/Worker → health → Frontend |
 | `dev-backend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | Backend+AI, disposable DB | Backend image | migration → Backend/Worker → health |
-| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
+| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | test:env·test:auth, typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
 
 세 Pipeline은 CodePipeline V2 `QUEUED`다. 독립 Pipeline 실행 권한이 운영자 승인 역할을 하므로 내부 Manual approval은 두지 않는다. 통합 Pipeline도 별도 승인 없이 끝까지 진행한다. 애플리케이션 Pipeline은 Terraform을 실행하지 않는다.
 
@@ -90,9 +90,9 @@ Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM clea
 
 ## Frontend build와 배포
 
-Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
+Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → test:env → test:auth → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
 
-운영 `VITE_*` 공개값은 Terraform의 단일 Frontend build map에서 CodeBuild process env로 동적
+배포별 `VITE_*` 공개값은 Terraform의 단일 Frontend build map에서 CodeBuild process env로 동적
 전달한다. CloudFront의 동일 origin routing을 사용하므로 API base는 절대 domain이 아니라 `/api`
 하위 상대 경로다. 새 build 변수를 release manifest schema에 추가하지 않는다.
 

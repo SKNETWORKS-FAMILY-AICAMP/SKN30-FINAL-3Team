@@ -51,6 +51,8 @@ from brokerage_ai.f3 import (
 )
 from brokerage_ai.f3.model_output import ModelPriceOpinion, PositionCardModelOutput
 from brokerage_ai.f3.prompts import build_position_card_messages
+from brokerage_ai.providers.ports import LlmProvider
+from brokerage_ai.providers.repair import REPAIR_MAX_ATTEMPTS
 
 OLD_AT = datetime(2026, 8, 10, 1, 0, tzinfo=UTC)
 NEW_AT = datetime(2026, 8, 19, 4, 0, tzinfo=UTC)
@@ -192,7 +194,7 @@ def requirement_request() -> PositionCardGenerationRequest:
     )
 
 
-def generator(provider: FakeProvider) -> LlmPositionCardGenerator:
+def generator(provider: LlmProvider) -> LlmPositionCardGenerator:
     return LlmPositionCardGenerator(
         provider=provider,
         route=ROUTE,
@@ -572,25 +574,82 @@ def test_model_output_rejects_a_repeated_price_kind() -> None:
         )
 
 
-async def test_prompt_states_the_rules_the_schema_cannot_express() -> None:
-    """JSON schema 로 표현되지 않는 교차 필드 규칙은 프롬프트가 책임진다.
+async def test_prompt_states_the_quote_rule_for_an_empty_log_set() -> None:
+    """상담 로그가 없으면 인용할 원문도 없다는 규칙 (프롬프트 규칙 6).
 
-    계약(`PositionCardModelOutput`)은 이 규칙들을 `model_validator` 로 강제하지만 strict schema
-    에는 담기지 않는다. 프롬프트에도 없으면 모델은 규칙의 존재조차 모른 채 어기고, 그 출력이
-    검증에서 걸려 실행이 실패한다. 실제로 `hard_deadline` 규칙이 빠져 있어 후보 카드 생성이
-    반복 실패했다.
+    실제로 모델이 앵커 장부 값을 인용으로 낸 적이 있다. 이 규칙은 `model_validator` 가 아니라
+    입력 상황에 대한 안내라서 계약에서 도출되지 않는다.
 
-    새 교차 필드 규칙을 계약에 추가하면 이 테스트가 그것을 여기에 적도록 상기시킨다.
+    `model_validator` 가 강제하는 교차 필드 규칙이 **빠짐없이** 프롬프트로 전달되는지는
+    `tests/architecture/test_prompt_covers_output_contract.py` 가 기계적으로 확인한다. 여기에
+    규칙을 하나씩 손으로 적어 두면 새 규칙이 생겼을 때 아무도 알려 주지 않는다.
     """
     messages = build_position_card_messages(listing_request())
     prompt = "\n".join(message.content for message in messages)
 
-    assert "hard_deadline" in prompt
-    # 근거 없는 마감일을 세우지 말라는 규칙 (F3-PC-04).
-    assert "null 이다" in prompt
-    # 같은 price_kind 를 두 번 담지 말라는 규칙.
-    assert "price_kind 를 두 번" in prompt
-    # 월 차임은 MONTHLY_RENT 에서만 쓰라는 규칙.
-    assert "MONTHLY_RENT" in prompt
-    # 로그가 없으면 인용할 원문도 없다는 규칙. 실제로 모델이 앵커 장부 값을 인용으로 냈다.
     assert "kind=QUOTE 를 쓰지 않는다" in prompt
+
+
+class SequenceProvider:
+    """호출 순서대로 다른 출력을 내놓는 대역. 되먹임 뒤 모델이 답을 고치는 상황을 흉내 낸다."""
+
+    def __init__(self, *outputs: PositionCardModelOutput) -> None:
+        self.outputs = list(outputs)
+        self.calls: list[StructuredGenerationRequest] = []
+
+    @property
+    def kind(self) -> ProviderKind:
+        return ProviderKind.VLLM
+
+    async def generate_structured(
+        self, request: StructuredGenerationRequest, output_schema: type[Any]
+    ) -> StructuredGenerationResult[Any]:
+        self.calls.append(request)
+        return StructuredGenerationResult(
+            output=self.outputs.pop(0),
+            diagnostics=ProviderDiagnostics(
+                provider=ProviderKind.VLLM, model="test-delegate", latency_ms=1.0
+            ),
+        )
+
+
+async def test_a_forged_quote_is_fed_back_and_the_next_attempt_is_accepted() -> None:
+    """조립·대조 단계의 실패도 되먹임 대상이다.
+
+    인용문 위조는 `validate_generation_result()` 에서만 걸린다. Provider 어댑터 안에 되먹임을
+    두면 이 층을 덮지 못하고, 지금까지는 첫 시도에 `FAILED_TERMINAL` 로 끝났다.
+    """
+    forged = model_output(
+        intent=IntentAssessment(
+            value=NegotiationIntent.PRESENT, evidence=(quote(text="본문에 없는 인용문"),)
+        )
+    )
+    provider = SequenceProvider(forged, model_output())
+
+    result = await generator(provider).generate_position_card(listing_request())
+
+    assert result.analysis.intent.value is NegotiationIntent.PRESENT
+    assert len(provider.calls) == 2
+    # 두 번째 시도는 원본 프롬프트를 보존한 채 지적 한 건만 덧붙는다.
+    original = build_position_card_messages(listing_request())
+    assert provider.calls[1].messages[: len(original)] == original
+    appended = provider.calls[1].messages[len(original) :]
+    assert len(appended) == 1
+    assert "not present" in appended[0].content
+    # 상담 원문은 되먹임 문구에 실리지 않는다. 원본 메시지에 이미 있고 두 번 보낼 이유가 없다.
+    assert NEW_QUOTE not in appended[0].content
+
+
+async def test_a_repeated_violation_still_fails_with_its_original_type() -> None:
+    """되먹여도 안 고쳐지면 등급은 그대로다. Backend 의 실행 수명주기 분류가 달라지면 안 된다."""
+    forged = model_output(
+        intent=IntentAssessment(
+            value=NegotiationIntent.PRESENT, evidence=(quote(text="본문에 없는 인용문"),)
+        )
+    )
+    provider = SequenceProvider(*[forged] * REPAIR_MAX_ATTEMPTS)
+
+    with pytest.raises(PositionCardContractError, match="not present"):
+        await generator(provider).generate_position_card(listing_request())
+
+    assert len(provider.calls) == REPAIR_MAX_ATTEMPTS

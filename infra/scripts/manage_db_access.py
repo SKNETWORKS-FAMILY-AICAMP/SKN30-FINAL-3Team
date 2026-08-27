@@ -44,6 +44,7 @@ DB_MIGRATOR_USER = "app_migrator"
 DB_OWNER_ROLE = "app_owner"
 DB_RW_ROLE = "app_rw"
 TEAM_GROUP = "team-db-tunnel"
+SESSION_ACCOUNT_ROLES = ("OWNER", "STAFF", "READ_ONLY")
 MANAGED_ROLE_COMMENT = "Managed by infra manage_db_access from team-db-tunnel"
 RDS_CA_URL = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -914,6 +915,71 @@ def migrate(settings: Settings, apply: bool) -> None:
     emit("migration-complete", database=target.identifier, username=username)
 
 
+def create_session_account(
+    settings: Settings,
+    *,
+    brokerage_name: str,
+    login_id: str,
+    display_name: str,
+    role: str,
+    apply: bool,
+) -> None:
+    require_apply(apply, "create-session-account")
+    direct = base_session(settings)
+    identity = direct.client("sts").get_caller_identity()
+    username = caller_username(identity["Arn"])
+    target = describe_database(direct, settings)
+    instance_id = find_app_instance(direct, settings)
+    token = direct.client("rds").generate_db_auth_token(
+        DBHostname=target.endpoint,
+        Port=target.port,
+        DBUsername=username,
+        Region=settings.region,
+    )
+    ca_bundle = ensure_ca_bundle()
+
+    with PortForward(direct, instance_id, target, settings.local_port):
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "APP_ENV": "local",
+                "AUTH_DEVELOPMENT_ENABLED": "false",
+                "DB_TARGET": "development",
+                "DB_URL": migration_url(
+                    target,
+                    settings.local_port,
+                    ca_bundle,
+                    username,
+                    token,
+                ),
+                "PGOPTIONS": f"-c role={DB_OWNER_ROLE}",
+            }
+        )
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "--frozen",
+                "python",
+                "src/manage.py",
+                "create-development-user",
+                "--brokerage-name",
+                brokerage_name,
+                "--login-id",
+                login_id,
+                "--display-name",
+                display_name,
+                "--role",
+                role,
+            ],
+            cwd=REPO_ROOT / "backend",
+            env=environment,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise ToolError("Backend development session account creation failed")
+
+
 def verify(settings: Settings) -> None:
     direct = base_session(settings)
     operator = assume_operator(direct, settings)
@@ -958,6 +1024,15 @@ def parser() -> argparse.ArgumentParser:
         subcommand = commands.add_parser(command)
         subcommand.add_argument("--apply", action="store_true")
 
+    create_account = commands.add_parser("create-session-account")
+    create_account.add_argument("--brokerage-name", required=True)
+    create_account.add_argument("--login-id", required=True)
+    create_account.add_argument("--display-name", required=True)
+    create_account.add_argument(
+        "--role", choices=SESSION_ACCOUNT_ROLES, default="OWNER"
+    )
+    create_account.add_argument("--apply", action="store_true")
+
     rotate = commands.add_parser("rotate-runtime")
     rotate.add_argument("--apply", action="store_true")
     rotate.add_argument("--maintenance-window-confirmed", action="store_true")
@@ -998,6 +1073,15 @@ def main() -> None:
         )
     elif arguments.command == "migrate":
         migrate(settings, arguments.apply)
+    elif arguments.command == "create-session-account":
+        create_session_account(
+            settings,
+            brokerage_name=arguments.brokerage_name,
+            login_id=arguments.login_id,
+            display_name=arguments.display_name,
+            role=arguments.role,
+            apply=arguments.apply,
+        )
     elif arguments.command == "verify":
         verify(settings)
     elif arguments.command == "client-info":
