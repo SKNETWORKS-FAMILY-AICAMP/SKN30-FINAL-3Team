@@ -88,7 +88,7 @@ cp environments/dev/secrets.example.tfvars environments/dev/secrets.auto.tfvars
 chmod 600 environments/dev/secrets.auto.tfvars
 ```
 
-- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`는 필수이고 vLLM API key는 필요한 항목만 추가한다.
+- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`, `AI_VLLM_LLM_API_KEY`, `AI_VLLM_STT_API_KEY`는 필수이고 Embedding 등 다른 vLLM API key는 필요할 때 추가한다.
 - `discord_webhook_url`: Discord webhook HTTPS URL을 입력한다.
 - 각 `*_secret_version`: 비밀값을 바꿀 때 함께 1씩 증가시킨다.
 
