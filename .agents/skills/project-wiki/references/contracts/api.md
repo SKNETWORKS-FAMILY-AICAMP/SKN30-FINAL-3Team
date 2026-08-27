@@ -147,6 +147,11 @@ SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 
 `docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
 음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
 
+F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한다. Backend는 시작할 때 F2 pipeline을
+항상 초기화하므로 모든 실행 환경에 `AI_VLLM_LLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`이 필요하며,
+둘 중 하나가 없으면 애플리케이션 시작이 설정 오류로 실패한다. endpoint 설정은 유효하지만 RunPod가
+중지됐거나 Provider 요청·응답을 사용할 수 없으면 분석 요청을 503 `F2_UNAVAILABLE`로 종료한다.
+
 ### 오류 코드
 
 | code | HTTP | 발생 조건 |
@@ -158,7 +163,7 @@ SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
-| F2_UNAVAILABLE | 503 | F2가 비활성화됐거나 RunPod STT·LLM Provider를 사용할 수 없음 |
+| F2_UNAVAILABLE | 503 | RunPod STT·LLM Provider에 연결할 수 없거나 Provider 요청·응답을 사용할 수 없음 |
 | F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.

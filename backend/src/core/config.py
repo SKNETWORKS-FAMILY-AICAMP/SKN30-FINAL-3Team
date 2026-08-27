@@ -104,7 +104,6 @@ class WorkerConfig(BaseModel):
 
 
 class F2Config(BaseModel):
-    enabled: bool = False
     max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
 
 
@@ -247,7 +246,6 @@ def bind_config(source: Mapping[str, str]) -> Config:
             worker_id=_optional(source, "WORKER_ID"),
         ),
         f2=F2Config(
-            enabled=_boolean(source, "F2_ENABLED", False),
             max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
         ),
     )

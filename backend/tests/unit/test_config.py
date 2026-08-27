@@ -255,6 +255,17 @@ def test_worker_settings_use_the_same_validated_mapping() -> None:
     assert config.worker.worker_id == "configured-worker"
 
 
+def test_f2_has_no_feature_flag_and_keeps_request_limits() -> None:
+    config = bind_config(
+        config_values(
+            F2_MAX_AUDIO_BYTES="1024",
+        )
+    )
+
+    assert not hasattr(config.f2, "enabled")
+    assert config.f2.max_audio_bytes == 1024
+
+
 @pytest.mark.parametrize(
     ("name", "value", "message"),
     (
