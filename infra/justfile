@@ -165,6 +165,11 @@ db-sync:
 db-migrate:
     uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" migrate --apply
 
+# 개인 IAM 인증과 SSM 터널로 공유 dev DB의 검토된 F3 합성 seed를 재적재하고 검증한다.
+[confirm("공유 dev의 API 요청·Worker 작업이 없음을 확인했으며, F3_SYNTHETIC 합성 사무소 데이터를 삭제 후 다시 적재하고 29개 검증을 실행합니까?")]
+dev-seed-f3:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" seed-f3 --apply
+
 # 개인 IAM 인증과 SSM 터널로 공유 dev DB에 개발용 세션 계정을 생성한다.
 [confirm("공유 dev DB에 개발용 세션 계정을 생성합니까?")]
 dev-create-session-account brokerage_name login_id display_name role="OWNER":

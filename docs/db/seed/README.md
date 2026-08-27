@@ -1,9 +1,9 @@
 # F3 합성 seed 데이터
 
-이 디렉터리는 F3 파이프라인을 로컬에서 끝까지 돌려 보기 위한 **합성 장부**를 관리한다.
+이 디렉터리는 F3 파이프라인을 로컬 또는 공유 dev에서 끝까지 돌려 보기 위한 **합성 장부**를 관리한다.
 
 seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하지 않고, 번호도 `migrate/`와
-무관하며, 운영 환경에는 적용하지 않는다. 합성 데이터가 운영 스키마 전진 migration에 딸려
+무관하며, prod에는 적용하지 않는다. 합성 데이터가 운영 스키마 전진 migration에 딸려
 들어가지 않도록 디렉터리를 분리했다.
 
 ## 파일
@@ -18,13 +18,16 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 
 - 삭제 대상은 `brokerage.name = 'F3_SYNTHETIC 합성중개사무소'` 한 곳뿐이다. 다른 사무소,
   다른 개발 계정과 `seed-sample-ledger`가 만든 데이터는 건드리지 않는다.
-- 개인 로컬 합성 DB에서만 사용한다. 운영·공유 DB에 적용하지 않는다.
+- 개인 로컬 합성 DB와 `infra/environments/dev`가 소유한 공유 dev에서만 사용한다. prod와 다른
+  공유·운영 DB에는 적용하지 않는다.
+- 공유 dev 적용은 커밋된 세 파일을 고정 순서로 실행하고 29개 검사를 확인하는
+  `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
 - 실존 이름·연락처·주소·상담 원문을 변형해 쓰지 않았다. 전부 새로 지어낸 값이다.
 - 연락처는 프로젝트가 합성 fixture에 사용하는 `010-0000-XXXX` 테스트 형식만 쓴다.
 - API Key, 토큰, 비밀번호를 넣지 않는다. `app_user.password_hash`에 들어가는
   `!development-login-disabled!`는 해시가 아니라 비밀번호 로그인을 막는 고정 표식이다.
 
-## 적용
+## 로컬 적용
 
 `docs/db/migrate/`의 migration을 먼저 끝까지 적용한 뒤 실행한다.
 
@@ -58,10 +61,33 @@ docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
 두 파일을 순서대로 돌리면 몇 번을 반복해도 같은 상태가 된다. 검증 결과의 마지막 열이
 전부 `PASS`여야 다음 단계로 넘어간다.
 
+## 공유 dev 적용
+
+공유 dev RDS와 app EC2가 실행 중이고 실행자가 `team-db-tunnel` 멤버여야 한다. 먼저 커밋된
+migration을 적용한 뒤 F3 합성 사무소 데이터를 재적재한다.
+
+```bash
+cd infra
+just db-migrate
+just dev-seed-f3
+```
+
+`dev-seed-f3`는 다음 경계를 강제한다.
+
+- 개인 `aws login` IAM 사용자와 같은 이름의 PostgreSQL 역할을 사용한다.
+- 태그로 제한된 app EC2의 SSM remote-host 터널과 15분 IAM DB 토큰을 프로세스 내부에서만 쓴다.
+- 실행 파일을 `001` reset → `002` seed → `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
+- `app_owner` 역할로 실행하며 IAM token과 DB URL을 명령행·로그에 출력하지 않는다.
+- `003`의 29개 결과가 모두 `PASS`일 때만 완료로 보고한다.
+
+확인 프롬프트는 기존 `F3_SYNTHETIC 합성중개사무소`의 실행 결과와 장부를 reset한 뒤 다시
+적재한다는 사실을 명시한다. 다른 사무소 데이터는 reset 대상이 아니지만, 공유 dev에서 실행 중인
+F3 작업이 없을 때만 실행한다.
+
 `002`의 마지막 출력에 `AUTH_DEVELOPMENT_BROKERAGE_ID`와 케이스별 `anchor_id`가 나온다.
 자동 증가 ID는 로컬마다 다르므로 이 문서의 숫자를 그대로 복사하지 않는다.
 
-`backend/.env`에 출력된 값을 넣고 API 서버를 재시작한다.
+로컬에서는 `backend/.env`에 출력된 값을 넣고 API 서버를 재시작한다.
 
 ```dotenv
 AUTH_DEVELOPMENT_ENABLED=true
@@ -73,6 +99,11 @@ AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 `http://127.0.0.1:8000/docs`에서 개발 세션 발급 → F3 실행 접수 → 상태·결과 조회 순서로
 확인한다. 인증·CSRF와 F3 경로의 정본은 [API 계약](../../../.agents/skills/project-wiki/references/contracts/api.md)이다.
 이 seed는 별도의 `create-development-user`, `seed-sample-ledger`와 AI 모델 설정 등록을 대신한다.
+
+공유 dev에서는 `002`가 출력한 `brokerage_id`와 `f3_synthetic_dev`를 ignored
+`infra/environments/dev/dev.tfvars`의 `development_auth`에 반영하고, 검토한 Terraform plan을
+적용한 다음 애플리케이션을 다시 배포한다. seed 명령은 Terraform 설정이나 실행 중인 프로세스를
+자동으로 변경하지 않는다.
 
 ## 실행 결과는 seed하지 않는다
 

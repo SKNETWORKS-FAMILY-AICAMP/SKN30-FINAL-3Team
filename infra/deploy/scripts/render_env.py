@@ -168,7 +168,7 @@ def build_process_environments(
             + ", ".join(sorted(collisions))
         )
 
-    api = {**backend, **ai, "DB_URL": runtime_url}
+    api = {**backend, "DB_URL": runtime_url}
     worker = {**backend, **ai, "DB_URL": runtime_url, **ai_provider_keys}
     migration = {"DB_MIGRATION_URL": migration_url}
     return api, worker, migration
