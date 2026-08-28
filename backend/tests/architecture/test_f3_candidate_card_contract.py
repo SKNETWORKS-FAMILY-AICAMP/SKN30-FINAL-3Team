@@ -40,4 +40,4 @@ def test_candidate_card_implementation_and_project_wiki_stay_aligned() -> None:
     assert "`SYNTHETIC_PROTOTYPE` 입력만 허용" in ai_contract
     assert "중개 판정 요청 조립, 결과·근거 저장" in online_runtime
     assert "후보 포지션 카드 확보" in online_runtime
-    assert "F3 결정적 후보 snapshot의 상위 15건" in log
+    assert "F3 최초 카드화·판정 상한을 상위 5건으로 조정" in log

@@ -13,7 +13,16 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import structlog
-from brokerage_ai.core.errors import ProviderError
+from brokerage_ai.core.errors import (
+    ProviderConfigurationError,
+    ProviderError,
+    ProviderOutputInvalidError,
+    ProviderRateLimitError,
+    ProviderRefusalError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 from brokerage_ai.f3 import BrokerageJudgmentContractError, PositionCardContractError
 from sqlmodel import Session
 
@@ -87,6 +96,33 @@ class StepOutcome(StrEnum):
     SKIPPED = "SKIPPED"
 
 
+class FailureStage(StrEnum):
+    """상담 본문 없이 실패 지점을 집계하는 안전한 단계 어휘."""
+
+    ANCHOR_CARD = "ANCHOR_CARD"
+    CANDIDATE_SELECTION = "CANDIDATE_SELECTION"
+    CANDIDATE_CARDS = "CANDIDATE_CARDS"
+    JUDGMENT = "JUDGMENT"
+    EXECUTION = "EXECUTION"
+
+
+class FailureCategory(StrEnum):
+    """Provider 원문·모델 출력을 남기지 않는 고정 실패 분류."""
+
+    LEASE = "LEASE"
+    INPUT_CHANGED = "INPUT_CHANGED"
+    CACHE_INVALIDATED = "CACHE_INVALIDATED"
+    OUTPUT_CONTRACT = "OUTPUT_CONTRACT"
+    PROVIDER_TIMEOUT = "PROVIDER_TIMEOUT"
+    PROVIDER_RATE_LIMIT = "PROVIDER_RATE_LIMIT"
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+    PROVIDER_REFUSAL = "PROVIDER_REFUSAL"
+    PROVIDER_RESPONSE = "PROVIDER_RESPONSE"
+    CONFIGURATION = "CONFIGURATION"
+    DATA_INTEGRITY = "DATA_INTEGRITY"
+    UNKNOWN = "UNKNOWN"
+
+
 @dataclass(frozen=True)
 class ExecutionBindings:
     """현재 단계에 필요한 생성 구성. 사용하지 않는 capability는 조회하지 않는다."""
@@ -107,6 +143,60 @@ def _card_binding(bindings: ExecutionBindings) -> GenerationBinding:
 def _judgment_binding(bindings: ExecutionBindings) -> JudgmentBinding | None:
     # 후보 0건이면 06번 유스케이스가 binding 없이 AI 호출을 생략한다.
     return bindings.judgment
+
+
+def failure_stage(status: str) -> FailureStage:
+    """DB 상태를 사용자 데이터가 없는 집계 단계로 바꿔 돌려준다."""
+    if status == RUNNING_STATUS:
+        return FailureStage.ANCHOR_CARD
+    if status == ANCHOR_READY_STATUS:
+        return FailureStage.CANDIDATE_SELECTION
+    if status == CANDIDATES_READY_STATUS:
+        return FailureStage.CANDIDATE_CARDS
+    if status in {CANDIDATE_CARDS_READY_STATUS, JUDGING_STATUS}:
+        return FailureStage.JUDGMENT
+    return FailureStage.EXECUTION
+
+
+def failure_category(error: BaseException) -> FailureCategory:
+    """예외 본문을 로그하지 않고 안정적인 소수 어휘로만 분류한다."""
+    if isinstance(error, LeaseNotHeldError):
+        return FailureCategory.LEASE
+    if isinstance(error, _SUPERSEDING_ERRORS):
+        return FailureCategory.INPUT_CHANGED
+    if isinstance(error, _RETRYABLE_ERRORS):
+        return FailureCategory.CACHE_INVALIDATED
+    if isinstance(error, ProviderOutputInvalidError):
+        return FailureCategory.OUTPUT_CONTRACT
+    if isinstance(error, ProviderTimeoutError):
+        return FailureCategory.PROVIDER_TIMEOUT
+    if isinstance(error, ProviderRateLimitError):
+        return FailureCategory.PROVIDER_RATE_LIMIT
+    if isinstance(error, ProviderUnavailableError):
+        return FailureCategory.PROVIDER_UNAVAILABLE
+    if isinstance(error, ProviderRefusalError):
+        return FailureCategory.PROVIDER_REFUSAL
+    if isinstance(error, ProviderResponseError):
+        return FailureCategory.PROVIDER_RESPONSE
+    if isinstance(error, ProviderConfigurationError | GenerationBindingError):
+        return FailureCategory.CONFIGURATION
+    if isinstance(
+        error,
+        PositionCardContractError
+        | BrokerageJudgmentContractError
+        | JudgmentEvidenceError
+        | JudgmentResultMismatchError,
+    ):
+        return FailureCategory.OUTPUT_CONTRACT
+    if isinstance(
+        error,
+        JudgmentAlreadyStoredError
+        | AgentRunAnchorError
+        | CandidateSelectionMissingError
+        | NotFoundError,
+    ):
+        return FailureCategory.DATA_INTEGRITY
+    return FailureCategory.UNKNOWN
 
 
 def classify(error: BaseException) -> StepOutcome:
@@ -243,8 +333,10 @@ def advance_run(
             "f3_step_failed",
             run_id=run.id,
             status=run.status,
+            failure_stage=failure_stage(run.status).value,
             attempt=run.attempt_count,
             outcome=outcome.value,
+            failure_category=failure_category(error).value,
             error_type=type(error).__name__,
         )
         if outcome is StepOutcome.LEASE_LOST:

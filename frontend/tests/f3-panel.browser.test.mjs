@@ -91,14 +91,21 @@ async function openPropertyLedger(page) {
   return links;
 }
 
+/** 매물 건이 있는 세대 상세를 열고 사용자가 실제로 교차 판정 버튼을 누르는 흐름. */
+async function openListingCrossMatch(page) {
+  const links = await openPropertyLedger(page);
+  // mock index 1은 listingFor 규칙상 매물 건을 가진다.
+  await links.nth(1).click();
+  await page.getByRole("button", { name: "교차 판정", exact: true }).click();
+}
+
 test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
 
   // 매물 건이 있는 세대를 연다. mock 장부는 네 세대 중 하나를 매물 없는 세대로 만든다.
-  const links = await openPropertyLedger(page);
-  await links.nth(1).click();
+  await openListingCrossMatch(page);
 
   const panel = page.locator("#cross-match-panel");
   await panel.waitFor();
@@ -123,8 +130,9 @@ test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 1
     .allInnerTexts();
   assert.ok(collapsed.includes("상세 판정 미수행"));
 
-  // 전체 23건 중 기각 5건을 숨겨 15건이 보이고, 첫 페이지는 20건 기준이다.
-  assert.equal(await page.locator(".cross-match-panel__candidate").count(), 15);
+  // 전체 23건 중 상위 5건을 판정하고 기각 1건을 숨겨, 첫 페이지에 19건이 보인다.
+  assert.equal(await page.locator(".cross-match-panel__candidate").count(), 19);
+  assert.match(await panel.innerText(), /상위 5건 판정 · 전체 23건/);
   const pager = page.getByLabel("후보 페이지 이동");
   assert.match((await pager.innerText()).replace(/\s+/g, " "), /1–20 \/ 23/);
 
@@ -143,8 +151,7 @@ test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 �
   const page = await browser.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
-  const links = await openPropertyLedger(page);
-  await links.nth(1).click();
+  await openListingCrossMatch(page);
   await page
     .locator(".cross-match-panel__grade-heading h4")
     .first()
@@ -185,8 +192,7 @@ test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 �
 
 test("장부에 없는 후보는 식별자만 보여준다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
-  const links = await openPropertyLedger(page);
-  await links.nth(1).click();
+  await openListingCrossMatch(page);
   await page
     .locator(".cross-match-panel__grade-heading h4")
     .first()
