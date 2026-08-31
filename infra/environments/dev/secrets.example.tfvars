@@ -2,8 +2,9 @@
 # secrets.auto.tfvars는 Git에서 제외되며 Terraform이 plan/apply 때 자동으로 읽는다.
 
 ai_provider_api_keys = {
-  AI_OPENAI_API_KEY = ""
-  # AI_VLLM_LLM_API_KEY       = ""
+  AI_OPENAI_API_KEY   = ""
+  AI_VLLM_LLM_API_KEY = ""
+  AI_VLLM_STT_API_KEY = ""
   # AI_VLLM_EMBEDDING_API_KEY = ""
 }
 ai_provider_secret_version = 1

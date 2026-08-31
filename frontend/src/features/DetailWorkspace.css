@@ -248,6 +248,14 @@
   white-space: nowrap;
 }
 
+/* 제목줄의 「크게 보기」는 로그 칸의 보조 동작이라 오른쪽 끝에 작게 붙인다. */
+.detail-log-pane__expand {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .detail-log-pane .pf-v6-c-form-control,
 .detail-log-pane textarea {
   flex: 1 1 auto;
@@ -1095,6 +1103,24 @@
   margin: 0 0 22px;
   color: var(--dw-text-subtle);
   line-height: 1.55;
+}
+
+/* 큰 창은 상담 로그를 읽는 것이 목적이라 화면 높이를 최대한 로그에 준다. */
+.detail-workspace__log-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* PatternFly의 textarea 기본 높이를 이기려면 상세 비고 칸과 같이 id 선택자가 필요하다. */
+.detail-workspace-modal #detail-log-expanded {
+  min-height: min(58vh, 560px);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.detail-workspace__log-modal-body .detail-log-meta {
+  margin-top: 0;
 }
 
 .detail-workspace__duplicate-modal-body p.duplicate-modal__note {

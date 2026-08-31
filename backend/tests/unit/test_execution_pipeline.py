@@ -7,7 +7,12 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
-from brokerage_ai.core.errors import ProviderResponseError, ProviderTimeoutError
+from brokerage_ai.core.errors import (
+    ProviderOutputInvalidError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
 from brokerage_ai.f3 import BrokerageJudgmentContractError, PositionCardContractError
 from sqlmodel import Session
 
@@ -54,6 +59,43 @@ def test_errors_have_one_execution_outcome(
     expected: pipeline.StepOutcome,
 ) -> None:
     assert pipeline.classify(error) is expected
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("RUNNING", pipeline.FailureStage.ANCHOR_CARD),
+        ("ANCHOR_READY", pipeline.FailureStage.CANDIDATE_SELECTION),
+        ("CANDIDATES_READY", pipeline.FailureStage.CANDIDATE_CARDS),
+        ("CANDIDATE_CARDS_READY", pipeline.FailureStage.JUDGMENT),
+        ("JUDGING", pipeline.FailureStage.JUDGMENT),
+        ("QUEUED", pipeline.FailureStage.EXECUTION),
+    ],
+)
+def test_saved_status_has_a_safe_failure_stage(
+    status: str, expected: pipeline.FailureStage
+) -> None:
+    assert pipeline.failure_stage(status) is expected
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (LeaseNotHeldError("raw"), pipeline.FailureCategory.LEASE),
+        (InputVersionChangedError("raw"), pipeline.FailureCategory.INPUT_CHANGED),
+        (CachedCardUnavailableError("raw"), pipeline.FailureCategory.CACHE_INVALIDATED),
+        (ProviderOutputInvalidError("raw"), pipeline.FailureCategory.OUTPUT_CONTRACT),
+        (ProviderTimeoutError(), pipeline.FailureCategory.PROVIDER_TIMEOUT),
+        (ProviderRateLimitError(), pipeline.FailureCategory.PROVIDER_RATE_LIMIT),
+        (ProviderResponseError(), pipeline.FailureCategory.PROVIDER_RESPONSE),
+        (PositionCardContractError("raw"), pipeline.FailureCategory.OUTPUT_CONTRACT),
+        (RuntimeError("raw"), pipeline.FailureCategory.UNKNOWN),
+    ],
+)
+def test_errors_have_a_safe_failure_category(
+    error: BaseException, expected: pipeline.FailureCategory
+) -> None:
+    assert pipeline.failure_category(error) is expected
 
 
 @pytest.mark.parametrize(
@@ -199,6 +241,39 @@ def test_contract_failure_stores_a_generic_terminal_error(
     assert outcome is pipeline.StepOutcome.FAILED_TERMINAL
     assert failure_calls[0]["failure_code"] == "EXECUTION_FAILED"
     assert "model output body" not in repr(failure_calls)
+
+
+def test_failure_log_contains_only_safe_classification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_message = "customer phone 010-0000-0000"
+    events: list[tuple[str, dict[str, object]]] = []
+
+    class RecordingLogger:
+        def warning(self, event: str, **values: object) -> None:
+            events.append((event, values))
+
+    monkeypatch.setattr(pipeline, "logger", RecordingLogger())
+    outcome, _, _ = advance_with_error(
+        monkeypatch, PositionCardContractError(raw_message)
+    )
+
+    assert outcome is pipeline.StepOutcome.FAILED_TERMINAL
+    assert events == [
+        (
+            "f3_step_failed",
+            {
+                "run_id": 17,
+                "status": "RUNNING",
+                "failure_stage": "ANCHOR_CARD",
+                "attempt": 2,
+                "outcome": "FAILED_TERMINAL",
+                "failure_category": "OUTPUT_CONTRACT",
+                "error_type": "PositionCardContractError",
+            },
+        )
+    ]
+    assert raw_message not in repr(events)
 
 
 @pytest.mark.parametrize("kind", ["retry", "failure"])

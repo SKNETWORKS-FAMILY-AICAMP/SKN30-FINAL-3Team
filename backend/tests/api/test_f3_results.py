@@ -101,6 +101,8 @@ def _store_completed_judgment(
     user_id: int,
     run_id: int,
     anchor_card_id: int,
+    *,
+    selection_schema: str = "candidate-selection:v3",
 ) -> int:
     party_id = session.execute(
         text(
@@ -131,7 +133,7 @@ def _store_completed_judgment(
     ).scalar_one()
     selection = json.dumps(
         {
-            "schema": "candidate-selection:v2",
+            "schema": selection_schema,
             "criteria": {
                 "candidate_side": "REQUIREMENT",
                 "price_kind": "SALE",
@@ -299,6 +301,27 @@ def test_completed_result_contains_all_sql_candidates_and_judgment(config: Confi
         # 판정 전 후보에는 피드백 대상이 없다. 화면은 이 값으로 [관심없음]을 막는다.
         assert uncarded["judgment_id"] is None
         assert body["candidates_total"] == 2
+
+
+@requires_database
+def test_completed_v2_candidate_result_remains_readable(config: Config) -> None:
+    """상한 조정 전에 완료된 판정 이력은 v3 배포 후에도 조회한다."""
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        anchor_card_id = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        _store_completed_judgment(
+            session,
+            brokerage_id,
+            user_id,
+            run["run_id"],
+            anchor_card_id,
+            selection_schema="candidate-selection:v2",
+        )
+
+        body = client.get(f"/api/v1/f3/runs/{run['run_id']}/result").json()
+
+        assert body["candidate_selection"]["total_count"] == 2
+        assert len(body["candidates"]) == 2
 
 
 @requires_database
