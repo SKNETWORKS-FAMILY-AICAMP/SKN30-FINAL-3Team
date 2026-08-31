@@ -23,7 +23,7 @@ updated: 2026-08-31
 | 업무 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱이 성공·취소 즉시, 실패 1시간 이내 삭제; lifecycle 1일 안전망 |
 | 데이터·모델 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료, 그 외 자동 만료 없음 |
 | 비밀·설정 | Secrets Manager, Parameter Store | 결정 | 기존 자원 적용됨·환경 materialization 미적용 | runtime DB·migration IAM·RDS master 자동 경계 유지; AI·delivery Discord와 새 Alarm Discord 입력은 각각 ignored tfvars→write-only 전환 후 plan·apply |
-| 관측성 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달과 2개 app alarm 코드 구현 미적용 | 적용 후 별도 SNS/Lambda가 기존 6개와 Backend 500·AI terminal alarm을 새 Discord Secret으로 전달; notifier log 14일, 기존 delivery notifier 무변경 |
+| 관측성 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달과 2개 app alarm 코드 구현, AWS 미적용 | 적용 후 별도 SNS/Lambda가 기존 6개와 Backend 500·AI terminal alarm을 새 Discord Secret으로 전달; app ALARM에는 조사 링크·안전 로그 1건을 best-effort 제공, notifier log 14일, 기존 delivery notifier 무변경 |
 | 전달 | CodeConnections, CodePipeline V2, CodeBuild, CodeDeploy | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, 모두 QUEUED |
 | 전달 저장소 | Pipeline artifact S3 | 결정 | 적용됨 | non-versioned, 객체 14일 만료; 업무용 S3·Terraform state와 분리 |
 | 모델 실행 | RunPod 공용 Template, 개발자별 Pod | 결정 | 보류 | 운영 구조는 결정됐으나 Terraform 소유 범위는 재개 전 결정 |
