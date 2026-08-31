@@ -91,12 +91,110 @@ async function openPropertyLedger(page) {
   return links;
 }
 
+/**
+ * 상세의 [교차 판정 실행]을 눌러 판정을 시작한다.
+ *
+ * 상세 진입과 저장은 판정을 시작하지 않는다(F3-CR-03·04). 실행 시점은 사용자가 정하므로
+ * 브라우저 검사도 같은 경로로 들어간다.
+ */
+async function runCrossJudgment(page) {
+  await page.getByRole("button", { name: "교차 판정 실행", exact: true }).click();
+  const panel = page.locator("#cross-match-panel");
+  await panel.waitFor();
+  return panel;
+}
+
+/**
+ * 동작 감소 설정을 켜면 스크롤 애니메이션을 쓰지 않는다.
+ *
+ * `styles.css`의 `scroll-behavior: auto`는 CSS 경로에만 걸린다. `scrollIntoView`에 옵션으로
+ * 직접 넘긴 `behavior`가 CSS를 이기므로, 설정을 코드에서 읽지 않으면 동작 감소를 켠
+ * 사용자에게도 애니메이션이 남는다. 실제로 어떤 `behavior`로 불렀는지를 본다.
+ */
+async function openDetailAndRecordScroll(page) {
+  // 페이지 스크립트보다 먼저 걸어야 첫 호출부터 기록된다.
+  await page.addInitScript(() => {
+    window.__scrollBehaviors = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function record(options) {
+      window.__scrollBehaviors.push(options && options.behavior);
+      return original.call(this, options);
+    };
+  });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "매물장", exact: true }).click();
+  const links = page.locator(".ledger-grid__detail-link");
+  await links.first().waitFor();
+  await links.nth(1).click();
+
+  // 판정을 실행하면 패널로 스크롤한다.
+  await page.locator("#detail-section-cross-match").waitFor();
+  await runCrossJudgment(page);
+  await page.waitForFunction(() => window.__scrollBehaviors.length > 0, undefined, { timeout: 10_000 });
+  return page.evaluate(() => window.__scrollBehaviors);
+}
+
+test("동작 감소를 켜면 섹션 스크롤에 애니메이션을 쓰지 않는다", { timeout: 120_000 }, async () => {
+  const reduced = await browser.newPage();
+  await reduced.emulateMedia({ reducedMotion: "reduce" });
+  const reducedBehaviors = await openDetailAndRecordScroll(reduced);
+  assert.deepEqual([...new Set(reducedBehaviors)], ["auto"]);
+  await reduced.close();
+
+  // 설정을 켜지 않은 환경에서는 종전대로 부드럽게 움직인다.
+  const normal = await browser.newPage();
+  await normal.emulateMedia({ reducedMotion: "no-preference" });
+  const normalBehaviors = await openDetailAndRecordScroll(normal);
+  assert.deepEqual([...new Set(normalBehaviors)], ["smooth"]);
+  await normal.close();
+});
+
+/**
+ * 판정을 시작하는 버튼은 둘이고, 상세 진입은 어느 쪽도 부르지 않는다.
+ *
+ * 액션 레일의 [교차 판정]과 섹션의 [교차 판정 실행]은 같은 실행을 요청한다.
+ * 저장과 상세 진입은 판정을 시작하지 않는다(F3-CR-03·04).
+ */
+test("상세 진입은 판정을 시작하지 않고 두 버튼이 각각 실행한다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage();
+  const failures = [];
+  page.on("pageerror", (error) => failures.push(String(error)));
+
+  const links = await openPropertyLedger(page);
+  await links.nth(1).click();
+
+  // 섹션은 늘 보이지만 상세를 열기만 해서는 판정이 돌지 않는다.
+  await page.locator("#detail-section-cross-match").waitFor();
+  assert.equal(await page.locator("#cross-match-panel").count(), 0);
+
+  // 섹션의 실행 버튼이 판정을 시작한다.
+  await runCrossJudgment(page);
+  await page.getByText("기준 세대 확인").waitFor();
+  await page.close();
+
+  // 레일 버튼도 같은 실행을 요청한다. 여닫기가 아니므로 aria-expanded를 갖지 않는다.
+  const rail = await browser.newPage();
+  const railLinks = await openPropertyLedger(rail);
+  await railLinks.nth(1).click();
+  assert.equal(await rail.locator("#cross-match-panel").count(), 0);
+  const railButton = rail.getByRole("button", { name: "교차 판정", exact: true });
+  assert.equal(await railButton.getAttribute("aria-expanded"), null);
+  // 패널이 없는 동안에는 없는 id를 가리키지 않는다.
+  assert.equal(await railButton.getAttribute("aria-controls"), null);
+  await railButton.click();
+  await rail.locator("#cross-match-panel").waitFor();
+  assert.equal(await railButton.getAttribute("aria-controls"), "cross-match-panel");
+  await rail.getByText("기준 세대 확인").waitFor();
+  await rail.close();
+
+  assert.deepEqual(failures, []);
+});
 /** 매물 건이 있는 세대 상세를 열고 사용자가 실제로 교차 판정 버튼을 누르는 흐름. */
 async function openListingCrossMatch(page) {
   const links = await openPropertyLedger(page);
   // mock index 1은 listingFor 규칙상 매물 건을 가진다.
   await links.nth(1).click();
-  await page.getByRole("button", { name: "교차 판정", exact: true }).click();
+  await runCrossJudgment(page);
 }
 
 test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 120_000 }, async () => {
@@ -106,9 +204,7 @@ test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 1
 
   // 매물 건이 있는 세대를 연다. mock 장부는 네 세대 중 하나를 매물 없는 세대로 만든다.
   await openListingCrossMatch(page);
-
   const panel = page.locator("#cross-match-panel");
-  await panel.waitFor();
 
   // 접수 직후에는 진행 단계만 보이고 후보는 없다. 완료를 가장하지 않는다.
   await page.getByText("기준 세대 확인").waitFor();

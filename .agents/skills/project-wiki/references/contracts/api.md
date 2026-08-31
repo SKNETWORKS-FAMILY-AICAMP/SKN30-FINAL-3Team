@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-08-31
 ---
 
 # API 계약 규칙
@@ -247,6 +247,12 @@ F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한�
 
 다음 네 저장이 성공하면 Backend가 F3 실행을 자동 접수한다 (F3-CR-01, F3-CR-02).
 
+이 실행이 자동으로 수행하는 범위는 **앵커 포지션 카드 생성까지**다 ([ADR-0018](../decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md)). 앵커 카드를 저장해
+`ANCHOR_READY`가 되면 실행은 거기서 멈추고, 후보 조회·후보 카드·중개 판정은 사용자가
+`POST /api/v1/f3/runs`로 판정을 요청할 때 이어서 수행한다 (F3-CR-01~04, 2026-08-31 개정).
+저장 하나가 모델 판정까지 완주하던 종전 계약을 대체한다. 결과를 볼 의사가 없는 저장에서도
+판정 비용이 들었고, 그 비용을 사용자가 선택한 적이 없기 때문이다.
+
 | 저장 경로 | 앵커 | 접수 조건 |
 |---|---|---|
 | `POST /api/v1/property-units/{unit_id}/listings` | 매물 | 신규 등록 |
@@ -262,7 +268,15 @@ F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한�
 F1 응답 형태에는 실행 ID나 F3 상태를 추가하지 않는다. 화면은 `POST /api/v1/f3/runs`로 실행을
 확인하며, 같은 앵커·입력 버전의 활성 실행이면 저장 시 자동 생성된 실행 ID를 그대로 돌려받는다.
 자동 실행의 `trigger_type`은 `LEDGER_SAVE`이고 직접 실행 요청의 `USER_REQUEST`와 구분한다. 기존
-활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다.
+활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다. **예외는
+`LEDGER_SAVE` 실행에 사용자의 판정 요청이 들어온 경우다.** 실행이 `QUEUED`면 다음 최초 선점이
+전체 판정을 수행하고, `RUNNING`이면 현재 lease의 Worker가 앵커 카드 뒤로 계속 진행하도록
+`trigger_type`을 요청자의 값으로 옮긴다. `ANCHOR_READY`에서 멈춰 있으면 기존 lease를 비우고
+같은 실행을 즉시 선점 가능하게 해 후보 조회부터 이어서 진행한다. 이 계획된 이어받기 선점은 실패
+재시도가 아니므로 `attempt_count`를 늘리지 않는다. `requested_by`는 최초 값을 유지한다. 이어받기는
+앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용이 없고, 화면은 종전과 같은 실행 ID를
+돌려받는다. `trigger_type`이 바뀌면 자동 접수에서 시작했다는 사실과 이전 상태는
+`f3_ledger_save_run_resumed` 로그로 남는다.
 
 PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 서비스가 저장 직전에 비교한 **실제 변경
 필드**로 판단한다. 메모·담당자 같은 운영 필드만 바꾸거나 가격·예산 등 기존과 같은 값을 다시
@@ -351,7 +365,11 @@ Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 
 원자 저장하면 `COMPLETED`, 입력 버전·상담 범위가 실행 중 바뀌면 `SUPERSEDED`, lease 최대 시도
 초과나 영구 오류이면 `FAILED_TERMINAL`이다. `ANCHOR_READY`,
 `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`은 중간 상태라 `completed_at`을 채우지
-않고 `COMPLETED`에서 채운다. 후보가 0건이면 모델 호출과 `JUDGING` 없이 빈 결과를 확정하고
+않고 `COMPLETED`에서 채운다. `ANCHOR_READY`는 자동 접수된 실행이 사용자 요청을 기다리며 머무는
+지점이기도 하다. 이 상태의 `LEDGER_SAVE` 실행은 Worker 선점과 최대 시도 초과 정리에서 모두
+제외되므로 시도 횟수가 늘지 않고 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료되지도 않는다. 사용자가 끝내 판정을 요청하지 않으면
+실행은 `ANCHOR_READY`로 남으며, 보존 기간이 지난 실행 정리는 `retention_until`·`purged_at`을
+쓰는 별도 작업의 범위다. 후보가 0건이면 모델 호출과 `JUDGING` 없이 빈 결과를 확정하고
 `CANDIDATE_CARDS_READY`에서 바로 `COMPLETED`로 간다. Worker polling·handler가 이 유스케이스를
 상태 순서대로 호출한다. 그 밖의 상태는 아직 만들지 않는다.
 
@@ -464,7 +482,11 @@ F3-TR-02의 정정은 이번 계약에 포함하지 않는다. 정정은 값을 
 
 Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
 `CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 구현된 진행
-상태(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다. 최초
+상태(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다.
+다만 `trigger_type`이 `LEDGER_SAVE`이고 상태가 `ANCHOR_READY`인 실행은 선점 대상에서 제외한다.
+저장이 자동으로 하는 일은 앵커 카드까지이므로 lease가 만료돼도 다시 집어가지 않는다. 사용자가
+판정을 요청해 `trigger_type`이 옮겨지면 lease가 없는 계획된 handoff로 즉시 선점 대상이 되며,
+그 첫 선점은 `attempt_count`를 늘리지 않는다. 최초
 `QUEUED`만 `RUNNING`으로 바꾸고
 재선점한 진행 상태는 보존한다. `JUDGING`을 재선점하면 최초 판정 바인딩과 후보 집합을 다시
 검증한 뒤 중개 판정 호출부터 안전하게 재실행한다. 5분짜리 lease와 시도 횟수를 기록하며,
@@ -476,7 +498,10 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 
 배포용 Worker 프로세스(`backend/src/worker.py`)는 `claim_next_run`을 RDS polling으로 호출하고,
 저장된 상태를 기준으로 앵커 카드 → 후보 SQL → 후보 카드 → 중개 판정 유스케이스를 같은 lease
-아래에서 진행한다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
+아래에서 진행한다. 자동 접수된 실행은 앵커 카드를 저장한 뒤 같은 lease 안에서 더 진행하지 않고
+`ANCHOR_READY`에 남기며 그 자리에서 lease를 비운다. 이 주차는 `trigger_type`을 조건에 넣은
+갱신이라 사용자 판정 요청과 같은 행에서 직렬화된다. Worker가 실행을 읽은 뒤 주차하기 전에
+요청이 들어왔으면 주차하지 않고 후보 조회로 이어 간다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
 일시 Provider 오류는 상태를 보존하고 lease를 즉시 만료시켜 다음 선점이 재시도하며, 영구 계약·
 설정 오류는 `FAILED_TERMINAL`, 입력 변경은 `SUPERSEDED`로 기록한다. raw 예외와 Provider 원문은
 failure 컬럼에 저장하지 않는다.

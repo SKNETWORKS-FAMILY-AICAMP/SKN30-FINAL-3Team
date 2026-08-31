@@ -24,6 +24,7 @@ updated: 2026-08-27
 | [ADR-0015](ADR-0015-environment-configuration-ownership.md) | 승인됨 | tracked `.env.local`, 개인 `.env`, Terraform 공개 설정과 write-only 비밀값의 소유권 분리 |
 | [ADR-0016](ADR-0016-pr-review-cross-chunk-evidence.md) | 승인됨 | 제한된 PR head 전체 파일·동일 PR 정책 근거 공유와 명시적 `high` 오탐 기각 |
 | [ADR-0017](ADR-0017-shared-dev-development-session.md) | 승인됨 | 공유 AWS를 애플리케이션 dev로 분류하고 합성 고정 계정의 개발 세션만 허용 |
+| [ADR-0018](ADR-0018-f3-save-trigger-anchor-card-scope.md) | 승인됨 | F1 저장 트리거를 앵커 포지션 카드까지로 한정하고 후보 조회·판정은 사용자 요청이 같은 실행을 이어받아 수행 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

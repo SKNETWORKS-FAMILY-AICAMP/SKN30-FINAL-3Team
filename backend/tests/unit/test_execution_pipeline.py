@@ -151,6 +151,98 @@ def test_saved_status_selects_exactly_one_stage(
     assert calls == ([] if called is None else [called])
 
 
+class ParkingSession:
+    """주차 UPDATE 의 commit·rollback 만 기록하는 최소 session 대역."""
+
+    def __init__(self) -> None:
+        self.settled: list[str] = []
+
+    def commit(self) -> None:
+        self.settled.append("commit")
+
+    def rollback(self) -> None:
+        self.settled.append("rollback")
+
+
+def test_ledger_save_run_stops_after_the_anchor_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """저장이 만든 실행은 앵커 카드까지만 한다 (F3-CR-01·02, ADR-0018).
+
+    후보 조회를 부르지 않는 것이 계약이다. 상태만 보고 다음 단계를 고르면 저장 하나가
+    모델 판정까지 완주한다.
+    """
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+    monkeypatch.setattr(pipeline.repository, "park_ledger_save_run", lambda *_a, **_k: 1)
+
+    parked = run_in("ANCHOR_READY")
+    parked.trigger_type = "LEDGER_SAVE"
+    session = ParkingSession()
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, session), parked, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.SKIPPED
+    assert calls == []
+    assert session.settled == ["commit"]
+
+
+def test_user_request_during_the_anchor_step_is_not_parked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """읽은 뒤 승격된 실행은 주차하지 않고 후보 조회로 이어 간다.
+
+    Worker 가 실행을 읽은 값만 믿고 주차하면 그 사이 들어온 사용자 요청이 다음 lease
+    만료까지 묻힌다. 주차 UPDATE 가 0행을 바꾸면 승격된 것으로 보고 계속 간다.
+    """
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+    monkeypatch.setattr(pipeline.repository, "park_ledger_save_run", lambda *_a, **_k: 0)
+
+    stale = run_in("ANCHOR_READY")
+    stale.trigger_type = "LEDGER_SAVE"
+    session = ParkingSession()
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, session), stale, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.ADVANCED
+    assert calls == ["candidates"]
+    assert session.settled == ["rollback"]
+
+
+def test_resumed_run_continues_from_the_anchor_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """사용자 요청으로 옮겨진 실행은 같은 상태에서 후보 조회로 이어진다."""
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+
+    resumed = run_in("ANCHOR_READY")
+    resumed.trigger_type = "USER_REQUEST"
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, object()), resumed, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.ADVANCED
+    assert calls == ["candidates"]
+
+
 class RecordingSession:
     def __init__(self) -> None:
         self.commits = 0

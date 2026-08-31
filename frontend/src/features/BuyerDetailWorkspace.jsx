@@ -222,7 +222,7 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
       <div className="detail-workspace__action-row">
         <Button variant="primary" icon={<SaveIcon />} onClick={() => save()} isLoading={isSaving} isDisabled={isSaving}>저장</Button>
         <Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button>
-        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button>
+        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button>
         <Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button>
       </div>
       <span className="buyer-detail-workspace__save-state" aria-live="polite">{dirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span>

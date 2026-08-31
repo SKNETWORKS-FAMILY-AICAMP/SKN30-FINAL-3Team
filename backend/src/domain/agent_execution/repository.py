@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, NamedTuple, cast
 
-from sqlalchemy import CursorResult, and_, case, func, literal, or_, text, update
+from sqlalchemy import CursorResult, and_, case, func, literal, not_, or_, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import Session, col, select
 
@@ -19,6 +19,7 @@ from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
     FAILED_TERMINAL_STATUS,
     IN_PROGRESS_STATUSES,
+    LEDGER_SAVE_TRIGGER_TYPE,
     POSITION_CARD_CAPABILITY,
     QUEUED_STATUS,
     RUNNING_STATUS,
@@ -101,6 +102,66 @@ def find_reusable_active_run(
     return session.execute(statement).scalars().first()
 
 
+def park_ledger_save_run(
+    session: Session, run_id: int, brokerage_id: int, worker_id: str, attempt_count: int
+) -> int:
+    """앵커 카드를 저장한 LEDGER_SAVE 실행을 주차하고 lease 를 비운다.
+
+    `trigger_type` 을 조건에 넣어 주차와 사용자 승격을 같은 행에서 직렬화한다. Worker 가
+    실행을 읽은 뒤 주차하기 전에 사용자 요청이 들어오면 조건이 어긋나 0행이 바뀌고,
+    호출자는 주차 대신 후보 조회로 계속 간다. 조건을 두지 않으면 그 요청이 다음 lease
+    만료까지 묻히고 계획된 handoff 가 실패 재시도로 처리된다.
+
+    lease 를 비우는 이유는 사용자 승격이 곧바로 선점 대상이 되게 하기 위해서다. 주차
+    조합은 선점과 최대 시도 정리 모두에서 제외되므로 lease 없이 남아도 집어가지 않는다.
+    """
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+            col(AgentRun.status) == ANCHOR_READY_STATUS,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+        )
+        .values(lease_owner=None, lease_expires_at=None, updated_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def resume_ledger_save_run(
+    session: Session, run_id: int, brokerage_id: int, trigger_type: str
+) -> int:
+    """저장이 만든 활성 실행에 들어온 사용자 판정 요청을 같은 실행에 기록한다.
+
+    QUEUED는 다음 최초 선점이 전체 실행을 하고, RUNNING은 현재 lease의 Worker가 앵커 카드
+    뒤로 계속 간다. 이미 ANCHOR_READY에 주차됐다면 lease를 비워 즉시 이어받게 한다. 이
+    이어받기는 실패 재시도가 아니므로 다음 선점에서 attempt_count를 늘리지 않는다.
+    """
+    parked = col(AgentRun.status) == ANCHOR_READY_STATUS
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+            col(AgentRun.status).in_(list(REUSABLE_ACTIVE_STATUSES)),
+        )
+        .values(
+            trigger_type=trigger_type,
+            lease_owner=case((parked, None), else_=col(AgentRun.lease_owner)),
+            lease_expires_at=case((parked, None), else_=col(AgentRun.lease_expires_at)),
+            updated_at=func.now(),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
 def find_root_cross_judgment_run(
     session: Session, brokerage_id: int, run_id: int
 ) -> AgentRun | None:
@@ -151,8 +212,24 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
         select(AgentRun)
         .where(
             *root_cross_judgment_conditions(),
+            # 저장이 만든 실행은 앵커 카드까지만 만들고 멈춘다. 사용자가 판정을 요청하면
+            # `service` 가 trigger_type 을 옮겨 다시 선점 대상이 된다(F3-CR-01~04).
+            not_(
+                and_(
+                    col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+                    col(AgentRun.status) == ANCHOR_READY_STATUS,
+                )
+            ),
             or_(
                 col(AgentRun.status) == QUEUED_STATUS,
+                # 사용자 요청이 ANCHOR_READY 주차 실행을 이어받은 최초 선점. lease가 없는
+                # 계획된 handoff이므로 실패 재시도 횟수를 소비하지 않는다.
+                and_(
+                    col(AgentRun.trigger_type) != LEDGER_SAVE_TRIGGER_TYPE,
+                    col(AgentRun.status) == ANCHOR_READY_STATUS,
+                    col(AgentRun.lease_owner).is_(None),
+                    col(AgentRun.lease_expires_at).is_(None),
+                ),
                 and_(
                     col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
                     col(AgentRun.lease_expires_at) < func.now(),
@@ -170,7 +247,17 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
 def mark_run_claimed(
     session: Session, run: AgentRun, worker_id: str, lease_seconds: int
 ) -> AgentRun:
-    """잠근 실행에 lease를 건다. 최초 QUEUED만 RUNNING으로 옮기고 진행 상태는 보존한다."""
+    """잠근 실행에 lease를 건다.
+
+    최초 QUEUED만 RUNNING으로 옮기고 진행 상태는 보존한다. 사용자 요청이 주차 실행을
+    이어받는 lease 없는 첫 선점은 계획된 handoff이므로 attempt_count를 늘리지 않는다.
+    """
+    resumed_handoff = and_(
+        col(AgentRun.trigger_type) != LEDGER_SAVE_TRIGGER_TYPE,
+        col(AgentRun.status) == ANCHOR_READY_STATUS,
+        col(AgentRun.lease_owner).is_(None),
+        col(AgentRun.lease_expires_at).is_(None),
+    )
     session.execute(
         update(AgentRun)
         .where(col(AgentRun.id) == run.id)
@@ -181,7 +268,10 @@ def mark_run_claimed(
             ),
             lease_owner=worker_id,
             lease_expires_at=func.now() + func.make_interval(0, 0, 0, 0, 0, 0, lease_seconds),
-            attempt_count=col(AgentRun.attempt_count) + 1,
+            attempt_count=case(
+                (resumed_handoff, col(AgentRun.attempt_count)),
+                else_=col(AgentRun.attempt_count) + 1,
+            ),
             started_at=func.coalesce(col(AgentRun.started_at), func.now()),
             updated_at=func.now(),
         )
@@ -194,11 +284,21 @@ def mark_run_claimed(
 def fail_runs_over_attempt_limit(
     session: Session, max_attempts: int, failure_code: str, failure_message: str
 ) -> int:
-    """상한을 넘겨 만료된 실행을 종료 처리하고 lease를 비운다. 바꾼 행 수를 돌려준다."""
+    """상한을 넘겨 만료된 실행을 종료 처리하고 lease를 비운다.
+
+    앵커 카드까지 성공한 LEDGER_SAVE 실행은 실패한 작업이 아니라 사용자 요청을 기다리는
+    주차 실행이므로 제외한다. 바꾼 행 수를 돌려준다.
+    """
     statement = (
         update(AgentRun)
         .where(
             *root_cross_judgment_conditions(),
+            not_(
+                and_(
+                    col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+                    col(AgentRun.status) == ANCHOR_READY_STATUS,
+                )
+            ),
             col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
             col(AgentRun.lease_expires_at) < func.now(),
             col(AgentRun.attempt_count) >= max_attempts,
