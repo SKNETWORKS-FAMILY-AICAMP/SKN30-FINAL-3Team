@@ -151,6 +151,52 @@ def test_saved_status_selects_exactly_one_stage(
     assert calls == ([] if called is None else [called])
 
 
+def test_ledger_save_run_stops_after_the_anchor_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """저장이 만든 실행은 앵커 카드까지만 한다 (F3-CR-01·02, 2026-08-31 개정).
+
+    후보 조회를 부르지 않는 것이 계약이다. 상태만 보고 다음 단계를 고르면 저장 하나가
+    모델 판정까지 완주한다.
+    """
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+
+    parked = run_in("ANCHOR_READY")
+    parked.trigger_type = "LEDGER_SAVE"
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, object()), parked, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.SKIPPED
+    assert calls == []
+
+
+def test_resumed_run_continues_from_the_anchor_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """사용자 요청으로 옮겨진 실행은 같은 상태에서 후보 조회로 이어진다."""
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+
+    resumed = run_in("ANCHOR_READY")
+    resumed.trigger_type = "USER_REQUEST"
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, object()), resumed, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.ADVANCED
+    assert calls == ["candidates"]
+
+
 class RecordingSession:
     def __init__(self) -> None:
         self.commits = 0

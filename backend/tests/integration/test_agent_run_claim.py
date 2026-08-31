@@ -28,7 +28,7 @@ INSERT_RUN = text(
     " status, trigger_type, requested_by, created_at, started_at, attempt_count, lease_owner,"
     " lease_expires_at)"
     " VALUES (:brokerage_id, :run_group_id, :parent_run_id, :run_type, 'BROKERAGE_WORKFLOW',"
-    " :status, 'USER_REQUEST', :requested_by, :created_at, :started_at, :attempt_count,"
+    " :status, :trigger_type, :requested_by, :created_at, :started_at, :attempt_count,"
     " :lease_owner, :lease_expires_at) RETURNING id"
 )
 
@@ -46,6 +46,7 @@ def insert_run(
     attempt_count: int = 0,
     lease_owner: str | None = None,
     lease_expires_at: datetime | None = None,
+    trigger_type: str = "USER_REQUEST",
 ) -> int:
     return session.execute(
         INSERT_RUN,
@@ -55,6 +56,7 @@ def insert_run(
             "parent_run_id": parent_run_id,
             "run_type": run_type,
             "status": status,
+            "trigger_type": trigger_type,
             "requested_by": requested_by,
             "created_at": created_at or datetime.now(UTC),
             "started_at": started_at,
@@ -301,6 +303,43 @@ def test_expired_run_over_the_attempt_limit_is_terminated_and_not_claimed(
         assert stored["lease_owner"] is None
         assert stored["lease_expires_at"] is None
         assert stored["attempt_count"] == service.MAX_CLAIM_ATTEMPTS
+
+
+@requires_database
+def test_parked_ledger_save_run_waits_and_resumes_at_the_attempt_limit() -> None:
+    """재시도 상한에서 앵커 카드에 성공해도 기다렸다가 판정을 이어갈 수 있다."""
+    with claim_session() as (session, brokerage_id, user_id):
+        run_id = insert_run(
+            session,
+            brokerage_id,
+            user_id,
+            status="ANCHOR_READY",
+            trigger_type="LEDGER_SAVE",
+            attempt_count=service.MAX_CLAIM_ATTEMPTS,
+            started_at=datetime(2026, 8, 19, 1, 0, tzinfo=UTC),
+            lease_owner=WORKER_A,
+            lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
+        )
+
+        assert service.claim_next_run(session, WORKER_B) is None
+
+        stored = stored_run(session, run_id)
+        assert stored["status"] == "ANCHOR_READY"
+        assert stored["failure_code"] is None
+        assert stored["completed_at"] is None
+        assert stored["attempt_count"] == service.MAX_CLAIM_ATTEMPTS
+
+        changed = repository.resume_ledger_save_run(
+            session, run_id, brokerage_id, "USER_REQUEST"
+        )
+        session.commit()
+        claimed = service.claim_next_run(session, WORKER_B)
+
+        assert changed == 1
+        assert claimed is not None and claimed.id == run_id
+        assert claimed.status == "ANCHOR_READY"
+        # 사용자 요청에 따른 계획된 handoff는 실패 재시도로 세지 않는다.
+        assert claimed.attempt_count == service.MAX_CLAIM_ATTEMPTS
 
 
 @requires_database

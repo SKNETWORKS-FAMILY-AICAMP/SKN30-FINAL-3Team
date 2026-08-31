@@ -14,7 +14,6 @@ from domain.agent_execution import repository, snapshot
 from domain.agent_execution.cache_key import position_card_cache_key
 from domain.agent_execution.fingerprint import input_fingerprint
 from domain.agent_execution.models import (
-    ANCHOR_READY_STATUS,
     BROKERAGE_WORKFLOW_AGENT_TYPE,
     CROSS_JUDGMENT_RUN_TYPE,
     LEASE_EXPIRED_FAILURE_CODE,
@@ -124,22 +123,27 @@ def queue_cross_judgment_run(
             anchor.input_data_version,
         )
         if existing is not None:
-            # 저장이 만든 실행은 앵커 카드까지만 하고 멈춰 있다. 사용자가 판정을 요청하면
-            # 그 실행을 그대로 이어받는다. 앵커 카드를 다시 만들지 않으므로 판정만 이어 돈다.
+            # 저장이 만든 실행이 어느 단계에 있든 사용자 판정 요청을 기억한다. QUEUED면 첫
+            # Worker가 전체 실행을 하고, RUNNING이면 현재 Worker가 계속 가며, ANCHOR_READY면
+            # lease를 비운 뒤 같은 실행을 후보 조회부터 이어받는다.
             if (
                 trigger_type != LEDGER_SAVE_TRIGGER_TYPE
                 and existing.trigger_type == LEDGER_SAVE_TRIGGER_TYPE
-                and existing.status == ANCHOR_READY_STATUS
             ):
-                repository.resume_parked_run(session, existing.id or 0, brokerage_id, trigger_type)
+                previous_status = existing.status
+                changed = repository.resume_ledger_save_run(
+                    session, existing.id or 0, brokerage_id, trigger_type
+                )
                 session.commit()
                 session.refresh(existing)
-                logger.info(
-                    "f3_parked_run_resumed",
-                    run_id=existing.id,
-                    anchor_type=anchor_type.value,
-                    anchor_id=anchor_id,
-                )
+                if changed == 1:
+                    logger.info(
+                        "f3_ledger_save_run_resumed",
+                        run_id=existing.id,
+                        anchor_type=anchor_type.value,
+                        anchor_id=anchor_id,
+                        previous_status=previous_status,
+                    )
                 return existing
             session.commit()
             return existing

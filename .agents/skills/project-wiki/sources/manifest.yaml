@@ -9,6 +9,7 @@ sources:
     reflected_in:
       - "docs/requirements/f3/cross-judgment.md"
       - "docs/requirements/changelog.md"
+      - ".agents/skills/project-wiki/references/contracts/api.md"
       - "docs/architecture/f3/overview.md"
       - "docs/architecture/f3/online-runtime.md"
       - "docs/architecture/f3/offline-data-evaluation.md"
@@ -19,13 +20,19 @@ sources:
       - "backend/src/domain/agent_execution/repository.py"
       - "backend/src/domain/agent_execution/service.py"
       - "backend/src/domain/agent_execution/triggers.py"
+      - "backend/tests/unit/test_execution_intake.py"
+      - "backend/tests/unit/test_execution_pipeline.py"
+      - "backend/tests/api/test_f3_auto_intake.py"
+      - "backend/tests/integration/test_agent_run_claim.py"
       - "frontend/src/features/DetailWorkspace.jsx"
       - "frontend/tests/f3-panel.browser.test.mjs"
       - ".agents/skills/project-wiki/references/log.md"
     scope: >-
-      F3-CR-01·02의 저장 트리거 범위를 앵커 포지션 카드 생성까지로 축소. 저장이 만든 실행은
-      ANCHOR_READY 에서 멈추고 Worker 선점 대상에서 빠지며, 사용자의 판정 요청이 같은 실행을
-      이어받아 후보 조회부터 진행. 세대 상세 액션 레일의 [교차 판정]을 여닫기에서 판정 요청으로
+      F3-CR-01·02의 저장 트리거 범위를 앵커 포지션 카드 생성까지로 축소하고 API 계약의
+      `F1 저장 후 자동 접수`·`Worker 선점과 lease`·상태 수명주기 절을 같은 범위로 대체. 저장이 만든 실행은
+      ANCHOR_READY 에서 멈추고 Worker 선점·최대 시도 정리 대상에서 빠지며, QUEUED·RUNNING·
+      ANCHOR_READY 어느 때든 사용자의 판정 요청이 같은 실행을 이어받아 진행. 주차 뒤의 계획된
+      첫 선점은 재시도 횟수를 쓰지 않음. 세대 상세 액션 레일의 [교차 판정]을 여닫기에서 판정 요청으로
       되돌려 섹션의 [교차 판정 실행]과 같은 실행을 요청
 
   - id: "f3-cross-judgment-save-panel-and-run-split-2026-08-31"
