@@ -27,6 +27,7 @@ from brokerage_ai.f3 import BrokerageJudgmentContractError, PositionCardContract
 from sqlmodel import Session
 
 from core.errors import NotFoundError
+from core.logging import exception_location
 from domain.agent_execution import repository
 from domain.agent_execution.anchor_card import (
     CachedCardUnavailableError,
@@ -348,24 +349,42 @@ def advance_run(
         return loop.run_until_complete(_advance(session, run, worker_id, resolved))
     except BaseException as error:  # noqa: BLE001 - 실행 하나의 실패를 격리하는 경계다.
         outcome = classify(error)
+        stage = failure_stage(run.status).value
+        category = failure_category(error).value
+        location = exception_location(error)
         logger.warning(
             "f3_step_failed",
             run_id=run.id,
             status=run.status,
-            failure_stage=failure_stage(run.status).value,
+            failure_stage=stage,
             attempt=run.attempt_count,
             outcome=outcome.value,
-            failure_category=failure_category(error).value,
+            failure_category=category,
             error_type=type(error).__name__,
+            error_location=location,
         )
         if outcome is StepOutcome.LEASE_LOST:
             session.rollback()
             return outcome
         if outcome is StepOutcome.RETRY:
             return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
-        return (
-            outcome if record_failure(session, run, worker_id, outcome) else StepOutcome.LEASE_LOST
-        )
+        if not record_failure(session, run, worker_id, outcome):
+            return StepOutcome.LEASE_LOST
+        if outcome is StepOutcome.FAILED_TERMINAL:
+            # Emit the alarm signal only after FAILED_TERMINAL was durably committed.
+            logger.error(
+                "ai_terminal_failure",
+                component="ai",
+                source="f3",
+                run_id=run.id,
+                status=FAILED_TERMINAL_STATUS,
+                failure_stage=stage,
+                attempt=run.attempt_count,
+                failure_category=category,
+                error_type=type(error).__name__,
+                error_location=location,
+            )
+        return outcome
 
 
 def drive_run(

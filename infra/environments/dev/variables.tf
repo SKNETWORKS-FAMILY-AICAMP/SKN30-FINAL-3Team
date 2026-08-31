@@ -184,3 +184,34 @@ variable "discord_webhook_secret_version" {
     error_message = "discord_webhook_secret_version은 1 이상의 정수여야 합니다."
   }
 }
+
+variable "alarm_discord_webhook_url" {
+  description = "CloudWatch alarm 전용 Lambda가 사용할 별도 Discord webhook URL"
+  type        = string
+  sensitive   = true
+  ephemeral   = true
+
+  validation {
+    condition = (
+      (
+        startswith(var.alarm_discord_webhook_url, "https://discord.com/api/webhooks/") ||
+        startswith(var.alarm_discord_webhook_url, "https://discordapp.com/api/webhooks/")
+      ) &&
+      length(regexall("[[:space:]]", var.alarm_discord_webhook_url)) == 0
+    )
+    error_message = "alarm_discord_webhook_url은 Discord HTTPS webhook URL이어야 합니다."
+  }
+}
+
+variable "alarm_discord_webhook_secret_version" {
+  description = "CloudWatch alarm 전용 Discord webhook 변경을 반영하는 독립 단조 증가 정수"
+  type        = number
+
+  validation {
+    condition = (
+      var.alarm_discord_webhook_secret_version >= 1 &&
+      var.alarm_discord_webhook_secret_version == floor(var.alarm_discord_webhook_secret_version)
+    )
+    error_message = "alarm_discord_webhook_secret_version은 1 이상의 정수여야 합니다."
+  }
+}

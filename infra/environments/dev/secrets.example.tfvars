@@ -11,3 +11,7 @@ ai_provider_secret_version = 1
 
 discord_webhook_url            = ""
 discord_webhook_secret_version = 1
+
+# CloudWatch alarm은 기존 Pipeline/CodeDeploy 알림과 분리된 webhook을 사용한다.
+alarm_discord_webhook_url            = ""
+alarm_discord_webhook_secret_version = 1

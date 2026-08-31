@@ -8,8 +8,11 @@
 - `.github/workflows/pr-policy-review.yml`의 별도 사용자 변경은 이 delivery 변경과 섞지 않는다.
 - `pipeline_operator_user_names`가 승인된 기존 IAM 사용자만 포함하고 `student` 외 추가 사용자가 없는지 확인한다.
 - `SKN30_FINAL` Connection이 `AVAILABLE`이고 승인된 repository만 접근하는지 확인한다.
-- ignored `infra/environments/dev/secrets.auto.tfvars`에 AI provider key와 Discord webhook을 입력하고 각 version counter가 실제 값과 함께 증가했는지 확인한다.
-- Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다. Frontend Verify에는 `test:env`, `test:auth`, `typecheck`과 원장 테스트가 모두 포함된다.
+- ignored `infra/environments/dev/secrets.auto.tfvars`에 AI provider key, 기존 delivery Discord
+  webhook과 새 Alarm 전용 Discord webhook을 각각 입력하고 각 version counter가 실제 값과 함께
+  증가했는지 확인한다. Alarm webhook은 Discord에서 새로 만들고 기존 webhook을 재사용하지 않는다.
+- Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다. Frontend
+  Verify에는 env·auth·최상위 오류 복구·F2·F3 계약, `typecheck`과 원장 테스트가 모두 포함된다.
 
 ## 로컬 CodeBuild 동등 검증
 
@@ -29,7 +32,7 @@ disposable DB를 시작한 뒤 다음을 순서대로 검증한다. Docker Hub i
 1. AI와 Backend의 frozen lock 설치, format, lint, type, 전체 테스트
 2. 빈 DB migration과 두 번째 no-op migration
 3. CodeDeploy lifecycle shell 구문과 image metadata 전달 계약 테스트
-4. Frontend Verify: clean install, env·로그인 플래그 테스트, typecheck, 원장 테스트
+4. Frontend Verify: clean install, env·로그인·최상위 오류 복구·F2·F3 계약 테스트, typecheck, 원장 테스트
 5. Frontend Build: 별도 clean install, release build와 release 계약 테스트
 6. Backend root-context image build와 UID 10001 실행
 7. Compose config
@@ -95,7 +98,7 @@ terraform plan -var-file=dev.tfvars -out=dev.tfplan
 terraform apply dev.tfplan
 ```
 
-`secrets.auto.tfvars`는 두 명령 모두 같은 directory에서 자동으로 읽힌다. 이 파일은 비어 있지 않은 일반 파일이어야 하고 group/other 권한 bit가 모두 꺼져 있어야 한다(`chmod 600`). Ephemeral 값은 saved plan에 포함되지 않으므로 plan과 apply 사이에 파일을 수정하지 않는다. AI provider key와 Discord webhook을 바꿀 때는 해당 `*_secret_version`도 증가시킨다. plan JSON과 state에 비밀 평문이 보이면 적용을 중단한다.
+`secrets.auto.tfvars`는 두 명령 모두 같은 directory에서 자동으로 읽힌다. 이 파일은 비어 있지 않은 일반 파일이어야 하고 group/other 권한 bit가 모두 꺼져 있어야 한다(`chmod 600`). Ephemeral 값은 saved plan에 포함되지 않으므로 plan과 apply 사이에 파일을 수정하지 않는다. AI provider key, delivery Discord webhook 또는 Alarm Discord webhook을 바꿀 때는 각각 대응하는 `*_secret_version`도 증가시킨다. plan JSON과 state에 비밀 평문이 보이면 적용을 중단한다.
 
 구성의 import block이 기존 Connection ARN을 state로 가져온다. plan에서 Connection replacement 또는 destroy가 보이면 적용하지 않는다.
 
@@ -237,6 +240,25 @@ Lifecycle script의 AWS CLI 오류는 원래 AWS service error와 operation 이�
 수 없다. 현재 계약은 `/opt/brokerage/config/global-bundle.pem` 파일 하나만 container의
 `/etc/ssl/certs/aws-rds-global-bundle.pem`에 read-only mount하며, `AfterInstall`이 migration
 전에 실제 readability를 검사한다. config directory mode를 `0755`로 완화해 우회하지 않는다.
+
+### CloudWatch Alarm fixture 검증
+
+새 Alarm 전용 webhook과 Terraform apply가 끝난 뒤에만 합성 fixture를 게시한다. 기존
+CodePipeline·CodeDeploy Discord 채널이나 webhook을 이 검증에 사용하지 않는다.
+
+```bash
+cd infra/environments/dev
+terraform output -json runtime_observability
+
+aws sns publish \
+  --topic-arn <RUNTIME_OBSERVABILITY의_ALARM_TOPIC_ARN> \
+  --message file://../../tests/fixtures/cloudwatch_alarm_sns_message.json \
+  --region ap-northeast-2
+```
+
+Alarm 전용 Discord 메시지에 fixture의 alarm name, `ALARM` state와 reason이 모두 있고 mention이
+발생하지 않는지 확인한다. Lambda log에는 webhook URL이나 fixture 바깥의 원문이 없어야 한다.
+Discord HTTP 오류를 주입하면 Lambda 호출이 실패해 SNS 재시도 대상으로 남아야 한다.
 
 ## 검증 순서
 

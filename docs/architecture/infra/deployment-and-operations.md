@@ -1,14 +1,14 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-27
+implementation: 기존 delivery 적용됨·Alarm 전용 전달 코드 구현 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-08-31
 ---
 
 # 배포 및 운영 구조
 
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
 - **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
 
@@ -18,7 +18,7 @@ updated: 2026-08-27
 |---|---|---|---|---|
 | `dev-integrated` | 최종 전환 후 `dev` 자동 감지 | Backend+AI와 Frontend 병렬 | Backend image와 Frontend release 병렬 | migration → Backend/Worker → health → Frontend |
 | `dev-backend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | Backend+AI, disposable DB | Backend image | migration → Backend/Worker → health |
-| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | test:env·test:auth, typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
+| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | env·auth·오류 복구·F2·F3 계약, typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
 
 세 Pipeline은 CodePipeline V2 `QUEUED`다. 독립 Pipeline 실행 권한이 운영자 승인 역할을 하므로 내부 Manual approval은 두지 않는다. 통합 Pipeline도 별도 승인 없이 끝까지 진행한다. 애플리케이션 Pipeline은 Terraform을 실행하지 않는다.
 
@@ -90,7 +90,10 @@ Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM clea
 
 ## Frontend build와 배포
 
-Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → test:env → test:auth → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
+Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는
+`npm ci → test:env → test:auth → test:root-error → typecheck → 원장 → F2 → F3 테스트`를 실행하고
+artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서
+`npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
 
 배포별 `VITE_*` 공개값은 Terraform의 단일 Frontend build map에서 CodeBuild process env로 동적
 전달한다. CloudFront의 동일 origin routing을 사용하므로 API base는 절대 domain이 아니라 `/api`
@@ -112,7 +115,9 @@ Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. �
 - CodeDeploy는 AWS 관리 service role을 사용한다.
 - EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write와 migration DB connect만 둔다.
 - 운영자 policy는 `pipeline_operator_user_names`에 지정한 기존 IAM 사용자에게 직접 연결하고 `team-readonly`에는 쓰기 권한을 추가하지 않는다.
-- OpenAI·선택적 vLLM key와 Discord webhook은 Git에서 제외한 `secrets.auto.tfvars`에서 받는다.
+- OpenAI·선택적 vLLM key, 기존 delivery Discord webhook과 별도 Alarm Discord webhook은 Git에서
+  제외한 `secrets.auto.tfvars`에서 받는다. Alarm webhook은 Discord에서 새로 만들고 기존 delivery
+  webhook을 재사용하지 않는다.
   Terraform ephemeral input과 Secrets Manager write-only version 인자로 전달해 plan·state에는 실제
   값을 남기지 않는다. 회전할 때 각 secret version 번호를 함께 증가시킨다.
 - RDS runtime 비밀번호와 migration IAM token은 서비스가 자동 생성하는 기존 경계를 유지한다.
@@ -121,6 +126,13 @@ Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. �
 ## 알림
 
 CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 SNS topic에 게시한다. Lambda는 Pipeline 종류, revision, execution ID, 실패 action과 Console 링크를 Discord에 보낸다. CodeDeploy rollback creator도 구분한다.
+
+CloudWatch Alarm은 별도 SNS topic과 별도 Lambda를 사용한다. 기존 인프라 alarm 6개와
+`unhandled_request_error`, `ai_terminal_failure`에서 만든 애플리케이션 alarm 2개가 `ALARM`·`OK`
+상태를 게시하고 Lambda는 alarm name, state, reason만 2,000자 이하·mention 비활성 메시지로 보낸다.
+이 Lambda는 새 Secrets Manager Secret에서 전용 webhook을 읽으며 기존 delivery notifier·Secret을
+수정하지 않는다. 이 경로는 코드와 fixture 테스트를 구현했지만 새 webhook을 넣은 saved plan의
+검토·승인·apply와 실제 alarm 검증 전에는 적용 상태로 간주하지 않는다.
 
 ## 단계적 적용
 

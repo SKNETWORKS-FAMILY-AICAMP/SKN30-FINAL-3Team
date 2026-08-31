@@ -11,7 +11,7 @@
 
 import { APP_ENV } from "../../config/env.ts";
 import { DecodeError } from "../decode/index.ts";
-import { ApiError, kindFromStatus } from "./errors.ts";
+import { ApiError, apiErrorFromResponse } from "./errors.ts";
 import { getCsrfToken } from "./session.ts";
 
 export type QueryValue = string | number | boolean | null | undefined | readonly string[];
@@ -61,7 +61,7 @@ export async function request<T>(path: string, options: RequestOptions<T>): Prom
     throw new ApiError({ kind: "offline", message: "네트워크 요청에 실패했습니다.", cause });
   }
 
-  if (!response.ok) throw await toApiError(response);
+  if (!response.ok) throw await apiErrorFromResponse(response);
 
   if (response.status === 204) return options.decode(undefined);
 
@@ -116,29 +116,4 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
 
 function isAbortError(cause: unknown): boolean {
   return cause instanceof DOMException && cause.name === "AbortError";
-}
-
-/**
- * 오류 응답 본문에서 code/message/request_id를 최대한 건져낸다.
- * 본문이 계약을 따르지 않아도 상태 코드로 분류는 유지한다.
- */
-async function toApiError(response: Response): Promise<ApiError> {
-  const kind = kindFromStatus(response.status);
-  let code: string | undefined;
-  let requestId: string | undefined;
-  let message = `요청이 실패했습니다 (HTTP ${response.status}).`;
-
-  try {
-    const body: unknown = await response.json();
-    if (typeof body === "object" && body !== null) {
-      const record = body as Record<string, unknown>;
-      if (typeof record["code"] === "string") code = record["code"];
-      if (typeof record["request_id"] === "string") requestId = record["request_id"];
-      if (typeof record["message"] === "string") message = record["message"];
-    }
-  } catch {
-    // 오류 응답이 JSON이 아닐 수 있다. 상태 코드 기반 분류만 사용한다.
-  }
-
-  return new ApiError({ kind, message, status: response.status, code, requestId });
 }

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-08-31
 ---
 
 # ADR-0011: 개발환경 delivery 구현 기준
@@ -9,6 +9,7 @@ updated: 2026-08-27
 - 결정일: 2026-08-20
 - 대체 범위: [ADR-0002](ADR-0002-dev-demo-aws-runpod-architecture.md)의 단일 수동 Pipeline 세부 결정
 - 부분 대체: 환경 설정 materialization과 Discord 비밀 입력 방식은 [ADR-0013](ADR-0013-dev-environment-materialization.md)에서 대체
+- 후속 확장: Frontend 오류 경계·F2·F3 계약 검사는 [프로젝트 ADR-0019](../../../project-wiki/references/decisions/ADR-0019-minimal-error-observability.md)의 검증 변경에서 추가
 - 상위 결정: [프로젝트 ADR-0011](../../../project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md)
 
 ## 결정
@@ -37,7 +38,9 @@ updated: 2026-08-27
 
 ### Frontend 배포
 
-- Verify는 clean install, 환경변수 우선순위 계약, 개발 인증 화면·환경 계약, typecheck와 원장 테스트까지만 수행한다. 별도 Build가 다시 clean install한 뒤 Vite release와 release 계약 검사를 수행하고 artifact를 만든다.
+- Verify는 clean install, 환경변수 우선순위, 개발 인증 화면·환경, 최상위 오류 복구, F2·F3 계약,
+  typecheck와 원장 테스트를 수행한다. 별도 Build가 다시 clean install한 뒤 Vite release와 release
+  계약 검사를 수행하고 artifact를 만든다.
 - Frontend는 runtime Dockerfile 없이 Vite `dist/client` artifact를 만든다.
 - 현재 Backend의 CloudFront `/health/ready`를 먼저 확인한다.
 - release manifest에 entry document, asset 목록, 크기와 SHA-256을 기록한다.
