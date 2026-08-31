@@ -120,9 +120,34 @@ async def test_filters_unknown_fields_and_evidence_not_found_in_transcript() -> 
 
 
 @pytest.mark.asyncio
+async def test_other_consultation_keeps_only_the_log_draft() -> None:
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.OTHER,
+            fields={"단지": "한강아파트"},
+            evidence={"단지": "한강아파트"},
+            summary="단순 시세 문의에 답변함.",
+        )
+    )
+    pipeline = F2Pipeline(
+        transcriber=FakeTranscriber("한강아파트 시세만 알려주세요."),
+        analyzer=analyzer,
+    )
+
+    result = await pipeline.run(
+        F2PipelineRequest(audio_path=Path("memo.wav"), ledger_type=LedgerType.PROPERTY)
+    )
+
+    assert result.consultation_type is ConsultationType.OTHER
+    assert result.ledger_mismatch is False
+    assert result.proposals == ()
+    assert result.consultation_log_draft == "단순 시세 문의에 답변함."
+
+
+@pytest.mark.asyncio
 async def test_stops_before_analysis_when_transcript_is_empty() -> None:
     analysis = ConsultationAnalysis(
-        consultation_type=ConsultationType.SIMPLE_INQUIRY,
+        consultation_type=ConsultationType.OTHER,
         summary="호출되지 않아야 함.",
     )
     analyzer = FakeAnalyzer(analysis)
