@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # F3 포지션 카드·중개 판정 Backend–AI 계약
@@ -133,6 +133,8 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
 후보 포지션 카드는 별도 AI 계약이나 생성기를 만들지 않고 앵커 카드와 같은
 `PositionCardGenerator`와 검증·저장 경로를 쓴다. 다른 것은 실행의 앵커가 아닌 결정적 SQL
 후보 snapshot의 상위 5건을 대상으로 하고, 앵커와 반대인 `negotiation_side`를 쓴다는 점뿐이다.
+이 상한은 [F3-BR-12·13](../../../../../docs/requirements/f3/delegates-and-brokerage.md)의
+2026-08-31 승인 결정이며 기존 상위 15건 규칙을 대체한다.
 
 - 각 후보의 현재 `row_version`, 상담 범위 identity와 입력 fingerprint를 준비·저장 시점에
   다시 확인한다.
