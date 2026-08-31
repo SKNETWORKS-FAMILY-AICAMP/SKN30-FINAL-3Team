@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-08-31
 ---
 
 # 개발환경 원칙
@@ -52,9 +52,11 @@ updated: 2026-08-27
 
 - 루트 `.pre-commit-config.yaml`이 AI·Backend Python 파일의 공통 커밋 전 hook 정본이다.
 - 개발자는 저장소 루트에서 `uv run --locked --project backend pre-commit install`을 한 번 실행한다.
-- hook은 staged 상태의 `ai/src`, `ai/tests`, `backend/src`, `backend/tests` Python 파일에 모듈별
-  고정 Ruff 환경으로 `ruff check --fix`를 먼저 실행하고 `ruff format`을 적용한 뒤 해당 모듈의
-  Pyright를 실행한다.
+- hook은 staged 상태의 `ai/`와 `backend/` 아래 Python 파일 전체에 모듈별 고정 Ruff 환경으로
+  `ruff check --fix`를 먼저 실행하고 `ruff format`을 적용한다. `src/`와 `tests/` 변경에는 해당
+  모듈의 Pyright도 실행한다.
+- 에이전트는 Python 파일 변경을 마치기 전에 루트 `AGENTS.md`의 모듈별 Ruff 명령을 실행한다.
+  이 완료 조건은 `eval/`, `training/`처럼 `src/`와 `tests/` 밖의 Python 파일에도 적용한다.
 - 자동 수정이 발생하면 pre-commit이 커밋을 중단하며, 개발자는 변경분을 검토하고 다시 stage한 뒤
   커밋한다. hook 우회 가능성을 고려해 CodeBuild의 format·lint·type 검사를 유지한다.
 - 루트 공통 Python 환경은 만들지 않으며 hook 실행 환경은 기존 Backend·AI 모듈 환경을 사용한다.

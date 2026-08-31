@@ -398,9 +398,7 @@ def test_parked_ledger_save_run_waits_and_resumes_at_the_attempt_limit() -> None
         assert stored["completed_at"] is None
         assert stored["attempt_count"] == service.MAX_CLAIM_ATTEMPTS
 
-        changed = repository.resume_ledger_save_run(
-            session, run_id, brokerage_id, "USER_REQUEST"
-        )
+        changed = repository.resume_ledger_save_run(session, run_id, brokerage_id, "USER_REQUEST")
         session.commit()
         claimed = service.claim_next_run(session, WORKER_B)
 

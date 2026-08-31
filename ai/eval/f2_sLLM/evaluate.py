@@ -391,8 +391,7 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
     # 실패 사례 자체는 각 JSONL의 error와 json_parse_rate에 남는다.
     latencies = [row["latency_seconds"] for row in rows if row["error"] is None]
     class_correct = sum(
-        row["prediction"].get("consultation_type")
-        == row["expected"].get("consultation_type")
+        row["prediction"].get("consultation_type") == row["expected"].get("consultation_type")
         for row in parsed
     )
 
