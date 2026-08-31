@@ -121,6 +121,13 @@ export interface PropertyRow extends LedgerRowMeta {
   facilityState: string;
   brokerage: string;
 
+  /**
+   * 33 컬럼(요구사항 13.1)에 없는 확장 항목. 전용 컬럼이 없어 `custom_fields`에 실린다.
+   * 컬럼으로 승격되면 `spec`처럼 위로 올라온다.
+   */
+  parking: string;
+  tax: string;
+
   raw: PropertyRawText;
 }
 
