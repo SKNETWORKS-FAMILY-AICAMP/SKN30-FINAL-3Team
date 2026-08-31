@@ -201,6 +201,15 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         )
         self.assertNotIn("secret_string         =", configuration)
         self.assertIn("ephemeral   = true", variables)
+        for required_key in (
+            "AI_OPENAI_API_KEY",
+            "AI_VLLM_LLM_API_KEY",
+            "AI_VLLM_STT_API_KEY",
+        ):
+            self.assertIn(
+                f'contains(keys(var.ai_provider_api_keys), "{required_key}")',
+                variables,
+            )
         self.assertIn('length(regexall("[[:space:]]", value)) == 0', variables)
         self.assertIn(
             'length(regexall("[[:space:]]", var.discord_webhook_url)) == 0',

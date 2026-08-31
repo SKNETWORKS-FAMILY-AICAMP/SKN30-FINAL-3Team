@@ -82,7 +82,7 @@ Launch Template은 SSM, Docker, pinned Compose plugin, CodeDeploy agent와 Cloud
 | `ApplicationStart` | API와 Worker 시작 |
 | `ValidateService` | container health와 local `/health/ready` 확인 |
 
-runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. API에는 Backend 설정과 `DB_URL`, Worker에는 Backend·AI 설정과 Provider key·`DB_URL`, migration에는 `DB_MIGRATION_URL`만 담긴 별도 env 파일을 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
+runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. API에는 Backend·AI 공개 설정, F2용 vLLM LLM·STT key와 `DB_URL`, Worker에는 Backend·AI 공개 설정, 전체 Provider key와 `DB_URL`, migration에는 `DB_MIGRATION_URL`만 담긴 별도 env 파일을 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
 
 CodeDeploy deployment group은 ASG와 target group을 사용하고 실패 시 마지막 정상 revision으로 자동 rollback한다. rollback은 image와 application revision만 되돌리고 DB down migration을 실행하지 않는다.
 
