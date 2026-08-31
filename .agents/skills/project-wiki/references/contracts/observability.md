@@ -25,7 +25,10 @@ updated: 2026-08-31
 | event | 발생 조건 | 필수 안전 필드 | 발생하지 않는 조건 |
 |---|---|---|---|
 | `unhandled_request_error` | Backend가 예상하지 못한 예외를 공개 500으로 변환함 | `component=backend`, `status_code=500`, `error_code`, `error_type`, `error_location`, API `request_id` | 처리된 4xx, F2의 분류된 502·503 |
-| `ai_terminal_failure` | F2가 502·503으로 끝나거나 F3가 `FAILED_TERMINAL`을 durable commit함 | `component=ai`, `source=f2\|f3`, 상태 또는 상태 코드, 안전한 실패 분류, 상관키 | F3 재시도, lease lost, superseded, 아직 commit되지 않은 실패 |
+| `ai_terminal_failure` | F2가 502·503으로 끝나거나 F3가 `FAILED_TERMINAL`을 durable commit함 | `component=ai`, 상태 또는 상태 코드, 안전한 실패 분류, 가능한 상관키 | F3 재시도, lease lost, superseded, 아직 commit되지 않은 실패 |
+
+`source`는 `f2`, `f3` 또는 이후 기능 문맥을 나타내는 선택적 진단 필드다. 알람의 모듈 판정과
+로그 그룹 선택은 정확한 alarm name과 `module=ai` 계약으로 고정하며 `source` 값으로 라우팅하지 않는다.
 
 최대 시도 초과 실행을 한 트랜잭션에서 여러 건 정리하면 이벤트 한 건에 `terminal_count`를
 기록한다. 알람은 정확한 업무 건수 계산이 아니라 장애 존재 탐지가 목적이다.
@@ -67,9 +70,27 @@ F3 이벤트는 DB 종료 상태 commit 뒤 한 번 기록을 **시도하는 bes
   않는다. 각 alarm은 5분 합계가 1 이상이면 `ALARM`, 데이터가 없으면 정상으로 본다.
 - 기존 인프라 alarm 6개와 위 애플리케이션 alarm 2개는 Alarm 전용 SNS topic으로 `ALARM`·`OK`
   상태만 전송한다. `INSUFFICIENT_DATA`는 전송하지 않는다.
-- Alarm 전용 Lambda는 기존 CodePipeline·CodeDeploy notifier와 분리한다. Discord 메시지는
-  `AlarmName`, `NewStateValue`, `NewStateReason`만 포함하고 2,000자 이하로 자르며 mention parsing을
+- Alarm 전용 Lambda는 기존 CodePipeline·CodeDeploy notifier와 분리한다. 모든 알람 메시지는
+  alarm name, `module`, state, 상태 전이 시각, 제한된 reason, Alarm 링크와 별도 장애 대응 Runbook
+  링크를 우선순위대로 포함한다. 두 애플리케이션 알람에는 미리 채운 Logs Insights 링크도 포함한다.
+  전체 메시지는 2,000자 이하이며 링크는 자르지 않고 detail, reason 순서로 축약하며 mention parsing을
   끈다. 잘못된 fixture는 무시하고 Discord HTTP 실패는 SNS 재시도를 위해 실패로 반환한다.
+- 애플리케이션 조회 계약은 정확히 `${name_prefix}-backend-unhandled-errors`와
+  `${name_prefix}-ai-terminal-failures` 두 전체 이름만 허용한다. 전자는 API의
+  `unhandled_request_error`, 후자는 API·Worker의 `ai_terminal_failure`를 조회한다. 그 밖의 인프라
+  알람은 로그를 자동 조회하지 않는다.
+- Console region은 표시용 SNS `Region`이 아니라 account·alarm name과 함께 검증한 `AlarmArn`에서
+  추출한다. 애플리케이션 `ALARM`에서만 `StateChangeTime ± 10분`, `limit 1` 쿼리를 실행하고
+  `Scheduled`·`Running`을 합계 최대 2초 기다린다. 만료 시 실행 중 쿼리를 best-effort로 중단한다.
+  `OK`에서는 API 조회하지 않되 Logs Insights 링크는 유지한다.
+- 조회와 출력은 `@timestamp`, `source`, `request_id`, `run_id`, `status`, `status_code`,
+  `failure_stage`, `attempt`, `failure_category`, `error_code`, `error_type`, `error_location`,
+  `terminal_count`만 허용한다. `@ptr`와 `@message`는 버리고 `GetLogRecord`는 호출하지 않는다.
+  상세 1건은 알람 시각 주변의 최근 일치 로그이며 직접 원인으로 확정하지 않는다.
+- 조회 실패·시간 초과·결과 없음은 고정된 안전 오류 코드만 notifier 로그에 남기고 기본 메시지와
+  링크를 전송한 뒤 성공 처리한다. Discord 전송 실패만 SNS 재시도를 위해 실패로 반환한다.
+- notifier의 `StartQuery`·`GetQueryResults`는 API·Worker log group ARN에 한정한다. 실행 중 쿼리
+  중단에 필요한 `StopQuery`만 AWS API의 resource-level 권한 부재 때문에 `Resource="*"`로 분리한다.
 - Alarm notifier는 기존 delivery webhook을 재사용하지 않는다. 새 Discord webhook URL을 별도
   ephemeral Terraform 입력으로 받아 독립 Secrets Manager Secret/version으로 저장한다.
 

@@ -1,6 +1,6 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·Alarm 전용 전달 코드 구현 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+implementation: 기존 delivery 적용됨·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
 updated: 2026-08-31
 ---
 
@@ -129,7 +129,12 @@ CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 
 
 CloudWatch Alarm은 별도 SNS topic과 별도 Lambda를 사용한다. 기존 인프라 alarm 6개와
 `unhandled_request_error`, `ai_terminal_failure`에서 만든 애플리케이션 alarm 2개가 `ALARM`·`OK`
-상태를 게시하고 Lambda는 alarm name, state, reason만 2,000자 이하·mention 비활성 메시지로 보낸다.
+상태를 게시한다. Lambda는 이름·`backend|ai|infra` 모듈·상태·전이 시각·제한된 사유와 Alarm·장애
+대응 Runbook 링크를 2,000자 이하·mention 비활성 메시지로 보낸다. 두 애플리케이션 알람에는
+미리 채운 Logs Insights 링크를 추가하고 `ALARM`에서만 전이 시각 ±10분의 안전 필드 1건을 최대
+2초 기다려 best-effort로 포함한다. 상세 로그는 직접 원인으로 확정하지 않으며 조회 실패는 기본 알림을
+막지 않는다. [장애 대응 Runbook](../../operations/cloudwatch-alarm-response.md)이 조사 순서를 정한다.
+
 이 Lambda는 새 Secrets Manager Secret에서 전용 webhook을 읽으며 기존 delivery notifier·Secret을
 수정하지 않는다. 이 경로는 코드와 fixture 테스트를 구현했지만 새 webhook을 넣은 saved plan의
 검토·승인·apply와 실제 alarm 검증 전에는 적용 상태로 간주하지 않는다.

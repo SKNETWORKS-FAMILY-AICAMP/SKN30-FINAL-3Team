@@ -1,6 +1,6 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
 updated: 2026-08-31
 ---
 
@@ -44,7 +44,7 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
 | CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨·deep lifecycle 미적용 | deep suspend는 ID·기본 도메인을 유지한 채 distribution 비활성화·ALB origin 제거 |
 | 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·delivery Discord와 별도 Alarm Discord 입력은 ignored tfvars→write-only 전환 후 plan·apply |
-| 관측 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달과 2개 app alarm 코드 구현 미적용 | log group 5개 14일; 적용 후 기존 6개+Backend 500·AI terminal 2개를 새 Alarm topic/Lambda로 전달, deep suspend는 ALB alarm 2개 제거 |
+| 관측 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달과 2개 app alarm 코드 구현, AWS 미적용 | log group 5개 14일; 적용 후 기존 6개+Backend 500·AI terminal 2개를 새 Alarm topic/Lambda로 전달하고 app ALARM에는 조사 링크·안전 로그 1건을 best-effort 제공, deep suspend는 ALB alarm 2개 제거 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
 | 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
 | 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |

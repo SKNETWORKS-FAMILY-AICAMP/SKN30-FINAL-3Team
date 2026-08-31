@@ -33,6 +33,11 @@ updated: 2026-08-31
 - React 최상위 Error Boundary는 복구 UI만 제공한다. 브라우저 오류 전송은 도입하지 않는다.
 - 기존 CloudWatch·SNS·Discord를 사용하고 외부 관측성 제품은 도입하지 않는다. CloudWatch Alarm
   전달은 기존 delivery notifier를 수정하지 않고 별도 Lambda와 별도 webhook Secret으로 분리한다.
+- 알람의 장기 모듈 식별자는 `backend`·`ai`로 두고 `f2`·`f3` 같은 `source`는 선택적 진단 문맥으로만
+  사용한다. 정확한 두 애플리케이션 alarm name만 API 또는 API·Worker 로그 조회에 매핑한다.
+- Discord에는 Alarm·Logs Insights·장애 대응 Runbook 링크를 우선 보존한다. 애플리케이션 `ALARM`만
+  알람 시각 전후 10분의 안전 필드 1건을 best-effort로 조회하며, 실패·빈 결과·2초 초과는 기본 알림을
+  막지 않는다. 시간 초과 쿼리는 best-effort로 중단하고 `OK`에서는 API 조회하지 않는다.
 
 세부 필드, 발생·제외 조건과 알림 형식은 [오류 관측 계약](../contracts/observability.md)을 따른다.
 
@@ -40,7 +45,8 @@ updated: 2026-08-31
 
 즉시 대응해야 하는 세 경로인 Backend 미처리 500, 동기 F2 최종 실패, 비동기 F3 최종 실패가
 기존 AWS 운영면 안에서 Discord까지 연결된다. 기존 인프라 alarm도 이름·상태·사유를 사람이 읽을
-수 있게 된다. 새로운 SaaS 요금과 계정·SDK 학습·데이터 정책 운영은 생기지 않는다.
+수 있게 된다. 애플리케이션 알람은 조사할 로그 그룹·시간·이벤트와 안전 로그 1건을 함께 제공해
+첫 수동 검색 단계를 줄인다. 새로운 SaaS 요금과 계정·SDK 학습·데이터 정책 운영은 생기지 않는다.
 
 반면 성공률, 지연, token 비용, queue 적체와 브라우저 오류를 자동 집계하지 않는다. 두 alarm의
 오탐·누락과 수동 조사 시간을 운영 기록으로 남기고, 그 비용이 이 최소 구성을 넘을 때만 다음

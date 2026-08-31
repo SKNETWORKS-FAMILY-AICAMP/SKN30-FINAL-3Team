@@ -5,6 +5,7 @@ updated: 2026-08-31
 
 # 위키 변경 로그
 
+- 2026-08-31: CloudWatch Alarm Discord 메시지에 검증된 `AlarmArn` 기반 Alarm 링크와 별도 장애 대응 Runbook을 추가하고, 정확한 Backend·AI 알람 두 개에는 미리 채운 Logs Insights 링크를 제공한다. 애플리케이션 `ALARM`만 전이 시각 ±10분의 허용 필드 1건을 최대 2초 best-effort 조회하며 시간 초과 쿼리는 중단한다. 조회 실패는 기본 알림을 막지 않고 Discord 전송 실패만 SNS 재시도하며, `source`는 라우팅이 아닌 선택적 기능 문맥으로 한정했다.
 - 2026-08-31: AI·Backend pre-commit Ruff 대상을 모듈 아래 Git 추적 Python 파일 전체로 넓혀 CodeBuild의 모듈 전체 검사와 일치시켰다. 에이전트는 Python 변경을 마치기 전에 루트 `AGENTS.md`의 모듈별 `ruff check --fix`와 `ruff format`을 실행하며, `ai/eval`·`ai/training`도 제외하지 않는다. Pyright의 기존 `src`·`tests` 검사 범위와 CodeBuild 최종 검증은 유지한다.
 - 2026-08-31: 개발 환경 오류 관측을 예상하지 못한 Backend 500과 F2·F3 AI 최종 실패 두 이벤트로 한정하고, `/api/v1` framework 404·405·422 envelope와 F2 안전 오류 문구·React 복구 경계를 정규화했다. 기존 CloudWatch·SNS·Discord만 사용하며 기존 delivery notifier는 유지하고, CloudWatch Alarm은 별도 SNS·Lambda와 새 Discord webhook Secret으로 전달한다. 외부 관측성 제품, 브라우저 telemetry, 전면 로그 스키마 이관과 token·queue·heartbeat 지표는 운영 비용을 고려해 제외했다.
 - 2026-08-31: F3-CR-01·02의 저장 트리거가 하는 일을 앵커 포지션 카드 생성까지로 줄이고 API 계약의 자동 접수·Worker 선점·상태 수명주기 절을 같은 범위로 대체했다. 저장이 만든 실행은 ANCHOR_READY에서 멈추고 Worker 선점·최대 시도 정리 대상에서 빠진다. 사용자가 QUEUED·RUNNING·ANCHOR_READY 어느 때 판정을 요청해도 같은 실행이 그 의도를 이어받으며, 주차 뒤의 계획된 첫 선점은 재시도 횟수를 쓰지 않는다. 앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용은 없다. 세대 상세의 액션 레일 [교차 판정]은 여닫기가 아니라 판정 요청으로 되돌렸고, 섹션의 [교차 판정 실행]과 같은 실행을 요청한다.

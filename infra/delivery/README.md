@@ -245,6 +245,8 @@ Lifecycle script의 AWS CLI 오류는 원래 AWS service error와 operation 이�
 
 새 Alarm 전용 webhook과 Terraform apply가 끝난 뒤에만 합성 fixture를 게시한다. 기존
 CodePipeline·CodeDeploy Discord 채널이나 webhook을 이 검증에 사용하지 않는다.
+실제 장애 조사 순서는 [CloudWatch Alarm 장애 대응 Runbook](../../docs/operations/cloudwatch-alarm-response.md)을
+따른다.
 
 ```bash
 cd infra/environments/dev
@@ -256,9 +258,16 @@ aws sns publish \
   --region ap-northeast-2
 ```
 
-Alarm 전용 Discord 메시지에 fixture의 alarm name, `ALARM` state와 reason이 모두 있고 mention이
-발생하지 않는지 확인한다. Lambda log에는 webhook URL이나 fixture 바깥의 원문이 없어야 한다.
-Discord HTTP 오류를 주입하면 Lambda 호출이 실패해 SNS 재시도 대상으로 남아야 한다.
+Alarm 전용 Discord 메시지에 fixture의 alarm name, `module=backend`, `ALARM` state, 상태 전이 시각,
+reason과 Alarm·Logs Insights·Runbook 링크가 있고 mention이 발생하지 않는지 확인한다. fixture의
+`Region=Asia Pacific (Seoul)`가 아니라 `AlarmArn`의 `ap-northeast-2`가 Console URL에 사용돼야 한다.
+일치 로그가 있으면 허용된 안전 필드 1건과 직접 원인이 아니라는 안내가 보여야 한다.
+
+Logs Insights 실패·빈 결과·2초 시간 초과를 주입해도 기본 메시지와 링크가 전송되고 Lambda는 성공해야
+한다. 시간 초과에서는 `StopQuery`를 시도한다. Lambda log에는 webhook URL, AWS 예외 원문,
+`@message`, `@ptr` 또는 fixture 바깥 원문이 없어야 한다. Discord HTTP 오류를 주입할 때만 Lambda
+호출이 실패해 SNS 재시도 대상으로 남아야 한다. `OK` fixture는 Logs Insights API를 호출하지 않고
+조사 링크만 유지해야 한다.
 
 ## 검증 순서
 

@@ -17,6 +17,7 @@ updated: 2026-08-31
 | [architecture/runtime.md](architecture/runtime.md) | 런타임, 프레임워크, 배포 후보를 검토할 때 |
 | [인프라 아키텍처](../../../../docs/architecture/infra/overview.md) | 개발·시연용 AWS·RunPod 배치와 자원 상태를 확인할 때 |
 | [인프라 배포·운영](../../../../docs/architecture/infra/deployment-and-operations.md) | 수동 Pipeline, rollback, RunPod·비용 운영 절차를 확인할 때 |
+| [CloudWatch Alarm 장애 대응](../../../../docs/operations/cloudwatch-alarm-response.md) | Discord alarm을 받고 Backend·AI·인프라 오류를 조사할 때 |
 | [브랜치 및 PR 정책](../../../../.agents-rule/git.md) | 브랜치, 커밋, PR, 병합 방식을 확인할 때 |
 | [development/environments.md](development/environments.md) | 로컬·CI·공유 dev·prod 환경이나 의존성을 변경할 때 |
 | [contracts/api.md](contracts/api.md) | HTTP API 계약을 만들거나 바꿀 때 |

@@ -6,6 +6,24 @@ locals {
     rds_postgresql = "/aws/rds/instance/${local.name_prefix}-postgres/postgresql"
     rds_upgrade    = "/aws/rds/instance/${local.name_prefix}-postgres/upgrade"
   }
+
+  alarm_log_contexts = {
+    "${local.name_prefix}-backend-unhandled-errors" = {
+      module          = "backend"
+      event           = "unhandled_request_error"
+      log_group_names = [aws_cloudwatch_log_group.runtime["api"].name]
+    }
+    "${local.name_prefix}-ai-terminal-failures" = {
+      module = "ai"
+      event  = "ai_terminal_failure"
+      log_group_names = [
+        aws_cloudwatch_log_group.runtime["api"].name,
+        aws_cloudwatch_log_group.runtime["worker"].name,
+      ]
+    }
+  }
+
+  alarm_runbook_url = "https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/dev/docs/operations/cloudwatch-alarm-response.md"
 }
 
 resource "aws_cloudwatch_log_group" "runtime" {
@@ -137,6 +155,21 @@ resource "aws_iam_role_policy" "cloudwatch_alarm_notifier" {
         Action   = ["secretsmanager:GetSecretValue"]
         Resource = aws_secretsmanager_secret.alarm_discord_webhook.arn
       },
+      {
+        Sid    = "ReadApplicationFailureLogs"
+        Effect = "Allow"
+        Action = ["logs:StartQuery", "logs:GetQueryResults"]
+        Resource = [
+          aws_cloudwatch_log_group.runtime["api"].arn,
+          aws_cloudwatch_log_group.runtime["worker"].arn,
+        ]
+      },
+      {
+        Sid      = "StopApplicationFailureQuery"
+        Effect   = "Allow"
+        Action   = ["logs:StopQuery"]
+        Resource = "*"
+      },
     ]
   })
 }
@@ -153,6 +186,8 @@ resource "aws_lambda_function" "cloudwatch_alarm_notifier" {
   environment {
     variables = {
       ALARM_DISCORD_SECRET_ARN = aws_secretsmanager_secret.alarm_discord_webhook.arn
+      ALARM_LOG_CONTEXTS_JSON  = jsonencode(local.alarm_log_contexts)
+      ALARM_RUNBOOK_URL        = local.alarm_runbook_url
     }
   }
 
