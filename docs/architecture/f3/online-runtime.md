@@ -186,7 +186,14 @@ sequenceDiagram
 
 현재 구현된 앵커 카드 유스케이스는 lease·attempt와 앵커 입력을 확인하고, cache hit이면 검증된 카드를 재사용하며, cache miss이면 주입된 AI 생성기를 호출한 뒤 카드·가격·근거를 저장하고 `ANCHOR_READY`로 전이한다. Worker handler가 `RUNNING` 상태에서 이 유스케이스를 호출한다.
 
-후보 카드 유스케이스는 `candidate-selection:v2` snapshot에서 `selected_for_cards`인 상위 15건을 순서대로 읽고 앵커의 반대편 포지션 카드를 확보한다. 앵커 카드와 같은 snapshot·privacy mode·cache key·저장 직전 fencing 경로를 재사용하며 후보의 현재 `row_version`을 고정한다. 후보를 순차 처리해 전부 확보한 경우에만 카드 ID를 snapshot에 기록하고 `CANDIDATE_CARDS_READY`로 전이한다. 후보가 0건이면 모델 호출 없이 전이하고, 하나라도 실패하면 상태는 `CANDIDATES_READY`에 남는다. Worker handler가 `CANDIDATES_READY` 상태에서 이 유스케이스를 호출한다.
+후보 카드 유스케이스는 `candidate-selection:v3` snapshot에서 `selected_for_cards`인 상위 5건을 순서대로 읽고 앵커의 반대편 포지션 카드를 확보한다. 앵커 카드와 같은 snapshot·privacy mode·cache key·저장 직전 fencing 경로를 재사용하며 후보의 현재 `row_version`을 고정한다. 후보를 순차 처리해 전부 확보한 경우에만 카드 ID를 snapshot에 기록하고 `CANDIDATE_CARDS_READY`로 전이한다. 후보가 0건이면 모델 호출 없이 전이하고, 하나라도 실패하면 상태는 `CANDIDATES_READY`에 남는다. Worker handler가 `CANDIDATES_READY` 상태에서 이 유스케이스를 호출한다.
+
+Worker는 실패 원인을 원문 없이 집계할 수 있게 두 구조화 로그를 남긴다.
+
+- `f3_step_failed`: `run_id`, 저장 상태, `failure_stage`, `failure_category`, attempt, outcome, 고정 `error_type`
+- `f3_candidate_card_failed`: `run_id`, attempt, 후보 순번, 카드화 대상 건수, 고정 `error_type`
+
+예외 메시지, 후보 표시명, 상담 본문, 전체 프롬프트와 모델 원문 응답은 로그하지 않는다.
 
 포지션 카드 cache key의 현재 schema version은 `position-card:v3`이다. `v2`의 상담 로그 건수·마지막 시각·최대 ID에 더해, AI 요청 전체의 비식별 SHA-256 fingerprint와 측면별 상담 범위 identity를 넣는다. 매물·구입장 `row_version`만으로는 세대 스펙, 단지명, 당사자 역할, 날짜 bucket 변화를 잡을 수 없기 때문이다. 지문에는 원문을 저장하지 않는다.
 
@@ -226,7 +233,8 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 판정 결과와 근거 저장 | `match_evaluation`, `match_candidate_evaluation`, `match_candidate_evidence` (migration 006) |
 | 결정적 SQL 후보 추출, 점수와 정렬, `CANDIDATES_READY` 전이 | `backend/src/domain/agent_execution/candidates.py` |
 | 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
-| 상위 15건 후보 카드 순차 생성·재사용, 카드 ID 기록과 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
+| 상위 5건 후보 카드 순차 생성·재사용, 카드 ID 기록과 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
+| 실패 단계·분류·후보 순번을 원문 없이 남기는 구조화 로그 | `backend/src/domain/agent_execution/pipeline.py`, `candidate_cards.py` |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
 | `WORKER_ENABLED=false` 배포. 작업을 하나도 claim하지 않고 대기 | `backend/src/worker.py` |
@@ -257,14 +265,16 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 
 - 후보 포함·제외는 SQL 조건으로 결정한다.
 - 가격 근접도·평형 일치·접수 최신순 점수는 우선 카드화 순서를 정할 뿐 중개 등급을 대신하지 않는다.
-- 상위 15건을 먼저 카드화하고 나머지 후보 수와 다음 페이지를 보존한다.
+- 상위 5건을 먼저 카드화하고 나머지 후보 수와 다음 페이지를 보존한다.
 - 조건에 맞는 후보가 없으면 사용한 조회 조건과 함께 빈 결과를 저장한다.
 - 7,200행 규모의 100ms 목표는 AI 품질 평가와 분리한 Backend 성능 검증으로 확인한다.
 
 ### 현재 구현 규칙
 
 정본 코드는 `backend/src/domain/agent_execution/candidates.py`이고 저장 위치는
-`match_evaluation.candidate_selection_snapshot`(schema `candidate-selection:v2`)이다.
+`match_evaluation.candidate_selection_snapshot`(schema `candidate-selection:v3`)이다.
+`v2`로 이미 완료된 과거 실행은 결과 조회에서 계속 읽지만, 새 후보 선택·카드화는
+`v3`만 생성·진행한다.
 
 가격 축은 앵커 **카드**의 첫 번째 거래 유형(`negotiation_position_price.display_order` 최소)
 하나다. 카드 생성이 `PriceKind` 열거 순서로 금액을 채우므로 같은 카드에서 항상 같은 축이
@@ -305,7 +315,7 @@ Worker 배포 계약의 정본은 [백엔드 ADR-0003](../../../.agents/skills/b
 조정값**이며 팀이 승인한 요구사항 수치가 아니다. 실제로 쓴 값은 snapshot의 `criteria`와
 `score_weights`에 함께 저장하므로 나중에 바꿔도 과거 판정의 근거가 남는다.
 
-snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, 순위와 카드화 여부를 담고
+snapshot은 상위 5건이 아니라 **전체** 후보의 ID, 구성 점수, 순위와 카드화 여부를 담고
 `total_count`·`carded_count`·`remaining_count`를 함께 기록한다. 후보 0건이면 `candidates`가
 빈 배열이고 `criteria`는 그대로 남는다.
 
@@ -315,7 +325,7 @@ snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, �
 
 ## 후보 포지션 카드 확보
 
-`CANDIDATES_READY` snapshot에서 `selected_for_cards=true`인 상위 15건만 카드화한다. snapshot
+`CANDIDATES_READY` snapshot에서 `selected_for_cards=true`인 상위 5건만 카드화한다. snapshot
 순서가 SQL 후보 우선순위이므로 다시 정렬하지 않는다. 각 후보는 앵커와 반대편
 `negotiation_side`를 쓰며 그 후보 자신의 현재 `row_version`으로 cache key와 저장 fencing을
 고정한다.
@@ -334,7 +344,7 @@ snapshot은 상위 15건이 아니라 **전체** 후보의 ID, 구성 점수, �
 ## 중개 판정과 완료
 
 정본 코드는 `backend/src/domain/agent_execution/judgment.py`다. 저장된 앵커 카드 1장과 후보 카드
-1~15장을 `brokerage-judgment:v1` 요청으로 조립해 **한 번의** AI 호출로 판정한다
+1~5장을 `brokerage-judgment:v1` 요청으로 조립해 **한 번의** AI 호출로 판정한다
 (F3-BR-01, F3-NF-04). 흐름은 세 단계다.
 
 | 단계 | transaction | 하는 일 |

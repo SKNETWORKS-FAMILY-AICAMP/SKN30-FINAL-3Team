@@ -29,7 +29,8 @@ Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. �
 - [just](https://github.com/casey/just)
 - uv
 - [aws cli](https://docs.aws.amazon.com/ko_kr/cli/latest/userguide/getting-started-install.html)
-  - [session manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-debian-and-ubuntu.html): cli 설치 후 세션 매니저 플러그인 설치
+- [session manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-debian-and-ubuntu.html): cli 설치 후 세션 매니저 플러그인 설치
+- PostgreSQL 15 `psql`: 공유 dev F3 합성 seed 적용에 필요
 - python 3.13
 - [terraform](https://developer.hashicorp.com/terraform/install)
 
@@ -87,7 +88,7 @@ cp environments/dev/secrets.example.tfvars environments/dev/secrets.auto.tfvars
 chmod 600 environments/dev/secrets.auto.tfvars
 ```
 
-- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`는 필수이고 vLLM API key는 필요한 항목만 추가한다.
+- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`, `AI_VLLM_LLM_API_KEY`, `AI_VLLM_STT_API_KEY`는 필수이고 Embedding 등 다른 vLLM API key는 필요할 때 추가한다.
 - `discord_webhook_url`: Discord webhook HTTPS URL을 입력한다.
 - 각 `*_secret_version`: 비밀값을 바꿀 때 함께 1씩 증가시킨다.
 
@@ -201,6 +202,17 @@ just db-sync
 ```bash
 just db-migrate
 ```
+
+공유 dev에 검토된 F3 합성 장부를 재적재할 때는 migration 적용 후 다음 명령을 사용한다.
+
+```bash
+just dev-seed-f3
+```
+
+이 명령은 개인 IAM 인증과 SSM 터널을 사용해 `F3_SYNTHETIC 합성중개사무소`만 reset하고,
+커밋된 seed를 적용한 뒤 29개 검사가 모두 `PASS`인지 확인한다. IAM token과 DB URL은 출력하지
+않는다. 기존 F3 실행 결과도 reset되므로 공유 dev에서 실행 중인 API 요청과 Worker 작업이 없을 때
+확인 프롬프트를 승인한다. prod 또는 임의 DB를 대상으로 실행할 수 없고 파일 경로도 받지 않는다.
 
 공유 AWS dev DB에 고정 합성 개발 세션 계정을 만들 때는 중개사무소명, 로그인 ID와 표시명을 전달한다.
 역할은 생략하면 `OWNER`이며 `OWNER`, `STAFF`, `READ_ONLY` 중 하나를 사용할 수 있다.

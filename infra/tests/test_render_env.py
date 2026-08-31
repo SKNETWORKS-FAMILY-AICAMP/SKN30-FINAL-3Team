@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import stat
 import tempfile
 import unittest
@@ -64,31 +65,59 @@ class RenderEnvironmentTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(SystemExit):
                 render_env.parse_public_parameters(payload, "/project-dev")
 
-    def test_ai_provider_keys_require_openai_and_allow_optional_vllm(self) -> None:
-        keys = render_env.parse_ai_provider_keys(
-            '{"AI_OPENAI_API_KEY":"openai-test","AI_VLLM_LLM_API_KEY":"vllm-test"}'
-        )
+    def test_ai_provider_keys_require_api_and_worker_keys(self) -> None:
+        provider_keys = {
+            "AI_OPENAI_API_KEY": "openai-test",
+            "AI_VLLM_LLM_API_KEY": "llm-test",
+            "AI_VLLM_STT_API_KEY": "stt-test",
+        }
 
-        self.assertEqual(set(keys), {"AI_OPENAI_API_KEY", "AI_VLLM_LLM_API_KEY"})
-        with self.assertRaises(SystemExit):
-            render_env.parse_ai_provider_keys('{"AI_VLLM_LLM_API_KEY":"vllm-test"}')
+        keys = render_env.parse_ai_provider_keys(json.dumps(provider_keys))
 
-    def test_process_environment_files_isolate_secrets(self) -> None:
+        self.assertEqual(set(keys), set(provider_keys))
+        for missing_name in provider_keys:
+            incomplete = {
+                name: value for name, value in provider_keys.items() if name != missing_name
+            }
+            with self.subTest(missing_name=missing_name), self.assertRaisesRegex(
+                SystemExit, missing_name
+            ):
+                render_env.parse_ai_provider_keys(json.dumps(incomplete))
+
+    def test_process_environment_files_route_public_ai_and_isolate_secrets(
+        self,
+    ) -> None:
         api, worker, migration = render_env.build_process_environments(
             public={
                 "backend": {"APP_ENV": "prod", "WORKER_ENABLED": "false"},
-                "ai": {"AI_OPENAI_BASE_URL": "https://api.openai.com/v1"},
+                "ai": {
+                    "AI_OPENAI_BASE_URL": "https://openai.example/v1",
+                    "AI_VLLM_LLM_BASE_URL": "https://llm.example/v1",
+                    "AI_VLLM_STT_BASE_URL": "https://stt.example/v1",
+                },
             },
             runtime_url="postgresql+psycopg://runtime",
             migration_url="postgresql+psycopg://migration",
-            ai_provider_keys={"AI_OPENAI_API_KEY": "openai-test"},
+            ai_provider_keys={
+                "AI_OPENAI_API_KEY": "openai-test",
+                "AI_VLLM_LLM_API_KEY": "llm-test",
+                "AI_VLLM_STT_API_KEY": "stt-test",
+            },
         )
 
         self.assertEqual(api["DB_URL"], "postgresql+psycopg://runtime")
         self.assertNotIn("AI_OPENAI_API_KEY", api)
-        self.assertNotIn("AI_OPENAI_BASE_URL", api)
+        self.assertEqual(api["AI_VLLM_LLM_API_KEY"], "llm-test")
+        self.assertEqual(api["AI_VLLM_STT_API_KEY"], "stt-test")
+        self.assertEqual(api["AI_OPENAI_BASE_URL"], "https://openai.example/v1")
+        self.assertEqual(api["AI_VLLM_LLM_BASE_URL"], "https://llm.example/v1")
+        self.assertEqual(api["AI_VLLM_STT_BASE_URL"], "https://stt.example/v1")
         self.assertEqual(worker["AI_OPENAI_API_KEY"], "openai-test")
+        self.assertEqual(worker["AI_VLLM_LLM_API_KEY"], "llm-test")
+        self.assertEqual(worker["AI_VLLM_STT_API_KEY"], "stt-test")
         self.assertEqual(worker["DB_URL"], "postgresql+psycopg://runtime")
+        self.assertEqual(worker["AI_VLLM_LLM_BASE_URL"], "https://llm.example/v1")
+        self.assertEqual(worker["AI_VLLM_STT_BASE_URL"], "https://stt.example/v1")
         self.assertEqual(
             migration, {"DB_MIGRATION_URL": "postgresql+psycopg://migration"}
         )

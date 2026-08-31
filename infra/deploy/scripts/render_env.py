@@ -17,6 +17,13 @@ ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 PUBLIC_NAMESPACES = frozenset({"backend", "ai"})
 INJECTED_NAMES = frozenset({"DB_URL", "DB_MIGRATION_URL"})
 SENSITIVE_SUFFIXES = ("_API_KEY", "_PASSWORD", "_PRIVATE_KEY", "_SECRET", "_TOKEN")
+REQUIRED_AI_PROVIDER_KEYS = frozenset(
+    {
+        "AI_OPENAI_API_KEY",
+        "AI_VLLM_LLM_API_KEY",
+        "AI_VLLM_STT_API_KEY",
+    }
+)
 
 
 def aws(*args: str) -> str:
@@ -119,8 +126,11 @@ def parse_ai_provider_keys(raw: str) -> dict[str, str]:
         if not isinstance(value, str) or not value.strip():
             raise SystemExit(f"AI provider secret value is empty: {name}")
         result[name] = value
-    if "AI_OPENAI_API_KEY" not in result:
-        raise SystemExit("AI provider secret must contain AI_OPENAI_API_KEY")
+    missing = REQUIRED_AI_PROVIDER_KEYS - result.keys()
+    if missing:
+        raise SystemExit(
+            "AI provider secret is missing required keys: " + ", ".join(sorted(missing))
+        )
     return result
 
 
@@ -168,7 +178,13 @@ def build_process_environments(
             + ", ".join(sorted(collisions))
         )
 
-    api = {**backend, **ai, "DB_URL": runtime_url}
+    api = {
+        **backend,
+        **ai,
+        "AI_VLLM_LLM_API_KEY": ai_provider_keys["AI_VLLM_LLM_API_KEY"],
+        "AI_VLLM_STT_API_KEY": ai_provider_keys["AI_VLLM_STT_API_KEY"],
+        "DB_URL": runtime_url,
+    }
     worker = {**backend, **ai, "DB_URL": runtime_url, **ai_provider_keys}
     migration = {"DB_MIGRATION_URL": migration_url}
     return api, worker, migration

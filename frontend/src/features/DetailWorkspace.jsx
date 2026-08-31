@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Checkbox, Divider, FormSelect, FormSelectOption, Label, Modal, ModalBody, ModalFooter, ModalHeader, TextArea, TextInput, Title } from "@patternfly/react-core";
-import { CheckCircleIcon, InfoCircleIcon, MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
+import { CheckCircleIcon, ExpandIcon, InfoCircleIcon, MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import { PROTOTYPE_ASSUMPTIONS } from "../config/prototypeAssumptions.js";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
+import { carrySavedIdentity } from "./ledger/index.ts";
 import { DEAL_TYPE_CHOICES, dealTypePatch, dealTypeValue } from "./ledger/model/dealType.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import { scrollIntoViewRespectingMotion } from "../shared/motion/index.ts";
@@ -170,15 +171,18 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    * 섹션을 접을 수 있고, 접었다 펴면 이미 접수된 실행을 그대로 이어받는다.
    */
   const [crossMatchSectionOpen, setCrossMatchSectionOpen] = useState(true);
+  /* 상담 로그를 큰 창에서 읽고 쓰는 상태. 값은 상세의 작성값 하나만 쓰고 여기서 복사하지 않는다. */
+  const [logExpanded, setLogExpanded] = useState(false);
   const initializedOpenRef = useRef(false);
   const securityRef = useRef(null);
   const detailCloseTriggerRef = useRef(null);
   const closeReturnFocusRef = useRef(null);
   const deleteTriggerRef = useRef(null);
   const keepExistingRef = useRef(null);
+  const logExpandTriggerRef = useRef(null);
   const crossMatchSectionRef = useRef(null);
 
-  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setDuplicateBlock(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); setReplaceDecision(null); setCrossMatchSectionOpen(true); }, [focusF2Request, isOpen, row]);
+  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setDuplicateBlock(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); setReplaceDecision(null); setLogExpanded(false); setCrossMatchSectionOpen(true); }, [focusF2Request, isOpen, row]);
   useEffect(() => { if (isOpen && focusF2Request) setF2Open(true); }, [focusF2Request, isOpen]);
   useEffect(() => { if (securityWarning) securityRef.current?.focus(); }, [securityWarning]);
   /* 확인을 받는 쪽이 덮어쓰기이므로, 처음 잡히는 초점은 기존 값을 지키는 버튼에 둔다. */
@@ -250,7 +254,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    * 다만 입력한 내용을 붙들어 두는 임시저장까지 막으면 잃는 쪽이 더 크다.
    * 임시저장인 줄 알고 누르는 경로(확인 팝업의 임시저장, 닫기 확인)는 allowDraft로 통과시킨다.
    */
-  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); setDraft(nextDraft); baselineRef.current = nextDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
+  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { const persisted = await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); /* 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다. */ const savedDraft = carrySavedIdentity(nextDraft, persisted); setDraft(savedDraft); baselineRef.current = savedDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
   /* 확인을 닫으면 바로 체크할 수 있도록 초점을 중복 검사 체크박스에 돌려준다. */
   const closeDuplicateBlock = () => {
     setDuplicateBlock(false);
@@ -280,6 +284,11 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
       crossMatchSectionRef.current?.querySelector("h2")?.focus();
     });
   };
+  /* 큰 창을 닫으면 상세의 상담 로그 칸으로 돌아온다. 방금 어디를 보고 있었는지 잃지 않게 여는 버튼에 초점을 돌려준다. */
+  const closeLogExpanded = () => {
+    setLogExpanded(false);
+    window.requestAnimationFrame(() => logExpandTriggerRef.current?.focus());
+  };
   const closeCloseDecision = () => {
     if (isSaving) return;
     setCloseDecision(false);
@@ -290,6 +299,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     if (isDeleting) return;
     if (duplicateBlock) { closeDuplicateBlock(); return; }
     if (deleteDecision) { closeDeleteDecision(); return; }
+    if (logExpanded) { closeLogExpanded(); return; }
     if (replaceDecision) { keepExistingOverF2(); return; }
     if (isDirty) {
       const trigger = event?.currentTarget;
@@ -397,7 +407,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
 
             {/* 가장 길게 쓰는 상담 로그가 오른쪽 열을 세로로 다 쓰고, 시설과 비고는 그 아래 남는 두 칸을 가로로 채운다. */}
             <div className="detail-info-column detail-info-column--log" id="detail-section-log">
-              <div className="detail-log-pane detail-log-pane--log"><h3><label htmlFor="detail-log">상담 로그</label><span>음성메모 제안 반영</span></h3><TextArea id="detail-log" aria-label="상담 로그" value={draft.log} placeholder="상담 내용, 다음 연락 일정, 요청사항을 기록하세요." resizeOrientation="vertical" onChange={(_event, value) => stageField("log", value)} /><div className="detail-log-meta"><span>유입 경로: {draft.source || "미입력"}</span><span>담당자: {draft.assignee || "미지정"}</span></div></div>
+              <div className="detail-log-pane detail-log-pane--log"><h3><label htmlFor="detail-log">상담 로그</label><span>음성메모 제안 반영</span><Button ref={logExpandTriggerRef} className="detail-log-pane__expand" variant="link" isInline icon={<ExpandIcon />} onClick={() => setLogExpanded(true)} aria-haspopup="dialog">크게 보기</Button></h3><TextArea id="detail-log" aria-label="상담 로그" value={draft.log} placeholder="상담 내용, 다음 연락 일정, 요청사항을 기록하세요." resizeOrientation="vertical" onChange={(_event, value) => stageField("log", value)} /><div className="detail-log-meta"><span>유입 경로: {draft.source || "미입력"}</span><span>담당자: {draft.assignee || "미지정"}</span></div></div>
               <div className="detail-log-pane detail-log-pane--memo"><h3><label htmlFor="detail-memo">비고</label></h3><TextArea id="detail-memo" aria-label="세대 비고" value={draft.memo} placeholder="참고사항을 입력하세요." resizeOrientation="vertical" onChange={(_event, value) => stageField("memo", value)} /></div>
             </div>
 
@@ -506,6 +516,32 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
       <ModalFooter>
         <Button id="detail-duplicate-block-confirm" variant="primary" onClick={closeDuplicateBlock} isDisabled={isSaving}>돌아가서 체크하기</Button>
         <Button variant="secondary" icon={<SaveIcon />} onClick={saveDraftOnly} isLoading={isSaving} isDisabled={isSaving}>임시저장</Button>
+      </ModalFooter>
+    </Modal>
+    {/*
+      * 상담 로그 큰 창.
+      *
+      * 상세 안의 로그 칸은 다른 칸과 자리를 나눠 쓰느라 긴 상담 내용을 한 번에 볼 수 없다.
+      * 큰 창은 같은 작성값(draft.log)을 그대로 읽고 쓰므로 여기서 고친 내용은 상세와 같은 값이며,
+      * 저장은 상세의 저장 버튼에서만 한다. 다른 확인 팝업과 같은 이유로 상세 안에 붙인다.
+      */}
+    <Modal
+      appendTo={() => document.getElementById("detail-workspace-modal")}
+      variant="large"
+      isOpen={logExpanded}
+      onClose={closeLogExpanded}
+      onEscapePress={(event) => { event.stopPropagation(); closeLogExpanded(); }}
+      elementToFocus="#detail-log-expanded"
+      aria-labelledby="detail-log-expanded-title"
+      className="detail-workspace__log-modal"
+    >
+      <ModalHeader title="상담 로그" labelId="detail-log-expanded-title" description={`${draft.complex || "단지 미입력"} ${draft.building || "-"}동 ${draft.unit || "-"}호 · ${draft.id || "신규"}`} />
+      <ModalBody className="detail-workspace__log-modal-body" data-screen-id="F1-MOD-127" data-requirement-ids="F1-LG-08, F1-LG-15, F1-LG-19, F1-LG-26">
+        <TextArea id="detail-log-expanded" aria-label="상담 로그" value={draft.log} placeholder="상담 내용, 다음 연락 일정, 요청사항을 기록하세요." resizeOrientation="vertical" onChange={(_event, value) => stageField("log", value)} />
+        <div className="detail-log-meta"><span>유입 경로: {draft.source || "미입력"}</span><span>담당자: {draft.assignee || "미지정"}</span><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="secondary" onClick={closeLogExpanded}>닫기</Button>
       </ModalFooter>
     </Modal>
   </Modal>;

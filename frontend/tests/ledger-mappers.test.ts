@@ -13,6 +13,7 @@ import { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "..
 import { addYears, formatTimestampAsDate, parseDate } from "../src/features/ledger/model/dates.ts";
 import { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "../src/features/ledger/model/phone.ts";
 import { LIFECYCLE_STATUS, toCode, toLabel } from "../src/features/ledger/model/codes.ts";
+import { carrySavedIdentity } from "../src/features/ledger/model/row.ts";
 import {
   applyServerIdentity,
   applyUnitDetail,
@@ -394,4 +395,38 @@ test("서버에 저장된 행은 값이 비어 보여도 빈 행이 아니다", 
   // 이미 서버에 있는 레코드는 화면에서 조용히 지우면 안 된다. 삭제는 별도 경로다.
   const saved = { ...createPropertyDraftRow("DRAFT-1"), serverId: 42, rowVersion: 1 };
   assert.equal(isEmptyDraft(saved), false);
+});
+
+/*
+ * 저장 응답의 서버 신원 전달.
+ *
+ * 상세 화면은 열릴 때 복사한 작성값으로 저장한다. 저장 뒤 새 row_version을 받아 두지 않으면
+ * 같은 상세에서 두 번째 저장이 낡은 버전을 보내, 혼자 쓰고 있어도 409를 받는다.
+ */
+test("저장 응답의 row_version과 서버 id를 작성값이 이어받는다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 1, listingId: 3, listingRowVersion: 1 };
+  const persisted = { ...draft, serverId: 7, rowVersion: 2, listingId: 3, listingRowVersion: 2 };
+
+  const next = carrySavedIdentity(draft, persisted);
+
+  assert.equal(next.rowVersion, 2);
+  assert.equal(next.listingRowVersion, 2);
+  assert.equal(next.serverId, 7);
+});
+
+test("저장 중에 이어서 적은 값은 저장 응답으로 덮지 않는다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 1, memo: "저장 뒤에 더 적은 메모" };
+  const persisted = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 2, memo: "저장 시점의 메모" };
+
+  const next = carrySavedIdentity(draft, persisted);
+
+  assert.equal(next.memo, "저장 뒤에 더 적은 메모");
+  assert.equal(next.rowVersion, 2);
+});
+
+test("저장 응답이 없으면 작성값을 그대로 둔다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 1 };
+
+  assert.deepEqual(carrySavedIdentity(draft, undefined), draft);
+  assert.deepEqual(carrySavedIdentity(draft, null), draft);
 });

@@ -206,7 +206,7 @@ class BrokerageJudgmentTarget(_Frozen):
 
     anchor_card_id: int = Field(ge=1)
     anchor_side: NegotiationSide
-    candidate_card_ids: tuple[int, ...] = Field(min_length=1, max_length=15)
+    candidate_card_ids: tuple[int, ...] = Field(min_length=1, max_length=5)
 
     @field_validator("candidate_card_ids")
     @classmethod
@@ -236,7 +236,7 @@ class BrokerageJudgmentRequest(_Frozen):
     contract_version: JudgmentContractVersion = BROKERAGE_JUDGMENT_CONTRACT_VERSION
     input_privacy_mode: InputPrivacyMode
     anchor: JudgmentCard
-    candidates: tuple[JudgmentCard, ...] = Field(min_length=1, max_length=15)
+    candidates: tuple[JudgmentCard, ...] = Field(min_length=1, max_length=5)
 
     @model_validator(mode="after")
     def candidates_must_be_the_opposite_side_and_distinct(self) -> Self:

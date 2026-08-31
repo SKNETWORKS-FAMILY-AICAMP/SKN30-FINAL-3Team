@@ -1,9 +1,9 @@
 # F3 합성 seed 데이터
 
-이 디렉터리는 F3 파이프라인을 로컬에서 끝까지 돌려 보기 위한 **합성 장부**를 관리한다.
+이 디렉터리는 F3 파이프라인을 로컬 또는 공유 dev에서 끝까지 돌려 보기 위한 **합성 장부**를 관리한다.
 
 seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하지 않고, 번호도 `migrate/`와
-무관하며, 운영 환경에는 적용하지 않는다. 합성 데이터가 운영 스키마 전진 migration에 딸려
+무관하며, prod에는 적용하지 않는다. 합성 데이터가 운영 스키마 전진 migration에 딸려
 들어가지 않도록 디렉터리를 분리했다.
 
 ## 파일
@@ -18,54 +18,64 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 
 - 삭제 대상은 `brokerage.name = 'F3_SYNTHETIC 합성중개사무소'` 한 곳뿐이다. 다른 사무소,
   다른 개발 계정과 `seed-sample-ledger`가 만든 데이터는 건드리지 않는다.
-- 개인 로컬 합성 DB에서만 사용한다. 운영·공유 DB에 적용하지 않는다.
+- 개인 로컬 합성 DB와 `infra/environments/dev`가 소유한 공유 dev에서만 사용한다. prod와 다른
+  공유·운영 DB에는 적용하지 않는다.
+- 공유 dev 적용은 커밋된 세 파일을 고정 순서로 실행하고 29개 검사를 확인하는
+  `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
 - 실존 이름·연락처·주소·상담 원문을 변형해 쓰지 않았다. 전부 새로 지어낸 값이다.
 - 연락처는 프로젝트가 합성 fixture에 사용하는 `010-0000-XXXX` 테스트 형식만 쓴다.
 - API Key, 토큰, 비밀번호를 넣지 않는다. `app_user.password_hash`에 들어가는
   `!development-login-disabled!`는 해시가 아니라 비밀번호 로그인을 막는 고정 표식이다.
 
-## 적용
+## 로컬 적용
 
-`docs/db/migrate/`의 migration을 먼저 끝까지 적용한 뒤 실행한다.
+`docs/db/migrate/`의 migration을 먼저 끝까지 적용하고 API와 Worker를 중지한 뒤 실행한다.
+`backend/.env`에는 로컬 PostgreSQL을 가리키는 `DB_URL`이 설정되어 있어야 한다.
 
-`infra/local/.env`의 로컬 DB 설정을 현재 셸에 불러온다. 아래 명령은 그 파일의
-`POSTGRES_USER`와 `POSTGRES_DB`를 사용하며 특정 계정·DB 이름을 고정하지 않는다.
-
-```bash
-set -a
-source infra/local/.env
-set +a
-```
+`backend/`에서 다음 관리 명령을 실행한다. `--confirm-reset`은 기존 합성 사무소의 장부와 실행
+결과를 지우고 재적재한다는 명시적 확인이며, 이 옵션 없이는 실행하지 않는다.
 
 ```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/001_F3_SYNTHETIC_RESET.sql
+cd backend
+uv run python src/manage.py seed-f3-synthetic --confirm-reset
 ```
+
+명령은 `APP_ENV=local`이고 `DB_URL` 호스트가 `localhost` 또는 loopback IP일 때만 동작한다.
+임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` seed → `003` verify를 고정 순서로
+실행한다. 29개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
+`verification_checks`를 출력한다. 몇 번을 반복해도 합성 사무소 ID와 같은 데이터 상태를 유지한다.
+
+## 공유 dev 적용
+
+공유 dev RDS와 app EC2가 실행 중이고 실행자가 `team-db-tunnel` 멤버여야 한다. 먼저 커밋된
+migration을 적용한 뒤 F3 합성 사무소 데이터를 재적재한다.
 
 ```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/002_F3_SYNTHETIC_SEED.sql
+cd infra
+just db-migrate
+just dev-seed-f3
 ```
 
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/003_F3_SYNTHETIC_VERIFY.sql
-```
+`dev-seed-f3`는 다음 경계를 강제한다.
 
-두 파일을 순서대로 돌리면 몇 번을 반복해도 같은 상태가 된다. 검증 결과의 마지막 열이
-전부 `PASS`여야 다음 단계로 넘어간다.
+- 개인 `aws login` IAM 사용자와 같은 이름의 PostgreSQL 역할을 사용한다.
+- 태그로 제한된 app EC2의 SSM remote-host 터널과 15분 IAM DB 토큰을 프로세스 내부에서만 쓴다.
+- 실행 파일을 `001` reset → `002` seed → `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
+- `app_owner` 역할로 실행하며 IAM token과 DB URL을 명령행·로그에 출력하지 않는다.
+- `003`의 29개 결과가 모두 `PASS`일 때만 완료로 보고한다.
+
+확인 프롬프트는 기존 `F3_SYNTHETIC 합성중개사무소`의 실행 결과와 장부를 reset한 뒤 다시
+적재한다는 사실을 명시한다. 다른 사무소 데이터는 reset 대상이 아니지만, 공유 dev에서 실행 중인
+F3 작업이 없을 때만 실행한다.
 
 `002`의 마지막 출력에 `AUTH_DEVELOPMENT_BROKERAGE_ID`와 케이스별 `anchor_id`가 나온다.
 자동 증가 ID는 로컬마다 다르므로 이 문서의 숫자를 그대로 복사하지 않는다.
 
-`backend/.env`에 출력된 값을 넣고 API 서버를 재시작한다.
+로컬에서는 `backend/.env`에 출력된 값을 넣고 API 서버를 재시작한다.
 
 ```dotenv
 AUTH_DEVELOPMENT_ENABLED=true
-AUTH_DEVELOPMENT_BROKERAGE_ID=<002 출력값>
+AUTH_DEVELOPMENT_BROKERAGE_ID=<brokerage_id 출력값>
 AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 ```
 
@@ -73,6 +83,11 @@ AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 `http://127.0.0.1:8000/docs`에서 개발 세션 발급 → F3 실행 접수 → 상태·결과 조회 순서로
 확인한다. 인증·CSRF와 F3 경로의 정본은 [API 계약](../../../.agents/skills/project-wiki/references/contracts/api.md)이다.
 이 seed는 별도의 `create-development-user`, `seed-sample-ledger`와 AI 모델 설정 등록을 대신한다.
+
+공유 dev에서는 `002`가 출력한 `brokerage_id`와 `f3_synthetic_dev`를 ignored
+`infra/environments/dev/dev.tfvars`의 `development_auth`에 반영하고, 검토한 Terraform plan을
+적용한 다음 애플리케이션을 다시 배포한다. seed 명령은 Terraform 설정이나 실행 중인 프로세스를
+자동으로 변경하지 않는다.
 
 ## 실행 결과는 seed하지 않는다
 
@@ -86,15 +101,33 @@ Worker가 직접 만들어야 파이프라인 전체가 검증된다. 결과를 
 
 ## 케이스 구성
 
-양쪽 앵커를 모두 확인할 수 있게 매물 기준 3건과 구입장 기준 2건을 둔다.
+작은 회귀 케이스 A~E에 대량 케이스 F~I를 더한다. 전체 데이터는 단지 5개, 세대 36개,
+인물 87명, 매물 36건, 구입장 48건, 상담 로그 169건이다. 이 중 대량 확장분은 매물 30건과
+구입장 40건이며, 별도 합성 단지에 격리해 기존 A~E의 후보 수를 바꾸지 않는다.
 
 | 케이스 | 앵커 | `seed_key` | 기대 후보 수 | 무엇을 확인하나 |
 |---|---|---|---:|---|
 | A | 매물 (매매 28.8억) | `L1` | 3 | 강한·약한·기각 후보가 한 실행에 함께 나온다 |
 | B | 구입장 (매수 29억) | `R1` | 2 | 반대 방향 앵커도 같은 파이프라인을 탄다 |
-| C | 매물 (월세) | `L5` | 0 | 호환되는 구분의 구입장이 아예 없다 |
+| C | 매물 (월세) | `L5` | 0 | 해당 단지를 희망하는 월세 구입장이 없다 |
 | D | 구입장 (매도) | `R8` | 0 | 대응하는 매물 거래 유형이 없는 구분이다 |
 | E | 매물 (전세 21.5억) | `L4` | 1 | SQL은 통과하지만 시점이 결정적으로 어긋난다 |
+| F | 매물 (대량 매매) | `BL01` | 19 | 전체 후보 19건 중 상위 5건만 카드화한다 |
+| G | 구입장 (대량 매수) | `BR01` | 12 | 반대 방향에서도 다수 매물을 안정적으로 찾는다 |
+| H | 매물 (대량 전세) | `BL13` | 12 | 전세 보증금 가격 축으로 후보를 찾는다 |
+| I | 매물 (대량 월세) | `BL23` | 10 | 월세 보증금·월 차임 가격 축을 보존한다 |
+
+### 대량 케이스 분포
+
+| 단지 `seed_key` | 거래 유형 | 매물 | 구입장 | 장부 키 범위 |
+|---|---|---:|---:|---|
+| `C3` | 매매·매수 | 12 | 18 | `BL01`~`BL12`, `BR01`~`BR18` |
+| `C4` | 전세 | 10 | 12 | `BL13`~`BL22`, `BR19`~`BR30` |
+| `C5` | 월세 | 8 | 10 | `BL23`~`BL30`, `BR31`~`BR40` |
+
+대량 행은 `custom_fields.dataset = "BULK"` 또는 단지의 `extra_info.dataset = "BULK"`로도
+구분할 수 있다. 각 매물·구입장에는 합성 상담 로그가 2건씩 있으며, 번호에 따라 가격 유연성,
+입주 시점과 연락 가능성 표현이 달라진다.
 
 ### 케이스 A의 후보 3건
 
@@ -154,6 +187,7 @@ ORDER BY seed_key;
 
 - `status`가 `COMPLETED`인가
 - `candidate_selection.total_count`가 위 표의 기대 후보 수와 같은가
+- 케이스 F에서 `candidate_selection.total_count=19`이고 `selected_for_cards=true`가 5건인가
 - `anchor_card.evidence`에 저장된 상담 로그를 가리키는 근거가 있는가
 - `candidates[].match_grade`가 `STRONG`·`WEAK`·`REJECTED` 중 하나인가
 - `REJECTED` 후보에 `rejection_reason`이 있는가

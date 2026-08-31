@@ -1,10 +1,10 @@
 -- PostgreSQL 15+
--- F3 파이프라인 검증용 합성 장부. migration 이 아니며 운영에 적용하지 않는다.
+-- F3 파이프라인 검증용 합성 장부. migration 이 아니며 prod 에 적용하지 않는다.
 --
 -- ## 이 파일이 만드는 것
 --
 -- 합성 사무소 1곳, 개발 사용자 1명, AI 모델 설정 2건(POSITION_CARD·BROKERAGE_JUDGMENT),
--- 단지 2개, 세대 6개, 인물 17명, 매물 6건, 구입장 8건, 상담 로그 29건.
+-- 단지 5개, 세대 36개, 인물 87명, 매물 36건, 구입장 48건, 상담 로그 169건.
 --
 -- ## 이 파일이 만들지 않는 것
 --
@@ -39,9 +39,13 @@
 -- |---|---|---|---:|---|
 -- | A | LISTING | L1 (매매 28.8억) | 3 | 강한·약한·기각 후보가 한 실행에 함께 나온다 |
 -- | B | REQUIREMENT | R1 (매수 29억) | 2 | 반대 방향 앵커도 같은 파이프라인을 탄다 |
--- | C | LISTING | L5 (월세) | 0 | 호환되는 구분의 구입장이 없다 |
+-- | C | LISTING | L5 (월세) | 0 | 해당 단지를 희망하는 월세 구입장이 없다 |
 -- | D | REQUIREMENT | R8 (매도) | 0 | 대응하는 매물 거래 유형이 없는 구분이다 |
 -- | E | LISTING | L4 (전세 21.5억) | 1 | SQL 은 통과하지만 시점이 결정적으로 어긋난다 |
+-- | F | LISTING | BL01 (대량 매매) | 19 | 전체 후보와 카드화 상위 5건을 나눠 저장한다 |
+-- | G | REQUIREMENT | BR01 (대량 매수) | 12 | 대량 장부에서도 반대 방향 후보를 찾는다 |
+-- | H | LISTING | BL13 (대량 전세) | 12 | 전세 가격 축으로 다수 후보를 찾는다 |
+-- | I | LISTING | BL23 (대량 월세) | 10 | 월세 보증금·월 차임 축을 보존한다 |
 --
 -- 기대 후보 수는 결정적 SQL 추출의 결과이므로 고정값으로 검증한다. 등급과 문장은 모델이
 -- 정하므로 고정하지 않는다. 003_F3_SYNTHETIC_VERIFY.sql 을 참고한다.
@@ -329,7 +333,7 @@ CROSS JOIN (
          '21,5', '즉시', '케이스 E 앵커. 전세 21.5억, 즉시 입주만 받는다.'),
         ('L5', 'U5', 'P_OWNER6', 3,  'RECEIVED',
          FALSE, NULL, FALSE, NULL, TRUE, 50000000, 3800000,
-         '5000/380', '만기후', '케이스 C 앵커. 호환되는 월세 구입장이 없다.'),
+         '5000/380', '만기후', '케이스 C 앵커. 해당 단지를 희망하는 월세 구입장이 없다.'),
         ('L6', 'U1', 'P_OWNER1', 400, 'CLOSED',
          TRUE,  2700000000, FALSE, NULL, FALSE, NULL, NULL,
          '27억', '협의', '종료된 과거 매물. 활성 상태 조건 확인용이며 후보로 올라오면 안 된다.')
@@ -471,6 +475,238 @@ JOIN property_complex c
   ON c.brokerage_id = t.brokerage_id AND c.extra_info->>'seed_key' = s.complex_key;
 
 
+-- ── 대량 장부 확장 ────────────────────────────────────────────────────────────
+--
+-- 기존 A~E는 작은 회귀 케이스로 유지한다. 아래 F~I는 별도 합성 단지에 매물 30건과
+-- 구입장 40건을 더해 목록 밀도, 양방향 후보 검색과 상위 5건 카드화 제한을 검증한다.
+-- generate_series의 번호와 seed_key는 고정이므로 reset 후 다시 넣어도 같은 분포가 된다.
+
+INSERT INTO property_complex (brokerage_id, property_type, name, road_address, memo, extra_info)
+SELECT
+    t.brokerage_id, s.property_type, s.name, s.road_address, s.memo,
+    jsonb_build_object('seed_key', s.seed_key, 'dataset', 'BULK')
+FROM (
+    SELECT id AS brokerage_id FROM brokerage WHERE name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN (
+    VALUES
+        ('C3', 'APARTMENT', 'F3_SYNTHETIC 다온마을', '가상특별시 합성구 예시로 300', '대량 매매 케이스 전용 합성 단지.'),
+        ('C4', 'APARTMENT', 'F3_SYNTHETIC 라온마을', '가상특별시 합성구 예시로 400', '대량 전세 케이스 전용 합성 단지.'),
+        ('C5', 'OFFICETEL', 'F3_SYNTHETIC 마루오피스텔', '가상특별시 합성구 예시로 500', '대량 월세 케이스 전용 합성 단지.')
+) AS s(seed_key, property_type, name, road_address, memo);
+
+INSERT INTO property_unit (
+    brokerage_id, complex_id, building_number, unit_number, floor_number, orientation, unit_type,
+    pyeong, exclusive_area_sqm, supply_area_sqm, tenancy_status,
+    current_deposit_amount, current_monthly_rent_amount, tenancy_expiry_date, tenancy_raw_text,
+    is_expanded, built_in_features, facility_condition,
+    assigned_user_id, memo, custom_fields, lifecycle_status
+)
+SELECT
+    t.brokerage_id,
+    c.id,
+    CASE WHEN g.n <= 22 THEN (200 + ((g.n - 1) / 10) + 1)::text ELSE NULL END,
+    lpad((100 + g.n)::text, 4, '0'),
+    ((g.n - 1) % 20 + 1)::text,
+    (ARRAY['남', '남동', '남서', '동'])[((g.n - 1) % 4) + 1],
+    CASE WHEN g.n <= 12 THEN 'J1' WHEN g.n <= 22 THEN 'J2' ELSE NULL END,
+    CASE WHEN g.n <= 12 THEN 33.00::numeric WHEN g.n <= 22 THEN 25.00 ELSE 18.00 END,
+    CASE WHEN g.n <= 12 THEN 109.00::numeric WHEN g.n <= 22 THEN 84.00 ELSE 59.00 END,
+    CASE WHEN g.n <= 12 THEN 140.00::numeric WHEN g.n <= 22 THEN 109.00 ELSE 78.00 END,
+    CASE WHEN g.n <= 12 THEN '자가' WHEN g.n <= 22 THEN '입주' ELSE '월환' END,
+    CASE WHEN g.n > 22 THEN 50000000::bigint + (g.n - 23) * 5000000 ELSE NULL END,
+    CASE WHEN g.n > 22 THEN 1500000::bigint + (g.n - 23) * 100000 ELSE NULL END,
+    CASE WHEN g.n > 12 THEN CURRENT_DATE + 90 + (g.n % 6) * 30 ELSE NULL END,
+    CASE WHEN g.n > 22 THEN '합성 월세 계약 만기 후 입주' WHEN g.n > 12 THEN '합성 전세 입주 협의' ELSE NULL END,
+    (g.n % 2 = 0),
+    CASE WHEN g.n > 22 THEN '합성 풀옵션' ELSE '합성 붙박이장' END,
+    (ARRAY['양호', '부분 수리', '입주 청소 예정'])[((g.n - 1) % 3) + 1],
+    t.user_id,
+    format('대량 합성 장부 세대 %s. 실제 주소나 인물을 나타내지 않는다.', lpad(g.n::text, 2, '0')),
+    jsonb_build_object('seed_key', 'BU' || lpad(g.n::text, 2, '0'), 'dataset', 'BULK'),
+    'NORMAL'
+FROM (
+    SELECT b.id AS brokerage_id, u.id AS user_id
+    FROM brokerage b
+    JOIN app_user u ON u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
+    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 30) AS g(n)
+JOIN property_complex c
+  ON c.brokerage_id = t.brokerage_id
+ AND c.extra_info->>'seed_key' = CASE WHEN g.n <= 12 THEN 'C3' WHEN g.n <= 22 THEN 'C4' ELSE 'C5' END;
+
+INSERT INTO party (
+    brokerage_id, party_type, name, alternate_name, memo, privacy_consent_at, privacy_consent_by
+)
+SELECT
+    t.brokerage_id,
+    'PERSON',
+    'F3_SYNTHETIC ' || s.display_role || ' ' || lpad(s.n::text, 2, '0'),
+    '대량 합성 장부 ' || s.display_role,
+    'seed_key=' || s.seed_prefix || lpad(s.n::text, 2, '0'),
+    CASE WHEN s.has_consent THEN now() ELSE NULL END,
+    CASE WHEN s.has_consent THEN t.user_id ELSE NULL END
+FROM (
+    SELECT b.id AS brokerage_id, u.id AS user_id
+    FROM brokerage b
+    JOIN app_user u ON u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
+    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN (
+    SELECT n, '대량매도인'::text AS display_role, 'BP_L'::text AS seed_prefix, FALSE AS has_consent
+    FROM generate_series(1, 30) AS g(n)
+    UNION ALL
+    SELECT n, '대량수요자', 'BP_R', TRUE
+    FROM generate_series(1, 40) AS g(n)
+) s;
+
+INSERT INTO party_contact (
+    brokerage_id, party_id, contact_method, contact_value, normalized_contact_value,
+    contact_label, is_primary, contactability_status
+)
+SELECT
+    p.brokerage_id,
+    p.id,
+    'PHONE',
+    '010-0000-' || lpad((1000 + row_number() OVER (ORDER BY p.id))::text, 4, '0'),
+    '01000000' || lpad((1000 + row_number() OVER (ORDER BY p.id))::text, 4, '0'),
+    '합성 대표',
+    TRUE,
+    'UNKNOWN'
+FROM party p
+JOIN brokerage b ON b.id = p.brokerage_id
+WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+  AND p.memo ~ '^seed_key=BP_[LR][0-9]{2}$';
+
+INSERT INTO property_unit_party_relation (
+    brokerage_id, unit_id, party_id, role, role_index, is_primary, is_co_owner, valid_from, memo
+)
+SELECT
+    t.brokerage_id, u.id, p.id, 'LANDLORD', 1::smallint, TRUE, FALSE,
+    CURRENT_DATE - 365, '대량 합성 장부 소유 관계'
+FROM (
+    SELECT id AS brokerage_id FROM brokerage WHERE name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 30) AS g(n)
+JOIN property_unit u
+  ON u.brokerage_id = t.brokerage_id
+ AND u.custom_fields->>'seed_key' = 'BU' || lpad(g.n::text, 2, '0')
+JOIN party p
+  ON p.brokerage_id = t.brokerage_id
+ AND p.memo = 'seed_key=BP_L' || lpad(g.n::text, 2, '0');
+
+INSERT INTO property_listing (
+    brokerage_id, unit_id, client_party_id, received_at, status,
+    is_sale_available, sale_price,
+    is_jeonse_available, jeonse_deposit_amount,
+    is_monthly_rent_available, monthly_rent_deposit_amount, monthly_rent_amount,
+    price_raw_text, handover_condition, assigned_user_id, memo, custom_fields
+)
+SELECT
+    t.brokerage_id,
+    u.id,
+    p.id,
+    CURRENT_DATE - (1 + g.n % 28),
+    'RECEIVED',
+    (g.n <= 12),
+    CASE WHEN g.n <= 12 THEN 2050000000::bigint + (g.n - 1) * 50000000 ELSE NULL END,
+    (g.n BETWEEN 13 AND 22),
+    CASE WHEN g.n BETWEEN 13 AND 22 THEN 800000000::bigint + (g.n - 13) * 40000000 ELSE NULL END,
+    (g.n >= 23),
+    CASE WHEN g.n >= 23 THEN 50000000::bigint + (g.n - 23) * 5000000 ELSE NULL END,
+    CASE WHEN g.n >= 23 THEN 1500000::bigint + (g.n - 23) * 100000 ELSE NULL END,
+    CASE
+        WHEN g.n <= 12 THEN format('합성 매매 %s억원', 20.5 + (g.n - 1) * 0.5)
+        WHEN g.n <= 22 THEN format('합성 전세 %s억원', 8.0 + (g.n - 13) * 0.4)
+        ELSE format('합성 월세 보증 %s만원 / %s만원', 5000 + (g.n - 23) * 500, 150 + (g.n - 23) * 10)
+    END,
+    (ARRAY['즉시', '한 달 내', '잔금일 협의'])[((g.n - 1) % 3) + 1],
+    t.user_id,
+    format('대량 합성 매물 BL%s. 가격·시점 조건의 분포를 만든다.', lpad(g.n::text, 2, '0')),
+    jsonb_build_object('seed_key', 'BL' || lpad(g.n::text, 2, '0'), 'dataset', 'BULK')
+FROM (
+    SELECT b.id AS brokerage_id, u2.id AS user_id
+    FROM brokerage b
+    JOIN app_user u2 ON u2.brokerage_id = b.id AND u2.login_id = 'f3_synthetic_dev'
+    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 30) AS g(n)
+JOIN property_unit u
+  ON u.brokerage_id = t.brokerage_id
+ AND u.custom_fields->>'seed_key' = 'BU' || lpad(g.n::text, 2, '0')
+JOIN party p
+  ON p.brokerage_id = t.brokerage_id
+ AND p.memo = 'seed_key=BP_L' || lpad(g.n::text, 2, '0');
+
+INSERT INTO property_requirement (
+    brokerage_id, party_id, received_at, demand_type,
+    desired_pyeongs, min_area_sqm, max_area_sqm, area_requirement_raw_text,
+    min_budget_amount, max_budget_amount, budget_raw_text,
+    desired_move_in_date, move_in_date_raw_text, request_expiry_date,
+    current_tenancy_expiry_date, co_broker_party_id,
+    classification, workflow_stage, status, assigned_user_id, memo, custom_fields
+)
+SELECT
+    t.brokerage_id,
+    p.id,
+    CURRENT_DATE - (1 + g.n % 35),
+    CASE WHEN g.n <= 18 THEN '매수' WHEN g.n <= 30 THEN '전세' ELSE '월세' END,
+    CASE WHEN g.n <= 18 THEN ARRAY[33.00::numeric] WHEN g.n <= 30 THEN ARRAY[25.00::numeric] ELSE ARRAY[18.00::numeric] END,
+    CASE WHEN g.n <= 18 THEN 100.00::numeric WHEN g.n <= 30 THEN 80.00 ELSE 55.00 END,
+    CASE WHEN g.n <= 18 THEN 120.00::numeric WHEN g.n <= 30 THEN 95.00 ELSE 70.00 END,
+    CASE WHEN g.n <= 18 THEN '합성 33평대' WHEN g.n <= 30 THEN '합성 25평대' ELSE '합성 18평대' END,
+    CASE
+        WHEN g.n <= 18 THEN 2300000000::bigint
+        WHEN g.n <= 30 THEN 800000000::bigint
+        ELSE 50000000::bigint
+    END,
+    CASE
+        WHEN g.n <= 18 THEN 2700000000::bigint + ((g.n - 1) % 6) * 100000000
+        WHEN g.n <= 30 THEN 1200000000::bigint + ((g.n - 19) % 4) * 100000000
+        ELSE 80000000::bigint + ((g.n - 31) % 5) * 10000000
+    END,
+    CASE
+        WHEN g.n <= 18 THEN '합성 매수 예산 27억 이상'
+        WHEN g.n <= 30 THEN '합성 전세 예산 12억 이상'
+        ELSE '합성 월세 보증금 8천만원 이상'
+    END,
+    CURRENT_DATE + 30 + (g.n % 8) * 30,
+    format('합성 희망 입주 %s일 이후', 30 + (g.n % 8) * 30),
+    CURRENT_DATE + 365 + (g.n % 6) * 30,
+    CASE WHEN g.n % 3 = 0 THEN CURRENT_DATE + 60 + (g.n % 5) * 30 ELSE NULL END,
+    NULL,
+    '일반',
+    (ARRAY['신규', '상담중', '방문예정'])[((g.n - 1) % 3) + 1],
+    'ACTIVE',
+    t.user_id,
+    format('대량 합성 구입장 BR%s. 예산·시점·연락 상태의 분포를 만든다.', lpad(g.n::text, 2, '0')),
+    jsonb_build_object('seed_key', 'BR' || lpad(g.n::text, 2, '0'), 'dataset', 'BULK')
+FROM (
+    SELECT b.id AS brokerage_id, u.id AS user_id
+    FROM brokerage b
+    JOIN app_user u ON u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
+    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 40) AS g(n)
+JOIN party p
+  ON p.brokerage_id = t.brokerage_id
+ AND p.memo = 'seed_key=BP_R' || lpad(g.n::text, 2, '0');
+
+INSERT INTO property_requirement_complex (brokerage_id, requirement_id, complex_id, preference_order)
+SELECT t.brokerage_id, r.id, c.id, 1::smallint
+FROM (
+    SELECT id AS brokerage_id FROM brokerage WHERE name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 40) AS g(n)
+JOIN property_requirement r
+  ON r.brokerage_id = t.brokerage_id
+ AND r.custom_fields->>'seed_key' = 'BR' || lpad(g.n::text, 2, '0')
+JOIN property_complex c
+  ON c.brokerage_id = t.brokerage_id
+ AND c.extra_info->>'seed_key' = CASE WHEN g.n <= 18 THEN 'C3' WHEN g.n <= 30 THEN 'C4' ELSE 'C5' END;
+
+
 -- ── 매물 측 상담 로그 ─────────────────────────────────────────────────────────
 --
 -- 매물 대리 카드는 이 로그만 읽는다. 가격 조정 여지, 명도·입주 시점, 결정권 제약처럼
@@ -609,6 +845,104 @@ JOIN party p
   ON p.brokerage_id = t.brokerage_id AND p.id = r.party_id;
 
 
+-- ── 대량 장부 상담 로그 ───────────────────────────────────────────────────────
+--
+-- 대량 매물·구입장도 각각 2건의 합성 상담 근거를 가진다. 번호의 나머지에 따라 가격
+-- 유연성·시점·연락 가능성을 달리해 같은 문장만 반복되는 데이터가 되지 않게 한다.
+
+INSERT INTO client_interaction (
+    brokerage_id, interaction_at, interaction_channel, communication_direction,
+    interaction_result, counterparty_role, counterparty_index, interaction_content,
+    party_id, unit_id, listing_id, source_type, approval_status, created_by
+)
+SELECT
+    t.brokerage_id,
+    now() - ((g.n * 2 + e.event_index) || ' days')::interval,
+    CASE WHEN e.event_index = 1 THEN 'CALL' ELSE 'MESSAGE' END,
+    CASE WHEN e.event_index = 1 THEN 'OUTBOUND' ELSE 'INBOUND' END,
+    CASE WHEN e.event_index = 2 AND g.n % 7 = 0 THEN 'NO_ANSWER' ELSE 'CONNECTED' END,
+    'LANDLORD',
+    1::smallint,
+    CASE
+        WHEN e.event_index = 1 AND g.n <= 12 THEN
+            format('F3_SYNTHETIC 다온마을 33평 매매 상담. 표기 가격은 %s번 합성 구간이며 매도 의사가 있다.', g.n)
+        WHEN e.event_index = 1 AND g.n <= 22 THEN
+            format('F3_SYNTHETIC 라온마을 25평 전세 상담. 보증금 조건은 %s번 합성 구간이다.', g.n - 12)
+        WHEN e.event_index = 1 THEN
+            format('F3_SYNTHETIC 마루오피스텔 월세 상담. 보증금과 월 차임은 %s번 합성 구간이다.', g.n - 22)
+        WHEN g.n % 7 = 0 THEN '합성 연락 점검에서 부재중이었다. 기존 의뢰는 철회하지 않았다.'
+        WHEN g.n % 3 = 0 THEN '합성 상담에서 가격보다 빠른 계약과 입주 시점을 우선한다고 확인했다.'
+        WHEN g.n % 3 = 1 THEN '합성 상담에서 조건이 맞으면 표기 금액을 일부 협의할 수 있다고 확인했다.'
+        ELSE '합성 상담에서 표기 금액은 유지하되 잔금일과 입주일은 조정할 수 있다고 확인했다.'
+    END,
+    p.id,
+    l.unit_id,
+    l.id,
+    'HUMAN',
+    'NOT_REQUIRED',
+    t.user_id
+FROM (
+    SELECT b.id AS brokerage_id, u.id AS user_id
+    FROM brokerage b
+    JOIN app_user u ON u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
+    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 30) AS g(n)
+CROSS JOIN (VALUES (1), (2)) AS e(event_index)
+JOIN property_listing l
+  ON l.brokerage_id = t.brokerage_id
+ AND l.custom_fields->>'seed_key' = 'BL' || lpad(g.n::text, 2, '0')
+JOIN party p
+  ON p.brokerage_id = t.brokerage_id
+ AND p.memo = 'seed_key=BP_L' || lpad(g.n::text, 2, '0');
+
+INSERT INTO client_interaction (
+    brokerage_id, interaction_at, interaction_channel, communication_direction,
+    interaction_result, counterparty_role, counterparty_index, interaction_content,
+    party_id, requirement_id, source_type, approval_status, created_by
+)
+SELECT
+    t.brokerage_id,
+    now() - ((g.n * 2 + e.event_index) || ' days')::interval,
+    CASE WHEN e.event_index = 1 THEN 'CALL' ELSE 'MESSAGE' END,
+    CASE WHEN e.event_index = 1 THEN 'INBOUND' ELSE 'OUTBOUND' END,
+    CASE WHEN e.event_index = 2 AND g.n % 9 = 0 THEN 'NO_ANSWER' ELSE 'CONNECTED' END,
+    'BUYER',
+    1::smallint,
+    CASE
+        WHEN e.event_index = 1 AND g.n <= 18 THEN
+            format('F3_SYNTHETIC 다온마을 33평 매수 희망. BR%s 합성 예산 범위에서 찾는다.', lpad(g.n::text, 2, '0'))
+        WHEN e.event_index = 1 AND g.n <= 30 THEN
+            format('F3_SYNTHETIC 라온마을 25평 전세 희망. BR%s 합성 보증금 범위에서 찾는다.', lpad(g.n::text, 2, '0'))
+        WHEN e.event_index = 1 THEN
+            format('F3_SYNTHETIC 마루오피스텔 월세 희망. BR%s 합성 보증금 범위에서 찾는다.', lpad(g.n::text, 2, '0'))
+        WHEN g.n % 9 = 0 THEN '합성 연락 점검에서 부재중이었다. 구입장 의뢰는 계속 유지한다.'
+        WHEN g.n % 4 = 0 THEN '합성 상담에서 예산 상한은 고정이고 입주일은 조정할 수 없다고 확인했다.'
+        WHEN g.n % 4 = 1 THEN '합성 상담에서 조건이 좋으면 예산을 소폭 높이고 잔금일도 맞출 수 있다고 확인했다.'
+        WHEN g.n % 4 = 2 THEN '합성 상담에서 가격보다 빠른 입주와 연락 가능한 매물을 우선한다고 확인했다.'
+        ELSE '합성 상담에서 평형과 단지는 고정이지만 세부 층과 방향은 협의할 수 있다고 확인했다.'
+    END,
+    p.id,
+    r.id,
+    'HUMAN',
+    'NOT_REQUIRED',
+    t.user_id
+FROM (
+    SELECT b.id AS brokerage_id, u.id AS user_id
+    FROM brokerage b
+    JOIN app_user u ON u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
+    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+) t
+CROSS JOIN generate_series(1, 40) AS g(n)
+CROSS JOIN (VALUES (1), (2)) AS e(event_index)
+JOIN property_requirement r
+  ON r.brokerage_id = t.brokerage_id
+ AND r.custom_fields->>'seed_key' = 'BR' || lpad(g.n::text, 2, '0')
+JOIN party p
+  ON p.brokerage_id = t.brokerage_id
+ AND p.memo = 'seed_key=BP_R' || lpad(g.n::text, 2, '0');
+
+
 -- ── 최종 접촉 시각 ───────────────────────────────────────────────────────────
 --
 -- 카드 입력의 days_since_last_contact 가 이 값에서 나온다. 비워 두면 접촉 신호가
@@ -673,6 +1007,22 @@ UNION ALL
 SELECT 'E', 'LISTING', l.id, '전세 21.5억 · 기대 후보 1건, 시점 불일치'
 FROM property_listing l JOIN brokerage b ON b.id = l.brokerage_id
 WHERE b.name = 'F3_SYNTHETIC 합성중개사무소' AND l.custom_fields->>'seed_key' = 'L4'
+UNION ALL
+SELECT 'F', 'LISTING', l.id, '대량 매매 · 전체 후보 19건, 카드화 5건'
+FROM property_listing l JOIN brokerage b ON b.id = l.brokerage_id
+WHERE b.name = 'F3_SYNTHETIC 합성중개사무소' AND l.custom_fields->>'seed_key' = 'BL01'
+UNION ALL
+SELECT 'G', 'REQUIREMENT', r.id, '대량 매수 · 기대 후보 12건'
+FROM property_requirement r JOIN brokerage b ON b.id = r.brokerage_id
+WHERE b.name = 'F3_SYNTHETIC 합성중개사무소' AND r.custom_fields->>'seed_key' = 'BR01'
+UNION ALL
+SELECT 'H', 'LISTING', l.id, '대량 전세 · 기대 후보 12건'
+FROM property_listing l JOIN brokerage b ON b.id = l.brokerage_id
+WHERE b.name = 'F3_SYNTHETIC 합성중개사무소' AND l.custom_fields->>'seed_key' = 'BL13'
+UNION ALL
+SELECT 'I', 'LISTING', l.id, '대량 월세 · 기대 후보 10건'
+FROM property_listing l JOIN brokerage b ON b.id = l.brokerage_id
+WHERE b.name = 'F3_SYNTHETIC 합성중개사무소' AND l.custom_fields->>'seed_key' = 'BL23'
 ORDER BY 1;
 
 COMMIT;

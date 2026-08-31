@@ -43,9 +43,9 @@ locals {
       HTTP_CORS_ALLOWED_ORIGINS    = "[]"
       LOG_FORMAT                   = "json"
       LOG_LEVEL                    = "INFO"
-      WORKER_ENABLED               = "false"
+      WORKER_ENABLED               = "true"
       WORKER_READY_FILE            = "/tmp/brokerage-worker-ready"
-      F3_ALLOW_SYNTHETIC_PROTOTYPE = "false"
+      F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
     }, local.development_auth_identity_environment)
     ai = {
       AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"

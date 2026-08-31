@@ -184,3 +184,38 @@ export function isPropertyRow(row: LedgerRow | null | undefined): row is Propert
 export function isUnsavedDraft(row: LedgerRow | null | undefined): boolean {
   return row != null && row.serverId == null;
 }
+
+/**
+ * 다음 저장에 필요한 서버 신원만 골라내는 열.
+ *
+ * 세대와 매물 건은 각각 `row_version`을 갖고(위 계약 주석), 손님 행은 인물 id를 갖는다.
+ * 저장이 끝나면 이 값들이 모두 새 값으로 바뀐다.
+ */
+const SAVED_IDENTITY_KEYS = [
+  "serverId",
+  "rowVersion",
+  "listingId",
+  "listingRowVersion",
+  "partyId",
+  "customFields",
+] as const;
+
+/**
+ * 저장 응답의 서버 신원을 작성값에 얹는다.
+ *
+ * 상세 화면은 열릴 때 복사한 작성값을 들고 있어, 저장이 끝나도 서버가 올린 `row_version`을
+ * 모른다. 그대로 두면 같은 상세에서 두 번째로 저장할 때 낡은 `row_version`을 보내
+ * 혼자 쓰고 있어도 "다른 사용자가 먼저 저장했습니다"(409)를 받는다.
+ *
+ * 사용자가 적은 값은 건드리지 않는다. 저장 중에 이어서 입력한 내용을 응답으로 덮으면
+ * 방금 친 글자가 사라진다.
+ */
+export function carrySavedIdentity<T extends object>(draft: T, persisted: unknown): T {
+  if (persisted == null || typeof persisted !== "object") return draft;
+  const source = persisted as Record<string, unknown>;
+  const carried: Record<string, unknown> = {};
+  for (const key of SAVED_IDENTITY_KEYS) {
+    if (key in source) carried[key] = source[key];
+  }
+  return { ...draft, ...carried };
+}

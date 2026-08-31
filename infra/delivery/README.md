@@ -208,7 +208,7 @@ Pipeline과 CodeDeploy에서는 다음 순서로 확인한다.
 1. CodePipeline의 Source revision이 요청한 40자리 SHA인지 확인한다.
 2. Backend Build artifact의 image가 `repository@sha256:...` 형식인지 확인한다.
 3. `backend-image.env`에 image digest와 비민감 parameter prefix·secret ARN·port·health/log 메타데이터만 있는지 확인한다.
-4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 AI provider key는 Worker 파일에만 있어야 한다.
+4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 비민감 AI endpoint·timeout은 API·Worker 파일에, AI provider key는 Worker 파일에만 있어야 한다.
 5. `ApplicationStart`, `ValidateService`가 성공하고 deployment 상태가 `Succeeded`인지 확인한다.
 6. Target Group의 유일한 target이 `healthy`인지 확인한다.
 7. CloudFront `https://<distribution-domain><APP_READINESS_PATH>`가 200을 반환하는지 확인한다.

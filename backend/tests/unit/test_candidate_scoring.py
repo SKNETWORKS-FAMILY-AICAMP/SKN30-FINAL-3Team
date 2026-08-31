@@ -37,7 +37,7 @@ def test_price_proximity_never_goes_negative() -> None:
 
 
 def test_an_unknown_candidate_amount_scores_zero_rather_than_a_neutral_value() -> None:
-    """금액을 모르는 후보가 금액을 아는 후보 사이에 끼어들면 카드화 15장이 낭비된다."""
+    """금액을 모르는 후보가 금액을 아는 후보 사이에 끼어들면 카드화 5장이 낭비된다."""
     assert _price_proximity(1_000_000_000, None) == Decimal(0)
 
 
@@ -108,6 +108,7 @@ def _selection(count: int) -> CandidateSelection:
 
 def test_the_card_limit_does_not_discard_the_rest() -> None:
     selection = _selection(40)
+    assert CANDIDATE_CARD_LIMIT == 5
     assert selection.total_count == 40
     assert len(selection.carded) == CANDIDATE_CARD_LIMIT
     assert selection.remaining_count == 40 - CANDIDATE_CARD_LIMIT

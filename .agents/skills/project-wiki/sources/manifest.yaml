@@ -23,6 +23,25 @@ sources:
       레일의 [교차 판정]은 섹션 여닫기, 섹션의 [교차 판정 실행]은 판정 요청으로 역할을 분리.
       저장이 패널을 열지 않게 되면서 F3-CR-05의 기각 노출 부모에서 저장 트리거를 제거.
       F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 유지
+  - id: "f3-judgment-candidate-limit-2026-08-31"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-31)"
+    received: "2026-08-31"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-08-31"
+    reflected_in:
+      - "docs/requirements/f3/delegates-and-brokerage.md"
+      - "docs/requirements/common/revision-history.md"
+      - "docs/requirements/changelog.md"
+      - "docs/requirements/traceability.yaml"
+      - ".agents/skills/project-wiki/references/contracts/f3-ai.md"
+      - ".agents/skills/project-wiki/references/contracts/api.md"
+      - "docs/architecture/f3/overview.md"
+      - "docs/architecture/f3/online-runtime.md"
+      - "docs/architecture/f3/offline-data-evaluation.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: "프로젝트 요청자가 F3-BR-12·13의 기존 상위 15건 규칙을 최초 후보 카드화·AI 판정 상위 5건으로 대체하도록 승인하고, 전체 SQL 후보·결정적 순위·남은 건수·페이징은 유지"
 
   - id: "f3-cross-judgment-manual-trigger-2026-08-27"
     type: "user-provided-direction"

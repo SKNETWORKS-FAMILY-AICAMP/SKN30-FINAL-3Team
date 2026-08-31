@@ -12,8 +12,10 @@
  * 예를 들어 인증은 계정 존재 여부를 드러내지 않으려고 사유를 뭉뚱그린다.
  */
 
-import { ApiError } from "../../../shared/api/index.ts";
-import type { ApiErrorKind } from "../../../shared/api/index.ts";
+// 오류 분류만 필요하므로 배럴이 아니라 순수 진입점을 쓴다(ADR-004). 배럴은 `import.meta.env`를
+// 읽는 설정 모듈에 닿아 있고, 이 파일은 순수해야 Node 테스트에 넣을 수 있다.
+import { ApiError } from "../../../shared/api/errors.ts";
+import type { ApiErrorKind } from "../../../shared/api/errors.ts";
 
 /**
  * row_version 없이 삭제를 시도한 경우. 두 장부가 같은 안내를 쓴다.

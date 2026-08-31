@@ -147,9 +147,11 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
     const next = { ...draft, saveState: completionReady ? "저장 완료" : "임시저장", ledgerType: "buyer", rowKind: "buyer" };
     setIsSaving(true);
     try {
-      await onSave?.(next);
-      setDraft(next);
-      baselineRef.current = next;
+      const persisted = await onSave?.(next);
+      // 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다.
+      const saved = carrySavedIdentity(next, persisted);
+      setDraft(saved);
+      baselineRef.current = saved;
       setError(null);
       setCloseDecision(false);
       if (closeAfter) onClose?.();

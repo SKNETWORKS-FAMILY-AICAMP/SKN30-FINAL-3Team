@@ -48,6 +48,11 @@ SESSION_ACCOUNT_ROLES = ("OWNER", "STAFF", "READ_ONLY")
 MANAGED_ROLE_COMMENT = "Managed by infra manage_db_access from team-db-tunnel"
 RDS_CA_URL = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
 REPO_ROOT = Path(__file__).resolve().parents[2]
+F3_SEED_DIRECTORY = REPO_ROOT / "docs" / "db" / "seed"
+F3_SEED_RESET = F3_SEED_DIRECTORY / "001_F3_SYNTHETIC_RESET.sql"
+F3_SEED_DATA = F3_SEED_DIRECTORY / "002_F3_SYNTHETIC_SEED.sql"
+F3_SEED_VERIFY = F3_SEED_DIRECTORY / "003_F3_SYNTHETIC_VERIFY.sql"
+F3_SEED_VERIFY_CHECK_COUNT = 29
 
 
 class ToolError(RuntimeError):
@@ -879,6 +884,122 @@ def migration_url(
     )
 
 
+def psql_environment(
+    target: DatabaseTarget,
+    local_port: int,
+    ca_bundle: Path,
+    username: str,
+    token: str,
+) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "PGHOST": target.endpoint,
+            "PGHOSTADDR": "127.0.0.1",
+            "PGPORT": str(local_port),
+            "PGDATABASE": target.database,
+            "PGUSER": username,
+            "PGPASSWORD": token,
+            "PGSSLMODE": "verify-full",
+            "PGSSLROOTCERT": str(ca_bundle),
+            "PGOPTIONS": f"-c role={DB_OWNER_ROLE}",
+        }
+    )
+    return environment
+
+
+def verify_f3_seed_output(output: str) -> None:
+    check_lines = [
+        line for line in output.splitlines() if line.endswith(("|PASS", "|FAIL"))
+    ]
+    failed_lines = [line for line in check_lines if line.endswith("|FAIL")]
+    if failed_lines:
+        raise ToolError("F3 synthetic seed verification reported FAIL")
+    if len(check_lines) != F3_SEED_VERIFY_CHECK_COUNT:
+        raise ToolError(
+            "F3 synthetic seed verification returned an unexpected check count"
+        )
+
+
+def seed_f3(settings: Settings, apply: bool) -> None:
+    require_apply(apply, "seed-f3")
+    if shutil.which("psql") is None:
+        raise ToolError("psql is required to apply the F3 synthetic seed")
+
+    direct = base_session(settings)
+    identity = direct.client("sts").get_caller_identity()
+    username = caller_username(identity["Arn"])
+    target = describe_database(direct, settings)
+    instance_id = find_app_instance(direct, settings)
+    token = direct.client("rds").generate_db_auth_token(
+        DBHostname=target.endpoint,
+        Port=target.port,
+        DBUsername=username,
+        Region=settings.region,
+    )
+    ca_bundle = ensure_ca_bundle()
+    environment = psql_environment(
+        target,
+        settings.local_port,
+        ca_bundle,
+        username,
+        token,
+    )
+
+    emit(
+        "f3-seed-plan",
+        apply=apply,
+        database=target.identifier,
+        username=username,
+        reset_scope="F3_SYNTHETIC 합성중개사무소",
+    )
+    with PortForward(direct, instance_id, target, settings.local_port):
+        apply_result = subprocess.run(
+            [
+                "psql",
+                "-X",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-f",
+                str(F3_SEED_RESET),
+                "-f",
+                str(F3_SEED_DATA),
+            ],
+            env=environment,
+            check=False,
+        )
+        if apply_result.returncode != 0:
+            raise ToolError("F3 synthetic seed reset or apply failed")
+
+        verify_result = subprocess.run(
+            [
+                "psql",
+                "-X",
+                "--tuples-only",
+                "--no-align",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-f",
+                str(F3_SEED_VERIFY),
+            ],
+            env=environment,
+            check=False,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        if verify_result.returncode != 0:
+            raise ToolError("F3 synthetic seed verification query failed")
+        print(verify_result.stdout, end="")
+        verify_f3_seed_output(verify_result.stdout)
+
+    emit(
+        "f3-seed-complete",
+        database=target.identifier,
+        username=username,
+        checks=F3_SEED_VERIFY_CHECK_COUNT,
+    )
+
+
 def migrate(settings: Settings, apply: bool) -> None:
     require_apply(apply, "migrate")
     direct = base_session(settings)
@@ -1020,7 +1141,7 @@ def parser() -> argparse.ArgumentParser:
     command_parser.add_argument("--operator-role", default="TerraformOperatorRole")
 
     commands = command_parser.add_subparsers(dest="command", required=True)
-    for command in ("bootstrap", "sync-team", "migrate"):
+    for command in ("bootstrap", "sync-team", "migrate", "seed-f3"):
         subcommand = commands.add_parser(command)
         subcommand.add_argument("--apply", action="store_true")
 
@@ -1073,6 +1194,8 @@ def main() -> None:
         )
     elif arguments.command == "migrate":
         migrate(settings, arguments.apply)
+    elif arguments.command == "seed-f3":
+        seed_f3(settings, arguments.apply)
     elif arguments.command == "create-session-account":
         create_session_account(
             settings,
