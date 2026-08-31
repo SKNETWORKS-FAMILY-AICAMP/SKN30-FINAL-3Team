@@ -20,8 +20,7 @@ class ConsultationType(StrEnum):
 
     SELL_REQUEST = "매도의뢰"
     BUY_REQUEST = "매수문의"
-    CO_BROKERAGE = "공동중개"
-    SIMPLE_INQUIRY = "단순문의"
+    OTHER = "기타상담"
 
 
 class ProposalStatus(StrEnum):
