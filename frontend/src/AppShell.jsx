@@ -558,7 +558,7 @@ export function AppShell() {
   const handleEvidenceOpen = () => {
     const targetId = isBuyerDetail ? "buyer-content" : "detail-log";
     const target = document.getElementById(targetId);
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+    scrollIntoViewRespectingMotion(target, { block: "center" });
     window.requestAnimationFrame(() => target?.focus());
   };
   const openCrossMatch = () => {

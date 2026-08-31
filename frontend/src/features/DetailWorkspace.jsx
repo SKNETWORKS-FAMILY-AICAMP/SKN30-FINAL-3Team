@@ -5,6 +5,7 @@ import { PROTOTYPE_ASSUMPTIONS } from "../config/prototypeAssumptions.js";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
 import { DEAL_TYPE_CHOICES, dealTypePatch, dealTypeValue } from "./ledger/model/dealType.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
+import { scrollIntoViewRespectingMotion } from "../shared/motion/index.ts";
 import RelationEditModal from "./RelationEditModal.jsx";
 import "@patternfly/react-core/dist/styles/base.css";
 import "./DetailWorkspace.css";
@@ -275,7 +276,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     if (crossMatchSectionOpen) { setCrossMatchSectionOpen(false); return; }
     setCrossMatchSectionOpen(true);
     window.requestAnimationFrame(() => {
-      crossMatchSectionRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      scrollIntoViewRespectingMotion(crossMatchSectionRef.current, { block: "start" });
       crossMatchSectionRef.current?.querySelector("h2")?.focus();
     });
   };

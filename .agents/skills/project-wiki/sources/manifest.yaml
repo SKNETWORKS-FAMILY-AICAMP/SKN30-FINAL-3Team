@@ -1,7 +1,29 @@
 version: 1
-updated: "2026-08-27"
+updated: "2026-08-31"
 
 sources:
+  - id: "f3-cross-judgment-save-panel-and-run-split-2026-08-31"
+    type: "user-provided-direction"
+    location: "Claude Code task prompt (2026-08-31)"
+    received: "2026-08-31"
+    reflected_in:
+      - "docs/requirements/f3/cross-judgment.md"
+      - "docs/architecture/f3/overview.md"
+      - "docs/architecture/f3/online-runtime.md"
+      - "docs/architecture/f3/offline-data-evaluation.md"
+      - "docs/screen/SCREEN_MATRIX_F1_F2_F3.md"
+      - "docs/screen/화면구조_분석_F1_F2_F3.md"
+      - "frontend/src/AppShell.jsx"
+      - "frontend/src/features/DetailWorkspace.jsx"
+      - "frontend/src/features/DetailWorkspace.css"
+      - "frontend/tests/f3-panel.browser.test.mjs"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      저장 성공 후 후보 패널을 자동으로 열던 화면 동작을 제거하고, 세대 상세에 교차 판정 섹션을 두어
+      레일의 [교차 판정]은 섹션 여닫기, 섹션의 [교차 판정 실행]은 판정 요청으로 역할을 분리.
+      저장이 패널을 열지 않게 되면서 F3-CR-05의 기각 노출 부모에서 저장 트리거를 제거.
+      F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 유지
+
   - id: "f3-cross-judgment-manual-trigger-2026-08-27"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-27)"

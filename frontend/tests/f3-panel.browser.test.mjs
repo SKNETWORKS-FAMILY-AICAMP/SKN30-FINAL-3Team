@@ -105,6 +105,55 @@ async function runCrossJudgment(page) {
 }
 
 /**
+ * 동작 감소 설정을 켜면 스크롤 애니메이션을 쓰지 않는다.
+ *
+ * `styles.css`의 `scroll-behavior: auto`는 CSS 경로에만 걸린다. `scrollIntoView`에 옵션으로
+ * 직접 넘긴 `behavior`가 CSS를 이기므로, 설정을 코드에서 읽지 않으면 동작 감소를 켠
+ * 사용자에게도 애니메이션이 남는다. 실제로 어떤 `behavior`로 불렀는지를 본다.
+ */
+async function openDetailAndRecordScroll(page) {
+  // 페이지 스크립트보다 먼저 걸어야 첫 호출부터 기록된다.
+  await page.addInitScript(() => {
+    window.__scrollBehaviors = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function record(options) {
+      window.__scrollBehaviors.push(options && options.behavior);
+      return original.call(this, options);
+    };
+  });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "매물장", exact: true }).click();
+  const links = page.locator(".ledger-grid__detail-link");
+  await links.first().waitFor();
+  await links.nth(1).click();
+
+  // 접었다 펴면 섹션으로 스크롤한다.
+  const rail = page.getByRole("button", { name: "교차 판정", exact: true });
+  await page.locator("#detail-section-cross-match").waitFor();
+  await rail.click();
+  await page.locator("#detail-section-cross-match").waitFor({ state: "detached" });
+  await rail.click();
+  await page.locator("#detail-section-cross-match").waitFor();
+  await page.waitForFunction(() => window.__scrollBehaviors.length > 0, undefined, { timeout: 10_000 });
+  return page.evaluate(() => window.__scrollBehaviors);
+}
+
+test("동작 감소를 켜면 섹션 스크롤에 애니메이션을 쓰지 않는다", { timeout: 120_000 }, async () => {
+  const reduced = await browser.newPage();
+  await reduced.emulateMedia({ reducedMotion: "reduce" });
+  const reducedBehaviors = await openDetailAndRecordScroll(reduced);
+  assert.deepEqual([...new Set(reducedBehaviors)], ["auto"]);
+  await reduced.close();
+
+  // 설정을 켜지 않은 환경에서는 종전대로 부드럽게 움직인다.
+  const normal = await browser.newPage();
+  await normal.emulateMedia({ reducedMotion: "no-preference" });
+  const normalBehaviors = await openDetailAndRecordScroll(normal);
+  assert.deepEqual([...new Set(normalBehaviors)], ["smooth"]);
+  await normal.close();
+});
+
+/**
  * 두 버튼의 역할이 다르다.
  *
  * 레일의 [교차 판정]은 섹션을 여닫기만 하고, 섹션 안의 [교차 판정 실행]이 판정을 시작한다.

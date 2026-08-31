@@ -53,6 +53,7 @@ import type {
   ParentContext,
 } from "./model/viewModel.ts";
 import { describeForUser } from "../ledger/index.ts";
+import { scrollIntoViewRespectingMotion } from "../../shared/motion/index.ts";
 import type { CrossJudgment } from "./hooks/useCrossJudgment.ts";
 import type { FeedbackReason } from "./model/dto.ts";
 import "./CrossMatchPanel.css";
@@ -761,7 +762,7 @@ export function CrossMatchPanel({
   useEffect(() => {
     if (!isOpen || !focusRequest) return undefined;
     const frame = window.requestAnimationFrame(() => {
-      panelRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      scrollIntoViewRespectingMotion(panelRef.current, { block: "start" });
       const title = panelRef.current?.querySelector<HTMLElement>("#cross-match-panel-title");
       title?.focus();
     });
