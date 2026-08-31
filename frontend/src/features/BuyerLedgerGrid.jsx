@@ -15,7 +15,8 @@ const columns = [
   { headerName: "부동산", field: "brokerage", width: 112 }, { headerName: "이사일", field: "moveDate", width: 112 },
   { headerName: "내용", field: "content", width: 230, tooltipField: "content" }, { headerName: "진행단계", field: "stage", width: 116 },
   { headerName: "완료여부", field: "completion", width: 96, cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["진행", "완료"] } },
-  { headerName: "담당자", field: "assignee", width: 96 }, { headerName: "바탕색", field: "background", width: 88 },
+  // 서버는 `assigned_user_id`를 받고 직원 목록 API가 아직 없다. 여기서 고친 이름은 저장되지 못한다.
+  { headerName: "담당자", field: "assignee", width: 96, editable: false }, { headerName: "바탕색", field: "background", width: 88 },
   { headerName: "만기일", field: "expiry", width: 112 }, { headerName: "분류", field: "classification", width: 100 }, { headerName: "비고", field: "memo", width: 168, tooltipField: "memo" },
 ];
 

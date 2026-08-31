@@ -13,6 +13,7 @@ import { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "..
 import { addYears, formatTimestampAsDate, parseDate } from "../src/features/ledger/model/dates.ts";
 import { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "../src/features/ledger/model/phone.ts";
 import { LIFECYCLE_STATUS, toCode, toLabel } from "../src/features/ledger/model/codes.ts";
+import { priceFieldPatch } from "../src/features/ledger/model/dealType.ts";
 import { carrySavedIdentity } from "../src/features/ledger/model/row.ts";
 import {
   applyServerIdentity,
@@ -270,6 +271,94 @@ test("매물 건 요청은 금액을 원 단위로 되돌린다", () => {
   assert.equal(payload.is_sale_available, true);
   assert.equal(payload.sale_price, dto.current_listing?.sale_price);
   assert.equal(payload.is_jeonse_available, false);
+});
+
+test("거래유형을 고르지 않고 매매가만 적어도 금액이 살아남는다", () => {
+  // 상세의 거래유형 셀렉트가 빈 값을 '매매'처럼 보여줘, 유형을 안 고른 채 금액만 적는 일이 잦다.
+  // 그대로 두면 세 플래그가 모두 꺼져 나가 방금 적은 금액이 사라진다.
+  const draft = createPropertyDraftRow("DRAFT-1");
+  const patched = { ...draft, ...priceFieldPatch(draft, "salePrice", "28억 8,000만") };
+
+  assert.equal(patched.saleFlag, "Y");
+  assert.equal(patched.listingType, "매매");
+  assert.equal(patched.price, "28억 8,000만");
+
+  const payload = toListingCreatePayload(patched);
+  assert.equal(payload.is_sale_available, true);
+  assert.equal(payload.sale_price, 2_880_000_000);
+});
+
+test("이미 고른 거래유형은 다른 금액을 적어도 바뀌지 않는다", () => {
+  // 매매 건에 전세보증금을 참고로 적는 것만으로 매물이 전세로 뒤집히면 안 된다.
+  const sale = { ...createPropertyDraftRow("DRAFT-1"), saleFlag: "Y", listingType: "매매" };
+  const patched = { ...sale, ...priceFieldPatch(sale, "leaseDeposit", "12억") };
+
+  assert.equal(patched.listingType, "매매");
+  assert.equal(patched.leaseFlag, "");
+  assert.equal(patched.leaseDeposit, "12억");
+  // 대표 금액은 지금 고른 유형의 것만 따라간다.
+  assert.equal(patched.price, "");
+});
+
+test("금액을 지우는 입력은 거래유형을 켜지 않는다", () => {
+  const draft = createPropertyDraftRow("DRAFT-1");
+  const patched = { ...draft, ...priceFieldPatch(draft, "salePrice", "") };
+
+  assert.equal(patched.saleFlag, "");
+  assert.equal(patched.listingType, "");
+});
+
+test("월세 금액은 현재 임대차 보증금·차임으로 덮이지 않는다", () => {
+  // deposit·rent는 지금 살고 있는 세입자의 조건이다. 내놓는 매물 조건과 다른 값이다.
+  const monthly = {
+    ...createPropertyDraftRow("DRAFT-1"),
+    monthlyFlag: "Y",
+    listingType: "월세",
+    deposit: "9억 4,500만",
+    rent: "380만",
+  };
+
+  const filled = toListingCreatePayload({ ...monthly, rentCondition: "2억 / 150만" });
+  assert.equal(filled.monthly_rent_deposit_amount, 200_000_000);
+  assert.equal(filled.monthly_rent_amount, 1_500_000);
+
+  // 매물 조건을 적지 않았으면 비워 둔다. 현재 임대차 금액을 매물가로 지어내지 않는다.
+  const blank = toListingCreatePayload(monthly);
+  assert.equal(blank.monthly_rent_deposit_amount, null);
+  assert.equal(blank.monthly_rent_amount, null);
+});
+
+test("명도만 적은 세대도 매물 건을 만든다", () => {
+  // 명도는 property_listing.handover_condition이 소유한다. 매물 건을 만들지 않으면 갈 곳이 없다.
+  const row = { ...createPropertyDraftRow("DRAFT-1"), clearance: "즉시" };
+
+  assert.equal(hasListingValues(row), true);
+  assert.equal(toListingCreatePayload(row).handover_condition, "즉시");
+  // 거래유형 플래그는 꺼진 채다. F3 후보 조회가 유형별 available을 요구하므로 후보로 올라오지 않는다.
+  assert.equal(toListingCreatePayload(row).is_sale_available, false);
+});
+
+test("주차·세금은 custom_fields로 왕복한다", () => {
+  // 33 컬럼에 없는 확장 항목이라 전용 컬럼이 없다. 매퍼가 빠뜨리면 입력값이 통째로 사라진다.
+  const row = { ...createPropertyDraftRow("DRAFT-1"), complexId: 1, unit: "203", parking: "2대", tax: "양도세 비과세" };
+
+  const created = toUnitCreatePayload(row);
+  assert.ok(created != null);
+  assert.equal(created.custom_fields.parking, "2대");
+  assert.equal(created.custom_fields.tax_memo, "양도세 비과세");
+
+  const restored = toPropertyRow({ ...saleUnit(), custom_fields: created.custom_fields });
+  assert.equal(restored.parking, "2대");
+  assert.equal(restored.tax, "양도세 비과세");
+});
+
+test("세대 수정도 생성과 같은 custom_fields를 보낸다", () => {
+  const row = { ...toPropertyRow(saleUnit()), parking: "지하 1대", tax: "재산세 6월" };
+  const payload = toUnitUpdatePayload(row);
+
+  assert.ok(payload != null);
+  assert.equal(payload.custom_fields?.parking, "지하 1대");
+  assert.equal(payload.custom_fields?.tax_memo, "재산세 6월");
 });
 
 test("상담 로그는 바뀌었을 때만 새 로그로 보낸다", () => {

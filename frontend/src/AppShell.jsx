@@ -515,10 +515,12 @@ export function AppShell() {
     closeDetail();
   };
   const saveDetail = (nextRow) => {
+    /*
+     * 거래 금액 세 열은 상세가 이미 유지한다(DetailWorkspace의 priceFieldPatch).
+     * 여기서 다시 조립하면 안 된다. 월세 분기가 사용자가 적은 매물 보증금·차임 대신
+     * **현재 임대차**의 deposit·rent로 덮어써서 입력값을 잃은 적이 있다.
+     */
     const propertyColumns = isBuyerDetail ? {} : {
-      salePrice: nextRow.listingType === "매매" ? nextRow.price || "" : nextRow.salePrice || "",
-      leaseDeposit: nextRow.listingType === "전세" ? nextRow.price || nextRow.deposit || "" : nextRow.leaseDeposit || "",
-      rentCondition: nextRow.listingType === "월세" ? [nextRow.deposit, nextRow.rent].filter(Boolean).join(" / ") : nextRow.rentCondition || "",
       ownerPhone: nextRow.phone || nextRow.ownerPhone || "",
     };
     const savedRow = {
@@ -712,6 +714,7 @@ export function AppShell() {
         row={detailRow}
         isOpen={Boolean(detailRow)}
         focusF2Request={f2FocusRequest}
+        currentUser={user}
         onClose={closeDetail}
         onDiscard={discardDetail}
         onDelete={deleteRowFromDetail}
@@ -725,6 +728,7 @@ export function AppShell() {
         row={detailRow}
         isOpen={Boolean(detailRow)}
         focusF2Request={f2FocusRequest}
+        currentUser={user}
         complexOptions={complexOptions}
         onCreateComplex={handleCreateComplex}
         onDeleteComplex={handleDeleteComplex}

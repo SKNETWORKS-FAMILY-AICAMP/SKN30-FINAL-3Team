@@ -459,6 +459,15 @@
   line-height: 1.25;
 }
 
+/* 그 칸이 왜 비어 있는지, 왜 못 고치는지 알려주는 보조 문구. */
+.detail-field__hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--pf-t--global--text--color--subtle, #4d5258);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .detail-complex-field > .pf-v6-c-button {
   margin-top: 4px;
 }

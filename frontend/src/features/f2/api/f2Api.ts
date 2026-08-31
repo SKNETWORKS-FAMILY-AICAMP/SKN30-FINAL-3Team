@@ -49,7 +49,8 @@ const PROPERTY_FIELDS: Record<string, FieldBinding> = {
   "전세보증금": { fieldKey: "deposit", label: "전세보증금" },
   "월세 보증금": { fieldKey: "deposit", label: "월세 보증금" },
   "월세 차임": { fieldKey: "rent", label: "월세 차임" },
-  "명도 조건": { fieldKey: "moveIn", label: "명도 조건" },
+  // 상세의 명도 칸이다. 예전 `moveIn`은 같은 값을 받던 중복 칸이라 없앴다.
+  "명도 조건": { fieldKey: "clearance", label: "명도 조건" },
   "임대인": { fieldKey: "owner", label: "임대인" },
   "임대인 전화": { fieldKey: "phone", label: "임대인 전화" },
   "임차인": { fieldKey: "tenant", label: "임차인" },
