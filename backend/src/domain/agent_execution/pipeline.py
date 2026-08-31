@@ -53,6 +53,7 @@ from domain.agent_execution.models import (
     CANDIDATES_READY_STATUS,
     FAILED_TERMINAL_STATUS,
     JUDGING_STATUS,
+    LEDGER_SAVE_TRIGGER_TYPE,
     RUNNING_STATUS,
     SUPERSEDED_FAILURE_CODE,
     SUPERSEDED_FAILURE_MESSAGE,
@@ -236,6 +237,12 @@ async def _advance(
         return StepOutcome.ADVANCED
 
     if run.status == ANCHOR_READY_STATUS:
+        # 저장이 만든 실행은 여기까지다. 앵커 포지션 카드만 만들어 두고 후보 조회와 판정은
+        # 사용자가 상세에서 요청할 때 돈다(F3-CR-01~04). 그 요청이 오면 `service` 가
+        # trigger_type 을 옮기고 lease 를 만료시켜 이 실행이 그대로 이어서 진행한다.
+        if run.trigger_type == LEDGER_SAVE_TRIGGER_TYPE:
+            logger.info("f3_run_parked_after_anchor_card", run_id=run_id)
+            return StepOutcome.SKIPPED
         store_candidate_selection(session, run_id, worker_id, attempt_count)
         return StepOutcome.ADVANCED
 

@@ -20,14 +20,16 @@ MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 
 | 트리거 | 앵커 | 실행 시점 | 현재 |
 |---|---|---|---|
-| 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 | Backend 자동 접수 구현됨 |
-| 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 | Backend 자동 접수 구현됨 |
+| 손님 신규 등록·조건 수정 저장 | 손님 | F1 저장 성공 후 | Backend 자동 접수 구현됨. **앵커 카드까지만** |
+| 매물 신규 등록·가격 변경 저장 | 매물 | F1 저장 성공 후 | Backend 자동 접수 구현됨. **앵커 카드까지만** |
 | 손님 상세의 [교차 판정] 버튼 | 손님 | 사용자 버튼 클릭 후 | Frontend 요청·Backend 접수 구현됨 |
 | 세대 상세의 [교차 판정 실행] 버튼 | 매물 | 사용자 버튼 클릭 후 | Frontend 요청·Backend 접수 구현됨 |
 
 Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 사용자의 판정 요청이 실패해도 F3 패널만 로딩·실패 상태를 표시한다. 상세 진입과 저장만으로는 패널을 열지 않는다.
 
-세대 상세의 버튼은 둘이며 역할이 다르다. 액션 레일의 **[교차 판정]** 은 상세 하단의 교차 판정 섹션을 여닫기만 하고 실행을 요청하지 않는다. 실행을 요청하는 것은 섹션 안의 **[교차 판정 실행]** 하나다. 섹션을 접으면 패널이 화면에서 빠져 Frontend의 진행 확인만 멈추며, 이미 접수된 서버 실행을 취소하지는 않는다. 손님 상세는 아직 이 분리를 적용하지 않아 푸터의 **[교차 판정]** 버튼 하나가 실행을 요청한다.
+저장 트리거가 하는 일은 **앵커 포지션 카드 생성까지**다. 저장이 만든 실행은 `ANCHOR_READY` 에서 멈추고 Worker 선점 대상에서 빠진다(`repository.lock_claimable_run`). 사용자가 상세에서 판정을 요청하면 접수 유스케이스가 그 실행의 `trigger_type` 을 사용자 요청으로 옮기고 lease 를 만료시켜(`repository.resume_parked_run`) **같은 실행이 후보 조회부터 이어서** 돈다. 앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용은 없다.
+
+세대 상세는 판정을 요청하는 버튼이 둘이다. 액션 레일의 **[교차 판정]** 과 교차 판정 섹션의 **[교차 판정 실행]** 이 같은 실행을 요청한다. 손님 상세는 푸터의 **[교차 판정]** 하나다.
 
 자동 접수는 `backend/src/domain/agent_execution/triggers.py`가 소유한다. 매물·구입장 신규 등록은
 항상 접수하고, 수정은 F1 서비스가 기존 저장값과 비교해 반환한 실제 변경 필드 중 판정 입력이 있을
@@ -214,7 +216,8 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 항목 | 위치 |
 |---|---|
 | `POST /api/v1/f3/runs`. 활성 실행이 없으면 `QUEUED` 생성, 있으면 같은 실행 반환 | `backend/src/api/f3_runs.py` |
-| 상세 진입·저장에서 패널을 열지 않고 판정 실행 버튼에서만 실행 확인·polling 시작. 세대 상세는 레일의 [교차 판정]이 섹션 여닫기, 섹션의 [교차 판정 실행]이 실행 요청. 활성 실행이 없을 때만 `USER_REQUEST`로 접수 | `frontend/src/AppShell.jsx`, `frontend/src/features/DetailWorkspace.jsx`, `frontend/src/features/f3/CrossMatchSection.tsx` |
+| 상세 진입·저장에서 패널을 열지 않고 판정 요청 버튼에서만 실행 확인·polling 시작. 세대 상세는 레일의 [교차 판정]과 섹션의 [교차 판정 실행]이 같은 실행을 요청 | `frontend/src/AppShell.jsx`, `frontend/src/features/DetailWorkspace.jsx`, `frontend/src/features/f3/CrossMatchSection.tsx` |
+| 저장이 만든 실행은 앵커 카드 뒤 `ANCHOR_READY`에서 멈추고, 사용자 요청이 같은 실행을 이어받아 후보 조회부터 진행 | `backend/src/domain/agent_execution/pipeline.py`, `repository.py`, `service.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
 | 사무소·앵커·입력 버전의 활성 실행 재사용과 PostgreSQL 동시 접수 직렬화 | `backend/src/domain/agent_execution/service.py`, `repository.py` |
 | F1 매물·구입장 저장 성공 후 `LEDGER_SAVE` 자동 접수와 F3 실패 격리 | `backend/src/domain/agent_execution/triggers.py`, `backend/src/api/property_ledger.py` |

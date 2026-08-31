@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import structlog
 from brokerage_ai.f3 import InputPrivacyMode
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session
@@ -13,10 +14,12 @@ from domain.agent_execution import repository, snapshot
 from domain.agent_execution.cache_key import position_card_cache_key
 from domain.agent_execution.fingerprint import input_fingerprint
 from domain.agent_execution.models import (
+    ANCHOR_READY_STATUS,
     BROKERAGE_WORKFLOW_AGENT_TYPE,
     CROSS_JUDGMENT_RUN_TYPE,
     LEASE_EXPIRED_FAILURE_CODE,
     LEASE_EXPIRED_FAILURE_MESSAGE,
+    LEDGER_SAVE_TRIGGER_TYPE,
     QUEUED_STATUS,
     USER_REQUEST_TRIGGER_TYPE,
     AgentRun,
@@ -25,6 +28,8 @@ from domain.agent_execution.models import (
     LeaseNotHeldError,
     anchor_of,
 )
+
+logger = structlog.get_logger()
 
 # Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
 LEASE_DURATION_SECONDS = 300
@@ -119,6 +124,23 @@ def queue_cross_judgment_run(
             anchor.input_data_version,
         )
         if existing is not None:
+            # 저장이 만든 실행은 앵커 카드까지만 하고 멈춰 있다. 사용자가 판정을 요청하면
+            # 그 실행을 그대로 이어받는다. 앵커 카드를 다시 만들지 않으므로 판정만 이어 돈다.
+            if (
+                trigger_type != LEDGER_SAVE_TRIGGER_TYPE
+                and existing.trigger_type == LEDGER_SAVE_TRIGGER_TYPE
+                and existing.status == ANCHOR_READY_STATUS
+            ):
+                repository.resume_parked_run(session, existing.id or 0, brokerage_id, trigger_type)
+                session.commit()
+                session.refresh(existing)
+                logger.info(
+                    "f3_parked_run_resumed",
+                    run_id=existing.id,
+                    anchor_type=anchor_type.value,
+                    anchor_id=anchor_id,
+                )
+                return existing
             session.commit()
             return existing
 

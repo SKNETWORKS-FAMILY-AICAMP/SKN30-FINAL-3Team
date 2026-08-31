@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, NamedTuple, cast
 
-from sqlalchemy import CursorResult, and_, case, func, literal, or_, text, update
+from sqlalchemy import CursorResult, and_, case, func, literal, not_, or_, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import Session, col, select
 
@@ -19,6 +19,7 @@ from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
     FAILED_TERMINAL_STATUS,
     IN_PROGRESS_STATUSES,
+    LEDGER_SAVE_TRIGGER_TYPE,
     POSITION_CARD_CAPABILITY,
     QUEUED_STATUS,
     RUNNING_STATUS,
@@ -101,6 +102,35 @@ def find_reusable_active_run(
     return session.execute(statement).scalars().first()
 
 
+def resume_parked_run(
+    session: Session, run_id: int, brokerage_id: int, trigger_type: str
+) -> int:
+    """앵커 카드까지만 하고 멈춘 실행을 사용자 요청으로 옮겨 다시 선점 대상으로 만든다.
+
+    lease 도 함께 만료시킨다. 정지 시점의 lease 가 그대로 남아 있으면 선점 조건의
+    ``lease_expires_at < now()`` 를 만족하지 못해 사용자가 최대 lease 길이만큼 기다린다.
+    바꾼 행 수를 돌려주며, 그 사이 다른 요청이 먼저 옮겼으면 0이다.
+    """
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+            col(AgentRun.status) == ANCHOR_READY_STATUS,
+        )
+        .values(
+            trigger_type=trigger_type,
+            lease_owner=None,
+            lease_expires_at=func.now() - func.make_interval(0, 0, 0, 0, 0, 0, 1),
+            updated_at=func.now(),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
 def find_root_cross_judgment_run(
     session: Session, brokerage_id: int, run_id: int
 ) -> AgentRun | None:
@@ -151,6 +181,14 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
         select(AgentRun)
         .where(
             *root_cross_judgment_conditions(),
+            # 저장이 만든 실행은 앵커 카드까지만 만들고 멈춘다. 사용자가 판정을 요청하면
+            # `service` 가 trigger_type 을 옮겨 다시 선점 대상이 된다(F3-CR-01~04).
+            not_(
+                and_(
+                    col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+                    col(AgentRun.status) == ANCHOR_READY_STATUS,
+                )
+            ),
             or_(
                 col(AgentRun.status) == QUEUED_STATUS,
                 and_(

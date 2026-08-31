@@ -127,13 +127,9 @@ async function openDetailAndRecordScroll(page) {
   await links.first().waitFor();
   await links.nth(1).click();
 
-  // 접었다 펴면 섹션으로 스크롤한다.
-  const rail = page.getByRole("button", { name: "교차 판정", exact: true });
+  // 판정을 실행하면 패널로 스크롤한다.
   await page.locator("#detail-section-cross-match").waitFor();
-  await rail.click();
-  await page.locator("#detail-section-cross-match").waitFor({ state: "detached" });
-  await rail.click();
-  await page.locator("#detail-section-cross-match").waitFor();
+  await runCrossJudgment(page);
   await page.waitForFunction(() => window.__scrollBehaviors.length > 0, undefined, { timeout: 10_000 });
   return page.evaluate(() => window.__scrollBehaviors);
 }
@@ -154,12 +150,12 @@ test("동작 감소를 켜면 섹션 스크롤에 애니메이션을 쓰지 않�
 });
 
 /**
- * 두 버튼의 역할이 다르다.
+ * 판정을 시작하는 버튼은 둘이고, 상세 진입은 어느 쪽도 부르지 않는다.
  *
- * 레일의 [교차 판정]은 섹션을 여닫기만 하고, 섹션 안의 [교차 판정 실행]이 판정을 시작한다.
- * 여닫기가 실행을 겸하면 접어 두려고 누른 버튼이 판정을 새로 세운다.
+ * 액션 레일의 [교차 판정]과 섹션의 [교차 판정 실행]은 같은 실행을 요청한다.
+ * 저장과 상세 진입은 판정을 시작하지 않는다(F3-CR-03·04).
  */
-test("레일 버튼은 섹션을 여닫기만 하고 판정은 실행 버튼이 시작한다", { timeout: 120_000 }, async () => {
+test("상세 진입은 판정을 시작하지 않고 두 버튼이 각각 실행한다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
@@ -167,28 +163,26 @@ test("레일 버튼은 섹션을 여닫기만 하고 판정은 실행 버튼이 
   const links = await openPropertyLedger(page);
   await links.nth(1).click();
 
-  const section = page.locator("#detail-section-cross-match");
-  const rail = page.getByRole("button", { name: "교차 판정", exact: true });
-  await section.waitFor();
-  // 상세를 열면 섹션은 펴져 있고 판정은 아직 돌지 않는다.
+  // 섹션은 늘 보이지만 상세를 열기만 해서는 판정이 돌지 않는다.
+  await page.locator("#detail-section-cross-match").waitFor();
   assert.equal(await page.locator("#cross-match-panel").count(), 0);
 
-  // 접는다. 판정은 여전히 시작하지 않는다.
-  await rail.click();
-  await section.waitFor({ state: "detached" });
-  assert.equal(await page.locator("#cross-match-panel").count(), 0);
-
-  // 다시 편다. 여기까지도 실행은 없다.
-  await rail.click();
-  await section.waitFor();
-  assert.equal(await page.locator("#cross-match-panel").count(), 0);
-
-  // 실행 버튼을 눌러야 판정이 시작된다.
+  // 섹션의 실행 버튼이 판정을 시작한다.
   await runCrossJudgment(page);
   await page.getByText("기준 세대 확인").waitFor();
+  await page.close();
+
+  // 레일 버튼도 같은 실행을 요청한다.
+  const rail = await browser.newPage();
+  const railLinks = await openPropertyLedger(rail);
+  await railLinks.nth(1).click();
+  assert.equal(await rail.locator("#cross-match-panel").count(), 0);
+  await rail.getByRole("button", { name: "교차 판정", exact: true }).click();
+  await rail.locator("#cross-match-panel").waitFor();
+  await rail.getByText("기준 세대 확인").waitFor();
+  await rail.close();
 
   assert.deepEqual(failures, []);
-  await page.close();
 });
 /** 매물 건이 있는 세대 상세를 열고 사용자가 실제로 교차 판정 버튼을 누르는 흐름. */
 async function openListingCrossMatch(page) {
