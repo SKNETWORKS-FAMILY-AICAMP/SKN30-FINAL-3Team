@@ -12,7 +12,7 @@
 export { request, expectNoContent } from "./httpClient.ts";
 export type { QueryValue, RequestOptions } from "./httpClient.ts";
 
-export { ApiError, isCanceled, kindFromStatus } from "./errors.ts";
+export { ApiError, apiErrorFromResponse, isCanceled, kindFromStatus } from "./errors.ts";
 export type { ApiErrorKind, ApiErrorOptions } from "./errors.ts";
 
 // CSRF 원문 보관소. 세션을 발급·폐기하는 features/auth가 이 값을 채우고 비운다.

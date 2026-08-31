@@ -22,7 +22,14 @@ import {
   TimesIcon,
   UploadIcon,
 } from "@patternfly/react-icons";
-import { analyzeNewIntake, analyzeVoiceMemo, appendVoiceMemoToLog, LEDGER_LABEL } from "./f2/index.ts";
+import {
+  analyzeNewIntake,
+  analyzeVoiceMemo,
+  appendVoiceMemoToLog,
+  describeF2Error,
+  isF2Canceled,
+  LEDGER_LABEL,
+} from "./f2/index.ts";
 
 const STATES = {
   empty: "파일 없음",
@@ -146,8 +153,8 @@ export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType
       setReviewComplete(false);
       setState("review");
     } catch (error) {
-      if (error?.name === "AbortError") return;
-      setAnalysisError(error?.message || "음성메모 분석을 완료하지 못했습니다.");
+      if (isF2Canceled(error)) return;
+      setAnalysisError(describeF2Error(error));
       setState("error");
     } finally {
       if (requestRef.current === controller) requestRef.current = null;

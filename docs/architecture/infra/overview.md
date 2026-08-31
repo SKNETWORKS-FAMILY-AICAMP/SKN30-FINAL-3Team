@@ -1,7 +1,7 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-25
+implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-08-31
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -10,9 +10,9 @@ updated: 2026-08-25
 
 - **이 문서가 답하는 질문:** 공유 개발·시연 환경을 AWS와 RunPod에 어떤 자원과 경계로 배치하는가?
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
-- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md)
+- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. deep lifecycle, Verify/Build 분리는 plan 검증 후 apply 승인 전이고 RunPod Terraform은 보류 상태다.
+- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·기존 관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. Alarm 전용 전달과 애플리케이션 alarm은 코드 구현 후 apply 전이며 deep lifecycle, Verify/Build 분리도 apply 승인 전이다. RunPod Terraform은 보류 상태다.
 
 ## 결정 요약
 
@@ -43,8 +43,8 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
 | 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
 | CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨·deep lifecycle 미적용 | deep suspend는 ID·기본 도메인을 유지한 채 distribution 비활성화·ALB origin 제거 |
-| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·Discord ignored tfvars→write-only 전환은 plan·apply 전 |
-| 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 6개; deep suspend는 ALB alarm 2개 제거, SNS 구독 없음 |
+| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·delivery Discord와 별도 Alarm Discord 입력은 ignored tfvars→write-only 전환 후 plan·apply |
+| 관측 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달과 2개 app alarm 코드 구현 미적용 | log group 5개 14일; 적용 후 기존 6개+Backend 500·AI terminal 2개를 새 Alarm topic/Lambda로 전달, deep suspend는 ALB alarm 2개 제거 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
 | 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
 | 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |

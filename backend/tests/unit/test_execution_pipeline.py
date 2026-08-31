@@ -345,27 +345,90 @@ def test_failure_log_contains_only_safe_classification(
         def warning(self, event: str, **values: object) -> None:
             events.append((event, values))
 
+        def error(self, event: str, **values: object) -> None:
+            events.append((event, values))
+
     monkeypatch.setattr(pipeline, "logger", RecordingLogger())
-    outcome, _, _ = advance_with_error(
-        monkeypatch, PositionCardContractError(raw_message)
-    )
+    outcome, _, _ = advance_with_error(monkeypatch, PositionCardContractError(raw_message))
 
     assert outcome is pipeline.StepOutcome.FAILED_TERMINAL
-    assert events == [
-        (
-            "f3_step_failed",
-            {
-                "run_id": 17,
-                "status": "RUNNING",
-                "failure_stage": "ANCHOR_CARD",
-                "attempt": 2,
-                "outcome": "FAILED_TERMINAL",
-                "failure_category": "OUTPUT_CONTRACT",
-                "error_type": "PositionCardContractError",
-            },
-        )
+    assert [event for event, _values in events] == [
+        "f3_step_failed",
+        "ai_terminal_failure",
     ]
+    warning = events[0][1]
+    assert warning == {
+        "run_id": 17,
+        "status": "RUNNING",
+        "failure_stage": "ANCHOR_CARD",
+        "attempt": 2,
+        "outcome": "FAILED_TERMINAL",
+        "failure_category": "OUTPUT_CONTRACT",
+        "error_type": "PositionCardContractError",
+        "error_location": warning["error_location"],
+    }
+    terminal = events[1][1]
+    assert terminal == {
+        "component": "ai",
+        "source": "f3",
+        "run_id": 17,
+        "status": "FAILED_TERMINAL",
+        "failure_stage": "ANCHOR_CARD",
+        "attempt": 2,
+        "failure_category": "OUTPUT_CONTRACT",
+        "error_type": "PositionCardContractError",
+        "error_location": warning["error_location"],
+    }
     assert raw_message not in repr(events)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ProviderTimeoutError(),
+        InputVersionChangedError("changed"),
+        LeaseNotHeldError("lost"),
+    ],
+)
+def test_non_terminal_outcomes_do_not_emit_terminal_alarm_events(
+    monkeypatch: pytest.MonkeyPatch, error: BaseException
+) -> None:
+    events: list[str] = []
+
+    class RecordingLogger:
+        def warning(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+        def error(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+    monkeypatch.setattr(pipeline, "logger", RecordingLogger())
+    advance_with_error(monkeypatch, error)
+
+    assert "ai_terminal_failure" not in events
+
+
+def test_lost_lease_during_terminal_commit_does_not_emit_an_alarm_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    class RecordingLogger:
+        def warning(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+        def error(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+    monkeypatch.setattr(pipeline, "logger", RecordingLogger())
+    outcome, _, _ = advance_with_error(
+        monkeypatch,
+        PositionCardContractError("invalid"),
+        fail_count=0,
+    )
+
+    assert outcome is pipeline.StepOutcome.LEASE_LOST
+    assert "ai_terminal_failure" not in events
 
 
 @pytest.mark.parametrize("kind", ["retry", "failure"])

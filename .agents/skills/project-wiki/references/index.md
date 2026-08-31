@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-08-31
 ---
 
 # 프로젝트 위키 인덱스
@@ -22,6 +22,7 @@ updated: 2026-08-27
 | [contracts/api.md](contracts/api.md) | HTTP API 계약을 만들거나 바꿀 때 |
 | [contracts/f3-ai.md](contracts/f3-ai.md) | F3 포지션 카드·중개 판정의 Backend–AI 입력·결과, 어휘, 근거와 개인정보 경계를 확인하거나 바꿀 때 |
 | [contracts/events.md](contracts/events.md) | 큐 메시지 또는 이벤트 계약을 만들거나 바꿀 때 |
+| [contracts/observability.md](contracts/observability.md) | 오류 로그·metric·alarm·모듈별 오류 대응 경계를 확인하거나 바꿀 때 |
 | [privacy/policy.md](privacy/policy.md) | 개인정보를 수집·저장·전송·기록할 가능성이 있을 때 |
 | [decisions/index.md](decisions/index.md) | 아키텍처·정책 변경 전에 승인된 결정을 확인할 때 |
 | [open-questions.md](open-questions.md) | 미확정 사항에 의존하거나 새 질문이 생겼을 때 |

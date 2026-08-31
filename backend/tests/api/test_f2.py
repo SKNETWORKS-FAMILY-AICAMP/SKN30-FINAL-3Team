@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from typing import cast
 
+import pytest
+from brokerage_ai.core.errors import ProviderTimeoutError
 from brokerage_ai.f2 import (
     ConsultationType,
+    EmptyTranscriptionError,
+    F2PipelineError,
     F2PipelineRequest,
     F2PipelineResult,
     FieldProposal,
@@ -12,6 +18,7 @@ from brokerage_ai.f2 import (
 )
 from fastapi.testclient import TestClient
 
+import main
 from api.f2 import get_f2_pipeline
 from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser, UserRole
@@ -19,15 +26,18 @@ from main import create_app
 
 
 class FakePipeline:
-    def __init__(self) -> None:
+    def __init__(self, error: Exception | None = None) -> None:
         self.request: F2PipelineRequest | None = None
         self.audio_bytes = b""
         self.temp_path: Path | None = None
+        self.error = error
 
     async def run(self, request: F2PipelineRequest) -> F2PipelineResult:
         self.request = request
         self.temp_path = request.audio_path
         self.audio_bytes = request.audio_path.read_bytes()
+        if self.error is not None:
+            raise self.error
         return F2PipelineResult(
             transcript="한강아파트를 12억에 매도합니다.",
             transcription_model="openai/whisper-large-v3-turbo",
@@ -126,3 +136,79 @@ def test_rejects_unsupported_audio_without_calling_pipeline(config) -> None:
 
     assert response.status_code == 422
     assert pipeline.request is None
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code", "error_code"),
+    [
+        (ProviderTimeoutError(), 503, "F2_UNAVAILABLE"),
+        (F2PipelineError("raw transcript must stay private"), 502, "F2_PROCESSING_FAILED"),
+    ],
+)
+def test_f2_502_and_503_emit_exactly_one_safe_terminal_event(
+    config,
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    status_code: int,
+    error_code: str,
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+
+    class RecordingLogger:
+        def error(self, event: str, **values: object) -> None:
+            events.append((event, values))
+
+    monkeypatch.setattr(main, "logger", RecordingLogger())
+    pipeline = FakePipeline(error)
+    with client_with_pipeline(config, pipeline) as client:
+        response = client.post(
+            "/api/v1/f2/analyses",
+            files={"audio": ("memo.wav", b"audio-content", "audio/wav")},
+            data={
+                "ledger_type": "매물장",
+                "current_fields": "{}",
+                "privacy_confirmed": "true",
+            },
+        )
+
+    assert response.status_code == status_code
+    assert response.json()["code"] == error_code
+    assert len(events) == 1
+    event, values = events[0]
+    assert event == "ai_terminal_failure"
+    assert values["component"] == "ai"
+    assert values["source"] == "f2"
+    assert values["request_id"] == response.json()["request_id"]
+    assert values["status_code"] == status_code
+    assert values["error_code"] == error_code
+    assert values["failure_stage"] == "F2_ANALYSIS"
+    assert values["error_type"] == type(error).__name__
+    assert re.fullmatch(r"[A-Za-z0-9_.<>]+:[^:]+:\d+", cast(str, values["error_location"]))
+    assert "raw transcript" not in repr(events)
+
+
+def test_empty_transcription_remains_422_without_a_terminal_event(
+    config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+
+    class RecordingLogger:
+        def error(self, event: str, **values: object) -> None:
+            events.append((event, values))
+
+    monkeypatch.setattr(main, "logger", RecordingLogger())
+    pipeline = FakePipeline(EmptyTranscriptionError("raw transcript must stay private"))
+    with client_with_pipeline(config, pipeline) as client:
+        response = client.post(
+            "/api/v1/f2/analyses",
+            files={"audio": ("memo.wav", b"audio-content", "audio/wav")},
+            data={
+                "ledger_type": "매물장",
+                "current_fields": "{}",
+                "privacy_confirmed": "true",
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "VALIDATION_FAILED"
+    assert events == []

@@ -21,7 +21,7 @@ check:
     terraform fmt -check -recursive .
     terraform -chdir=bootstrap validate
     terraform -chdir=environments/dev validate
-    uvx ruff check scripts/manage_db_access.py scripts/manage_dev_power.py deploy/scripts/render_env.py delivery/lambda/discord_notifier.py tests
+    uvx ruff check scripts/manage_db_access.py scripts/manage_dev_power.py deploy/scripts/render_env.py delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py tests
     uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
 
 # 모든 Terraform 파일을 포맷한다.

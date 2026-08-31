@@ -118,10 +118,12 @@ async def analyze_voice_memo(
         )
     except EmptyTranscriptionError:
         raise ValidationError("음성에서 분석 가능한 텍스트를 찾지 못했습니다.") from None
-    except ProviderError:
-        raise F2UnavailableError() from None
-    except F2PipelineError:
-        raise F2ProcessingError() from None
+    except ProviderError as error:
+        # The public exception keeps only a private cause for safe type/location diagnostics.
+        # The response and log never copy the Provider message or payload.
+        raise F2UnavailableError() from error
+    except F2PipelineError as error:
+        raise F2ProcessingError() from error
     finally:
         await audio.close()
         if temp_path is not None:

@@ -4,6 +4,7 @@ from typing import cast
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session
 
 from domain.agent_execution import service
@@ -57,9 +58,7 @@ def test_user_request_promotes_ledger_save_run_in_every_handoff_state(
             target_requirement_id=None,
         ),
     )
-    monkeypatch.setattr(
-        service.repository, "find_reusable_active_run", lambda *_args: existing
-    )
+    monkeypatch.setattr(service.repository, "find_reusable_active_run", lambda *_args: existing)
 
     def resume(_session: Session, run_id: int, brokerage_id: int, trigger_type: str) -> int:
         resumed.append((run_id, brokerage_id, trigger_type))
@@ -83,3 +82,72 @@ def test_user_request_promotes_ledger_save_run_in_every_handoff_state(
     assert result.requested_by == 4
     assert session.commits == 1
     assert session.rollbacks == 0
+
+
+def test_attempt_exhaustion_emits_one_terminal_event_after_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = IntakeSession()
+    events: list[tuple[str, dict[str, object], int]] = []
+
+    class RecordingLogger:
+        def error(self, event: str, **values: object) -> None:
+            events.append((event, values, session.commits))
+
+    monkeypatch.setattr(service, "logger", RecordingLogger())
+    monkeypatch.setattr(
+        service.repository,
+        "fail_runs_over_attempt_limit",
+        lambda *_args: 2,
+    )
+    monkeypatch.setattr(service.repository, "lock_claimable_run", lambda *_args: None)
+
+    claimed = service.claim_next_run(cast(Session, session), "worker-test")
+
+    assert claimed is None
+    assert events == [
+        (
+            "ai_terminal_failure",
+            {
+                "component": "ai",
+                "source": "f3",
+                "status": "FAILED_TERMINAL",
+                "failure_stage": "EXECUTION",
+                "attempt": service.MAX_CLAIM_ATTEMPTS,
+                "failure_category": "LEASE",
+                "error_code": "LEASE_EXPIRED_MAX_ATTEMPTS",
+                "error_type": "AttemptLimitExceeded",
+                "terminal_count": 2,
+            },
+            1,
+        )
+    ]
+
+
+def test_attempt_exhaustion_does_not_log_when_commit_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingSession(IntakeSession):
+        def commit(self) -> None:
+            raise SQLAlchemyError("commit failed")
+
+    events: list[str] = []
+
+    class RecordingLogger:
+        def error(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+    session = FailingSession()
+    monkeypatch.setattr(service, "logger", RecordingLogger())
+    monkeypatch.setattr(
+        service.repository,
+        "fail_runs_over_attempt_limit",
+        lambda *_args: 1,
+    )
+    monkeypatch.setattr(service.repository, "lock_claimable_run", lambda *_args: None)
+
+    with pytest.raises(SQLAlchemyError, match="commit failed"):
+        service.claim_next_run(cast(Session, session), "worker-test")
+
+    assert session.rollbacks == 1
+    assert events == []

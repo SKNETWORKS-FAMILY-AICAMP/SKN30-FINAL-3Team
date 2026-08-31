@@ -185,7 +185,7 @@ def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
     선점이 함께 취소되어 어중간한 상태가 남지 않는다.
     """
     try:
-        repository.fail_runs_over_attempt_limit(
+        terminal_count = repository.fail_runs_over_attempt_limit(
             session,
             MAX_CLAIM_ATTEMPTS,
             LEASE_EXPIRED_FAILURE_CODE,
@@ -201,6 +201,21 @@ def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
     except SQLAlchemyError:
         session.rollback()
         raise
+
+    if terminal_count > 0:
+        # The cleanup and claim share a transaction; log only after its commit succeeds.
+        logger.error(
+            "ai_terminal_failure",
+            component="ai",
+            source="f3",
+            status="FAILED_TERMINAL",
+            failure_stage="EXECUTION",
+            attempt=MAX_CLAIM_ATTEMPTS,
+            failure_category="LEASE",
+            error_code=LEASE_EXPIRED_FAILURE_CODE,
+            error_type="AttemptLimitExceeded",
+            terminal_count=terminal_count,
+        )
 
     return claimed
 

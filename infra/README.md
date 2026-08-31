@@ -81,7 +81,9 @@ just setup-existing 2026-09-23
 
 ### 수동 비밀값 준비
 
-Setup과 `just verify-account`는 비밀값 없이 실행할 수 있다. 실제 dev plan 전에 AI provider key와 Discord webhook처럼 사람이 제공하는 비밀값을 별도 ignored tfvars에 준비한다.
+Setup과 `just verify-account`는 비밀값 없이 실행할 수 있다. 실제 dev plan 전에 AI provider key와
+delivery·Alarm용으로 각각 만든 Discord webhook처럼 사람이 제공하는 비밀값을 별도 ignored
+tfvars에 준비한다.
 
 ```bash
 cp environments/dev/secrets.example.tfvars environments/dev/secrets.auto.tfvars
@@ -89,7 +91,8 @@ chmod 600 environments/dev/secrets.auto.tfvars
 ```
 
 - `ai_provider_api_keys`: `AI_OPENAI_API_KEY`, `AI_VLLM_LLM_API_KEY`, `AI_VLLM_STT_API_KEY`는 필수이고 Embedding 등 다른 vLLM API key는 필요할 때 추가한다.
-- `discord_webhook_url`: Discord webhook HTTPS URL을 입력한다.
+- `discord_webhook_url`: 기존 CodePipeline·CodeDeploy 알림용 Discord webhook HTTPS URL을 입력한다.
+- `alarm_discord_webhook_url`: 사람이 Discord에서 CloudWatch Alarm 전용 webhook을 새로 생성한 뒤 그 HTTPS URL을 입력한다. 기존 delivery webhook을 복사하거나 재사용하지 않는다.
 - 각 `*_secret_version`: 비밀값을 바꿀 때 함께 1씩 증가시킨다.
 
 Terraform은 `.auto.tfvars`를 plan과 saved-plan apply에서 자동으로 다시 읽는다. Ephemeral 비밀값은 plan/state에 저장되지 않으므로 승인된 plan과 apply 사이에 이 파일을 수정하지 않는다.

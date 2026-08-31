@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-08-31
 ---
 
 # Infra 결정 인덱스
@@ -21,3 +21,4 @@ updated: 2026-08-27
 | [ADR-0012](ADR-0012-existing-iam-operators.md) | 승인됨 | 기존 IAM 운영자에 최소 권한 Pipeline policy 직접 연결 |
 | [ADR-0013](ADR-0013-dev-environment-materialization.md) | 승인됨 | Terraform 설정 정본, write-only 수동 비밀과 프로세스별 환경파일 사용 |
 | [ADR-0014](ADR-0014-dev-deep-power-lifecycle.md) | 승인됨 | ALB 삭제·CloudFront 비활성화를 포함한 검토 가능한 dev deep 전원 운영 |
+| [ADR-0015](ADR-0015-cloudwatch-alarm-discord-delivery.md) | 승인됨·코드 구현, 미적용 | CloudWatch Alarm을 전용 SNS·Lambda와 새 Discord webhook Secret으로 분리 전달 |
