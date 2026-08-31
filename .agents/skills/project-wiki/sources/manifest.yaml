@@ -1,7 +1,27 @@
 version: 1
-updated: "2026-08-27"
+updated: "2026-08-31"
 
 sources:
+  - id: "f3-judgment-candidate-limit-2026-08-31"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-08-31)"
+    received: "2026-08-31"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-08-31"
+    reflected_in:
+      - "docs/requirements/f3/delegates-and-brokerage.md"
+      - "docs/requirements/common/revision-history.md"
+      - "docs/requirements/changelog.md"
+      - "docs/requirements/traceability.yaml"
+      - ".agents/skills/project-wiki/references/contracts/f3-ai.md"
+      - ".agents/skills/project-wiki/references/contracts/api.md"
+      - "docs/architecture/f3/overview.md"
+      - "docs/architecture/f3/online-runtime.md"
+      - "docs/architecture/f3/offline-data-evaluation.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: "프로젝트 요청자가 F3-BR-12·13의 기존 상위 15건 규칙을 최초 후보 카드화·AI 판정 상위 5건으로 대체하도록 승인하고, 전체 SQL 후보·결정적 순위·남은 건수·페이징은 유지"
+
   - id: "f3-cross-judgment-manual-trigger-2026-08-27"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-08-27)"

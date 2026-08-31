@@ -276,7 +276,7 @@ function CandidateGroups({
 /**
  * 아직 판정되지 않은 SQL 후보.
  *
- * 카드화 대상은 상위 15건이라 나머지는 등급 없이 목록에만 남는다. 이것을 판정 실패로 보여주면
+ * 카드화 대상은 상위 5건이라 나머지는 등급 없이 목록에만 남는다. 이것을 판정 실패로 보여주면
  * 사용자가 서버가 무언가를 놓쳤다고 오해한다.
  */
 function PendingGroup({ candidates, selectedId, onSelect }: GroupProps) {
@@ -727,6 +727,7 @@ export function CrossMatchPanel({
     state,
     candidates,
     candidatesTotal,
+    cardedCount,
     limit,
     offset,
     criteria,
@@ -872,7 +873,7 @@ export function CrossMatchPanel({
                         </h3>
                       </div>
                       <Label color="grey" variant="outline">
-                        표시 {visibleCandidates.length}건 · 전체 {candidatesTotal}건
+                        상위 {cardedCount}건 판정 · 전체 {candidatesTotal}건
                       </Label>
                     </div>
                     <CandidateGroups

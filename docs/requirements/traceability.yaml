@@ -1,9 +1,28 @@
 version: 1
-updated: "2026-08-27"
+updated: "2026-08-31"
 
 # 상세 요구사항은 분할 Markdown 정본에만 둔다.
 # 구현 또는 테스트가 생긴 PR에서 요구사항 ID별 경로를 추가한다.
 requirements:
+  - id: F3-BR-12
+    summary: 최초 카드화·AI 판정 후보를 최대 5건으로 제한
+    implementation:
+      - ai/src/brokerage_ai/f3/judgment_contracts.py
+      - backend/src/domain/agent_execution/candidate_cards.py
+    tests:
+      - ai/tests/unit/f3/test_judgment.py
+      - backend/tests/integration/test_candidate_cards.py
+  - id: F3-BR-13
+    summary: 전체 후보 중 결정적 SQL 순위 상위 5건 우선 카드화
+    implementation:
+      - backend/src/domain/agent_execution/candidates.py
+      - backend/src/domain/agent_execution/candidate_cards.py
+      - backend/src/domain/agent_execution/results.py
+      - frontend/src/features/f3/CrossMatchPanel.tsx
+    tests:
+      - backend/tests/integration/test_candidate_selection.py
+      - backend/tests/integration/test_candidate_cards.py
+      - frontend/tests/f3-mock.test.ts
   - id: F3-CR-03
     summary: 손님 상세의 [교차 판정] 버튼으로 실행
     implementation:

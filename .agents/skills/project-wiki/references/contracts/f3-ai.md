@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # F3 포지션 카드·중개 판정 Backend–AI 계약
@@ -132,7 +132,9 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
 
 후보 포지션 카드는 별도 AI 계약이나 생성기를 만들지 않고 앵커 카드와 같은
 `PositionCardGenerator`와 검증·저장 경로를 쓴다. 다른 것은 실행의 앵커가 아닌 결정적 SQL
-후보 snapshot의 상위 15건을 대상으로 하고, 앵커와 반대인 `negotiation_side`를 쓴다는 점뿐이다.
+후보 snapshot의 상위 5건을 대상으로 하고, 앵커와 반대인 `negotiation_side`를 쓴다는 점뿐이다.
+이 상한은 [F3-BR-12·13](../../../../../docs/requirements/f3/delegates-and-brokerage.md)의
+2026-08-31 승인 결정이며 기존 상위 15건 규칙을 대체한다.
 
 - 각 후보의 현재 `row_version`, 상담 범위 identity와 입력 fingerprint를 준비·저장 시점에
   다시 확인한다.
@@ -396,7 +398,7 @@ AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로�
 | `contract_version` | `brokerage-judgment:v1` 고정 |
 | `input_privacy_mode` | `SYNTHETIC_PROTOTYPE` 또는 `MASKED` |
 | `anchor` | `JudgmentCard` 1장 |
-| `candidates` | 반대편 `JudgmentCard` 1~15장 |
+| `candidates` | 반대편 `JudgmentCard` 1~5장 |
 
 `JudgmentCard`는 내부 `card_id`, `negotiation_side`, 비식별 `target_label`과 포지션 카드 계약의
 `PositionCardAnalysis`를 그대로 담는다. 별도 카드 표현을 만들지 않는다. 후보 ID는 중복될 수
@@ -485,10 +487,10 @@ checkpoint 저장 계약은 AI-OQ-004로 계속 미확정이다.
 - AI 호출 전후 transaction 분리와 lease·attempt·입력 버전·상담 범위·source identity 재검증
 - 검증된 카드·거래 유형별 가격·근거 인용과 quote offset 저장
 - cache hit 재사용과 저장 경합 단일화, `ANCHOR_READY` 상태 전이
-- 결정적 SQL 후보 snapshot의 상위 15건에 대한 반대편 카드 순차 생성·캐시 재사용
+- 결정적 SQL 후보 snapshot의 상위 5건에 대한 반대편 카드 순차 생성·캐시 재사용
 - 후보 카드 ID snapshot 기록과 전건 성공 후 `CANDIDATE_CARDS_READY` 상태 전이
 - 중개 판정 계약 `brokerage-judgment:v1`, 등급·행동·근거 어휘와 프레임워크 중립 Protocol
-- 앵커 1장과 후보 1~15장을 한 번에 보내는 Provider 중립 구조화 출력 생성기
+- 앵커 1장과 후보 1~5장을 한 번에 보내는 Provider 중립 구조화 출력 생성기
 - 합성 입력 이중 opt-in과 생성 결과 반환 전 후보 집합·순위·근거 교차 검증
 - 저장된 앵커·후보 카드의 판정 요청 조립과 `SYNTHETIC_PROTOTYPE` privacy mode 고정
 - AI 호출 전후 transaction 분리와 lease·attempt·바인딩·앵커·후보 장부 버전·후보 집합 재검증

@@ -1,6 +1,6 @@
 """후보 포지션 카드 확보 단계.
 
-`CANDIDATES_READY` snapshot 의 상위 15건에 대해 **반대편** 측면의 포지션 카드를 확보하고
+`CANDIDATES_READY` snapshot 의 상위 5건에 대해 **반대편** 측면의 포지션 카드를 확보하고
 `CANDIDATE_CARDS_READY` 로 옮긴다.
 
 카드 생성 자체는 `anchor_card` 의 공용 경로를 그대로 쓴다. 여기서 하는 일은 어느 대상의
@@ -29,6 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import structlog
 from brokerage_ai.f3 import PositionCardGenerationResult
 from sqlmodel import Session
 
@@ -55,6 +56,8 @@ from domain.agent_execution.models import (
 )
 from domain.agent_execution.service import current_target_version
 
+logger = structlog.get_logger()
+
 
 class CandidateSelectionMissingError(RuntimeError):
     """`CANDIDATES_READY` 인데 읽을 수 있는 후보 snapshot 이 없다.
@@ -66,7 +69,7 @@ class CandidateSelectionMissingError(RuntimeError):
 
 @dataclass(frozen=True)
 class CandidateCardPlan:
-    """이번 단계에서 카드를 확보할 대상. snapshot 이 정한 상위 15건이다."""
+    """이번 단계에서 카드를 확보할 대상. snapshot 이 정한 상위 5건이다."""
 
     candidate_side: AnchorType
     candidate_ids: tuple[int, ...]
@@ -105,7 +108,7 @@ def _opposite(anchor_type: AnchorType) -> AnchorType:
 
 
 def _plan_from_snapshot(run: AgentRun, header: repository.MatchEvaluation) -> CandidateCardPlan:
-    """snapshot 에서 카드화 대상만 뽑는다. 15건 이후는 이 단계가 건드리지 않는다."""
+    """snapshot 에서 카드화 대상만 뽑는다. 5건 이후는 이 단계가 건드리지 않는다."""
     snapshot = header.candidate_selection_snapshot
     if snapshot.get("schema") != CANDIDATE_SELECTION_SCHEMA_VERSION:
         raise CandidateSelectionMissingError("the candidate selection snapshot is unreadable")
@@ -283,47 +286,60 @@ async def generate_and_store_candidate_cards(
 
     cards: list[CandidateCard] = []
     input_tokens = output_tokens = latency_ms = 0
-    for candidate_id in plan.candidate_ids:
-        prepared = prepare_generation(
-            session,
-            run_id,
-            worker_id,
-            attempt_count,
-            binding,
-            target=CardTarget(anchor_type=plan.candidate_side, anchor_id=candidate_id),
-            expected_status=CANDIDATES_READY_STATUS,
-            as_of=moment,
-        )
-        result: PositionCardGenerationResult | None = None
-        if prepared.request is not None:
-            # cache miss 일 때만 모델을 부른다. transaction 은 이미 닫혀 있다.
-            result = await binding.generator.generate_position_card(prepared.request)
-            diagnostics = result.diagnostics
-            usage = diagnostics.usage if diagnostics else None
-            if usage is not None:
-                input_tokens += usage.input_tokens
-                # total 만 오는 Provider 가 있어 output 을 total 로 덮지 않는다.
-                output_tokens += usage.output_tokens or 0
-            if diagnostics is not None:
-                latency_ms += int(diagnostics.latency_ms)
-
-        analysis_id = store_position_card(
-            session,
-            run_id,
-            worker_id,
-            attempt_count,
-            binding,
-            prepared,
-            result,
-            expected_status=CANDIDATES_READY_STATUS,
-        )
-        cards.append(
-            CandidateCard(
-                candidate_id=candidate_id,
-                position_analysis_id=analysis_id,
-                cache_hit=result is None,
+    for candidate_ordinal, candidate_id in enumerate(plan.candidate_ids, start=1):
+        try:
+            prepared = prepare_generation(
+                session,
+                run_id,
+                worker_id,
+                attempt_count,
+                binding,
+                target=CardTarget(anchor_type=plan.candidate_side, anchor_id=candidate_id),
+                expected_status=CANDIDATES_READY_STATUS,
+                as_of=moment,
             )
-        )
+            result: PositionCardGenerationResult | None = None
+            if prepared.request is not None:
+                # cache miss 일 때만 모델을 부른다. transaction 은 이미 닫혀 있다.
+                result = await binding.generator.generate_position_card(prepared.request)
+                diagnostics = result.diagnostics
+                usage = diagnostics.usage if diagnostics else None
+                if usage is not None:
+                    input_tokens += usage.input_tokens
+                    # total 만 오는 Provider 가 있어 output 을 total 로 덮지 않는다.
+                    output_tokens += usage.output_tokens or 0
+                if diagnostics is not None:
+                    latency_ms += int(diagnostics.latency_ms)
+
+            analysis_id = store_position_card(
+                session,
+                run_id,
+                worker_id,
+                attempt_count,
+                binding,
+                prepared,
+                result,
+                expected_status=CANDIDATES_READY_STATUS,
+            )
+            cards.append(
+                CandidateCard(
+                    candidate_id=candidate_id,
+                    position_analysis_id=analysis_id,
+                    cache_hit=result is None,
+                )
+            )
+        except BaseException as error:
+            # 후보 순번과 고정 오류 타입만 남긴다. 후보 표시명, 상담 본문,
+            # Provider 응답과 예외 메시지는 로그하지 않는다.
+            logger.warning(
+                "f3_candidate_card_failed",
+                run_id=run_id,
+                attempt=attempt_count,
+                candidate_ordinal=candidate_ordinal,
+                candidate_count=len(plan.candidate_ids),
+                error_type=type(error).__name__,
+            )
+            raise
 
     stored = tuple(cards)
     _record_cards(
