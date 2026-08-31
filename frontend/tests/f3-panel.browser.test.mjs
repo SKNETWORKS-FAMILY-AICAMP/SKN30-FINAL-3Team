@@ -172,13 +172,18 @@ test("상세 진입은 판정을 시작하지 않고 두 버튼이 각각 실행
   await page.getByText("기준 세대 확인").waitFor();
   await page.close();
 
-  // 레일 버튼도 같은 실행을 요청한다.
+  // 레일 버튼도 같은 실행을 요청한다. 여닫기가 아니므로 aria-expanded를 갖지 않는다.
   const rail = await browser.newPage();
   const railLinks = await openPropertyLedger(rail);
   await railLinks.nth(1).click();
   assert.equal(await rail.locator("#cross-match-panel").count(), 0);
-  await rail.getByRole("button", { name: "교차 판정", exact: true }).click();
+  const railButton = rail.getByRole("button", { name: "교차 판정", exact: true });
+  assert.equal(await railButton.getAttribute("aria-expanded"), null);
+  // 패널이 없는 동안에는 없는 id를 가리키지 않는다.
+  assert.equal(await railButton.getAttribute("aria-controls"), null);
+  await railButton.click();
   await rail.locator("#cross-match-panel").waitFor();
+  assert.equal(await railButton.getAttribute("aria-controls"), "cross-match-panel");
   await rail.getByText("기준 세대 확인").waitFor();
   await rail.close();
 
