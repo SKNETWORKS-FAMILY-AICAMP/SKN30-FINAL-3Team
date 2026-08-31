@@ -104,6 +104,44 @@ async function runCrossJudgment(page) {
   return panel;
 }
 
+/**
+ * 두 버튼의 역할이 다르다.
+ *
+ * 레일의 [교차 판정]은 섹션을 여닫기만 하고, 섹션 안의 [교차 판정 실행]이 판정을 시작한다.
+ * 여닫기가 실행을 겸하면 접어 두려고 누른 버튼이 판정을 새로 세운다.
+ */
+test("레일 버튼은 섹션을 여닫기만 하고 판정은 실행 버튼이 시작한다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage();
+  const failures = [];
+  page.on("pageerror", (error) => failures.push(String(error)));
+
+  const links = await openPropertyLedger(page);
+  await links.nth(1).click();
+
+  const section = page.locator("#detail-section-cross-match");
+  const rail = page.getByRole("button", { name: "교차 판정", exact: true });
+  await section.waitFor();
+  // 상세를 열면 섹션은 펴져 있고 판정은 아직 돌지 않는다.
+  assert.equal(await page.locator("#cross-match-panel").count(), 0);
+
+  // 접는다. 판정은 여전히 시작하지 않는다.
+  await rail.click();
+  await section.waitFor({ state: "detached" });
+  assert.equal(await page.locator("#cross-match-panel").count(), 0);
+
+  // 다시 편다. 여기까지도 실행은 없다.
+  await rail.click();
+  await section.waitFor();
+  assert.equal(await page.locator("#cross-match-panel").count(), 0);
+
+  // 실행 버튼을 눌러야 판정이 시작된다.
+  await runCrossJudgment(page);
+  await page.getByText("기준 세대 확인").waitFor();
+
+  assert.deepEqual(failures, []);
+  await page.close();
+});
+
 test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
   const failures = [];

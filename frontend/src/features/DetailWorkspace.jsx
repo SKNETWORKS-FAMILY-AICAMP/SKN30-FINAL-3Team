@@ -162,14 +162,22 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const [complexQuickAddStatus, setComplexQuickAddStatus] = useState("");
   /* 음성 메모 제안이 이미 값이 있는 칸을 덮어쓰려 할 때만 채워지는 확인 대기 상태. */
   const [replaceDecision, setReplaceDecision] = useState(null);
+  /*
+   * 교차 판정 섹션을 펼쳐 둘지.
+   *
+   * 실행 여부(isCrossMatchOpen)와는 다른 축이다. 판정을 실행한 뒤에도 다른 칸을 보려고
+   * 섹션을 접을 수 있고, 접었다 펴면 이미 접수된 실행을 그대로 이어받는다.
+   */
+  const [crossMatchSectionOpen, setCrossMatchSectionOpen] = useState(true);
   const initializedOpenRef = useRef(false);
   const securityRef = useRef(null);
   const detailCloseTriggerRef = useRef(null);
   const closeReturnFocusRef = useRef(null);
   const deleteTriggerRef = useRef(null);
   const keepExistingRef = useRef(null);
+  const crossMatchSectionRef = useRef(null);
 
-  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setDuplicateBlock(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); setReplaceDecision(null); }, [focusF2Request, isOpen, row]);
+  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setDuplicateBlock(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); setReplaceDecision(null); setCrossMatchSectionOpen(true); }, [focusF2Request, isOpen, row]);
   useEffect(() => { if (isOpen && focusF2Request) setF2Open(true); }, [focusF2Request, isOpen]);
   useEffect(() => { if (securityWarning) securityRef.current?.focus(); }, [securityWarning]);
   /* 확인을 받는 쪽이 덮어쓰기이므로, 처음 잡히는 초점은 기존 값을 지키는 버튼에 둔다. */
@@ -252,6 +260,24 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     if (isDeleting) return;
     setDeleteDecision(false);
     window.requestAnimationFrame(() => deleteTriggerRef.current?.focus());
+  };
+  /*
+   * 레일의 [교차 판정]은 섹션을 여닫기만 한다.
+   *
+   * 판정을 시작하는 것은 섹션 안의 [교차 판정 실행]이다. 여닫기가 실행을 겸하면 잠시
+   * 접어 두려고 누른 버튼이 판정을 새로 세우게 되어, 실행 시점을 사용자가 정한다는
+   * 전제(F3-CR-03·04)가 다시 무너진다.
+   *
+   * 접으면 패널이 화면에서 빠지므로 브라우저 확인만 멈춘다. 서버 실행을 취소하지는
+   * 않으며 다시 펴면 같은 입력 버전의 활성 실행을 이어받는다.
+   */
+  const toggleCrossMatchSection = () => {
+    if (crossMatchSectionOpen) { setCrossMatchSectionOpen(false); return; }
+    setCrossMatchSectionOpen(true);
+    window.requestAnimationFrame(() => {
+      crossMatchSectionRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      crossMatchSectionRef.current?.querySelector("h2")?.focus();
+    });
   };
   const closeCloseDecision = () => {
     if (isSaving) return;
@@ -383,17 +409,20 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
           * 패널이 열리는 순간 실행이 확보되므로, 이 섹션을 저장이나 상세 진입으로 열지
           * 않는다. 저장이 접수한 실행은 서버에 남아 있고 버튼을 누르면 같은 입력 버전의
           * 활성 실행을 그대로 이어받는다.
+          *
+          * 두 버튼의 역할이 다르다. 레일의 [교차 판정]은 이 섹션을 여닫고, 섹션 안의
+          * [교차 판정 실행]이 판정을 시작한다.
           */}
-        <section id="detail-section-cross-match" className={`detail-section${isCrossMatchOpen ? " detail-section--cross-match-open" : ""}`} aria-labelledby={isCrossMatchOpen ? "cross-match-panel-title" : "detail-cross-match-heading"} data-screen-id="F3-PNL-010" data-requirement-ids="F3-CR-03~04">
+        {crossMatchSectionOpen && <section ref={crossMatchSectionRef} id="detail-section-cross-match" className={`detail-section${isCrossMatchOpen ? " detail-section--cross-match-open" : ""}`} aria-labelledby={isCrossMatchOpen ? "cross-match-panel-title" : "detail-cross-match-heading"} data-screen-id="F3-PNL-010" data-requirement-ids="F3-CR-03~04">
           {/* 패널이 열리면 패널 자신의 머리말이 같은 제목과 [닫기]를 들고 있다. 여기서 또 그리면 제목이 둘이 된다. */}
           {!isCrossMatchOpen && <div className="detail-section__heading">
-            <div><Title headingLevel="h2" id="detail-cross-match-heading" size="md">교차 판정</Title><span>{isDirty ? "저장된 매물 건을 기준으로 판정합니다. 지금 화면의 미저장 변경은 반영되지 않습니다." : "저장된 매물 건을 기준으로 조건이 맞는 손님 후보를 찾습니다."}</span></div>
+            <div><Title headingLevel="h2" id="detail-cross-match-heading" size="md" tabIndex={-1}>교차 판정</Title><span>{isDirty ? "저장된 매물 건을 기준으로 판정합니다. 지금 화면의 미저장 변경은 반영되지 않습니다." : "저장된 매물 건을 기준으로 조건이 맞는 손님 후보를 찾습니다."}</span></div>
             <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-controls="cross-match-panel">교차 판정 실행</Button>
           </div>}
           {crossMatchPanel}
-        </section>
+        </section>}
       </main>
-      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
+      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={toggleCrossMatchSection} aria-expanded={crossMatchSectionOpen} aria-controls="detail-section-cross-match">교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
     </div>
     {replaceDecision && <div className="detail-workspace__decision-layer" role="presentation"><section className="detail-workspace__decision-card" role="alertdialog" aria-modal="true" aria-labelledby="replace-decision-title" aria-describedby="replace-decision-effect"><div className="decision-card__icon decision-card__icon--warning"><MicrophoneIcon aria-hidden="true" /></div><Title headingLevel="h2" id="replace-decision-title" size="lg">이미 입력된 값을 음성 메모 값으로 바꿀까요?</Title><p id="replace-decision-effect">아래 {replaceDecision.replacements.length}개 칸에는 이미 값이 있습니다. 바꾸면 기존 값은 이 화면에서 되돌릴 수 없습니다. 어느 쪽을 골라도 장부에 저장하지는 않습니다.</p><ul className="decision-card__replacements">{replaceDecision.replacements.map((item) => <li key={item.fieldKey}><strong>{item.field}</strong><span><em>현재</em>{item.current}</span><span><em>음성 메모</em>{item.next}</span></li>)}</ul>{f2KeptFieldCount > 0 && <p className="decision-card__kept">비어 있던 {f2KeptFieldCount}개 칸은 어느 쪽을 골라도 채웁니다.</p>}<div className="decision-card__actions"><Button variant="primary" onClick={replaceWithF2}>음성 메모 값으로 대체</Button><Button ref={keepExistingRef} variant="secondary" onClick={keepExistingOverF2}>기존 값 유지</Button></div></section></div>}
     </ModalBody>
