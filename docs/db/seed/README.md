@@ -29,37 +29,21 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 
 ## 로컬 적용
 
-`docs/db/migrate/`의 migration을 먼저 끝까지 적용한 뒤 실행한다.
+`docs/db/migrate/`의 migration을 먼저 끝까지 적용하고 API와 Worker를 중지한 뒤 실행한다.
+`backend/.env`에는 로컬 PostgreSQL을 가리키는 `DB_URL`이 설정되어 있어야 한다.
 
-`infra/local/.env`의 로컬 DB 설정을 현재 셸에 불러온다. 아래 명령은 그 파일의
-`POSTGRES_USER`와 `POSTGRES_DB`를 사용하며 특정 계정·DB 이름을 고정하지 않는다.
-
-```bash
-set -a
-source infra/local/.env
-set +a
-```
+`backend/`에서 다음 관리 명령을 실행한다. `--confirm-reset`은 기존 합성 사무소의 장부와 실행
+결과를 지우고 재적재한다는 명시적 확인이며, 이 옵션 없이는 실행하지 않는다.
 
 ```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/001_F3_SYNTHETIC_RESET.sql
+cd backend
+uv run python src/manage.py seed-f3-synthetic --confirm-reset
 ```
 
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/002_F3_SYNTHETIC_SEED.sql
-```
-
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/003_F3_SYNTHETIC_VERIFY.sql
-```
-
-두 파일을 순서대로 돌리면 몇 번을 반복해도 같은 상태가 된다. 검증 결과의 마지막 열이
-전부 `PASS`여야 다음 단계로 넘어간다.
+명령은 `APP_ENV=local`이고 `DB_URL` 호스트가 `localhost` 또는 loopback IP일 때만 동작한다.
+임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` seed → `003` verify를 고정 순서로
+실행한다. 29개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
+`verification_checks`를 출력한다. 몇 번을 반복해도 합성 사무소 ID와 같은 데이터 상태를 유지한다.
 
 ## 공유 dev 적용
 
@@ -91,7 +75,7 @@ F3 작업이 없을 때만 실행한다.
 
 ```dotenv
 AUTH_DEVELOPMENT_ENABLED=true
-AUTH_DEVELOPMENT_BROKERAGE_ID=<002 출력값>
+AUTH_DEVELOPMENT_BROKERAGE_ID=<brokerage_id 출력값>
 AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 ```
 

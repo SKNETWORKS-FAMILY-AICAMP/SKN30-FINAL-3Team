@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 
 from sqlmodel import Session
 
@@ -17,6 +18,7 @@ from domain.property_ledger.commands import (
     has_sample_ledger,
     seed_sample_ledger,
 )
+from synthetic_seed import SyntheticSeedError, seed_f3_synthetic
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,12 +45,34 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="해당 사무소의 기존 장부 데이터를 지우고 다시 만든다",
     )
+
+    f3_seed = subcommands.add_parser(
+        "seed-f3-synthetic",
+        help="로컬 loopback DB의 F3 합성 seed를 초기화하고 검증한다",
+    )
+    f3_seed.add_argument(
+        "--confirm-reset",
+        action="store_true",
+        help="F3_SYNTHETIC 합성 사무소의 기존 장부와 실행 결과 삭제를 확인한다",
+    )
     return parser
 
 
 def main() -> None:
     arguments = build_parser().parse_args()
     config = get_config()
+
+    if arguments.command == "seed-f3-synthetic":
+        try:
+            result = seed_f3_synthetic(
+                config,
+                confirm_reset=arguments.confirm_reset,
+            )
+        except SyntheticSeedError as error:
+            raise SystemExit(str(error)) from None
+        print(json.dumps(asdict(result), ensure_ascii=False))
+        return
+
     engine = create_database_engine(config)
 
     with Session(engine) as session:
