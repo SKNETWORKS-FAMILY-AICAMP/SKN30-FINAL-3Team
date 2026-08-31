@@ -102,6 +102,36 @@ def find_reusable_active_run(
     return session.execute(statement).scalars().first()
 
 
+def park_ledger_save_run(
+    session: Session, run_id: int, brokerage_id: int, worker_id: str, attempt_count: int
+) -> int:
+    """앵커 카드를 저장한 LEDGER_SAVE 실행을 주차하고 lease 를 비운다.
+
+    `trigger_type` 을 조건에 넣어 주차와 사용자 승격을 같은 행에서 직렬화한다. Worker 가
+    실행을 읽은 뒤 주차하기 전에 사용자 요청이 들어오면 조건이 어긋나 0행이 바뀌고,
+    호출자는 주차 대신 후보 조회로 계속 간다. 조건을 두지 않으면 그 요청이 다음 lease
+    만료까지 묻히고 계획된 handoff 가 실패 재시도로 처리된다.
+
+    lease 를 비우는 이유는 사용자 승격이 곧바로 선점 대상이 되게 하기 위해서다. 주차
+    조합은 선점과 최대 시도 정리 모두에서 제외되므로 lease 없이 남아도 집어가지 않는다.
+    """
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.trigger_type) == LEDGER_SAVE_TRIGGER_TYPE,
+            col(AgentRun.status) == ANCHOR_READY_STATUS,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+        )
+        .values(lease_owner=None, lease_expires_at=None, updated_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
 def resume_ledger_save_run(
     session: Session, run_id: int, brokerage_id: int, trigger_type: str
 ) -> int:

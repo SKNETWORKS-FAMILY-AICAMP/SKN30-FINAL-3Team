@@ -43,8 +43,12 @@ updated: 2026-08-31
   `QUEUED`·`RUNNING`·`ANCHOR_READY` 어느 상태에서든 기록하며, 요청 시점에 따라 실행이
   갈라지지 않게 한다. 이때 `trigger_type`을 요청자의 값으로 옮기고 `requested_by`는 최초
   값을 유지한다.
-- `ANCHOR_READY`에서 이어받을 때만 lease를 비운다. 진행 중인 Worker의 lease는 건드리지
-  않는다.
+- 주차는 `trigger_type`을 조건에 넣은 UPDATE로 수행하고 그 자리에서 lease를 비운다. Worker가
+  실행을 읽은 뒤 주차하기 전에 사용자 요청이 들어오면 조건이 어긋나 주차가 일어나지 않고
+  후보 조회로 이어 간다. 낡은 값만 믿고 주차하면 그 요청이 다음 lease 만료까지 묻히고
+  계획된 handoff가 실패 재시도로 처리된다.
+- 이어받기가 `ANCHOR_READY` 실행의 lease를 비우는 것도 같은 이유다. 진행 중인 Worker의
+  lease는 건드리지 않는다.
 - 주차 뒤의 첫 선점은 계획된 handoff이므로 `attempt_count`를 늘리지 않는다. 저장 단계가
   판정 단계의 실패 재시도 예산을 미리 쓰지 않게 한다.
 - 새 실행을 만들지 않는다. 새로 만들면 앵커 카드 단계를 다시 지나 저장이 이미 치른 비용을

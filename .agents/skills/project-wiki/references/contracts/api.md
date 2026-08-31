@@ -497,7 +497,9 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 배포용 Worker 프로세스(`backend/src/worker.py`)는 `claim_next_run`을 RDS polling으로 호출하고,
 저장된 상태를 기준으로 앵커 카드 → 후보 SQL → 후보 카드 → 중개 판정 유스케이스를 같은 lease
 아래에서 진행한다. 자동 접수된 실행은 앵커 카드를 저장한 뒤 같은 lease 안에서 더 진행하지 않고
-`ANCHOR_READY`에 남긴다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
+`ANCHOR_READY`에 남기며 그 자리에서 lease를 비운다. 이 주차는 `trigger_type`을 조건에 넣은
+갱신이라 사용자 판정 요청과 같은 행에서 직렬화된다. Worker가 실행을 읽은 뒤 주차하기 전에
+요청이 들어왔으면 주차하지 않고 후보 조회로 이어 간다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
 일시 Provider 오류는 상태를 보존하고 lease를 즉시 만료시켜 다음 선점이 재시도하며, 영구 계약·
 설정 오류는 `FAILED_TERMINAL`, 입력 변경은 `SUPERSEDED`로 기록한다. raw 예외와 Provider 원문은
 failure 컬럼에 저장하지 않는다.

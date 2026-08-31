@@ -238,11 +238,23 @@ async def _advance(
 
     if run.status == ANCHOR_READY_STATUS:
         # 저장이 만든 실행은 여기까지다. 앵커 포지션 카드만 만들어 두고 후보 조회와 판정은
-        # 사용자가 상세에서 요청할 때 돈다(F3-CR-01~04). 그 요청이 오면 `service` 가
-        # trigger_type 을 옮기고 lease 를 만료시켜 이 실행이 그대로 이어서 진행한다.
+        # 사용자가 상세에서 요청할 때 돈다(F3-CR-01~04, ADR-0018).
+        #
+        # 여기서 읽은 `run` 은 이미 낡았을 수 있다. 앵커 카드를 저장한 뒤 이 지점에 오기까지
+        # 사용자 요청이 `trigger_type` 을 옮겼을 수 있기 때문이다. 그래서 조건부 UPDATE 로
+        # 주차하고 바뀐 행 수로 판단한다. 0행이면 그 사이 승격된 것이므로 주차하지 않고
+        # 후보 조회로 이어 간다. 낡은 값만 믿고 주차하면 그 요청이 다음 lease 만료까지
+        # 묻히고, 계획된 handoff 가 실패 재시도로 처리된다.
         if run.trigger_type == LEDGER_SAVE_TRIGGER_TYPE:
-            logger.info("f3_run_parked_after_anchor_card", run_id=run_id)
-            return StepOutcome.SKIPPED
+            parked = repository.park_ledger_save_run(
+                session, run_id, run.brokerage_id, worker_id, attempt_count
+            )
+            if parked == 1:
+                session.commit()
+                logger.info("f3_run_parked_after_anchor_card", run_id=run_id)
+                return StepOutcome.SKIPPED
+            session.rollback()
+            logger.info("f3_run_promoted_before_parking", run_id=run_id)
         store_candidate_selection(session, run_id, worker_id, attempt_count)
         return StepOutcome.ADVANCED
 
