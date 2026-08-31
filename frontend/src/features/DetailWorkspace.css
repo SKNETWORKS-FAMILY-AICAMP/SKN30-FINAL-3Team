@@ -126,6 +126,12 @@
   margin-top: 4px;
 }
 
+/* 패널이 열리면 패널 자신이 테두리를 그린다. 섹션 상자를 겹쳐 두면 테두리가 이중이 된다. */
+.detail-section--cross-match-open {
+  padding: 0;
+  border: 0;
+}
+
 .detail-section__heading {
   display: flex;
   align-items: baseline;

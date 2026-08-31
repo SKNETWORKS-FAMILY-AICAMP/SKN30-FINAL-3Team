@@ -91,6 +91,19 @@ async function openPropertyLedger(page) {
   return links;
 }
 
+/**
+ * 상세의 [교차 판정 실행]을 눌러 판정을 시작한다.
+ *
+ * 상세 진입과 저장은 판정을 시작하지 않는다(F3-CR-03·04). 실행 시점은 사용자가 정하므로
+ * 브라우저 검사도 같은 경로로 들어간다.
+ */
+async function runCrossJudgment(page) {
+  await page.getByRole("button", { name: "교차 판정 실행", exact: true }).click();
+  const panel = page.locator("#cross-match-panel");
+  await panel.waitFor();
+  return panel;
+}
+
 test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 120_000 }, async () => {
   const page = await browser.newPage();
   const failures = [];
@@ -100,8 +113,7 @@ test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 1
   const links = await openPropertyLedger(page);
   await links.nth(1).click();
 
-  const panel = page.locator("#cross-match-panel");
-  await panel.waitFor();
+  await runCrossJudgment(page);
 
   // 접수 직후에는 진행 단계만 보이고 후보는 없다. 완료를 가장하지 않는다.
   await page.getByText("기준 세대 확인").waitFor();
@@ -145,6 +157,7 @@ test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 �
   page.on("pageerror", (error) => failures.push(String(error)));
   const links = await openPropertyLedger(page);
   await links.nth(1).click();
+  await runCrossJudgment(page);
   await page
     .locator(".cross-match-panel__grade-heading h4")
     .first()
@@ -187,6 +200,7 @@ test("장부에 없는 후보는 식별자만 보여준다", { timeout: 120_000 
   const page = await browser.newPage();
   const links = await openPropertyLedger(page);
   await links.nth(1).click();
+  await runCrossJudgment(page);
   await page
     .locator(".cross-match-panel__grade-heading h4")
     .first()

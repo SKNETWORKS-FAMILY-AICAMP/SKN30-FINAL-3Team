@@ -534,11 +534,14 @@ export function AppShell() {
     // 낙관적 반영 후 서버에 보낸다. 실패하면 행의 sync 상태가 남고 사용자에게 알린다.
     updateRow(savedRow);
     /*
-     * 저장 트리거는 그대로 둔다(F3-CR-01·02). 저장이 성공하면 서버가 실행을 접수하므로,
-     * 화면이 패널을 닫아 두면 이미 도는 판정의 결과를 아무도 보지 못한다.
-     * 화면이 보내는 실행 요청은 같은 입력 버전의 활성 실행을 재사용한다.
+     * 저장은 패널을 열지 않는다.
+     *
+     * 서버 쪽 저장 트리거는 그대로다(F3-CR-01·02). 다만 패널이 열리는 순간 화면도 실행을
+     * 확보하므로(useCrossJudgment의 enabled), 저장할 때마다 패널을 열면 결과를 볼 생각이
+     * 없는 저장에서도 판정이 돌고 사용자가 요청하지 않은 화면 전환이 일어난다.
+     * 결과를 볼 시점은 상세의 [교차 판정] 섹션에서 사용자가 정한다(F3-CR-03·04).
+     * 그때 보내는 실행 요청은 저장이 접수한, 같은 입력 버전의 활성 실행을 재사용한다.
      */
-    setCrossMatchOpen(true);
     const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
     return ledger.saveRow(savedRow).then(
