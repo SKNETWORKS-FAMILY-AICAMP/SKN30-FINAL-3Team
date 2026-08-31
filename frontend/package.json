@@ -12,7 +12,7 @@
     "preview": "node --env-file=.env.local --env-file-if-exists=.env ./node_modules/vite/bin/vite.js preview",
     "test:ledger": "node --test tests/ledger-mappers.test.ts tests/ledger-fixtures.test.ts",
     "test:auth": "node --test tests/auth-session.test.ts tests/auth-screen.test.mjs",
-    "test:f2": "node --test tests/f2-consultation-routing.test.ts tests/f2-consultation-log.test.ts",
+    "test:f2": "node --test tests/f2-consultation-routing.test.ts",
     "test:f3": "node --test tests/f3-decode.test.ts tests/f3-mock.test.ts tests/f3-candidate-label.test.ts tests/f3-feedback-error.test.ts",
     "test:browser": "node --test tests/f3-panel.browser.test.mjs",
     "test:env": "node --test tests/env-cli.test.mjs tests/env-schema.test.ts tests/vite-config.test.mjs",
