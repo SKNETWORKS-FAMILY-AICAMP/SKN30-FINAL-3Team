@@ -6,7 +6,13 @@ sources:
     type: "user-provided-direction"
     location: "Claude Code task prompt (2026-08-31)"
     received: "2026-08-31"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-08-31"
+    supersedes: "API 계약 `F1 저장 후 자동 접수`의 저장 1건 = 판정 완주 규칙"
     reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md"
+      - ".agents/skills/project-wiki/references/decisions/index.md"
       - "docs/requirements/f3/cross-judgment.md"
       - "docs/requirements/changelog.md"
       - ".agents/skills/project-wiki/references/contracts/api.md"
@@ -53,7 +59,9 @@ sources:
       - ".agents/skills/project-wiki/references/log.md"
     scope: >-
       저장 성공 후 후보 패널을 자동으로 열던 화면 동작을 제거하고, 세대 상세에 교차 판정 섹션을 두어
-      레일의 [교차 판정]은 섹션 여닫기, 섹션의 [교차 판정 실행]은 판정 요청으로 역할을 분리.
+      레일의 [교차 판정]은 섹션 여닫기, 섹션의 [교차 판정 실행]은 판정 요청으로 역할을 분리
+      (여닫기 분리는 같은 날 `f3-save-trigger-scope-and-run-buttons-2026-08-31`이 되돌려 두 버튼 모두
+      판정을 요청한다).
       저장이 패널을 열지 않게 되면서 F3-CR-05의 기각 노출 부모에서 저장 트리거를 제거.
       F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 유지
   - id: "f3-judgment-candidate-limit-2026-08-31"

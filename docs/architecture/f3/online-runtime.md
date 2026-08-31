@@ -27,7 +27,7 @@ MVP의 교차 판정은 다음 네 사용자 행동에서 시작한다.
 
 Backend는 F1 저장 트랜잭션과 F3 실행을 분리한다. F3 작업 생성이나 실행이 실패해도 이미 성공한 F1 저장을 되돌리지 않으며, 사용자의 판정 요청이 실패해도 F3 패널만 로딩·실패 상태를 표시한다. 상세 진입과 저장만으로는 패널을 열지 않는다.
 
-저장 트리거가 하는 일은 **앵커 포지션 카드 생성까지**다. 저장이 만든 실행은 `ANCHOR_READY` 에서 멈추고 Worker 선점 대상에서 빠진다(`repository.lock_claimable_run`). 사용자가 상세에서 판정을 요청하면 접수 유스케이스가 그 실행의 `trigger_type` 을 사용자 요청으로 옮기고 lease 를 만료시켜(`repository.resume_parked_run`) **같은 실행이 후보 조회부터 이어서** 돈다. 앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용은 없다.
+저장 트리거가 하는 일은 **앵커 포지션 카드 생성까지**다 ([ADR-0018](../../../.agents/skills/project-wiki/references/decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md), API 계약의 `F1 저장 후 자동 접수` 절이 정본). 저장이 만든 실행은 `ANCHOR_READY` 에서 멈추고 Worker 선점 대상에서 빠진다(`repository.lock_claimable_run`). 사용자가 상세에서 판정을 요청하면 접수 유스케이스가 그 실행의 `trigger_type` 을 사용자 요청으로 옮기고 lease 를 만료시켜(`repository.resume_parked_run`) **같은 실행이 후보 조회부터 이어서** 돈다. 앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용은 없다.
 
 세대 상세는 판정을 요청하는 버튼이 둘이다. 액션 레일의 **[교차 판정]** 과 교차 판정 섹션의 **[교차 판정 실행]** 이 같은 실행을 요청한다. 손님 상세는 푸터의 **[교차 판정]** 하나다.
 
