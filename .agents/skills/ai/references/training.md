@@ -3,6 +3,8 @@
 ## F2 상담 유형 분류
 
 - 학습 코드는 `ai/training/f2_sLLM/`에 둔다.
+- 학습 코드는 운영 `src` 패키지에 포함하지 않는다. AI pytest는 모듈 루트를 import 경로에
+  추가해 `tests/unit/training/`에서 `training.f2_sLLM`을 직접 검증한다.
 - 데이터 분할과 계보는 Data가 소유하며 `data/scripts/split_f2_sllm_dataset.py`로
   `source_group_id` 단위 train·validation·test 분할한다.
 - AI 학습 입력 변환, QLoRA 실행과 어댑터 산출물은 AI가 소유한다.
