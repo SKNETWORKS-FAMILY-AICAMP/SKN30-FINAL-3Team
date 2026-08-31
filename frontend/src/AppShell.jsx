@@ -545,6 +545,8 @@ export function AppShell() {
       (persisted) => {
         setDetailRow((current) => (current?.id === persisted.id ? persisted : current));
         setToast({ variant: "success", title: `${targetLabel}을(를) 저장했습니다.` });
+        // 상세가 다음 저장에 쓸 row_version을 알아야 한다. 돌려주지 않으면 두 번째 저장이 409가 된다.
+        return persisted;
       },
       (error) => {
         setToast({ variant: "danger", title: `${targetLabel} 저장에 실패했습니다 · ${describeForUser(error)}` });

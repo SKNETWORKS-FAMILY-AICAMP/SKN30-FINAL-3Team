@@ -22,7 +22,7 @@ import {
   TimesIcon,
   UploadIcon,
 } from "@patternfly/react-icons";
-import { analyzeNewIntake, analyzeVoiceMemo, LEDGER_LABEL } from "./f2/index.ts";
+import { analyzeNewIntake, analyzeVoiceMemo, appendVoiceMemoToLog, LEDGER_LABEL } from "./f2/index.ts";
 
 const STATES = {
   empty: "파일 없음",
@@ -177,9 +177,11 @@ export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType
   const applySelected = () => {
     const selected = proposals.filter((proposal) => proposal.selected && proposal.fieldKey);
     const isAppendOnly = (proposal) => proposal.fieldKey === "log" || proposal.fieldKey === "content";
+    /* 반영한 시각을 로그에 적으므로, 한 번에 함께 붙는 제안들은 같은 시각을 갖는다. */
+    const appliedAt = new Date();
     const patch = selected.reduce((result, proposal) => {
-      const current = draft[proposal.fieldKey];
-      return { ...result, [proposal.fieldKey]: isAppendOnly(proposal) && current ? `${current}\n${proposal.proposal}` : proposal.proposal };
+      const current = result[proposal.fieldKey] ?? draft[proposal.fieldKey];
+      return { ...result, [proposal.fieldKey]: isAppendOnly(proposal) ? appendVoiceMemoToLog(current, proposal.proposal, appliedAt) : proposal.proposal };
     }, {});
     /*
      * 기존 값을 지우는 칸만 따로 알린다.
