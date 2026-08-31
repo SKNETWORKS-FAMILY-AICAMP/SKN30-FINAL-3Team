@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-27
 ---
 
 # ADR-0013: 개발환경 설정과 비밀값 materialization
@@ -16,10 +16,10 @@ updated: 2026-08-24
 - Frontend release 공개값은 Terraform `frontend_build_environment` map에서 CodeBuild 환경변수로 동적 전달한다. API base는 CloudFront 동일 origin의 `/api/v1` 상대 경로를 사용한다.
 - release manifest schema는 환경 설정 때문에 확장하지 않는다. Parameter prefix, secret ARN, application port, readiness path와 log group 같은 비민감 배포 메타데이터는 기존 `backend-image.env`에 기록한다.
 - 사람이 입력하는 AI provider key와 Discord webhook은 Git에서 제외된 `secrets.auto.tfvars`에 둔다. 입력 변수는 `sensitive`·`ephemeral`, Secrets Manager version 값은 `secret_string_wo`를 사용한다.
-- AI secret은 `AI_OPENAI_API_KEY`를 필수로 하고 `AI_*_API_KEY` 형식의 vLLM key를 선택적으로 허용한다. Discord secret은 webhook URL 문자열을 저장한다. 값을 바꿀 때 각 독립 version counter도 증가시킨다.
+- AI secret은 `AI_OPENAI_API_KEY`를 필수로 하고 `AI_*_API_KEY` 형식의 vLLM key를 허용한다. 공유 dev의 상시 F2 runtime에는 `AI_VLLM_LLM_API_KEY`와 `AI_VLLM_STT_API_KEY`도 필요하다. Discord secret은 webhook URL 문자열을 저장한다. 값을 바꿀 때 각 독립 version counter도 증가시킨다.
 - RDS master secret, Backend runtime DB credential과 migration IAM token의 기존 자동 생성·운영 경계는 유지한다.
 - 배포 renderer는 SSM의 `backend/<ENV_NAME>`·`ai/<ENV_NAME>` 구조와 일반 환경변수 이름 규칙을 검사한다. 변수별 allowlist는 만들지 않고 DB URL, AWS 예약 이름과 비밀형 suffix를 공개 설정에서 거부한다.
-- renderer는 root 전용 config directory에 API, Worker, Migration 환경파일을 각각 원자적으로 `0600` 생성한다. Compose `v2.35.1`의 `env_file.format=raw`로 읽어 `$`, `#` 등을 재해석하지 않는다. API key는 Worker 파일에만, runtime DB URL은 API·Worker에만, IAM migration URL은 Migration 파일에만 둔다.
+- renderer는 root 전용 config directory에 API, Worker, Migration 환경파일을 각각 원자적으로 `0600` 생성한다. Compose `v2.35.1`의 `env_file.format=raw`로 읽어 `$`, `#` 등을 재해석하지 않는다. Backend 설정과 비민감 AI Provider endpoint·timeout은 API·Worker 파일에 둔다. F2가 동기 실행되는 API 파일에는 vLLM LLM·STT key만, Worker 파일에는 전체 AI Provider key를 둔다. runtime DB URL은 API·Worker에만, IAM migration URL은 Migration 파일에만 둔다.
 - `BeforeInstall`은 분리 이전의 `/opt/brokerage/config/runtime.env` 파일만 제거해 stale DB credential이 host에 남지 않게 한다.
 - application port와 readiness path는 Terraform 정본에서 ALB·security group·배포 metadata·admission 및 Frontend deploy 검증으로 전달한다.
 - 애플리케이션은 AWS 설정 저장소에 직접 접근하지 않고 전달된 프로세스 환경변수만 읽는다.

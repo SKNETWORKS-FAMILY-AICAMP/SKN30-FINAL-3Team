@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-08-27
 ---
 
 # API 계약 규칙
@@ -29,11 +29,11 @@ updated: 2026-08-24
 |---|---|---|---|
 | GET | /health/live | 불필요 | 프로세스 생존 확인 |
 | GET | /health/ready | 불필요 | PostgreSQL 준비 상태 확인 |
-| POST | /api/v1/auth/development-session | local 전용 | 설정된 개발 계정의 서버 세션·CSRF 발급 |
+| POST | /api/v1/auth/development-session | local·dev 합성 전용 | 설정된 개발 계정의 서버 세션·CSRF 발급 |
 | GET | /api/v1/auth/me | 서버 세션 | 현재 사용자와 역할, 그리고 브라우저에 보관된 기존 CSRF 토큰 반환 |
 | DELETE | /api/v1/auth/session | 서버 세션·CSRF | 현재 세션 폐기 |
 
-서버 세션 원문과 CSRF 원문은 각각 별도의 HttpOnly·SameSite=Lax Cookie로 전달하며, 서버 DB에는 두 값의 SHA-256 해시만 보관한다. `/auth/me`는 브라우저가 보낸 CSRF Cookie를 해당 세션의 해시와 상수 시간 비교한 뒤 같은 원문을 응답해 화면 메모리를 다시 채운다. 이 GET은 CSRF 토큰을 새로 만들거나 DB의 `csrf_token_hash`를 변경하지 않으므로 새로고침과 여러 탭이 서로의 토큰을 무효화하지 않는다. CSRF 원문을 반환하는 세션 발급·확인 응답은 `Cache-Control: no-store`로 캐시를 금지한다. CSRF Cookie가 없거나 세션의 해시와 다르면 403으로 거절한다. 상태 변경 요청은 응답으로 받은 값을 `X-CSRF-Token`에 실어야 한다. 로그아웃은 서버 세션을 폐기하고 두 Cookie를 함께 삭제한다. 개발 세션 발급 경로는 운영 애플리케이션에 등록하지 않는다. 실제 비밀번호 로그인 계약은 현재 MVP 범위에 포함하지 않는다.
+서버 세션 원문과 CSRF 원문은 각각 별도의 HttpOnly·SameSite=Lax Cookie로 전달하며, 서버 DB에는 두 값의 SHA-256 해시만 보관한다. `/auth/me`는 브라우저가 보낸 CSRF Cookie를 해당 세션의 해시와 상수 시간 비교한 뒤 같은 원문을 응답해 화면 메모리를 다시 채운다. 이 GET은 CSRF 토큰을 새로 만들거나 DB의 `csrf_token_hash`를 변경하지 않으므로 새로고침과 여러 탭이 서로의 토큰을 무효화하지 않는다. CSRF 원문을 반환하는 세션 발급·확인 응답은 `Cache-Control: no-store`로 캐시를 금지한다. CSRF Cookie가 없거나 세션의 해시와 다르면 403으로 거절한다. 상태 변경 요청은 응답으로 받은 값을 `X-CSRF-Token`에 실어야 한다. 로그아웃은 서버 세션을 폐기하고 두 Cookie를 함께 삭제한다. 배포된 dev에서는 두 Cookie에 `Secure`도 적용하고 세션을 유휴 30분·절대 12시간으로 제한한다. 개발 세션 route는 설정된 local·dev에만 등록하고 prod에는 등록하지 않는다. 공개 dev URL을 아는 사용자는 모두 같은 합성 계정 세션을 발급받을 수 있으므로 실제 개인정보와 인증정보를 사용하지 않는다. 실제 비밀번호 로그인 계약은 현재 MVP 범위에 포함하지 않는다.
 
 오류 응답은 code, message, request_id를 포함하고 인증 실패는 401, 권한 부족은 403으로 구분한다.
 
@@ -147,6 +147,11 @@ SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 
 `docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
 음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
 
+F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한다. Backend는 시작할 때 F2 pipeline을
+항상 초기화하므로 모든 실행 환경에 `AI_VLLM_LLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`이 필요하며,
+둘 중 하나가 없으면 애플리케이션 시작이 설정 오류로 실패한다. endpoint 설정은 유효하지만 RunPod가
+중지됐거나 Provider 요청·응답을 사용할 수 없으면 분석 요청을 503 `F2_UNAVAILABLE`로 종료한다.
+
 ### 오류 코드
 
 | code | HTTP | 발생 조건 |
@@ -158,7 +163,7 @@ SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
-| F2_UNAVAILABLE | 503 | F2가 비활성화됐거나 RunPod STT·LLM Provider를 사용할 수 없음 |
+| F2_UNAVAILABLE | 503 | RunPod STT·LLM Provider에 연결할 수 없거나 Provider 요청·응답을 사용할 수 없음 |
 | F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
@@ -388,6 +393,14 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 `carded_count`, `remaining_count`를 싣는다. 후보는 장부 `candidate_id`, SQL 순위·점수·금액·접수일,
 카드화 여부와 저장된 경우에만 중개 판정 및 근거를 싣는다. 빈 후보 결과도 같은 형태로 200을 반환한다.
 
+후보의 `candidate_id`는 반대편 장부 레코드 식별자다. `LISTING` 앵커의 후보는 `property_requirement.id`,
+`REQUIREMENT` 앵커의 후보는 `property_listing.id`다. 이 경로는 후보의 성명, 연락처와 표시 이름을 싣지
+않으므로 화면은 자기 사무소의 F1 조회 결과로 표시 이름을 만든다.
+
+후보의 `judgment_id`는 저장된 중개 판정의 식별자이며 관심없음 피드백의 `target_id`로 쓴다. 판정 전
+후보와 카드화되지 않은 후보는 `null`이다. 실행 내부 식별자가 아니라 사무소 범위 피드백 대상 식별자이며,
+피드백 경로가 같은 사무소 소유를 다시 확인한다.
+
 ### 관심없음 피드백
 
 `POST /api/v1/f3/feedback`은 F3-TR-03의 [관심없음]만 기록하는 상태 변경 경로이므로 세션과 CSRF를
@@ -404,7 +417,8 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 ```
 
 - `target`: `POSITION_ANALYSIS` 또는 `MATCH_CANDIDATE`
-- `target_id`: 1 이상의 숫자 식별자
+- `target_id`: 1 이상의 숫자 식별자. `POSITION_ANALYSIS`이면 결과 조회의
+  `anchor_card.position_analysis_id`, `MATCH_CANDIDATE`이면 후보의 `judgment_id`다
 - `reason`: `CONDITION_MISMATCH`, `ALREADY_CONTACTED`, `WRONG_JUDGMENT`, `OTHER`
 - `field_name`: 선택값. `negotiation_intent`, `urgency`, `preferred_timing`,
   `flexible_conditions`, `inflexible_conditions`, `contactability_status`, `price`,

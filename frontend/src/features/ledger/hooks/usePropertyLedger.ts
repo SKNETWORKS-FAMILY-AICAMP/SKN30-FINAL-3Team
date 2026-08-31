@@ -6,7 +6,8 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { LedgerApiError } from "../api/errors.ts";
+import { ApiError } from "../../../shared/api/index.ts";
+import { DELETE_WITHOUT_VERSION } from "../api/errors.ts";
 import { ledgerTransport } from "../api/ledgerTransport.ts";
 import type { ListQuery } from "../api/transport.ts";
 import type { PropertyUnitDetailDto } from "../model/dto.ts";
@@ -92,13 +93,12 @@ export function usePropertyLedger(
           const create = toUnitCreatePayload(row);
           if (create == null) {
             // 실패 사유를 뭉뚱그리지 않는다. 둘은 사용자가 할 일이 전혀 다르다.
-            throw new LedgerApiError({
-              kind: "validation",
-              message:
-                row.complexId == null
-                  ? `'${row.complex || "선택한 단지"}'는 아직 서버에 등록되지 않은 단지입니다. 단지 등록 API가 없어 화면에서 만든 단지로는 저장할 수 없습니다. 목록에 있는 단지를 선택해 주세요.`
-                  : "호는 저장 전에 반드시 입력해야 합니다.",
-            });
+            const reason =
+              row.complexId == null
+                ? `'${row.complex || "선택한 단지"}'는 아직 서버에 등록되지 않은 단지입니다. 단지 등록 API가 없어 화면에서 만든 단지로는 저장할 수 없습니다. 목록에 있는 단지를 선택해 주세요.`
+                : "호는 저장 전에 반드시 입력해야 합니다.";
+            // 화면이 만든 문구다. 그대로 보여도 되므로 userMessage로 표시한다.
+            throw new ApiError({ kind: "validation", message: reason, userMessage: reason });
           }
           detail = await ledgerTransport.createPropertyUnit(create);
         } else {
@@ -183,9 +183,10 @@ export function usePropertyLedger(
         return;
       }
       if (row.rowVersion == null) {
-        throw new LedgerApiError({
+        throw new ApiError({
           kind: "validation",
-          message: "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.",
+          message: DELETE_WITHOUT_VERSION,
+          userMessage: DELETE_WITHOUT_VERSION,
         });
       }
 

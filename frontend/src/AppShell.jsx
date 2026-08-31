@@ -10,15 +10,17 @@ import {
   UserIcon,
 } from "@patternfly/react-icons";
 import { useBuyerLedger, useComplexOptions, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser } from "./features/ledger/api/errors.ts";
+import { describeForUser, isEmptyDraft } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
 import { BuyerLedgerGrid } from "./features/BuyerLedgerGrid.jsx";
 import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
-import { CrossMatchPanel } from "./features/CrossMatchPanel.jsx";
+import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
+import { HomeScreen } from "./features/HomeScreen.tsx";
+import VoiceMemoModal from "./features/VoiceMemoModal.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
 const compactNavItems = ["배치 캠페인"];
@@ -130,11 +132,14 @@ export function AppShell() {
   const buyerLoadError = buyerLedger.state.error;
   useEffect(() => {
     if (propertyLoadError?.kind === "unauthorized" || buyerLoadError?.kind === "unauthorized") {
+      // 실행 식별자와 후보 요약은 중개사무소 안에서만 유효하다. 사무소 공용 PC를 전제하므로
+      // 세션이 끊긴 자리에 남겨 두면 다음 사용자가 앞 사용자의 실행을 조회하게 된다.
+      resetCrossJudgmentCache();
       markSessionExpired();
     }
   }, [propertyLoadError, buyerLoadError, markSessionExpired]);
 
-  const [activeNav, setActiveNav] = useState("매물장");
+  const [activeNav, setActiveNav] = useState("홈");
   const [searchQuery, setSearchQuery] = useState("");
   const [complexFilter, setComplexFilter] = useState("전체");
   const [saveFilter, setSaveFilter] = useState("전체");
@@ -154,6 +159,8 @@ export function AppShell() {
   const [messageComposer, setMessageComposer] = useState(null);
   const [messageCopied, setMessageCopied] = useState(false);
   const [campaignRows, setCampaignRows] = useState([]);
+  /** 장부를 정하지 않은 신규 음성메모 접수 팝업. 상단바 어디서나 연다. */
+  const [intakeOpen, setIntakeOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -178,9 +185,19 @@ export function AppShell() {
   const composerRecipients = messageComposer?.recipients.filter((recipient) => !recipient.excluded) || [];
   const activeComposerRecipient = composerRecipients.find((recipient) => recipientKey(recipient) === messageComposer?.activeRecipientId);
   const isCampaign = activeNav === "배치 캠페인";
+  const isHome = activeNav === "홈";
+  /* 신규 접수는 열려 있는 상세가 없는 빈 행에서 시작한다. 참조가 흔들리면 팝업이 매번 초기화된다. */
+  const intakeDraft = useMemo(() => ({}), []);
 
+  /*
+   * 상세를 열어도 교차 판정을 시작하지 않는다.
+   *
+   * 패널이 열리는 순간 실행이 접수되므로(useCrossJudgment의 enabled), 상세 진입만으로
+   * 판정 실행이 만들어졌다. 실행 시점은 사용자가 [교차 판정]으로 정한다(F3-CR-03·04).
+   * 다른 행으로 옮기면 이전 행의 패널을 닫는다.
+   */
   useEffect(() => {
-    setCrossMatchOpen(Boolean(detailRow));
+    setCrossMatchOpen(false);
   }, [detailRow?.id]);
 
   const filteredCount = useMemo(() => {
@@ -205,12 +222,6 @@ export function AppShell() {
     const draft = propertyLedger.addDraft();
     if (focusF2) setF2FocusRequest((current) => current + 1);
     setDetailRow({ ...draft, ledgerType: "property", rowKind: "property" });
-  };
-
-  /** 구입장 초기 화면의 음성메모 진입점. 매물장과 같이 신규 행을 만들고 그 위에 팝업을 연다. */
-  const openBuyerF2Entry = () => {
-    setF2FocusRequest((current) => current + 1);
-    handleAddBuyerRow();
   };
 
   const handleAddBuyerRow = () => {
@@ -341,14 +352,40 @@ export function AppShell() {
     window.requestAnimationFrame(() => addRowButtonRef.current?.focus());
   };
 
-  const openF2Entry = () => {
-    if (selectedRows.length > 1) {
-      setToast({ variant: "warning", title: "음성메모 입력은 대상 세대를 한 건만 선택해 주세요." });
+  /** 매물장에서 고른 세대에 음성메모를 반영한다. 대상이 이미 정해져 있어 장부를 판정하지 않는다. */
+  const openSelectedRowF2 = () => {
+    if (selectedRows.length !== 1) {
+      setToast({ variant: "warning", title: "선택 세대 음성메모는 대상 세대를 한 건만 선택해 주세요." });
       return;
     }
     setF2FocusRequest((current) => current + 1);
-    if (selectedRows.length === 1) setDetailRow({ ...selectedRows[0], ledgerType: "property", rowKind: "property" });
-    else handleAddRow();
+    setDetailRow({ ...selectedRows[0], ledgerType: "property", rowKind: "property" });
+  };
+
+  /*
+   * 홈·상단바의 신규 음성메모 접수 반영.
+   *
+   * 어느 장부인지는 분석이 정한다. 그 장부에 빈 행을 만들고 사용자가 고른 제안만 채운 뒤
+   * 상세를 열어 준다. 여기서 저장하지 않는다. 상세에서 확인하고 저장해야 서버로 간다.
+   */
+  const applyIntake = (patch, f2Draft, meta) => {
+    const isBuyer = meta?.ledgerType === "buyer";
+    const ledger = isBuyer ? buyerLedger : propertyLedger;
+    const draftRow = ledger.addDraft();
+    const nextRow = { ...draftRow, ...patch, f2Draft };
+    ledger.patchRow(draftRow.id, () => nextRow);
+
+    setIntakeOpen(false);
+    if (activeNav !== (isBuyer ? "구입장" : "매물장")) {
+      setSelectedRows([]);
+      setSelectionResetToken((current) => current + 1);
+    }
+    setActiveNav(isBuyer ? "구입장" : "매물장");
+    setDetailRow(nextRow);
+    setToast({
+      variant: "success",
+      title: `${isBuyer ? "구입장" : "매물장"}에 신규 행을 추가했습니다. 내용을 확인한 뒤 저장하세요.`,
+    });
   };
 
   const openMessageComposer = (payload) => {
@@ -446,7 +483,7 @@ export function AppShell() {
   };
 
   const navTo = (item) => {
-    if (item !== "매물장" && item !== "구입장" && item !== "배치 캠페인") {
+    if (item !== "홈" && item !== "매물장" && item !== "구입장" && item !== "배치 캠페인") {
       alert(`${item}: 대표 F1 업무 흐름 검증이 끝난 뒤 같은 디자인 언어로 확장하는 화면입니다.`);
       return;
     }
@@ -459,7 +496,19 @@ export function AppShell() {
   };
 
   const isBuyerDetail = detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer";
-  const closeDetail = () => { setCrossMatchOpen(false); setDetailRow(null); };
+
+  /*
+   * 상세 닫기.
+   *
+   * 값을 하나도 넣지 않은 미저장 행은 그리드에 남기지 않는다(F1-GR-32).
+   * 행 추가만 하고 닫으면 저장할 것이 없는 빈 임시저장 행만 쌓인다.
+   * 값이 있는 미저장 행(예: 음성메모 접수)은 다시 열어 저장할 수 있게 남긴다.
+   */
+  const closeDetail = () => {
+    if (isEmptyDraft(detailRow)) (isBuyerDetail ? buyerLedger : propertyLedger).discardRow(detailRow);
+    setCrossMatchOpen(false);
+    setDetailRow(null);
+  };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
     else if (detailRow) propertyLedger.discardRow(detailRow);
@@ -484,6 +533,11 @@ export function AppShell() {
 
     // 낙관적 반영 후 서버에 보낸다. 실패하면 행의 sync 상태가 남고 사용자에게 알린다.
     updateRow(savedRow);
+    /*
+     * 저장 트리거는 그대로 둔다(F3-CR-01·02). 저장이 성공하면 서버가 실행을 접수하므로,
+     * 화면이 패널을 닫아 두면 이미 도는 판정의 결과를 아무도 보지 못한다.
+     * 화면이 보내는 실행 요청은 같은 입력 버전의 활성 실행을 재사용한다.
+     */
     setCrossMatchOpen(true);
     const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
@@ -491,6 +545,8 @@ export function AppShell() {
       (persisted) => {
         setDetailRow((current) => (current?.id === persisted.id ? persisted : current));
         setToast({ variant: "success", title: `${targetLabel}을(를) 저장했습니다.` });
+        // 상세가 다음 저장에 쓸 row_version을 알아야 한다. 돌려주지 않으면 두 번째 저장이 409가 된다.
+        return persisted;
       },
       (error) => {
         setToast({ variant: "danger", title: `${targetLabel} 저장에 실패했습니다 · ${describeForUser(error)}` });
@@ -509,38 +565,51 @@ export function AppShell() {
     setCrossMatchFocusRequest((current) => current + 1);
   };
 
-  const crossMatchPanel = <CrossMatchPanel
+  /* 앵커 도출과 실행 확보는 타입 검사를 받는 `CrossMatchSection`이 소유한다. */
+  const crossMatchPanel = <CrossMatchSection
     isOpen={crossMatchOpen}
     focusRequest={crossMatchFocusRequest}
     onClose={() => setCrossMatchOpen(false)}
-    anchorRow={detailRow}
+    row={detailRow}
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
+    /* 후보 표시 이름은 판정 응답에 없다. 이미 불러온 반대편 장부에서 찾는다. */
+    propertyRows={propertyLedger.state.rows}
+    buyerRows={buyerLedger.state.rows}
     onComposeMessage={openMessageComposer}
     onOpenEvidence={handleEvidenceOpen}
     onLater={() => { closeDetail(); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}
-    onInterest={({ reason }) => setToast({ variant: "info", title: `관심없음 피드백을 기록했습니다 · ${reason}` })}
+    onFeedbackResult={({ ok, cause }) => setToast(ok
+      ? { variant: "success", title: "관심없음 피드백을 기록했습니다." }
+      : { variant: "danger", title: describeForUser(cause) })}
     onSchedule={({ candidate }) => setScheduleSuggestion({ candidate, anchorRow: detailRow })}
   />;
 
   return <div className="app-shell app-shell--compact-ledger">
     <main className={`work-area${
-      isCampaign
-        ? " work-area--campaign"
-        : viewState === "offline"
-          ? " work-area--offline"
-          : ""
+      isHome
+        ? " work-area--home"
+        : isCampaign
+          ? " work-area--campaign"
+          : viewState === "offline"
+            ? " work-area--offline"
+            : ""
     }`}>
       <header className="f1-topbar">
         <div className="f1-product-title"><strong>집크크</strong><span>beta</span></div>
-        <h1 className="pf-v6-screen-reader">{isCampaign ? "배치 캠페인" : activeNav}</h1>
-        <div className="f1-ledger-switch" role="tablist" aria-label="F1 장부 전환">
-          {["매물장", "구입장"].map((item) => <button key={item} type="button" role="tab" aria-selected={activeNav === item} className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}
-        </div>
-        <div className="jump-control f1-topbar__jump"><input value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && jumpQuery.trim()) handleJump(); }} placeholder="동·호 조회 예) 101 203" aria-label="동·호 조회" /><Button variant="secondary" onClick={handleJump} isDisabled={!jumpQuery.trim()}>조회</Button></div>
-        <div className="masthead-search"><SearchIcon aria-hidden="true" /><input type="text" aria-label="통합 검색" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="통합 검색 (성명·전화번호·로그)" /></div>
+        {/* 홈은 본문에 보이는 h1이 있다. 여기서 또 h1을 두면 화면 제목이 둘이 된다. */}
+        {!isHome && <h1 className="pf-v6-screen-reader">{isCampaign ? "배치 캠페인" : activeNav}</h1>}
+        <nav className="f1-ledger-switch" aria-label="주요 화면">
+          {["홈", "매물장", "구입장"].map((item) => <button key={item} type="button" aria-current={activeNav === item ? "page" : undefined} className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}
+        </nav>
+        {/* 동·호 조회와 통합 검색은 장부 위에서만 뜻이 있다. 홈에서는 걸 곳이 없어 감춘다. */}
+        {!isHome && <>
+          <div className="jump-control f1-topbar__jump"><input value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && jumpQuery.trim()) handleJump(); }} placeholder="동·호 조회 예) 101 203" aria-label="동·호 조회" /><Button variant="secondary" onClick={handleJump} isDisabled={!jumpQuery.trim()}>조회</Button></div>
+          <div className="masthead-search"><SearchIcon aria-hidden="true" /><input type="text" aria-label="통합 검색" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="통합 검색 (성명·전화번호·로그)" /></div>
+        </>}
         {activeNav === "매물장" && <div className="f1-topbar__counts"><span>필터 {filteredCount.toLocaleString()}건</span><span>전체 {propertyLedger.state.totalCount.toLocaleString()}건</span></div>}
         <div className="masthead-actions">
-          <Label color={viewState === "offline" ? "orange" : "green"}>{viewState === "offline" ? "오프라인" : "연결됨"}</Label>
+          <Button className="f1-topbar__intake" variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="topbar-intake-help" onClick={() => setIntakeOpen(true)}>음성메모 입력</Button>
+          <span id="topbar-intake-help" className="pf-v6-screen-reader">음성을 분석해 매도의뢰는 매물장, 매수문의는 구입장에 신규 행으로 추가합니다.</span>
           <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
           <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />
           <Button variant="plain" aria-label="사용자 메뉴" icon={<UserIcon />} />
@@ -553,7 +622,7 @@ export function AppShell() {
                 variant="secondary"
                 size="sm"
                 isDisabled={authSubmitting}
-                onClick={() => void signOut()}
+                onClick={() => { resetCrossJudgmentCache(); void signOut(); }}
                 style={{ marginLeft: "8px" }}
               >
                 로그아웃
@@ -563,7 +632,15 @@ export function AppShell() {
         </div>
       </header>
 
-      {isCampaign ? (
+      {isHome ? (
+        <HomeScreen
+          onVoiceIntake={() => setIntakeOpen(true)}
+          onOpenPropertyLedger={() => navTo("매물장")}
+          onOpenBuyerLedger={() => navTo("구입장")}
+          propertyCount={propertyLedger.state.status === "ready" ? propertyLedger.state.totalCount : null}
+          buyerCount={buyerLedger.state.status === "ready" ? buyerLedger.state.totalCount : null}
+        />
+      ) : isCampaign ? (
         <CampaignWorkspace targets={campaignRows} onBack={() => setActiveNav("매물장")} onOpenComposer={openMessageComposer} />
       ) : <>
         {viewState === "offline" && (
@@ -588,8 +665,8 @@ export function AppShell() {
               {selectedRows.length ? <>
                 <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
                 <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
-                <Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby={selectedRows.length > 1 ? "f2-selected-entry-help" : undefined} isDisabled={selectedRows.length > 1} onClick={openF2Entry}>음성메모 입력</Button>
-                {selectedRows.length > 1 && <span id="f2-selected-entry-help" className="pf-v6-screen-reader">음성메모 입력은 대상 세대를 한 건만 선택해야 합니다.</span>}
+                <Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby={selectedRows.length > 1 ? "f2-selected-entry-help" : undefined} isDisabled={selectedRows.length > 1} onClick={openSelectedRowF2}>선택 세대 음성메모</Button>
+                {selectedRows.length > 1 && <span id="f2-selected-entry-help" className="pf-v6-screen-reader">선택 세대 음성메모는 대상 세대를 한 건만 선택해야 합니다.</span>}
                 <Button variant="secondary" onClick={() => setBatchEditOpen(true)}>일괄 편집</Button>
                 <Button variant="secondary" isDanger onClick={() => requestDeleteRows(selectedRows, "grid")}>삭제</Button>
                 <Button variant="secondary" icon={<OutlinedCommentsIcon />} onClick={openDirectMessage}>문자 작성</Button>
@@ -597,8 +674,6 @@ export function AppShell() {
               </> : <>
                 <Button ref={addRowButtonRef} icon={<AddCircleOIcon />} onClick={() => handleAddRow()}>행 추가</Button>
                 <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingPropertyRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingPropertyRows.length > 0 ? `변경 저장 · ${pendingPropertyRows.length.toLocaleString()}건` : "변경 저장"}</Button>
-                <Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="f2-entry-help" onClick={openF2Entry}>음성메모 입력</Button>
-                <span id="f2-entry-help" className="pf-v6-screen-reader">선택이 없으면 신규 세대를 만들고, 한 건 선택 시 해당 상세 위에 음성메모 팝업을 엽니다.</span>
               </>}
             </div>
             <div className="f1-control-strip__right-group">
@@ -618,8 +693,6 @@ export function AppShell() {
         </div> : <div className="f1-control-strip f1-control-strip--buyer">
           <div className="f1-control-strip__left-group">
             <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
-            <Button variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="buyer-f2-entry-help" onClick={openBuyerF2Entry}>음성메모 입력</Button>
-            <span id="buyer-f2-entry-help" className="pf-v6-screen-reader">신규 손님을 만들고 그 상세 위에 음성메모 팝업을 엽니다.</span>
           </div>
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
@@ -638,6 +711,8 @@ export function AppShell() {
         onDiscard={discardDetail}
         onDelete={deleteRowFromDetail}
         onSave={saveDetail}
+        onOpenCrossMatch={openCrossMatch}
+        isCrossMatchOpen={crossMatchOpen}
         crossMatchPanel={crossMatchPanel}
       />
     ) : (
@@ -657,6 +732,14 @@ export function AppShell() {
         crossMatchPanel={crossMatchPanel}
       />
     )}
+
+    <VoiceMemoModal
+      isOpen={intakeOpen}
+      ledgerType="auto"
+      draft={intakeDraft}
+      onClose={() => setIntakeOpen(false)}
+      onApply={applyIntake}
+    />
 
     <Modal variant="small" isOpen={Boolean(messageComposer)} onClose={closeMessageComposer}>
       <ModalHeader title="문자 작성" description="손님별 문안과 번호를 확인한 뒤 복사합니다. 실제 발송은 외부 도구에서 진행합니다." />

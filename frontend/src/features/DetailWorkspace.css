@@ -800,13 +800,25 @@
   border: 1px solid var(--dw-border-subtle);
 }
 
+/*
+ * 제안 검토 표의 칸 너비.
+ *
+ * 자동 배치에 맡기면 긴 근거 문장이 폭을 가져가고 현재값·제안이 밀린다.
+ * 게다가 한국어는 글자 사이 어디서나 줄이 갈 수 있어 "미입력"이 한 글자 폭까지 눌린다.
+ * 칸 너비를 고정하고 남는 폭은 제안이 가져가게 한다.
+ */
 .f2-review-table {
-  min-width: 940px;
+  width: 100%;
+  min-width: 1040px;
+  table-layout: fixed;
 }
 
 .f2-review-table th,
 .f2-review-table td {
   vertical-align: top;
+  /* 낱말 안에서 끊지 않는다. 넘칠 때만 어쩔 수 없이 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .f2-review-table th:nth-child(1),
@@ -817,12 +829,23 @@
 
 .f2-review-table th:nth-child(2),
 .f2-review-table td:nth-child(2) {
-  width: 110px;
+  width: 120px;
+}
+
+/* 현재값. "미입력"과 짧은 값이 대부분이라 두 낱말이 한 줄에 들어가는 폭이면 된다. */
+.f2-review-table th:nth-child(3),
+.f2-review-table td:nth-child(3) {
+  width: 170px;
 }
 
 .f2-review-table th:nth-child(5),
 .f2-review-table td:nth-child(5) {
-  width: 170px;
+  width: 150px;
+}
+
+.f2-review-table th:nth-child(6),
+.f2-review-table td:nth-child(6) {
+  width: 260px;
 }
 
 .f2-review-table__evidence {
@@ -1066,6 +1089,7 @@
   font-size: 13px;
 }
 
+.detail-workspace__close-modal-body > p:first-child,
 .detail-workspace__delete-modal-body > p:first-child,
 .detail-workspace__duplicate-modal-body > p:first-child {
   margin: 0 0 22px;
@@ -1346,7 +1370,8 @@
 }
 
 .detail-section [tabindex="-1"]:focus-visible,
-#cross-match-panel [tabindex="-1"]:focus-visible {
+#cross-match-panel [tabindex="-1"]:focus-visible,
+.buyer-detail-workspace__error:focus-visible {
   border-radius: 2px;
   outline: 2px solid var(--dw-accent);
   outline-offset: 4px;
@@ -1541,17 +1566,113 @@
   font-size: 13px;
 }
 
+/*
+ * 구입장 상세.
+ *
+ * 매물장 상세는 본문을 `.detail-workspace__content`가 감싸 안쪽 여백과 스크롤을 맡는다.
+ * 구입장은 그 자리에 이 요소가 바로 놓여 입력이 창 모서리에 붙고, 내용이 길어지면
+ * 스크롤 없이 잘렸다. 같은 역할을 여기서 준다.
+ *
+ * 열이 매물장의 절반도 되지 않아 밀도를 그만큼 끌어올릴 이유가 없다.
+ * 매물장이 두 겹(구획 + 그룹 카드)으로 만드는 안쪽 여백을 한 겹으로 낸다.
+ */
 .buyer-detail-workspace {
-  display: grid;
-  gap: var(--pf-t--global--spacer--md);
+  height: 100%;
+  padding: 12px 14px 16px;
+  overflow-y: auto;
+}
+
+/* 블록 흐름으로 쌓는다. flex로 두면 스크롤이 생길 때 입력 칸을 눌러 줄인다. */
+.buyer-detail-workspace > * + * {
+  margin-top: 10px;
+}
+
+.buyer-detail-workspace .detail-info-grid {
+  gap: 10px;
+}
+
+/* 칸 사이가 붙으면 라벨이 왼쪽 칸의 입력에 붙어 어느 칸의 이름인지 흐려진다. */
+.buyer-detail-workspace .detail-info-column {
+  gap: 8px 12px;
+  padding: 12px 14px;
+}
+
+.buyer-detail-workspace .detail-info-column > h3 {
+  margin-bottom: 2px;
+}
+
+.buyer-detail-workspace .detail-field__label {
+  margin-bottom: 4px;
+}
+
+/*
+ * 상담 로그와 비고.
+ *
+ * 창 폭을 통째로 쓰는 칸이라 위 그룹과 같은 카드로 감싸지 않으면 어디까지가 한 칸인지
+ * 보이지 않는다. 여러 줄을 실제로 적을 만큼 높이도 함께 준다.
+ */
+.buyer-detail-workspace > .detail-field {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  border: 1px solid var(--dw-border-subtle);
+  background: var(--dw-surface-subtle);
+}
+
+.buyer-detail-workspace > .detail-field textarea {
+  min-height: 96px;
+}
+
+.buyer-detail-workspace > .pf-v6-c-check {
+  padding-block: 2px;
+}
+
+/*
+ * 저장을 막은 사유.
+ *
+ * 어느 칸을 고쳐야 하는지 항목으로 읽히게 한다. 초점을 여기로 옮기므로
+ * 초점 표시는 상세 안의 다른 [tabindex="-1"] 영역과 같은 규칙을 쓴다(아래 focus-visible).
+ */
+.buyer-detail-workspace__error ul {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.buyer-detail-workspace__error li + li {
+  margin-top: 4px;
+}
+
+.buyer-detail-workspace__error p {
+  margin: 8px 0 0;
+  color: var(--dw-text-subtle);
+  font-size: 13px;
+}
+
+/*
+ * 작업 줄.
+ *
+ * 본문 안에 두면 교차 판정 아래로 밀려 스크롤해야 저장을 누를 수 있었다.
+ * 모달 바닥에 두어 스크롤과 상관없이 늘 같은 자리에 있게 한다.
+ */
+.detail-workspace-modal .buyer-detail-workspace__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--dw-border);
+  background: var(--color-surface);
 }
 
 .detail-workspace__action-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--pf-t--global--spacer--sm);
-  position: sticky;
-  bottom: 0;
-  padding-block: var(--pf-t--global--spacer--sm);
-  background: var(--color-surface);
+}
+
+.buyer-detail-workspace__save-state {
+  margin-left: auto;
+  color: var(--dw-text-subtle);
+  font-size: 13px;
 }

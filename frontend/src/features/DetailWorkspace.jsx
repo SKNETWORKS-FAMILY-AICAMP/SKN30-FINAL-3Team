@@ -3,6 +3,7 @@ import { Alert, Button, Checkbox, Divider, FormSelect, FormSelectOption, Label, 
 import { CheckCircleIcon, InfoCircleIcon, MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import { PROTOTYPE_ASSUMPTIONS } from "../config/prototypeAssumptions.js";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
+import { carrySavedIdentity } from "./ledger/index.ts";
 import { DEAL_TYPE_CHOICES, dealTypePatch, dealTypeValue } from "./ledger/model/dealType.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import RelationEditModal from "./RelationEditModal.jsx";
@@ -164,6 +165,8 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const [replaceDecision, setReplaceDecision] = useState(null);
   const initializedOpenRef = useRef(false);
   const securityRef = useRef(null);
+  const detailCloseTriggerRef = useRef(null);
+  const closeReturnFocusRef = useRef(null);
   const deleteTriggerRef = useRef(null);
   const keepExistingRef = useRef(null);
 
@@ -239,7 +242,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    * 다만 입력한 내용을 붙들어 두는 임시저장까지 막으면 잃는 쪽이 더 크다.
    * 임시저장인 줄 알고 누르는 경로(확인 팝업의 임시저장, 닫기 확인)는 allowDraft로 통과시킨다.
    */
-  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); setDraft(nextDraft); baselineRef.current = nextDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
+  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { const persisted = await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); /* 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다. */ const savedDraft = carrySavedIdentity(nextDraft, persisted); setDraft(savedDraft); baselineRef.current = savedDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
   /* 확인을 닫으면 바로 체크할 수 있도록 초점을 중복 검사 체크박스에 돌려준다. */
   const closeDuplicateBlock = () => {
     setDuplicateBlock(false);
@@ -251,8 +254,25 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     setDeleteDecision(false);
     window.requestAnimationFrame(() => deleteTriggerRef.current?.focus());
   };
-  /* Esc와 닫기 버튼이 삭제 확인 위로 지나가면 상세가 통째로 닫혀 확인이 사라진다. 확인 중에는 확인만 닫는다. */
-  const requestClose = () => { if (isDeleting) return; if (duplicateBlock) { closeDuplicateBlock(); return; } if (deleteDecision) { closeDeleteDecision(); return; } if (replaceDecision) { keepExistingOverF2(); return; } if (isDirty) setCloseDecision(true); else onClose?.(); };
+  const closeCloseDecision = () => {
+    if (isSaving) return;
+    setCloseDecision(false);
+    window.requestAnimationFrame(() => closeReturnFocusRef.current?.focus());
+  };
+  /* Esc와 닫기 버튼이 열린 확인 위로 지나가면 상세가 통째로 닫힌다. 확인 중에는 가장 위의 확인만 닫는다. */
+  const requestClose = (event) => {
+    if (isDeleting) return;
+    if (duplicateBlock) { closeDuplicateBlock(); return; }
+    if (deleteDecision) { closeDeleteDecision(); return; }
+    if (replaceDecision) { keepExistingOverF2(); return; }
+    if (isDirty) {
+      const trigger = event?.currentTarget;
+      closeReturnFocusRef.current = trigger?.matches?.("button") ? trigger : detailCloseTriggerRef.current;
+      setCloseDecision(true);
+      return;
+    }
+    onClose?.();
+  };
   const discardAndClose = async () => { try { await onDiscard?.(baselineRef.current); setCloseDecision(false); onClose?.(); } catch (error) { setSaveError(error?.message || "변경 내용을 되돌리지 못했습니다."); } };
 
   /*
@@ -319,7 +339,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     stageField("f2Draft", nextF2Draft);
   };
 
-  return <Modal id="detail-workspace-modal" isOpen={isOpen} onClose={requestClose} disableFocusTrap={deleteDecision} className="detail-workspace-modal" aria-label="세대 상세·상담 로그">
+  return <Modal id="detail-workspace-modal" isOpen={isOpen} onClose={requestClose} disableFocusTrap={closeDecision || deleteDecision} className="detail-workspace-modal" aria-label="세대 상세·상담 로그">
     <ModalHeader><div className="detail-workspace__header"><div className="detail-workspace__title-group"><Title headingLevel="h1" id="detail-workspace-title" size="xl">세대 상세 · 상담 로그</Title><span>{draft.complex || "단지 미입력"} {draft.building || "-"}동 {draft.unit || "-"}호 · {draft.id || "신규"}</span></div><div className="detail-workspace__state-summary"><StateSummary label="저장 상태" value={draft.saveState} status={statusForStorage(draft.saveState)} /></div></div></ModalHeader>
     <ModalBody className="detail-workspace__modal-body"><div className="detail-workspace__layout" data-screen-id="F1-MOD-010 F1-MOD-130" data-requirement-ids="F1-UD-01~28, F1-LG-01~06, F1-LG-08~34, F1-TR-01~05, F2-POP-01, F1-GR-32, F1-GR-35~36, F1-ST-18, F2-POP-02">
       <main className="detail-workspace__content">
@@ -360,9 +380,8 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
         </section>
         {crossMatchPanel}
       </main>
-      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 매칭</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
+      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
     </div>
-    {closeDecision && <div className="detail-workspace__decision-layer" role="presentation"><section className="detail-workspace__decision-card" role="alertdialog" aria-modal="true" aria-labelledby="close-decision-title"><div className="decision-card__icon"><SaveIcon aria-hidden="true" /></div><Title headingLevel="h2" id="close-decision-title" size="lg">변경사항을 저장할까요?</Title><p>임시저장은 언제든 가능하며, 저장 완료는 단지·동·호·중복 검사 조건을 충족해야 합니다.</p><dl className="decision-card__summary"><div><dt>변경 항목</dt><dd>{changedFieldCount}개</dd></div><div><dt>저장 후 상태</dt><dd>{canComplete ? "저장 완료" : "임시저장"}</dd></div><div><dt>미충족 조건</dt><dd>{unmet.join(", ") || "없음"}</dd></div></dl>{saveError && <Alert className="decision-card__error" variant="danger" isInline title="저장하지 못했습니다">{saveError}</Alert>}<div className="decision-card__actions"><Button variant="primary" onClick={() => saveDraft({ closeAfter: true, allowDraft: true })} isLoading={isSaving}>저장</Button><Button variant="danger" onClick={discardAndClose} isDisabled={isSaving}>저장 안 함</Button><Button variant="secondary" onClick={() => setCloseDecision(false)} isDisabled={isSaving}>취소</Button></div></section></div>}
     {replaceDecision && <div className="detail-workspace__decision-layer" role="presentation"><section className="detail-workspace__decision-card" role="alertdialog" aria-modal="true" aria-labelledby="replace-decision-title" aria-describedby="replace-decision-effect"><div className="decision-card__icon decision-card__icon--warning"><MicrophoneIcon aria-hidden="true" /></div><Title headingLevel="h2" id="replace-decision-title" size="lg">이미 입력된 값을 음성 메모 값으로 바꿀까요?</Title><p id="replace-decision-effect">아래 {replaceDecision.replacements.length}개 칸에는 이미 값이 있습니다. 바꾸면 기존 값은 이 화면에서 되돌릴 수 없습니다. 어느 쪽을 골라도 장부에 저장하지는 않습니다.</p><ul className="decision-card__replacements">{replaceDecision.replacements.map((item) => <li key={item.fieldKey}><strong>{item.field}</strong><span><em>현재</em>{item.current}</span><span><em>음성 메모</em>{item.next}</span></li>)}</ul>{f2KeptFieldCount > 0 && <p className="decision-card__kept">비어 있던 {f2KeptFieldCount}개 칸은 어느 쪽을 골라도 채웁니다.</p>}<div className="decision-card__actions"><Button variant="primary" onClick={replaceWithF2}>음성 메모 값으로 대체</Button><Button ref={keepExistingRef} variant="secondary" onClick={keepExistingOverF2}>기존 값 유지</Button></div></section></div>}
     </ModalBody>
     {/*
@@ -376,6 +395,29 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
       */}
     <VoiceMemoModal isOpen={f2Open} draft={draft} initialDraft={f2Draft} appendTo={() => document.getElementById("detail-workspace-modal")} onClose={() => setF2Open(false)} onApply={handleF2Apply} onDraftChange={handleF2DraftChange} />
     <RelationEditModal isOpen={relationOpen} person={relationTarget} onClose={() => setRelationOpen(false)} onApply={updatePeople} />
+    {/* 닫기 확인은 긴 상세 본문과 분리된 중첩 Modal이어야 한다. 본문 안의 absolute 레이어는 뒤 콘텐츠의 스크롤을 막지 못한다. */}
+    <Modal
+      appendTo={() => document.getElementById("detail-workspace-modal")}
+      variant="small"
+      isOpen={closeDecision}
+      onEscapePress={(event) => { event.stopPropagation(); closeCloseDecision(); }}
+      elementToFocus="#detail-close-cancel"
+      aria-labelledby="close-decision-title"
+      aria-describedby="close-decision-effect"
+      className="detail-workspace__close-modal"
+    >
+      <ModalHeader title="변경사항을 저장할까요?" titleIconVariant="info" labelId="close-decision-title" />
+      <ModalBody className="detail-workspace__close-modal-body">
+        <p id="close-decision-effect">임시저장은 언제든 가능하며, 저장 완료는 단지·동·호·중복 검사 조건을 충족해야 합니다.</p>
+        <dl className="decision-card__summary"><div><dt>변경 항목</dt><dd>{changedFieldCount}개</dd></div><div><dt>저장 후 상태</dt><dd>{canComplete ? "저장 완료" : "임시저장"}</dd></div><div><dt>미충족 조건</dt><dd>{unmet.join(", ") || "없음"}</dd></div></dl>
+        {saveError && <Alert className="decision-card__error" variant="danger" isInline title="저장하지 못했습니다">{saveError}</Alert>}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="primary" onClick={() => saveDraft({ closeAfter: true, allowDraft: true })} isLoading={isSaving}>저장</Button>
+        <Button variant="danger" onClick={discardAndClose} isDisabled={isSaving}>저장 안 함</Button>
+        <Button id="detail-close-cancel" variant="secondary" onClick={closeCloseDecision} isDisabled={isSaving}>취소</Button>
+      </ModalFooter>
+    </Modal>
     <Modal
       appendTo={() => document.getElementById("detail-workspace-modal")}
       variant="small"

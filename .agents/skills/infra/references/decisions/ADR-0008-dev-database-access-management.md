@@ -1,13 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-20
+updated: 2026-08-27
 ---
 
 # ADR-0008: 개발 DB 계정과 IAM 인증 관리
 
 - 상태: 승인됨
 - 결정일: 2026-08-19
-- 수정일: 2026-08-20
+- 수정일: 2026-08-27
 
 ## 맥락
 
@@ -45,6 +45,9 @@ Backend는 현재 일반 실행에도 `DB_MIGRATION_URL`을 요구하므로 migr
 - `sync-team --apply`는 그룹 멤버를 DB 역할과 동기화한다. 제거된 사용자는 권한을 회수하고 `NOLOGIN`으로 바꾸며 활성 세션을 종료하되 role은 감사 목적으로 보존한다.
 - `rotate-runtime --apply --maintenance-window-confirmed`는 pending Secret과 DB 비밀번호를 검증한 뒤 current version을 전환한다.
 - `migrate --apply`는 개인 IAM 사용자로 SSM 터널과 IAM 토큰을 만들고 Yoyo를 실행한다.
+- `seed-f3 --apply`는 개인 IAM 사용자로 SSM 터널과 IAM 토큰을 만들고 커밋된 F3 합성
+  reset·seed·verify 파일을 고정 순서로 `app_owner`에서 실행한다. 임의 파일과 대상 DB는 받지 않으며
+  29개 검사가 모두 `PASS`일 때만 완료한다.
 - `verify`는 runtime Secret의 endpoint metadata가 실제 RDS와 일치하는지, 고정 역할의
   `LOGIN` 속성과 `app_runtime → app_rw`, `app_migrator → rds_iam/app_owner` 멤버십을
   읽기 전용으로 검증한다.

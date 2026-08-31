@@ -33,19 +33,16 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        runtime: F2Runtime | None = None
-        if resolved_config.f2.enabled:
-            runtime = (
-                f2_runtime_factory()
-                if f2_runtime_factory is not None
-                else create_f2_runtime(load_ai_config(resolved_config.app.environment.value))
-            )
-            app.state.f2_pipeline = runtime.pipeline
+        runtime = (
+            f2_runtime_factory()
+            if f2_runtime_factory is not None
+            else create_f2_runtime(load_ai_config(resolved_config.app.environment.value))
+        )
+        app.state.f2_pipeline = runtime.pipeline
         try:
             yield
         finally:
-            if runtime is not None:
-                await runtime.close()
+            await runtime.close()
 
     app = FastAPI(
         title="Brokerage Backend",

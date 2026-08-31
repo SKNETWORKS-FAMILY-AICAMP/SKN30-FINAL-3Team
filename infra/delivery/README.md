@@ -9,7 +9,7 @@
 - `pipeline_operator_user_names`가 승인된 기존 IAM 사용자만 포함하고 `student` 외 추가 사용자가 없는지 확인한다.
 - `SKN30_FINAL` Connection이 `AVAILABLE`이고 승인된 repository만 접근하는지 확인한다.
 - ignored `infra/environments/dev/secrets.auto.tfvars`에 AI provider key와 Discord webhook을 입력하고 각 version counter가 실제 값과 함께 증가했는지 확인한다.
-- Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다.
+- Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다. Frontend Verify에는 `test:env`, `test:auth`, `typecheck`과 원장 테스트가 모두 포함된다.
 
 ## 로컬 CodeBuild 동등 검증
 
@@ -29,7 +29,7 @@ disposable DB를 시작한 뒤 다음을 순서대로 검증한다. Docker Hub i
 1. AI와 Backend의 frozen lock 설치, format, lint, type, 전체 테스트
 2. 빈 DB migration과 두 번째 no-op migration
 3. CodeDeploy lifecycle shell 구문과 image metadata 전달 계약 테스트
-4. Frontend Verify: clean install, env 우선순위 테스트, typecheck, 원장 테스트
+4. Frontend Verify: clean install, env·로그인 플래그 테스트, typecheck, 원장 테스트
 5. Frontend Build: 별도 clean install, release build와 release 계약 테스트
 6. Backend root-context image build와 UID 10001 실행
 7. Compose config
@@ -99,6 +99,66 @@ terraform apply dev.tfplan
 
 구성의 import block이 기존 Connection ARN을 state로 가져온다. plan에서 Connection replacement 또는 destroy가 보이면 적용하지 않는다.
 
+## 공유 dev 개발 세션 전환
+
+CloudFront dev 주소는 공개 상태를 유지한다. 접속자는 모두 같은 고정 개발 계정
+세션을 발급받을 수 있으므로 실제 개인정보·실제 계정·실제 비밀번호를 사용하지
+않고 합성·비식별 데이터만 허용한다. Terraform `development_auth`는 비민감 식별자이지만
+실제 값은 Git에서 제외된 `dev.tfvars`에 둔다.
+
+1. 공유 환경과 DB를 시작하고 migration 상태를 확인한다.
+2. 저장소 `infra/`에서 다음 고정 합성 계정을 멱등 생성한다.
+
+   ```bash
+   just dev-create-session-account "개발 중개사무소" developer "Developer" OWNER
+   ```
+
+3. 출력된 식별자를 `environments/dev/dev.tfvars`에 기록한다. `setup-local.sh`를 다시
+   실행해도 기존 블록은 보존되며, `target_account_id`나 `expires_at`이 다르면
+   `--force`로도 수정하지 않고 실패한다.
+
+   ```hcl
+   development_auth = {
+     brokerage_id = 1
+     login_id      = "developer"
+   }
+   ```
+
+   `null`이면 Backend 개발 세션 경로와 Frontend 버튼이 모두 비활성화된다.
+   값이 있으면 Backend는 `APP_ENV=dev`, `DB_TARGET=development`, 유휴 30분·절대
+   720분 세션 설정과 개발 계정 식별자를 받고, Frontend는 개발 로그인 버튼을
+   표시한다.
+4. `integrated_pipeline_detect_changes = false`를 유지한다.
+5. 저장소 `infra/`에서 `just dev-plan → just dev-show → just dev-apply → just dev-drift`
+   순서로 적용한다. plan에 RDS·ALB·CloudFront의 교체 또는 삭제가 보이면
+   `dev-apply`를 실행하지 않는다.
+6. 변경이 `dev` 브랜치에 병합된 뒤 병합 결과의 정확한 40자 commit SHA로
+   `skn30-final-3team-dev-integrated` Pipeline을 수동 실행한다.
+7. 같은 Pipeline의 Backend와 Frontend 배포가 모두 성공하고 아래 smoke test를
+   통과한 뒤에만 별도 검토 Terraform 변경으로 통합 Pipeline 자동 감지를 다시 켠다.
+
+정확한 SHA 수동 실행은 다음 형식을 사용한다.
+
+```bash
+aws codepipeline start-pipeline-execution \
+  --name skn30-final-3team-dev-integrated \
+  --source-revisions actionName=Source,revisionType=COMMIT_ID,revisionValue=<40자리-SHA> \
+  --region ap-northeast-2
+```
+
+### 개발 세션 smoke test
+
+배포된 CloudFront 동일 origin을 기준으로 다음을 순서대로 확인한다.
+
+1. 초기 `GET /api/v1/auth/me`는 401을 반환한다.
+2. `POST /api/v1/auth/development-session`은 200을 반환하고 두 `Set-Cookie`에 각각
+   `Secure`, `HttpOnly`, `SameSite=Lax`가 있다.
+3. 세션 Cookie로 `GET /api/v1/auth/me`가 200이고, 반환된 CSRF token을 사용한
+   상태 변경 요청이 성공한다.
+4. `DELETE /api/v1/auth/session`은 204이고 이후 `GET /api/v1/auth/me`는 다시 401이다.
+5. 로그인 화면에 비활성 ID·비밀번호 폼과 `개발용 세션으로 로그인` 버튼이
+   함께 표시된다.
+
 ## Pipeline 실행
 
 논리 이름과 실제 이름은 다음과 같다.
@@ -148,7 +208,7 @@ Pipeline과 CodeDeploy에서는 다음 순서로 확인한다.
 1. CodePipeline의 Source revision이 요청한 40자리 SHA인지 확인한다.
 2. Backend Build artifact의 image가 `repository@sha256:...` 형식인지 확인한다.
 3. `backend-image.env`에 image digest와 비민감 parameter prefix·secret ARN·port·health/log 메타데이터만 있는지 확인한다.
-4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 AI provider key는 Worker 파일에만 있어야 한다.
+4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 비민감 AI endpoint·timeout은 API·Worker 파일에, AI provider key는 Worker 파일에만 있어야 한다.
 5. `ApplicationStart`, `ValidateService`가 성공하고 deployment 상태가 `Succeeded`인지 확인한다.
 6. Target Group의 유일한 target이 `healthy`인지 확인한다.
 7. CloudFront `https://<distribution-domain><APP_READINESS_PATH>`가 200을 반환하는지 확인한다.

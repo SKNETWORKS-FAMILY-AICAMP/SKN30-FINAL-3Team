@@ -1,65 +1,29 @@
 /**
- * API 오류 분류.
+ * 장부 오류 문구.
  *
- * 화면은 "실패"를 한 덩어리로 다루면 안 된다. 요구사항이 상태별로 다른 화면을 지정한다.
+ * 오류의 **분류**는 `shared/api`가 소유하고, 여기서는 장부 화면이 보여줄 **문구**만 정한다.
+ * 요구사항이 상태별로 다른 화면을 지정하기 때문이다.
  *   - 불러오기 실패는 입력을 건드리지 않고 재시도를 제공한다(F1-GR 로드 오류 화면).
  *   - 저장 충돌은 롤백하고 해당 셀을 표시한다(F1-GR-26).
  *   - 연결 단절은 브라우저에 보관하고 복구 시 재전송한다(F1-GR-35).
  *   - 권한 부족은 재시도할 대상이 아니다.
  *
- * 그래서 전송 실패, JSON 파싱 실패, 계약 위반, 도메인 오류를 서로 다른 종류로 구분한다.
+ * 같은 분류라도 기능마다 사용자에게 할 말이 다르므로 문구를 공통 영역에 올리지 않는다.
+ * 예를 들어 인증은 계정 존재 여부를 드러내지 않으려고 사유를 뭉뚱그린다.
  */
 
-export type LedgerErrorKind =
-  /** 네트워크에 닿지 못했다. 오프라인 처리 대상. */
-  | "offline"
-  /** 요청이 취소되었다. 화면에 오류로 보여주지 않는다. */
-  | "canceled"
-  /** 세션이 없거나 만료됐다(401). */
-  | "unauthorized"
-  /** 권한이 부족하다(403). CSRF 토큰 불일치도 여기에 들어온다. */
-  | "forbidden"
-  /** 대상이 없다(404). */
-  | "notFound"
-  /** row_version 충돌(409). 다른 사용자가 먼저 저장했다. */
-  | "conflict"
-  /** 입력값이 서버 검증을 통과하지 못했다(422 등). */
-  | "validation"
-  /** 서버 내부 오류(5xx). */
-  | "server"
-  /** 응답이 계약과 다르다. 배포 불일치일 가능성이 높다. */
-  | "contract";
+// 오류 분류만 필요하므로 배럴이 아니라 순수 진입점을 쓴다(ADR-004). 배럴은 `import.meta.env`를
+// 읽는 설정 모듈에 닿아 있고, 이 파일은 순수해야 Node 테스트에 넣을 수 있다.
+import { ApiError } from "../../../shared/api/errors.ts";
+import type { ApiErrorKind } from "../../../shared/api/errors.ts";
 
-export interface LedgerApiErrorOptions {
-  kind: LedgerErrorKind;
-  message: string;
-  status?: number;
-  /** 서버가 준 도메인 오류 코드(api.md의 `code`). */
-  code?: string;
-  /** 추적용 요청 식별자(api.md의 `request_id`). */
-  requestId?: string;
-  cause?: unknown;
-}
-
-export class LedgerApiError extends Error {
-  readonly kind: LedgerErrorKind;
-  readonly status: number | undefined;
-  readonly code: string | undefined;
-  readonly requestId: string | undefined;
-
-  constructor(options: LedgerApiErrorOptions) {
-    super(options.message, options.cause == null ? undefined : { cause: options.cause });
-    this.name = "LedgerApiError";
-    this.kind = options.kind;
-    this.status = options.status;
-    this.code = options.code;
-    this.requestId = options.requestId;
-  }
-}
-
-export function isCanceled(error: unknown): boolean {
-  return error instanceof LedgerApiError && error.kind === "canceled";
-}
+/**
+ * row_version 없이 삭제를 시도한 경우. 두 장부가 같은 안내를 쓴다.
+ *
+ * 서버에 보내기 전 화면이 스스로 막는 자리라 사용자에게 그대로 보여준다.
+ */
+export const DELETE_WITHOUT_VERSION =
+  "row_version이 없어 삭제할 수 없습니다. 목록을 새로 불러온 뒤 다시 시도해 주세요.";
 
 /**
  * 사용자에게 보여줄 문구.
@@ -68,11 +32,15 @@ export function isCanceled(error: unknown): boolean {
  * 추적이 필요한 `request_id`만 덧붙인다.
  */
 export function describeForUser(error: unknown): string {
-  if (!(error instanceof LedgerApiError)) {
+  if (!(error instanceof ApiError)) {
     return "알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
-  const base = messageForCode(error.code) ?? messageFor(error.kind);
+  /*
+   * `userMessage`는 화면 코드가 "이 문장은 사용자에게 보여도 된다"고 표시한 오류에만 있다.
+   * 응답에서 만든 오류에는 붙지 않으므로 서버 원문이 이 경로로 새지 않는다.
+   */
+  const base = messageForCode(error.code) ?? error.userMessage ?? messageFor(error.kind);
   return error.requestId == null ? base : `${base} (요청 번호 ${error.requestId})`;
 }
 
@@ -91,7 +59,7 @@ function messageForCode(code: string | undefined): string | null {
   }
 }
 
-function messageFor(kind: LedgerErrorKind): string {
+function messageFor(kind: ApiErrorKind): string {
   switch (kind) {
     case "offline":
       return "네트워크에 연결하지 못했습니다. 변경 내용은 브라우저에 보관됩니다.";
@@ -112,15 +80,4 @@ function messageFor(kind: LedgerErrorKind): string {
     case "contract":
       return "서버 응답 형식이 예상과 다릅니다. 배포 버전을 확인해 주세요.";
   }
-}
-
-/** HTTP 상태 코드를 오류 종류로. */
-export function kindFromStatus(status: number): LedgerErrorKind {
-  if (status === 401) return "unauthorized";
-  if (status === 403) return "forbidden";
-  if (status === 404) return "notFound";
-  if (status === 409) return "conflict";
-  if (status === 400 || status === 422) return "validation";
-  if (status >= 500) return "server";
-  return "server";
 }

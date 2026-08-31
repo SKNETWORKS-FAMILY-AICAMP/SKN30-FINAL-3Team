@@ -19,6 +19,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 class AppEnvironment(StrEnum):
     LOCAL = "local"
     TEST = "test"
+    DEV = "dev"
     PROD = "prod"
 
 
@@ -103,7 +104,6 @@ class WorkerConfig(BaseModel):
 
 
 class F2Config(BaseModel):
-    enabled: bool = False
     max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
 
 
@@ -121,6 +121,7 @@ class Config(BaseModel):
         expected_target = {
             AppEnvironment.LOCAL: DatabaseTarget.DEVELOPMENT,
             AppEnvironment.TEST: DatabaseTarget.TEST,
+            AppEnvironment.DEV: DatabaseTarget.DEVELOPMENT,
             AppEnvironment.PROD: DatabaseTarget.PRODUCTION,
         }[self.app.environment]
         if self.db.target is not expected_target:
@@ -137,7 +138,7 @@ class Config(BaseModel):
 
     @property
     def secure_cookie(self) -> bool:
-        return self.app.environment is AppEnvironment.PROD
+        return self.app.environment in {AppEnvironment.DEV, AppEnvironment.PROD}
 
 
 def _required(source: Mapping[str, str], name: str) -> str:
@@ -245,7 +246,6 @@ def bind_config(source: Mapping[str, str]) -> Config:
             worker_id=_optional(source, "WORKER_ID"),
         ),
         f2=F2Config(
-            enabled=_boolean(source, "F2_ENABLED", False),
             max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
         ),
     )
@@ -270,7 +270,7 @@ def load_config(
     try:
         selected_environment = AppEnvironment(selected_value)
     except ValueError as exc:
-        raise ConfigurationError("APP_ENV must be local, test, or prod") from exc
+        raise ConfigurationError("APP_ENV must be local, test, dev, or prod") from exc
 
     values: dict[str, str] = {}
     if selected_environment is AppEnvironment.LOCAL:

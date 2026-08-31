@@ -10,7 +10,9 @@ from brokerage_ai.f3.judgment_contracts import (
     JudgmentCard,
 )
 
-BROKERAGE_JUDGMENT_PROMPT_VERSION = "brokerage-judgment-prompt:v1"
+# v2: `each_candidate_appears_once` 가 강제하던 "같은 후보를 두 번 판정하지 않는다"를 규칙 2에
+# 명시했다. JSON schema 로 표현할 수 없어 모델이 그 존재를 알 방법이 없었다.
+BROKERAGE_JUDGMENT_PROMPT_VERSION = "brokerage-judgment-prompt:v2"
 
 _ROLE = (
     "너는 중개 판정자다. 한쪽을 대리하지 않는다. 앵커 포지션 카드 1장과 반대편 후보 카드 "
@@ -22,6 +24,7 @@ _RULES = """규칙을 모두 지킨다.
 1. 출력 언어는 한국어다. 현업 표기(경신·월환·명도·붙박이)를 그대로 쓴다.
 2. 받은 후보를 **전부** 판정한다. 하나도 빠뜨리지 않고, 받지 않은 후보를 만들지 않는다.
    card_id 는 입력에 있는 값을 그대로 쓴다.
+   - 같은 card_id 를 두 번 판정하지 않는다. 후보마다 판정은 한 번뿐이다.
 3. 등급은 STRONG, WEAK, REJECTED 셋뿐이다.
    - STRONG: 지금 연결할 만하다.
    - WEAK: 조건이 움직이면 가능하다.
@@ -49,7 +52,11 @@ _RULES = """규칙을 모두 지킨다.
 12. 개인정보를 생성하거나 복원하지 않는다. 가려진 이름·연락처가 무엇인지 추측하지 않고
     성명, 전화번호, 이메일, 생년월일을 출력에 넣지 않는다.
 13. 법률 판단이나 공식 가격 감정으로 표현하지 않는다. 두 포지션을 놓고 본 중개 판단이다.
-14. 발송 문안을 만들지 않는다. message 는 무슨 말을 꺼낼지에 대한 한 문장 제안이다."""
+14. 발송 문안을 만들지 않는다. message 는 무슨 말을 꺼낼지에 대한 한 문장 제안이다.
+15. 근거의 네 필드는 항상 모두 출력하되 해당하지 않는 필드는 null 로 둔다.
+    - kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고 note 는 null 이다.
+    - kind=INFERENCE 이면 note 만 채우고 interaction_id 와 quote_text 는 null 이다.
+    해당하지 않는 필드는 반드시 null 로 출력하고 임의 값을 채우지 않는다."""
 
 
 def _card_payload(card: JudgmentCard) -> dict[str, object]:

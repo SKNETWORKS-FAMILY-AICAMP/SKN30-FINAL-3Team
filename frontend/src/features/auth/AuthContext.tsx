@@ -13,7 +13,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { isMockSource } from "../../config/env.ts";
-import { clearCsrfToken } from "../ledger/index.ts";
+import { clearCsrfToken } from "../../shared/api/index.ts";
 import { createDevelopmentSession, deleteSession, fetchCurrentUser } from "./api/authApi.ts";
 import { describeAuthError, isCanceled, isSessionLost } from "./model/authError.ts";
 import type { AuthUser } from "./model/user.ts";
