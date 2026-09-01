@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import stat
 import tempfile
 import unittest
@@ -64,16 +65,26 @@ class RenderEnvironmentTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(SystemExit):
                 render_env.parse_public_parameters(payload, "/project-dev")
 
-    def test_ai_provider_keys_require_openai_and_allow_optional_vllm(self) -> None:
-        keys = render_env.parse_ai_provider_keys(
-            '{"AI_OPENAI_API_KEY":"openai-test","AI_VLLM_LLM_API_KEY":"vllm-test"}'
-        )
+    def test_ai_provider_keys_require_api_and_worker_keys(self) -> None:
+        provider_keys = {
+            "AI_OPENAI_API_KEY": "openai-test",
+            "AI_VLLM_LLM_API_KEY": "llm-test",
+            "AI_VLLM_STT_API_KEY": "stt-test",
+        }
 
-        self.assertEqual(set(keys), {"AI_OPENAI_API_KEY", "AI_VLLM_LLM_API_KEY"})
-        with self.assertRaises(SystemExit):
-            render_env.parse_ai_provider_keys('{"AI_VLLM_LLM_API_KEY":"vllm-test"}')
+        keys = render_env.parse_ai_provider_keys(json.dumps(provider_keys))
 
-    def test_process_environment_files_route_f2_keys_and_isolate_worker_secrets(
+        self.assertEqual(set(keys), set(provider_keys))
+        for missing_name in provider_keys:
+            incomplete = {
+                name: value for name, value in provider_keys.items() if name != missing_name
+            }
+            with self.subTest(missing_name=missing_name), self.assertRaisesRegex(
+                SystemExit, missing_name
+            ):
+                render_env.parse_ai_provider_keys(json.dumps(incomplete))
+
+    def test_process_environment_files_route_public_ai_and_isolate_secrets(
         self,
     ) -> None:
         api, worker, migration = render_env.build_process_environments(

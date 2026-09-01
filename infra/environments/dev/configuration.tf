@@ -43,17 +43,15 @@ locals {
       HTTP_CORS_ALLOWED_ORIGINS    = "[]"
       LOG_FORMAT                   = "json"
       LOG_LEVEL                    = "INFO"
-      WORKER_ENABLED               = "false"
+      WORKER_ENABLED               = "true"
       WORKER_READY_FILE            = "/tmp/brokerage-worker-ready"
-      F3_ALLOW_SYNTHETIC_PROTOTYPE = "false"
+      F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
     }, local.development_auth_identity_environment)
     ai = {
       AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
       AI_REQUEST_TIMEOUT_SECONDS = "60"
-      AI_VLLM_LLM_BASE_URL       = "https://rc4gnqm2g1vwgo-8001.proxy.runpod.net/v1"
-      AI_VLLM_STT_BASE_URL       = "https://rc4gnqm2g1vwgo-8002.proxy.runpod.net/v1"
-      AI_F2_LLM_MODEL            = "f2-qwen3-4b-full-output-v04"
-      AI_F2_STT_MODEL            = "openai/whisper-large-v3-turbo"
+      AI_VLLM_LLM_BASE_URL       = "https://xkgavic14hanqr-8001.proxy.runpod.net/v1"
+      AI_VLLM_STT_BASE_URL       = "https://xkgavic14hanqr-8002.proxy.runpod.net/v1"
     }
   }
 

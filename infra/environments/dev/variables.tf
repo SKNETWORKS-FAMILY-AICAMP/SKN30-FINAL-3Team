@@ -134,6 +134,8 @@ variable "ai_provider_api_keys" {
   validation {
     condition = (
       contains(keys(var.ai_provider_api_keys), "AI_OPENAI_API_KEY") &&
+      contains(keys(var.ai_provider_api_keys), "AI_VLLM_LLM_API_KEY") &&
+      contains(keys(var.ai_provider_api_keys), "AI_VLLM_STT_API_KEY") &&
       alltrue([
         for name, value in var.ai_provider_api_keys :
         can(regex("^AI_[A-Z0-9_]+_API_KEY$", name)) &&
@@ -141,7 +143,7 @@ variable "ai_provider_api_keys" {
         length(regexall("[[:space:]]", value)) == 0
       ])
     )
-    error_message = "ai_provider_api_keys에는 비어 있지 않은 AI_OPENAI_API_KEY와 AI_*_API_KEY 형식의 키만 지정해야 합니다."
+    error_message = "ai_provider_api_keys에는 비어 있지 않은 AI_OPENAI_API_KEY, AI_VLLM_LLM_API_KEY, AI_VLLM_STT_API_KEY와 AI_*_API_KEY 형식의 키만 지정해야 합니다."
   }
 }
 
