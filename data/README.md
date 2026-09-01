@@ -32,6 +32,30 @@ data/
 
 원본, 별도 스키마 또는 라벨 가이드가 실제로 필요해지면 그때 해당 파일이나 폴더를 추가한다.
 
+### F2 full-output v0.4 작업 초안
+
+`f2_full_output_scenarios.privacy_safe.v0.4.jsonl`은 장부 종류와 전체 `expected`
+구조를 가진 검수 전 합성 초안이다. 기존 상담 유형 분류 900건을 덮어쓰지 않는다.
+모든 transcript는 실제 STT 반환 형식에 맞춰 `중개사:`·`고객:` 같은 화자 이름 표식 없이
+다중 발화를 이어 붙인다. 합성 고객이 본인 이름을 직접 말하며, 맞는 장부에서는 이를
+임대인 또는 구입자 이름의 근거로 연결한다. 사실 순서 변경, 반복 진술, 끼어드는 맥락,
+불확실·충돌 조건과 장부 불일치 사례는 `difficulty_tags`로 구분한다.
+
+```bash
+python data/scripts/generate_f2_full_output_scenarios.py
+python data/scripts/split_f2_sllm_dataset.py \
+  --input data/f2_llm/working/f2_full_output_scenarios.privacy_safe.v0.4.jsonl \
+  --output-dir <output-dir> \
+  --validation-per-label 25 \
+  --test-per-label 25 \
+  --seed 20260820
+```
+
+같은 blueprint 파생본 30건은 동일 `source_group_id`를 사용한다. split 보고서에는 그룹
+교차 검사와 진단용 near-duplicate 결과가 포함된다. 사람 검수와 불변 릴리스 전에는 정식
+골드 평가나 운영 성능 주장에 사용하지 않는다. RunPod 학습 전에는 실제 Qwen tokenizer로
+길이 분포를 확인해 `max_length`에 의해 정답이 잘리지 않는지도 검사한다.
+
 ## 산출물 문서 세트
 
 Git에 두는 데이터 산출물은 릴리스 여부와 관계없이 같은 폴더에 다음 세 파일을 함께 둔다.

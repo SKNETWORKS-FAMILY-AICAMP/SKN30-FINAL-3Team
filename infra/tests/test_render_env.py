@@ -73,7 +73,7 @@ class RenderEnvironmentTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             render_env.parse_ai_provider_keys('{"AI_VLLM_LLM_API_KEY":"vllm-test"}')
 
-    def test_process_environment_files_route_public_ai_and_isolate_secrets(
+    def test_process_environment_files_route_f2_keys_and_isolate_worker_secrets(
         self,
     ) -> None:
         api, worker, migration = render_env.build_process_environments(
@@ -87,15 +87,23 @@ class RenderEnvironmentTests(unittest.TestCase):
             },
             runtime_url="postgresql+psycopg://runtime",
             migration_url="postgresql+psycopg://migration",
-            ai_provider_keys={"AI_OPENAI_API_KEY": "openai-test"},
+            ai_provider_keys={
+                "AI_OPENAI_API_KEY": "openai-test",
+                "AI_VLLM_LLM_API_KEY": "llm-test",
+                "AI_VLLM_STT_API_KEY": "stt-test",
+            },
         )
 
         self.assertEqual(api["DB_URL"], "postgresql+psycopg://runtime")
         self.assertNotIn("AI_OPENAI_API_KEY", api)
+        self.assertEqual(api["AI_VLLM_LLM_API_KEY"], "llm-test")
+        self.assertEqual(api["AI_VLLM_STT_API_KEY"], "stt-test")
         self.assertEqual(api["AI_OPENAI_BASE_URL"], "https://openai.example/v1")
         self.assertEqual(api["AI_VLLM_LLM_BASE_URL"], "https://llm.example/v1")
         self.assertEqual(api["AI_VLLM_STT_BASE_URL"], "https://stt.example/v1")
         self.assertEqual(worker["AI_OPENAI_API_KEY"], "openai-test")
+        self.assertEqual(worker["AI_VLLM_LLM_API_KEY"], "llm-test")
+        self.assertEqual(worker["AI_VLLM_STT_API_KEY"], "stt-test")
         self.assertEqual(worker["DB_URL"], "postgresql+psycopg://runtime")
         self.assertEqual(worker["AI_VLLM_LLM_BASE_URL"], "https://llm.example/v1")
         self.assertEqual(worker["AI_VLLM_STT_BASE_URL"], "https://stt.example/v1")

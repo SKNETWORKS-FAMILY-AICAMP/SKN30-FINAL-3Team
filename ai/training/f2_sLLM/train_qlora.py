@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qwen3-4B를 F2 상담 유형 분류 데이터로 QLoRA 미세조정한다.
+"""Qwen3-4B를 F2 분류 또는 full-output 데이터로 QLoRA 미세조정한다.
 
 전체 실행 흐름
 1. CLI 인자와 YAML 설정을 읽고 입력 파일 및 출력 경로를 검증한다.
@@ -39,10 +39,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir", type=Path, required=True, help="어댑터/체크포인트 저장 위치"
     )
+    parser.add_argument(
+        "--model-revision",
+        help="YAML의 model.revision을 덮어쓸 불변 Hugging Face commit hash",
+    )
     # 실제 전체 학습 전에 --max-samples 8 --max-steps 2처럼 지정하면 모델 로딩부터
     # 저장까지 전체 연결이 정상인지 적은 비용으로 확인할 수 있다.
     parser.add_argument("--max-samples", type=int, help="연결 확인용 split별 최대 건수")
     parser.add_argument("--max-steps", type=int, default=-1, help="연결 확인용 학습 step 제한")
+    parser.add_argument(
+        "--init-adapter",
+        type=Path,
+        help="새 optimizer로 추가학습할 기존 PEFT/LoRA adapter 디렉터리",
+    )
     # 중단된 학습을 checkpoint-N 디렉터리부터 이어서 실행할 때 사용한다.
     parser.add_argument("--resume-from-checkpoint", type=Path)
     return parser.parse_args()
@@ -107,6 +116,88 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_directory(path: Path) -> str:
+    """초기 adapter 디렉터리 전체의 상대 경로와 내용을 하나의 체크섬으로 묶는다."""
+
+    digest = hashlib.sha256()
+    files = sorted(item for item in path.rglob("*") if item.is_file())
+    if not files:
+        raise ValueError(f"adapter 디렉터리가 비어 있습니다: {path}")
+    for file_path in files:
+        relative_path = file_path.relative_to(path).as_posix().encode()
+        digest.update(len(relative_path).to_bytes(8, "big"))
+        digest.update(relative_path)
+        with file_path.open("rb") as file:
+            for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_init_adapter(
+    path: Path, config: dict[str, Any]
+) -> tuple[dict[str, Any], str, Path | None]:
+    """기존 adapter 계약과 기반 모델 ID를 GPU 모델 다운로드 전에 검사한다."""
+
+    if not path.is_dir():
+        raise FileNotFoundError(path)
+    config_path = path / "adapter_config.json"
+    if not config_path.is_file():
+        raise FileNotFoundError(config_path)
+    weight_paths = (path / "adapter_model.safetensors", path / "adapter_model.bin")
+    if not any(weight_path.is_file() for weight_path in weight_paths):
+        raise FileNotFoundError(f"adapter 가중치 파일이 없습니다: {path}")
+    with config_path.open(encoding="utf-8") as file:
+        adapter_config = json.load(file)
+    if not isinstance(adapter_config, dict):
+        raise ValueError(f"adapter_config.json은 JSON 객체여야 합니다: {config_path}")
+    base_model_id = adapter_config.get("base_model_name_or_path")
+    model_id = config["model"]["id"]
+    if base_model_id != model_id:
+        raise ValueError(
+            "초기 adapter의 기반 모델이 학습 설정과 다릅니다: "
+            f"adapter={base_model_id!r}, config={model_id!r}"
+        )
+    metadata_path = path.parent / "run_metadata.json"
+    resolved_revision = None
+    if metadata_path.is_file():
+        with metadata_path.open(encoding="utf-8") as file:
+            run_metadata = json.load(file)
+        if not isinstance(run_metadata, dict):
+            raise ValueError(f"run_metadata.json은 JSON 객체여야 합니다: {metadata_path}")
+        resolved_revision = run_metadata.get("resolved_model_revision")
+    adapter_revision = adapter_config.get("revision")
+    resolved_revision = resolved_revision or adapter_revision
+    if not isinstance(resolved_revision, str) or resolved_revision in {"", "main"}:
+        raise ValueError(
+            "초기 adapter의 불변 기반 모델 revision을 확인할 수 없습니다. "
+            "기존 run_metadata.json과 --model-revision commit hash가 필요합니다"
+        )
+    configured_revision = config["model"]["revision"]
+    if resolved_revision != configured_revision:
+        raise ValueError(
+            "초기 adapter의 기반 모델 revision이 학습 설정과 다릅니다: "
+            f"adapter={resolved_revision!r}, config={configured_revision!r}"
+        )
+
+    lora_config = config["lora"]
+    comparable_values = {
+        "r": int(lora_config["rank"]),
+        "lora_alpha": int(lora_config["alpha"]),
+        "lora_dropout": float(lora_config["dropout"]),
+    }
+    for key, expected_value in comparable_values.items():
+        if adapter_config.get(key) != expected_value:
+            raise ValueError(
+                f"초기 adapter의 {key}가 학습 설정과 다릅니다: "
+                f"adapter={adapter_config.get(key)!r}, config={expected_value!r}"
+            )
+    adapter_targets = set(adapter_config.get("target_modules") or [])
+    configured_targets = set(lora_config["target_modules"])
+    if adapter_targets != configured_targets:
+        raise ValueError("초기 adapter의 target_modules가 학습 설정과 다릅니다")
+    return adapter_config, resolved_revision, metadata_path if metadata_path.is_file() else None
+
+
 def git_revision() -> str | None:
     """학습에 사용한 코드 revision을 반환하고 Git 정보가 없으면 None을 반환한다."""
 
@@ -121,11 +212,12 @@ def git_revision() -> str | None:
         return None
 
 
-def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[str]]:
-    """SFT JSONL의 최소 계약과 split을 확인하고 ID·원천 그룹 집합을 반환한다."""
+def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[str], set[str]]:
+    """SFT JSONL의 최소 계약과 split을 확인하고 ID·그룹·과제 집합을 반환한다."""
 
     ids: set[str] = set()
     groups: set[str] = set()
+    tasks: set[str] = set()
     with path.open(encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
             if not line.strip():
@@ -142,6 +234,9 @@ def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[st
                 raise ValueError(f"{path}:{line_number}: prompt 대화가 비어 있습니다")
             if not isinstance(sample["completion"], list) or not sample["completion"]:
                 raise ValueError(f"{path}:{line_number}: completion 대화가 비어 있습니다")
+            task = sample.get("task", "classification")
+            if task not in {"classification", "full"}:
+                raise ValueError(f"{path}:{line_number}: 알 수 없는 task {task!r}")
             sample_id = sample["id"]
             group_id = sample["source_group_id"]
             if not all(isinstance(value, str) and value.strip() for value in (sample_id, group_id)):
@@ -150,9 +245,10 @@ def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[st
                 raise ValueError(f"{path}:{line_number}: 중복 id {sample_id!r}")
             ids.add(sample_id)
             groups.add(group_id)
+            tasks.add(task)
     if not ids:
         raise ValueError(f"{path}: 데이터가 없습니다")
-    return ids, groups
+    return ids, groups, tasks
 
 
 def main() -> None:
@@ -161,6 +257,10 @@ def main() -> None:
     # 1. 사용자 입력과 YAML 설정을 먼저 읽는다.
     args = parse_args()
     config = load_config(args.config)
+    if args.model_revision is not None:
+        if not args.model_revision.strip():
+            raise ValueError("model-revision은 비어 있지 않아야 합니다")
+        config["model"]["revision"] = args.model_revision
     if args.max_steps == 0 or args.max_steps < -1:
         raise ValueError("max_steps는 -1 또는 1 이상의 정수여야 합니다")
 
@@ -170,16 +270,39 @@ def main() -> None:
             raise FileNotFoundError(path)
     if args.train_data.resolve() == args.validation_data.resolve():
         raise ValueError("train-data와 validation-data는 서로 다른 파일이어야 합니다")
-    train_ids, train_groups = validate_sft_file(args.train_data, "train")
-    validation_ids, validation_groups = validate_sft_file(args.validation_data, "validation")
+    train_ids, train_groups, train_tasks = validate_sft_file(args.train_data, "train")
+    validation_ids, validation_groups, validation_tasks = validate_sft_file(
+        args.validation_data, "validation"
+    )
     if overlap := train_ids & validation_ids:
         raise ValueError(f"train/validation에 중복 id가 있습니다: {sorted(overlap)[:5]}")
     if overlap := train_groups & validation_groups:
         raise ValueError(
             f"train/validation에 중복 source_group_id가 있습니다: {sorted(overlap)[:5]}"
         )
+    if len(train_tasks) != 1 or train_tasks != validation_tasks:
+        raise ValueError(
+            "train/validation은 동일한 단일 task여야 합니다: "
+            f"train={sorted(train_tasks)}, validation={sorted(validation_tasks)}"
+        )
+    training_task = next(iter(train_tasks))
     if args.resume_from_checkpoint and not args.resume_from_checkpoint.is_dir():
         raise FileNotFoundError(args.resume_from_checkpoint)
+    init_adapter_config = None
+    init_adapter_revision = None
+    init_adapter_metadata_path = None
+    if args.init_adapter:
+        (
+            init_adapter_config,
+            init_adapter_revision,
+            init_adapter_metadata_path,
+        ) = validate_init_adapter(args.init_adapter, config)
+
+    if args.resume_from_checkpoint:
+        output_dir = args.output_dir.resolve()
+        checkpoint_dir = args.resume_from_checkpoint.resolve()
+        if not checkpoint_dir.is_relative_to(output_dir):
+            raise ValueError("resume checkpoint는 이번 output-dir 내부 경로여야 합니다")
 
     # 실수로 이전 실험의 checkpoint/adapter를 섞거나 덮어쓰지 않게 빈 출력 경로만 허용한다.
     # 단, --resume-from-checkpoint를 명시한 경우에는 기존 출력 경로 사용을 허용한다.
@@ -200,7 +323,7 @@ def main() -> None:
     import transformers
     import trl
     from datasets import load_dataset
-    from peft import LoraConfig, prepare_model_for_kbit_training
+    from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     from trl import SFTConfig, SFTTrainer
 
@@ -214,7 +337,7 @@ def main() -> None:
     dtype = torch.bfloat16 if quantization["compute_dtype"] == "bfloat16" else torch.float16
 
     # 3. JSONL을 train/validation 두 split으로 읽는다. 각 레코드에는 대화형 prompt와
-    # 정답 completion이 들어 있으며, 원본 데이터의 label은 completion에 이미 반영되어 있다.
+    # 정답 completion이 들어 있으며, 원본 분류 label 또는 full expected가 이미 반영되어 있다.
     data = load_dataset(
         "json",
         data_files={"train": str(args.train_data), "validation": str(args.validation_data)},
@@ -303,14 +426,21 @@ def main() -> None:
     # target_modules에 지정한 attention/MLP 선형 계층에 저랭크 행렬을 추가한다.
     # rank가 클수록 표현력과 학습 파라미터 수가 함께 증가하고, alpha는 LoRA 갱신의
     # 스케일을 조절하며 dropout은 작은 데이터셋에서의 과적합을 줄이는 역할을 한다.
-    peft_config = LoraConfig(
-        r=int(lora["rank"]),
-        lora_alpha=int(lora["alpha"]),
-        lora_dropout=float(lora["dropout"]),
-        bias="none",
-        task_type="CAUSAL_LM",
-        target_modules=list(lora["target_modules"]),
-    )
+    if args.init_adapter:
+        # 기존 분류 adapter의 LoRA 파라미터를 학습 가능 상태로 불러오되 optimizer와
+        # scheduler는 새 full-output 학습에서 처음부터 만든다. 같은 실행의 중단 복구에 쓰는
+        # --resume-from-checkpoint와는 의미가 다르다.
+        model = PeftModel.from_pretrained(model, str(args.init_adapter), is_trainable=True)
+        peft_config = None
+    else:
+        peft_config = LoraConfig(
+            r=int(lora["rank"]),
+            lora_alpha=int(lora["alpha"]),
+            lora_dropout=float(lora["dropout"]),
+            bias="none",
+            task_type="CAUSAL_LM",
+            target_modules=list(lora["target_modules"]),
+        )
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # 7. TRL의 지도 미세조정(SFT) 옵션을 구성한다.
@@ -402,6 +532,28 @@ def main() -> None:
             },
         },
         "limits": {"max_samples": args.max_samples, "max_steps": args.max_steps},
+        "task": training_task,
+        "initial_adapter": (
+            {
+                "path": str(args.init_adapter.resolve()),
+                "sha256": sha256_directory(args.init_adapter),
+                "config": init_adapter_config,
+                "resolved_model_revision": init_adapter_revision,
+                "run_metadata": (
+                    {
+                        "path": str(init_adapter_metadata_path.resolve()),
+                        "sha256": sha256(init_adapter_metadata_path),
+                    }
+                    if init_adapter_metadata_path
+                    else None
+                ),
+            }
+            if args.init_adapter
+            else None
+        ),
+        "resumed_from_checkpoint": (
+            str(args.resume_from_checkpoint.resolve()) if args.resume_from_checkpoint else None
+        ),
         "metrics": {"train": train_result.metrics, "evaluation": evaluation},
         "versions": {
             "torch": torch.__version__,

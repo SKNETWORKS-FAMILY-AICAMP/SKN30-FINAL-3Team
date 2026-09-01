@@ -6,7 +6,9 @@ import argparse
 import hashlib
 import json
 import random
+import re
 from collections import Counter, defaultdict
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +19,6 @@ LEGACY_LABELS = {
     "단순문의": "기타상담",
 }
 REQUIRED_FIELDS = {
-    "scenario_id",
     "transcript",
     "label",
     "source_group_id",
@@ -71,7 +72,7 @@ def load_samples(path: Path) -> list[dict[str, Any]]:
             if missing:
                 raise ValueError(f"{path}:{line_number}: 필수 필드 누락 {sorted(missing)}")
 
-            scenario_id = sample["scenario_id"]
+            record_id = sample.get("sample_id", sample.get("scenario_id"))
             transcript = sample["transcript"]
             raw_label = sample["label"]
             label = LEGACY_LABELS.get(raw_label, raw_label)
@@ -80,7 +81,7 @@ def load_samples(path: Path) -> list[dict[str, Any]]:
             if not all(
                 isinstance(value, str) and value.strip()
                 for value in (
-                    scenario_id,
+                    record_id,
                     transcript,
                     label,
                     group_id,
@@ -94,8 +95,8 @@ def load_samples(path: Path) -> list[dict[str, Any]]:
                     f"{path}:{line_number}: 실제 개인정보 포함 데이터는 "
                     "학습 입력으로 사용할 수 없습니다"
                 )
-            if scenario_id in ids:
-                raise ValueError(f"{path}:{line_number}: 중복 scenario_id {scenario_id!r}")
+            if record_id in ids:
+                raise ValueError(f"{path}:{line_number}: 중복 record id {record_id!r}")
             if transcript in transcripts:
                 raise ValueError(f"{path}:{line_number}: 중복 transcript")
             previous_label = group_labels.setdefault(group_id, label)
@@ -104,7 +105,7 @@ def load_samples(path: Path) -> list[dict[str, Any]]:
                     f"{path}:{line_number}: 한 source_group_id에 여러 label이 있습니다"
                 )
 
-            ids.add(scenario_id)
+            ids.add(record_id)
             transcripts.add(transcript)
             samples.append(sample)
 
@@ -179,6 +180,50 @@ def distribution(samples: list[dict[str, Any]]) -> dict[str, int]:
     return {label: counts[label] for label in LABELS}
 
 
+def normalized_bigrams(text: str) -> set[tuple[str, str]]:
+    """숫자 슬롯을 일반화한 어절 bigram으로 near-duplicate 진단용 지문을 만든다."""
+
+    tokens = ["#" if token.isdigit() else token for token in re.findall(r"[가-힣A-Za-z]+|\d+", text)]
+    return set(pairwise(tokens))
+
+
+def cross_split_near_duplicates(
+    split_samples: dict[str, list[dict[str, Any]]], threshold: float = 0.85
+) -> dict[str, Any]:
+    """서로 다른 split의 매우 유사한 문장을 진단하되 자동 합격선으로 사용하지 않는다."""
+
+    fingerprints = {
+        name: [(sample, normalized_bigrams(sample["transcript"])) for sample in samples]
+        for name, samples in split_samples.items()
+    }
+    pairs: list[dict[str, Any]] = []
+    count = 0
+    for left, right in (("train", "validation"), ("train", "test"), ("validation", "test")):
+        for left_sample, left_fingerprint in fingerprints[left]:
+            for right_sample, right_fingerprint in fingerprints[right]:
+                union = left_fingerprint | right_fingerprint
+                similarity = len(left_fingerprint & right_fingerprint) / len(union) if union else 1.0
+                if similarity < threshold:
+                    continue
+                count += 1
+                if len(pairs) < 20:
+                    pairs.append(
+                        {
+                            "splits": f"{left}/{right}",
+                            "left_id": left_sample.get("sample_id", left_sample.get("scenario_id")),
+                            "right_id": right_sample.get("sample_id", right_sample.get("scenario_id")),
+                            "similarity": round(similarity, 4),
+                        }
+                    )
+    return {
+        "method": "number-normalized word-bigram Jaccard",
+        "threshold": threshold,
+        "cross_split_pair_count": count,
+        "sample_pairs": pairs,
+        "interpretation": "diagnostic_only_not_an_approved_quality_threshold",
+    }
+
+
 def main() -> None:
     args = parse_args()
     output_paths = {
@@ -213,6 +258,8 @@ def main() -> None:
     if overlaps:
         raise RuntimeError(f"분할 간 source_group_id 중복: {overlaps}")
 
+    all_group_sizes = Counter(sample["source_group_id"] for sample in samples)
+
     manifest = {
         "source": {"path": str(args.input), "sha256": sha256(args.input), "count": len(samples)},
         "split_policy": {
@@ -221,6 +268,13 @@ def main() -> None:
             "validation_per_label_target": args.validation_per_label,
             "test_per_label_target": args.test_per_label,
             "seed": args.seed,
+        },
+        "group_quality": {
+            "source_group_count": len(all_group_sizes),
+            "minimum_group_size": min(all_group_sizes.values()),
+            "maximum_group_size": max(all_group_sizes.values()),
+            "cross_split_group_overlap_count": 0,
+            "near_duplicate_diagnostic": cross_split_near_duplicates(split_samples_by_name),
         },
         "outputs": {
             name: {

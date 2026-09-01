@@ -1,0 +1,124 @@
+dataset_id: f2-full-output-synthetic
+dataset_version: 0.4.0
+status: draft_label_review_pending
+created_at: 2026-08-31
+updated_at: 2026-08-31
+
+purpose:
+  - F2 상담 유형, 장부 불일치, 필드 추출, 원문 근거와 상담 로그 초안 평가
+  - 검수 완료 후 full-output SFT 학습 후보 입력
+
+format: jsonl
+data_file: f2_full_output_scenarios.privacy_safe.v0.4.jsonl
+privacy_record: f2_full_output_scenarios.privacy_safe.v0.4.privacy.md
+
+schema:
+  record_id_field: sample_id
+  fields:
+    - sample_id
+    - dataset_version
+    - label
+    - transcript
+    - ledger_type
+    - expected
+    - source_type
+    - source_group_id
+    - split
+    - contains_real_personal_data
+    - review_status
+    - difficulty_tags
+  label_values: [매도의뢰, 매수문의, 기타상담]
+  label_guide: docs/requirements/f2/processing.md와 docs/requirements/f2/fields.md
+
+lineage:
+  source_types: [fully_synthetic_from_deterministic_blueprint]
+  source_reference: null
+  derivation: 실제 상담 원문 없이 저장소의 F2 요구사항 필드와 합성 슬롯만으로 결정적으로 생성
+  source_group_policy: 같은 문장 blueprint에서 슬롯만 바꾼 30개 변형은 동일 source_group_id 사용
+  usage_terms: 프로젝트 내부 개발·평가 전용 합성 데이터
+  human_verified: false
+  supersedes: null
+  generation:
+    tooling: data/scripts/generate_f2_full_output_scenarios.py
+    random_seed: null
+    reproducible: true
+
+counts:
+  total: 900
+  train: 0
+  validation: 0
+  test: 0
+label_distribution:
+  매도의뢰: 300
+  매수문의: 300
+  기타상담: 300
+
+split:
+  method: unassigned_working_draft
+  group_key: source_group_id
+  random_seed: null
+  recommended_command: >-
+    python data/scripts/split_f2_sllm_dataset.py --input
+    data/f2_llm/working/f2_full_output_scenarios.privacy_safe.v0.4.jsonl
+    --output-dir <output-dir> --validation-per-label 25 --test-per-label 25
+    --seed 20260820
+
+privacy:
+  classification: 내부
+  contains_real_personal_data: false
+  processing_purpose: F2 구조화 출력 개발·평가
+  storage_location: Git 저장소의 data/f2_llm/working
+  access_subjects: 프로젝트 저장소 접근 권한이 있는 팀원
+  external_transfer: 명시적으로 실행한 승인된 RunPod 실험 환경에서만 합성 transcript 처리 가능
+  retention_and_deletion: working 초안은 검수 승인 또는 반려 시 새 버전 발행이나 삭제로 처리
+  controls:
+    - 실제 원천을 읽지 않는 결정적 합성 생성기
+    - 모든 행의 contains_real_personal_data=false 강제
+    - 가상 지명·가상 인명·가상 중개업소명만 사용
+    - 전화번호는 고정 placeholder 010-1234-5678만 사용
+    - 개인정보 동의 여부는 정답 필드 생성 금지
+  reidentification_mapping: none
+
+validation:
+  validated_at: 2026-08-31
+  validated_by: data/scripts/generate_f2_full_output_scenarios.py 및 split_f2_sllm_dataset.py
+  method: 생성 시 스키마·ID·본문 중복·라벨·근거·허용 필드·그룹 검사 후 임시 그룹 분할 검증
+  results:
+    schema_errors: 0
+    duplicate_sample_ids: 0
+    duplicate_transcripts: 0
+    ungrounded_evidence: 0
+    forbidden_field_proposals: 0
+    source_groups: 30
+    variants_per_source_group: 30
+    rows_with_expected_fields: 480
+    ledger_mismatch_rows: 120
+    unlabeled_multi_speaker_stt_rows: 900
+    spoken_self_identification_rows: 900
+    spoken_name_extracted_rows: 480
+    reordered_fact_rows: 702
+    repeated_statement_rows: 240
+    uncertain_or_conflicting_value_rows: 240
+    transcript_character_length:
+      minimum: 457
+      median: 515.0
+      p95: 608
+      maximum: 728
+    temporary_split_group_overlap: 0
+    temporary_split_near_duplicate_pairs_at_0_85: 0
+
+checksums:
+  algorithm: sha256
+  f2_full_output_scenarios.privacy_safe.v0.4.jsonl: b7d6aa63bf7f44231778446de95ec02815eb3f439670ade7989dc8854e8f53ff
+
+known_limitations:
+  - 사람이 필드 정답, 근거와 상담 로그 초안을 검수하지 않은 작업 초안이다.
+  - 결정적 합성 템플릿은 실제 STT 오류와 실제 상담 분포를 대표하지 않는다.
+  - 문자 길이는 검증했지만 Qwen tokenizer 기준 토큰 길이는 RunPod 학습 전 별도로 확인해야 한다.
+  - near-duplicate 0.85 기준은 진단값이며 승인된 합격 임계값이 아니다.
+  - working 파일의 split은 unassigned이며 최종 test 릴리스가 아니다.
+allowed_use: 생성·분할 도구 검증, 사람이 검수할 라벨 초안, 비공개 개발 평가
+prohibited_use:
+  - 사람 검수 전 정식 골드 평가 또는 운영 성능 주장
+  - 실제 개인정보 분포를 대표한다는 주장
+  - working 데이터를 최종 test로 고정하지 않은 채 반복 튜닝에 사용

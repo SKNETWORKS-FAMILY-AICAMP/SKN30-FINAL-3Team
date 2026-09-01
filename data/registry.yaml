@@ -14,6 +14,9 @@ datasets:
     latest_release: null
     notes:
       - 입력·정답 형식과 검수 기준은 실제 데이터 작성 전에 팀이 합의한다.
+      - full-output 0.4.0 작업 초안은 상담 유형별 300건, 총 900건이며 기존 분류 데이터와
+        별도 파일로 관리한다. 화자 표식 없는 다중 발화 STT, 합성 고객의 본인 이름 발화와
+        난이도 태그를 포함하며 필드 정답·근거·summary는 사람 검수 전 상태다.
 
   - dataset_id: f2-sell-request-privacy-safe
     path: f2_sell_request

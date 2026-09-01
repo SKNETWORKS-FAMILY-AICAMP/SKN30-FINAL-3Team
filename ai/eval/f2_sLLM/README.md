@@ -85,8 +85,14 @@ ai/eval/f2_sLLM/
 uv venv --python 3.12 ai/eval/f2_sLLM/.venv
 uv pip install \
   --python ai/eval/f2_sLLM/.venv/bin/python \
+  --torch-backend=auto \
   -r ai/eval/f2_sLLM/requirements.txt
+uv pip install --python ai/eval/f2_sLLM/.venv/bin/python hf_transfer
 ```
+
+`--torch-backend=auto`는 Pod의 NVIDIA 드라이버에 맞는 CUDA 빌드를 고르게 한다. 생략하면
+드라이버보다 새로운 CUDA용 torch가 설치되어 GPU를 사용하지 못한다. RunPod PyTorch
+템플릿이 설정한 `HF_HUB_ENABLE_HF_TRANSFER=1` 때문에 새 venv에도 `hf_transfer`가 필요하다.
 
 네 모델 전체를 실행한다.
 

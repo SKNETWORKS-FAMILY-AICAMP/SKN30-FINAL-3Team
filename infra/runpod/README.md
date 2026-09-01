@@ -88,3 +88,46 @@ F1 상세에서 `음성메모 입력`을 열고 주의 문구 확인, WAV·MP3·
 RunPod HTTP proxy로 전환할 때는 서비스 host를 `0.0.0.0`으로 바꾸고 Pod의 HTTP port를 노출해야 한다.
 그 경로는 공개 접근이므로 vLLM API key와 HTTPS proxy URL을 반드시 함께 설정하며, 동기 분석이 proxy의
 연결 제한을 넘을 수 있어 현재 1차 로컬 SSH tunnel 검증에는 사용하지 않는다.
+
+## AWS dev HTTPS proxy 연동
+
+AWS dev Backend는 개발자 노트북의 SSH tunnel을 사용할 수 없으므로 RunPod HTTP proxy를 사용한다.
+Pod 설정의 `Expose HTTP ports`에 `8001,8002`를 추가하고 두 vLLM 서비스를 `0.0.0.0`에 bind한다.
+두 서비스에는 서로 다른 API key를 설정하며 인증 없는 공개 endpoint를 운영하지 않는다.
+
+```bash
+VLLM_API_KEY="$VLLM_LLM_API_KEY" CUDA_VISIBLE_DEVICES=0 \
+vllm serve Qwen/Qwen3-4B \
+  --host 0.0.0.0 \
+  --port 8001 \
+  --dtype bfloat16 \
+  --max-model-len 4096 \
+  --gpu-memory-utilization 0.65 \
+  --enable-lora \
+  --max-lora-rank 16 \
+  --lora-modules \
+  f2-qwen3-4b-full-output-v04=/workspace/models/f2-qwen3-4b-full-output-v04/adapter
+```
+
+```bash
+VLLM_API_KEY="$VLLM_STT_API_KEY" VLLM_MAX_AUDIO_CLIP_FILESIZE_MB=25 \
+CUDA_VISIBLE_DEVICES=0 \
+vllm serve openai/whisper-large-v3-turbo \
+  --host 0.0.0.0 \
+  --port 8002 \
+  --gpu-memory-utilization 0.20
+```
+
+Terraform의 공개 설정에는 다음 형식의 endpoint와 실제 served model 이름을 둔다.
+
+```text
+AI_VLLM_LLM_BASE_URL=https://<POD_ID>-8001.proxy.runpod.net/v1
+AI_VLLM_STT_BASE_URL=https://<POD_ID>-8002.proxy.runpod.net/v1
+AI_F2_LLM_MODEL=f2-qwen3-4b-full-output-v04
+AI_F2_STT_MODEL=openai/whisper-large-v3-turbo
+```
+
+`AI_VLLM_LLM_API_KEY`와 `AI_VLLM_STT_API_KEY`는 ignored `secrets.auto.tfvars`의
+`ai_provider_api_keys`로 전달한다. 배포 환경 조립은 F2 호출에 필요한 두 key만 API에 주입하고 전체
+provider key 집합은 Worker에 주입한다. endpoint나 key를 바꾸면 Terraform 적용 후 Backend를 다시
+배포해야 새 환경 파일이 생성된다.
