@@ -26,8 +26,7 @@ RUN uv pip install \
     && uv pip check --system \
     && python -c "import sys; assert sys.version_info[:2] == (3, 12)" \
     && python -c "import aiohttp, multidict, torch; assert torch.__version__.split('+')[0] == '2.8.0'; assert torch.version.cuda == '12.8'" \
-    && python -c "from vllm.entrypoints.cli.main import main; assert callable(main)" \
-    && vllm --version
+    && python -c "from vllm.entrypoints.cli.main import main; assert callable(main)"
 
 COPY scripts/ ./scripts/
 

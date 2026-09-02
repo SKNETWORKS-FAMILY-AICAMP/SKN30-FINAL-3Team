@@ -191,6 +191,7 @@ class ImageAndTemplateTests(unittest.TestCase):
         self.assertIn("--no-deps", dockerfile)
         self.assertIn("--require-hashes", dockerfile)
         self.assertIn("import artifact_bootstrap", dockerfile)
+        self.assertNotIn("vllm --version", dockerfile)
         self.assertNotIn("AutoConfig.from_pretrained", dockerfile)
         self.assertNotIn("PYTHONPATH", dockerfile)
         self.assertNotIn("tmux", dockerfile)
