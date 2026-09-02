@@ -1,0 +1,113 @@
+name: Publish RunPod F2 Serving Image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: runpod-f2-serving-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish linux/amd64 image
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Install immutable test tools
+        run: python -m pip install "ruff==0.14.10" "aiohttp==3.14.3" "multidict==6.7.1"
+
+      - name: Gate image on Ruff
+        run: ruff check infra/runpod/scripts infra/runpod/tests
+
+      - name: Gate image on runtime and authenticated proxy tests
+        run: python -m unittest discover -s infra/runpod/tests -v
+
+      - name: Derive lowercase GHCR image name
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="${GITHUB_REPOSITORY,,}"
+          echo "name=ghcr.io/${repository}/f2-serving" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+
+      - name: Log in to GHCR
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push immutable revision tag
+        id: build
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        with:
+          context: infra/runpod
+          file: infra/runpod/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image.outputs.name }}:git-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=runpod-f2-serving
+          cache-to: type=gha,mode=max,scope=runpod-f2-serving
+
+      - name: Create resolved Template artifact
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          mkdir -p dist
+          jq --arg image "${IMAGE_NAME}@${IMAGE_DIGEST}" \
+            '.image = $image' infra/runpod/template.json > dist/template.json
+          jq -e '.image | test("@sha256:[0-9a-f]{64}$")' dist/template.json >/dev/null
+
+      - name: Upload resolved Template artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runpod-template-${{ github.sha }}
+          path: dist/template.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish immutable digest summary
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## RunPod F2 image"
+            echo
+            echo '```text'
+            echo "${IMAGE_NAME}@${IMAGE_DIGEST}"
+            echo '```'
+            echo
+            echo "Use this exact reference as the runpod-bootstrap-plan and runpod-bootstrap input."
+          } >> "$GITHUB_STEP_SUMMARY"
