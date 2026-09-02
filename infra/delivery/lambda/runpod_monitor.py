@@ -211,12 +211,6 @@ def handler(_event: Mapping[str, Any], _context: Any) -> dict[str, Any]:
     except MonitorError as error:
         metrics = {
             "RunPodControlPlaneReachable": 0.0,
-            "RunPodEndpointConsistent": 1.0,
-            "RunPodSllmHealthy": 1.0,
-            "RunPodSttHealthy": 1.0,
-            "RunPodOrphanPodAgeMinutes": 0.0,
-            "RunPodRuntimeHours": 0.0,
-            "RunPodHourlyCostUsd": 0.0,
             "RunPodMonitorHeartbeat": 1.0,
         }
         outcome = str(error)

@@ -3,7 +3,7 @@ import sys
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 PATH = ROOT / "infra/delivery/lambda/runpod_monitor.py"
@@ -88,6 +88,51 @@ class ObserveTests(unittest.TestCase):
         self.assertEqual(metrics["RunPodSllmHealthy"], 0)
         self.assertEqual(metrics["RunPodSttHealthy"], 0)
         health.assert_not_called()
+
+
+class HandlerTests(unittest.TestCase):
+    def test_control_plane_failure_omits_unobserved_metrics(self):
+        secrets_client = Mock()
+        secrets_client.get_secret_value.side_effect = [
+            {"SecretString": "monitor-key"},
+            {"SecretString": "{}"},
+        ]
+        ssm_client = Mock()
+        ssm_client.get_parameter.return_value = {
+            "Parameter": {"Value": '{"status":"active"}'}
+        }
+        cloudwatch_client = Mock()
+        environment = {
+            "METRIC_NAMESPACE": "SKN30/dev",
+            "MONITOR_SECRET_ARN": "monitor-secret",
+            "AI_PROVIDER_SECRET_ARN": "provider-secret",
+            "ENDPOINT_PARAMETER_NAME": "endpoint-parameter",
+        }
+
+        with (
+            patch.dict(MODULE.os.environ, environment, clear=True),
+            patch.object(
+                MODULE.boto3,
+                "client",
+                side_effect=[secrets_client, ssm_client, cloudwatch_client],
+            ),
+            patch.object(
+                MODULE, "_request_json", side_effect=MODULE.MonitorError("UNREACHABLE")
+            ),
+            patch.object(MODULE, "_publish") as publish,
+        ):
+            result = MODULE.handler({}, None)
+
+        publish.assert_called_once_with(
+            cloudwatch_client,
+            "SKN30/dev",
+            {
+                "RunPodControlPlaneReachable": 0.0,
+                "RunPodMonitorHeartbeat": 1.0,
+            },
+        )
+        self.assertEqual(result["outcome"], "UNREACHABLE")
+        self.assertEqual(result["metric_count"], 2)
 
 
 if __name__ == "__main__":

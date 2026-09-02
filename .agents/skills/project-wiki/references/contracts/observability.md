@@ -102,8 +102,10 @@ F3 이벤트는 DB 종료 상태 commit 뒤 한 번 기록을 **시도하는 bes
 - 감시 Lambda error와 heartbeat 2주기 누락, RunPod API 2회 실패, endpoint 불일치, SLLM·STT
   각각 2회 health 실패, offline orphan 60분, 기본 8시간 연속 실행을 Alarm 전용 SNS·Discord로
   전달한다. 주기는 5~60분의 5분 단위, 실행 경고는 1~24시간에서 Terraform 변수로 조정한다.
-- offline이거나 endpoint가 불일치하면 health 실패로 중복 판단하지 않는다. 제어면 장애에서도
-  heartbeat와 도달 실패 metric을 남기며 외부 오류 본문, URL, Pod 응답, key와 hash는 기록하지 않는다.
+- offline이거나 endpoint가 불일치하면 health 실패로 중복 판단하지 않는다. 제어면 장애에서는
+  heartbeat와 도달 실패 metric만 남기고 확인할 수 없는 endpoint 일치, Provider health, orphan,
+  runtime과 비용 metric은 발행하지 않는다. 외부 오류 본문, URL, Pod 응답, key와 hash는 기록하지
+  않는다.
 - Lambda에는 Secret·Parameter 읽기와 지정 namespace metric 쓰기만 허용한다. endpoint·Pod를
   변경하지 않으며 `PutParameter`, `SendCommand`, 자동 삭제 권한은 없다.
 
