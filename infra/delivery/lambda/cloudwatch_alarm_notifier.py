@@ -476,6 +476,13 @@ def _send(content: str) -> None:
 
 
 def handler(event: Any, _context: Any) -> None:
+    if (
+        isinstance(event, dict)
+        and event.get("fixture") == "secret-rotation"
+        and event.get("target") == "alarm-discord"
+    ):
+        _send("CloudWatch Alarm Discord webhook rotation fixture: OK")
+        return
     records = event.get("Records", []) if isinstance(event, dict) else []
     if not isinstance(records, list):
         return

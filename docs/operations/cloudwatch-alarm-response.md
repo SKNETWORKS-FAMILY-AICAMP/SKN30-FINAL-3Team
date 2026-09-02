@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # CloudWatch Alarm 장애 대응 Runbook
@@ -70,9 +70,35 @@ fields @timestamp, source, request_id, run_id, status, status_code,
 
 ## 인프라 알람
 
-인프라 알람 6개는 Logs Insights 자동 조회를 하지 않는다. `Alarm` 링크의 metric과 dimensions를
+RunPod 이외의 인프라 알람은 Logs Insights 자동 조회를 하지 않는다. `Alarm` 링크의 metric과 dimensions를
 기준으로 ALB target health, ASG capacity 또는 RDS 자원을 확인한다. 애플리케이션 로그는 지표가
 가리키는 시각과 서비스 상태를 확인한 뒤 필요한 경우에만 연다.
+
+## RunPod 알람
+
+RunPod 알람에는 외부 응답 본문이나 Secret을 붙이지 않는다. 다음 순서를 고정한다.
+
+```text
+just -f infra/justfile runpod-status
+just -f infra/justfile runpod-reconcile
+# 필요한 명시적 조정 명령을 검토·실행
+just -f infra/justfile runpod-smoke
+# CloudWatch Alarm의 OK 전이 확인
+```
+
+| 관측 상태 | 자동 변경 | 운영자 조치 |
+|---|---|---|
+| monitor error 또는 heartbeat 누락 | 없음 | Lambda log의 고정 outcome, EventBridge rule, Secret AWSCURRENT와 IAM을 확인한다. |
+| RunPod API 2회 실패 | 없음 | `secret-status`, `runpod-status`로 세션과 read-only key를 확인하고 상태가 불명확하면 변경하지 않는다. |
+| active endpoint, 공유 Pod 없음 | 없음 | `runpod-reconcile` 계획을 확인하고 실제 Pod 부재가 맞을 때만 `runpod-reconcile-apply`로 offline+refresh한다. |
+| endpoint와 다른 Pod 또는 복수 Pod | 없음 | 어느 Pod도 삭제·선택하지 말고 Pod ID·Template ID와 최근 bootstrap generation을 대조한다. |
+| SLLM/STT health 2회 실패 | 없음 | endpoint를 바꾸지 않고 인증 proxy·모델 기동 상태와 image digest를 확인한다. |
+| offline orphan 60분 | 없음 | reconcile이 제시한 정확한 `runpod-delete <pod-id>`를 별도 검토·확인한다. |
+| 연속 실행 8시간 초과 | 없음 | 진행 중 workload 담당자를 확인하고 종료 가능할 때 status와 정확한 Pod ID를 거쳐 삭제한다. |
+
+조사 명령의 stdout, CloudWatch와 Discord에 API key, webhook, presigned URL, Secret Version hash나
+외부 오류 본문을 복사하지 않는다. `runpod-reconcile`이 막힌 상태에서는 endpoint 또는 Pod를 Console에서
+임의 수정하지 않는다.
 
 ## 상세 로그가 표시되지 않을 때
 
