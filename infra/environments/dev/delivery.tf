@@ -1125,14 +1125,16 @@ resource "aws_iam_user_policy_attachment" "pipeline_operator" {
 
 resource "aws_secretsmanager_secret" "discord_webhook" {
   name                    = "/${local.name_prefix}/delivery/discord-webhook"
-  description             = "Discord webhook managed from the ignored secrets.auto.tfvars input"
+  description             = "Container for the delivery Discord webhook populated outside Terraform"
   recovery_window_in_days = 7
 }
 
-resource "aws_secretsmanager_secret_version" "discord_webhook" {
-  secret_id                = aws_secretsmanager_secret.discord_webhook.id
-  secret_string_wo         = var.discord_webhook_url
-  secret_string_wo_version = var.discord_webhook_secret_version
+removed {
+  from = aws_secretsmanager_secret_version.discord_webhook
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 data "archive_file" "discord_notifier" {

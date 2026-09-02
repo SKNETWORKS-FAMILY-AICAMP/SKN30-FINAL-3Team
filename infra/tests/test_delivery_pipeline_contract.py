@@ -14,6 +14,21 @@ def read(relative_path: str) -> str:
 
 
 class DeliveryPipelineContractTests(unittest.TestCase):
+    def test_runpod_image_publish_is_gated_before_digest_output(self) -> None:
+        workflow = read(".github/workflows/runpod-image.yml")
+
+        ruff = workflow.index("Gate image on Ruff")
+        runtime_tests = workflow.index(
+            "Gate image on runtime and authenticated proxy tests"
+        )
+        publish = workflow.index("Build and push immutable revision tag")
+        summary = workflow.index("Publish immutable digest summary")
+        self.assertLess(ruff, publish)
+        self.assertLess(runtime_tests, publish)
+        self.assertLess(publish, summary)
+        self.assertIn("${IMAGE_NAME}@${IMAGE_DIGEST}", workflow)
+        self.assertIn("runpod-bootstrap-plan and runpod-bootstrap input", workflow)
+
     def test_backend_verify_owns_database_checks_without_artifacts(self) -> None:
         buildspec = read("infra/delivery/buildspec-backend-verify.yml")
 
@@ -176,7 +191,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn("test -r '${RDS_CA_CONTAINER_FILE}'", after_install)
         self.assertIn('required_environment("RDS_CA_CONTAINER_FILE")', render_env)
 
-    def test_runtime_configuration_is_dynamic_and_secret_values_are_write_only(
+    def test_runtime_configuration_is_dynamic_and_secret_values_are_external(
         self,
     ) -> None:
         configuration = read("infra/environments/dev/configuration.tf")
@@ -188,6 +203,17 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn(
             "for namespace, values in local.application_environment", configuration
         )
+        self.assertIn(
+            'resource "aws_ssm_parameter" "ai_vllm_endpoint_set"', configuration
+        )
+        self.assertIn(
+            'name        = "/${local.name_prefix}/ai/AI_VLLM_ENDPOINT_SET"',
+            configuration,
+        )
+        self.assertIn("ignore_changes = [value]", configuration)
+        self.assertNotIn("xkgavic14hanqr", configuration)
+        self.assertNotIn("AI_VLLM_SLLM_BASE_URL      =", configuration)
+        self.assertNotIn("AI_VLLM_STT_BASE_URL       =", configuration)
         for previous_address in (
             "backend_auth_session_absolute_minutes",
             "backend_auth_session_idle_minutes",
@@ -198,27 +224,18 @@ class DeliveryPipelineContractTests(unittest.TestCase):
                 f'from = aws_ssm_parameter.application["{previous_address}"]',
                 configuration,
             )
+        self.assertNotIn("secret_string", configuration)
+        self.assertNotIn("secret_string", delivery)
+        self.assertNotIn("ai_provider_api_keys", variables)
+        self.assertNotIn("discord_webhook_url", variables)
         self.assertIn(
-            "secret_string_wo         = jsonencode(var.ai_provider_api_keys)",
-            configuration,
+            "from = aws_secretsmanager_secret_version.ai_provider", configuration
         )
-        self.assertNotIn("secret_string         =", configuration)
-        self.assertIn("ephemeral   = true", variables)
-        for required_key in (
-            "AI_OPENAI_API_KEY",
-            "AI_VLLM_LLM_API_KEY",
-            "AI_VLLM_STT_API_KEY",
-        ):
-            self.assertIn(
-                f'contains(keys(var.ai_provider_api_keys), "{required_key}")',
-                variables,
-            )
-        self.assertIn('length(regexall("[[:space:]]", value)) == 0', variables)
         self.assertIn(
-            'length(regexall("[[:space:]]", var.discord_webhook_url)) == 0',
-            variables,
+            "from = aws_secretsmanager_secret_version.discord_webhook", delivery
         )
-        self.assertIn("secret_string_wo         = var.discord_webhook_url", delivery)
+        self.assertIn("destroy = false", configuration)
+        self.assertIn("destroy = false", delivery)
         self.assertIn("frontend_build_environment = {", delivery)
         self.assertIn('dynamic "environment_variable"', delivery)
         self.assertIn('check "application_environment_names"', checks)
@@ -239,6 +256,30 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn('can(regex("^VITE_[A-Z0-9_]+$", name))', checks)
         self.assertIn('trimspace(value) != ""', checks)
 
+    def test_ai_endpoint_refresh_only_rerenders_and_recreates_consumers(self) -> None:
+        refresh = read("infra/deploy/scripts/refresh_ai_endpoints.sh")
+        buildspec = read("infra/delivery/buildspec-backend-build.yml")
+        verifier = read("infra/delivery/scripts/verify_deploy_scripts.sh")
+
+        self.assertIn("cp -R infra/deploy/scripts _backend_release/scripts", buildspec)
+        self.assertIn("refresh_ai_endpoints.sh", verifier)
+        self.assertIn('scripts/render_env.py"', refresh)
+        self.assertIn(
+            "compose up --detach --no-deps --force-recreate --pull never api worker",
+            refresh,
+        )
+        self.assertIn('scripts/validate_service.sh"', refresh)
+        self.assertIn("docker image inspect", refresh)
+        self.assertIn("release-manifest.json", refresh)
+        self.assertIn("BACKEND_IMAGE_METADATA_SHA256", refresh)
+        for forbidden in (
+            "compose build",
+            "compose pull",
+            "compose restart",
+            "compose --profile migration run",
+        ):
+            self.assertNotIn(forbidden, refresh)
+
     def test_development_auth_drives_backend_and_frontend_together(self) -> None:
         variables = read("infra/environments/dev/variables.tf")
         configuration = read("infra/environments/dev/configuration.tf")
@@ -248,9 +289,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn("default   = null", variables)
         self.assertIn("nullable  = true", variables)
         self.assertIn("sensitive = false", variables)
-        self.assertIn(
-            "condition = var.development_auth == null ? true : (", variables
-        )
+        self.assertIn("condition = var.development_auth == null ? true : (", variables)
         self.assertIn(
             "var.development_auth.brokerage_id == "
             "floor(var.development_auth.brokerage_id)",
@@ -266,9 +305,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             "development_auth_enabled = var.development_auth != null",
             configuration,
         )
-        self.assertIn(
-            "development_auth == null ? tomap({}) : tomap({", configuration
-        )
+        self.assertIn("development_auth == null ? tomap({}) : tomap({", configuration)
         self.assertIn("AUTH_DEVELOPMENT_BROKERAGE_ID", configuration)
         self.assertIn("AUTH_DEVELOPMENT_LOGIN_ID", configuration)
         self.assertIn(
@@ -277,8 +314,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             configuration,
         )
         self.assertIn(
-            "VITE_AUTH_DEVELOPMENT_ENABLED = "
-            "tostring(local.development_auth_enabled)",
+            "VITE_AUTH_DEVELOPMENT_ENABLED = tostring(local.development_auth_enabled)",
             delivery,
         )
 
@@ -294,8 +330,12 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             'AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "720"',
         ):
             self.assertIn(setting, configuration)
-        self.assertNotIn('APP_ENV                               = "prod"', configuration)
-        self.assertNotIn('DB_TARGET                             = "production"', configuration)
+        self.assertNotIn(
+            'APP_ENV                               = "prod"', configuration
+        )
+        self.assertNotIn(
+            'DB_TARGET                             = "production"', configuration
+        )
 
     def test_account_link_setup_does_not_require_application_secrets(self) -> None:
         verification = read("infra/scripts/verify-account-link.sh")
@@ -306,22 +346,14 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertNotIn(
             'terraform -chdir="$infra_dir/environments/dev" plan', verification
         )
-        self.assertIn("dev-plan: require-dev-secrets", justfile)
-        self.assertNotIn("setup expires_at: require-dev-secrets", justfile)
-        self.assertNotIn("setup-existing expires_at: require-dev-secrets", justfile)
-        self.assertNotIn("verify-account: require-dev-secrets", justfile)
-        self.assertIn(
-            'test -f "$secret_file" && test ! -L "$secret_file" && test -s "$secret_file"',
-            justfile,
-        )
-        self.assertIn("stat -c '%a'", justfile)
-        self.assertIn('case "$secret_mode" in *00)', justfile)
+        self.assertIn("dev-plan:\n", justfile)
+        self.assertNotIn("require-dev-secrets", justfile)
 
     def test_dev_destroy_requires_a_reviewed_saved_plan(self) -> None:
         justfile = read("infra/justfile")
         gitignore = read(".gitignore")
 
-        self.assertIn("dev-destroy-plan: require-dev-secrets", justfile)
+        self.assertIn("dev-destroy-plan:\n", justfile)
         self.assertIn(
             "terraform -chdir=environments/dev plan -destroy -input=false "
             "-var-file=dev.tfvars -out=dev-destroy.tfplan",
@@ -332,7 +364,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             "    terraform -chdir=environments/dev show dev-destroy.tfplan",
             justfile,
         )
-        self.assertIn("dev-destroy: require-dev-secrets", justfile)
+        self.assertIn("dev-destroy:\n", justfile)
         self.assertIn(
             "terraform -chdir=environments/dev apply dev-destroy.tfplan",
             justfile,
@@ -340,67 +372,26 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertNotIn("terraform -chdir=environments/dev destroy", justfile)
         self.assertIn("*.tfplan", gitignore)
 
-    def test_dev_secret_gate_rejects_missing_empty_and_shared_files(self) -> None:
+    def test_dev_terraform_has_no_plaintext_secret_inputs_or_versions(self) -> None:
         justfile = read("infra/justfile")
-        recipe = justfile.split("require-dev-secrets:\n", maxsplit=1)[1]
-        gate_command = recipe.splitlines()[0].strip().removeprefix("@")
+        variables = read("infra/environments/dev/variables.tf")
+        configuration = read("infra/environments/dev/configuration.tf")
+        delivery = read("infra/environments/dev/delivery.tf")
+        observability = read("infra/environments/dev/observability.tf")
+        combined = f"{variables}\n{configuration}\n{delivery}\n{observability}"
 
-        with tempfile.TemporaryDirectory(dir="/tmp") as directory:
-            root = Path(directory)
-            secret_dir = root / "environments/dev"
-            secret_dir.mkdir(parents=True)
-            secret_file = secret_dir / "secrets.auto.tfvars"
-
-            missing = subprocess.run(
-                ["sh", "-c", gate_command],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(missing.returncode, 0)
-
-            secret_file.touch(mode=0o600)
-            empty = subprocess.run(
-                ["sh", "-c", gate_command],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(empty.returncode, 0)
-
-            secret_file.write_text('discord_webhook_url = "placeholder"\n')
-            secret_file.chmod(0o644)
-            shared = subprocess.run(
-                ["sh", "-c", gate_command],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(shared.returncode, 0)
-
-            secret_file.chmod(0o600)
-            owner_only = subprocess.run(
-                ["sh", "-c", gate_command],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(owner_only.returncode, 0)
-
-            secret_file.rename(secret_dir / "actual-secrets.tfvars")
-            secret_file.symlink_to(secret_dir / "actual-secrets.tfvars")
-            symlink = subprocess.run(
-                ["sh", "-c", gate_command],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(symlink.returncode, 0)
+        self.assertNotIn("secrets.auto.tfvars", justfile)
+        self.assertNotIn('resource "aws_secretsmanager_secret_version"', combined)
+        for name in (
+            "ai_provider_api_keys",
+            "ai_provider_secret_version",
+            "discord_webhook_url",
+            "discord_webhook_secret_version",
+            "alarm_discord_webhook_url",
+            "alarm_discord_webhook_secret_version",
+        ):
+            self.assertNotIn(f'variable "{name}"', variables)
+        self.assertFalse((REPOSITORY_ROOT / "infra/environments/dev/secrets.example.tfvars").exists())
 
     def test_compose_uses_process_specific_environment_files(self) -> None:
         compose = read("infra/deploy/compose.dev.yml")

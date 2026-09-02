@@ -1,13 +1,14 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-09-01
 ---
 
 # ADR-0015: 환경설정과 비밀값의 소유권을 환경별로 분리
 
-- 상태: 승인됨
+- 상태: 부분 대체됨
 - 결정일: 2026-08-24
 - 관련 문서: [개발환경 원칙](../development/environments.md), [공유 dev 환경](ADR-0017-shared-dev-development-session.md)
+- 대체 범위: 운영 AI·Discord 비밀값의 Terraform tfvars/version 소유 방식은 [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md)에서 대체한다.
 
 ## 맥락
 

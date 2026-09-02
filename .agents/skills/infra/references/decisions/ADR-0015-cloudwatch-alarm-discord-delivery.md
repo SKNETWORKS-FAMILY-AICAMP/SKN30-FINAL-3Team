@@ -1,15 +1,17 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # ADR-0015: CloudWatch Alarm은 전용 SNS·Lambda·Discord Secret으로 전달한다
 
-- 상태: 승인됨·코드 구현, AWS 미적용
+- 상태: 부분 대체됨·코드 구현, AWS 미적용
 - 결정일: 2026-08-31
 - 승인 주체: 프로젝트 요청자
 - 부분 대체: [ADR-0004](ADR-0004-dev-runtime-and-observability-baseline.md)의 SNS 사람 수신 구독 제외
 - 관련 프로젝트 결정: [프로젝트 ADR-0019](../../../project-wiki/references/decisions/ADR-0019-minimal-error-observability.md)
+- 대체 범위: webhook 값·Secret version의 `secrets.auto.tfvars`/Terraform 소유 방식은
+  [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)에서 대체한다.
 
 ## 맥락
 

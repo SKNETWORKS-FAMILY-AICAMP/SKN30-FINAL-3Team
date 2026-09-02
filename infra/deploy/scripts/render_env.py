@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import urllib.parse
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +21,30 @@ SENSITIVE_SUFFIXES = ("_API_KEY", "_PASSWORD", "_PRIVATE_KEY", "_SECRET", "_TOKE
 REQUIRED_AI_PROVIDER_KEYS = frozenset(
     {
         "AI_OPENAI_API_KEY",
-        "AI_VLLM_LLM_API_KEY",
+        "AI_VLLM_SLLM_API_KEY",
         "AI_VLLM_STT_API_KEY",
     }
+)
+F2_API_KEY = re.compile(r"^[A-Za-z0-9_-]{43,128}$")
+AI_VLLM_ENDPOINT_SET_NAME = "AI_VLLM_ENDPOINT_SET"
+AI_VLLM_BASE_URL_NAMES = frozenset(
+    {"AI_VLLM_SLLM_BASE_URL", "AI_VLLM_STT_BASE_URL", "AI_F2_PROVIDER_STATUS"}
+)
+AI_VLLM_ENDPOINT_SET_FIELDS = frozenset(
+    {
+        "revision",
+        "status",
+        "pod_id",
+        "sllm_release_id",
+        "sllm_base_url",
+        "stt_base_url",
+        "updated_at",
+    }
+)
+RUNPOD_POD_ID = re.compile(r"^[a-z0-9]{5,64}$")
+SLLM_RELEASE_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
+RFC3339_TIMESTAMP = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
 )
 
 
@@ -61,6 +83,141 @@ def json_object(raw: str, *, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SystemExit(f"{label} must contain a JSON object")
     return value
+
+
+def endpoint_set_json_object(raw: str) -> dict[str, Any]:
+    duplicate_names: set[str] = set()
+
+    def collect(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for name, value in pairs:
+            if name in result:
+                duplicate_names.add(name)
+            result[name] = value
+        return result
+
+    try:
+        value = json.loads(raw, object_pairs_hook=collect)
+    except json.JSONDecodeError:
+        raise SystemExit("AI vLLM endpoint set must contain a JSON object") from None
+    if not isinstance(value, dict):
+        raise SystemExit("AI vLLM endpoint set must contain a JSON object")
+    if duplicate_names:
+        raise SystemExit(
+            "AI vLLM endpoint set contains duplicate fields: "
+            + ", ".join(sorted(duplicate_names))
+        )
+    return value
+
+
+def validate_runpod_base_url(value: Any, *, pod_id: str, port: int) -> str:
+    if not isinstance(value, str):
+        raise SystemExit("AI vLLM endpoint URLs must be strings")
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        parsed_port = parsed.port
+    except ValueError:
+        raise SystemExit("AI vLLM endpoint URL is malformed") from None
+    expected_host = f"{pod_id}-{port}.proxy.runpod.net"
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != expected_host
+        or parsed.path != "/v1"
+        or parsed.query
+        or parsed.fragment
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed_port is not None
+    ):
+        raise SystemExit(
+            f"AI vLLM endpoint URL must be exactly https://{expected_host}/v1"
+        )
+    return value
+
+
+def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
+    payload = endpoint_set_json_object(raw)
+    fields = set(payload)
+    if fields != AI_VLLM_ENDPOINT_SET_FIELDS:
+        missing = AI_VLLM_ENDPOINT_SET_FIELDS - fields
+        unexpected = fields - AI_VLLM_ENDPOINT_SET_FIELDS
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(sorted(missing)))
+        if unexpected:
+            details.append("unexpected " + ", ".join(sorted(unexpected)))
+        raise SystemExit("Invalid AI vLLM endpoint set schema: " + "; ".join(details))
+
+    revision = payload["revision"]
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+        raise SystemExit("AI vLLM endpoint set revision must be a non-negative integer")
+
+    status = payload["status"]
+    if status not in {"active", "offline"}:
+        raise SystemExit("AI vLLM endpoint set status must be active or offline")
+
+    updated_at = payload["updated_at"]
+    if not isinstance(updated_at, str) or not RFC3339_TIMESTAMP.fullmatch(updated_at):
+        raise SystemExit("AI vLLM endpoint set updated_at must be RFC3339")
+    try:
+        parsed_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+    except ValueError:
+        raise SystemExit("AI vLLM endpoint set updated_at must be RFC3339") from None
+    if parsed_time.utcoffset() is None:
+        raise SystemExit("AI vLLM endpoint set updated_at must include an offset")
+
+    pod_id = payload["pod_id"]
+    release_id = payload["sllm_release_id"]
+    if status == "offline":
+        if any(
+            value is not None
+            for value in (
+                pod_id,
+                release_id,
+                payload["sllm_base_url"],
+                payload["stt_base_url"],
+            )
+        ):
+            raise SystemExit(
+                "offline AI vLLM endpoint set must have null Pod, release and URLs"
+            )
+        return {"AI_F2_PROVIDER_STATUS": "offline"}
+
+    if (
+        not isinstance(pod_id, str)
+        or pod_id == "unconfigured"
+        or not RUNPOD_POD_ID.fullmatch(pod_id)
+    ):
+        raise SystemExit("active AI vLLM endpoint set pod_id is invalid")
+    if not isinstance(release_id, str) or not SLLM_RELEASE_ID.fullmatch(release_id):
+        raise SystemExit("active AI vLLM endpoint set sllm_release_id is invalid")
+    return {
+        "AI_F2_PROVIDER_STATUS": "active",
+        "AI_VLLM_SLLM_BASE_URL": validate_runpod_base_url(
+            payload["sllm_base_url"], pod_id=pod_id, port=8001
+        ),
+        "AI_VLLM_STT_BASE_URL": validate_runpod_base_url(
+            payload["stt_base_url"], pod_id=pod_id, port=8002
+        ),
+    }
+
+
+def expand_ai_vllm_endpoint_set(
+    public: Mapping[str, Mapping[str, str]],
+) -> dict[str, dict[str, str]]:
+    expanded = {namespace: dict(public[namespace]) for namespace in PUBLIC_NAMESPACES}
+    ai = expanded["ai"]
+    raw = ai.pop(AI_VLLM_ENDPOINT_SET_NAME, None)
+    if raw is None:
+        raise SystemExit("Missing public parameter: AI_VLLM_ENDPOINT_SET")
+    collisions = AI_VLLM_BASE_URL_NAMES & ai.keys()
+    if collisions:
+        raise SystemExit(
+            "AI vLLM endpoint set collides with legacy public parameters: "
+            + ", ".join(sorted(collisions))
+        )
+    ai.update(parse_ai_vllm_endpoint_set(raw))
+    return expanded
 
 
 def validate_public_name(name: str) -> None:
@@ -131,6 +288,13 @@ def parse_ai_provider_keys(raw: str) -> dict[str, str]:
         raise SystemExit(
             "AI provider secret is missing required keys: " + ", ".join(sorted(missing))
         )
+    for name in ("AI_VLLM_SLLM_API_KEY", "AI_VLLM_STT_API_KEY"):
+        if F2_API_KEY.fullmatch(result[name]) is None:
+            raise SystemExit(
+                f"{name} must be 43 to 128 URL-safe letters, digits, underscores, or hyphens"
+            )
+    if result["AI_VLLM_SLLM_API_KEY"] == result["AI_VLLM_STT_API_KEY"]:
+        raise SystemExit("AI vLLM SLLM and STT API keys must be different")
     return result
 
 
@@ -169,8 +333,9 @@ def build_process_environments(
     migration_url: str,
     ai_provider_keys: Mapping[str, str],
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
-    backend = dict(public["backend"])
-    ai = dict(public["ai"])
+    expanded_public = expand_ai_vllm_endpoint_set(public)
+    backend = expanded_public["backend"]
+    ai = expanded_public["ai"]
     collisions = (set(backend) | set(ai)) & set(ai_provider_keys)
     if collisions:
         raise SystemExit(
@@ -181,7 +346,7 @@ def build_process_environments(
     api = {
         **backend,
         **ai,
-        "AI_VLLM_LLM_API_KEY": ai_provider_keys["AI_VLLM_LLM_API_KEY"],
+        "AI_VLLM_SLLM_API_KEY": ai_provider_keys["AI_VLLM_SLLM_API_KEY"],
         "AI_VLLM_STT_API_KEY": ai_provider_keys["AI_VLLM_STT_API_KEY"],
         "DB_URL": runtime_url,
     }
