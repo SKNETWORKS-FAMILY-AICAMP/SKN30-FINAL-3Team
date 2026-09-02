@@ -1,0 +1,7 @@
+**/__pycache__
+**/*.pyc
+README.md
+legacy-uv-archive-recovery.md
+tests/
+template.json
+image-provenance.json
