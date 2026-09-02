@@ -1,7 +1,7 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-31
+implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용·RunPod 공유 F2 운영 코드 구현 및 외부 자원 미적용
+updated: 2026-09-01
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -10,15 +10,15 @@ updated: 2026-08-31
 
 - **이 문서가 답하는 질문:** 공유 개발·시연 환경을 AWS와 RunPod에 어떤 자원과 경계로 배치하는가?
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
-- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md)
+- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0020](../../../.agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·기존 관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. Alarm 전용 전달과 애플리케이션 alarm은 코드 구현 후 apply 전이며 deep lifecycle, Verify/Build 분리도 apply 승인 전이다. RunPod Terraform은 보류 상태다.
+- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·기존 관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. Alarm 전용 전달과 애플리케이션 alarm은 코드 구현 후 apply 전이며 deep lifecycle, Verify/Build 분리도 apply 승인 전이다. RunPod image·Template·운영 CLI와 endpoint cutover는 코드 구현 후 외부 자원 적용 전이다.
 
 ## 결정 요약
 
 1차 런타임은 `EC2 Backend + 설치형 brokerage-ai + RunPod Pod 추론`이다. EC2 한 대에서 API와 Worker를 별도 프로세스로 실행하되 같은 배포 이미지와 호스트를 사용한다. Backend는 `brokerage-ai`를 Python 라이브러리로 설치해 프레임워크 중립 DTO와 실행 facade를 호출한다.
 
-LLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 하나의 Pod에 함께 둘지 여러 Pod로 나눌지는 모델별 VRAM·처리량 평가 후 정하며 현재는 미확정이다. OpenAI와 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
+SLLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 공유 F2 dev 서빙은 GPU 한 개의 단일 Pod에서 `sllm`·`stt` vLLM 두 프로세스를 실행한다. 실제 기반 모델은 S3 release와 Template이 소유한다. Embedding과 학습·개인 실험은 이 운영 범위에 포함하지 않는다. OpenAI와 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
 
 AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용한다. 이 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없어 해당 자원을 만들지 않으며 자동 알림·차단도 전제하지 않는다. RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 분리한다.
 
@@ -43,8 +43,8 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
 | 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
 | CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨·deep lifecycle 미적용 | deep suspend는 ID·기본 도메인을 유지한 채 distribution 비활성화·ALB origin 제거 |
-| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·delivery Discord와 별도 Alarm Discord 입력은 ignored tfvars→write-only 전환 후 plan·apply |
-| 관측 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달과 2개 app alarm 코드 구현, AWS 미적용 | log group 5개 14일; 적용 후 기존 6개+Backend 500·AI terminal 2개를 새 Alarm topic/Lambda로 전달하고 app ALARM에는 조사 링크·안전 로그 1건을 best-effort 제공, deep suspend는 ALB alarm 2개 제거 |
+| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·운영 값 분리 코드 미적용 | Terraform은 AI·Discord·RunPod·GHCR Secret 컨테이너만 소유하고 TTY 운영 명령이 AWSCURRENT를 관리; endpoint/control 문서는 비민감 |
+| 관측 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달, 2개 app alarm과 RunPod 감시 코드 구현, AWS 미적용 | 기존 알람 외에 30분 RunPod read-only heartbeat·API·Pod·endpoint·health·runtime·cost와 기본 8시간 경고를 같은 Alarm SNS/Discord로 전달 |
 | 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
 | 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
 | 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |
@@ -52,8 +52,9 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
 | 비동기 작업 | SQS, DLQ | 조건부 | 미확정 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |
 | AI 분리 | ECS Fargate, Cloud Map | 조건부 | 미확정 | 경합·지연·독립 배포·장애 격리 필요성이 측정될 때 |
-| RunPod | 공용 Pod Template, 개발자별 Pod | 결정 | 보류 | 운영 구조는 유지하되 Terraform 소유 범위는 재개 전 결정 |
-| RunPod | custom image, Network Volume | 조건부 | 미확정 | 기본 vLLM·일반 다운로드·로컬 volume으로 부족할 때 |
+| RunPod | shared F2 Pod, private Team Template | 결정 | 코드 구현·외부 자원 미적용 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
+| RunPod | private GHCR image, private S3 SLLM release | 결정 | 코드 구현·image 미게시 | 고정 digest·lock, presigned bundle, `sllm`·`stt` 자동 감독 |
+| RunPod | bootstrap control, read-only monitor | 결정 | 코드 구현·외부 자원 미적용 | digest plan/apply, Secrets Manager 값 정본, SSM generation/ID, 30분 감시와 수동 reconcile |
 | 1차 제외 | GitHub Actions OIDC | 제외 | 제외 | AWS Developer Tools 전달 경로를 사용 |
 | 1차 제외 | NAT Gateway, Multi-AZ RDS | 제외 | 제외 | 공유 개발·시연 예산 우선 |
 | 1차 제외 | WAF, ElastiCache, AWS Backup | 제외 | 제외 | 부하·보존 요구가 확인되면 별도 결정 |
@@ -82,7 +83,7 @@ flowchart LR
     end
 
     subgraph external["외부 모델 실행"]
-        runpod["RunPod Pods\nLLM · STT · Embedding"]
+        runpod["RunPod shared F2 Pod\nsllm · stt"]
         openai["OpenAI API"]
     end
 
@@ -222,7 +223,7 @@ flowchart LR
 
 - 도메인, Route 53 hosted zone과 ACM 인증서
 - `t3.small`·gp3 40 GiB 기본값을 다시 조정할 부하 임계값
-- LLM·STT·Embedding의 실제 모델, GPU, Pod 통합 또는 분리 배치와 RunPod Terraform 소유 범위
+- Embedding 모델과 F2 외 workload의 GPU·Pod 배치
 - RDS polling에서 SQS·DLQ로 전환할 측정 임계값
 - 향후 ECS AI 내부 호출의 인증·암호화·재시도 방식
 

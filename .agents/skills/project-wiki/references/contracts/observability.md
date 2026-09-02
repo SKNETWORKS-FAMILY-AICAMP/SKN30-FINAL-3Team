@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # 오류 관측 계약
@@ -92,14 +92,32 @@ F3 이벤트는 DB 종료 상태 commit 뒤 한 번 기록을 **시도하는 bes
 - notifier의 `StartQuery`·`GetQueryResults`는 API·Worker log group ARN에 한정한다. 실행 중 쿼리
   중단에 필요한 `StopQuery`만 AWS API의 resource-level 권한 부재 때문에 `Resource="*"`로 분리한다.
 - Alarm notifier는 기존 delivery webhook을 재사용하지 않는다. 새 Discord webhook URL을 별도
-  ephemeral Terraform 입력으로 받아 독립 Secrets Manager Secret/version으로 저장한다.
+  Secrets Manager 컨테이너에 TTY 운영 명령으로 넣고 회전 fixture로 검증한다.
+
+## RunPod 운영 metric과 알람
+
+- 기본 30분 주기의 읽기 전용 Lambda가 기존 `${project}/dev` namespace에 heartbeat, RunPod API
+  도달, 공유 Pod 존재·RUNNING, active endpoint와 Pod ID 일치, 인증된 SLLM/STT `/v1/models`, Pod
+  실행 시간·시간당 비용과 offline orphan 경과 시간을 dimension 없이 기록한다.
+- 감시 Lambda error와 heartbeat 2주기 누락, RunPod API 2회 실패, endpoint 불일치, SLLM·STT
+  각각 2회 health 실패, offline orphan 60분, 기본 8시간 연속 실행을 Alarm 전용 SNS·Discord로
+  전달한다. 주기는 5~60분의 5분 단위, 실행 경고는 1~24시간에서 Terraform 변수로 조정한다.
+- offline이거나 endpoint가 불일치하면 health 실패로 중복 판단하지 않는다. 제어면 장애에서는
+  heartbeat와 도달 실패 metric만 남기고 확인할 수 없는 endpoint 일치, Provider health, orphan,
+  runtime과 비용 metric은 발행하지 않는다. 외부 오류 본문, URL, Pod 응답, key와 hash는 기록하지
+  않는다.
+- 감시 로그의 endpoint 상태는 `active`·`offline`만 기록하고 누락, 타입 오류와 그 밖의 값은 원문
+  대신 고정된 `invalid`로 기록한다.
+- Lambda에는 Secret·Parameter 읽기와 지정 namespace metric 쓰기만 허용한다. endpoint·Pod를
+  변경하지 않으며 `PutParameter`, `SendCommand`, 자동 삭제 권한은 없다.
 
 ## 이번 범위에서 제외
 
 - Better Stack·Sentry·OpenTelemetry 등 외부 관측성 제품
 - 브라우저 runtime telemetry와 사용자 입력 수집
 - 전역 access log 스키마 이관, tracing, dashboard
-- Provider 시도별 token·비용·latency, queue age, Worker heartbeat와 알람
+- Provider 시도별 token·latency, queue age와 Worker heartbeat 알람. RunPod Pod의 aggregate 실행
+  시간·시간당 비용과 감시 heartbeat는 ADR-0021 범위로 포함한다.
 - DLQ, 별도 KMS key, 중복 제거 저장소
 - DB outbox를 통한 최종 실패 알림의 exactly-once 전달
 - F3의 기존 `BaseException` 업무 실패 경계 변경. 종료·취소 신호 오분류 가능성은 잔여 위험이다.

@@ -107,7 +107,7 @@ resource "aws_sns_topic_policy" "cloudwatch_alarms" {
 
 resource "aws_secretsmanager_secret" "alarm_discord_webhook" {
   name                    = "/${local.name_prefix}/observability/alarm-discord-webhook"
-  description             = "CloudWatch alarm Discord webhook managed from the ignored secrets.auto.tfvars input"
+  description             = "Container for the CloudWatch alarm Discord webhook populated outside Terraform"
   recovery_window_in_days = 7
 }
 

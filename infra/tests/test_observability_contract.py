@@ -37,39 +37,20 @@ class ObservabilityContractTests(unittest.TestCase):
             ],
         )
 
-    def test_alarm_webhook_is_an_independent_write_only_secret(self) -> None:
-        variables = read("infra/environments/dev/variables.tf")
+    def test_alarm_webhook_is_an_external_value_container(self) -> None:
         observability = read("infra/environments/dev/observability.tf")
 
-        webhook = section(
-            variables,
-            'variable "alarm_discord_webhook_url"',
-            'variable "alarm_discord_webhook_secret_version"',
-        )
-        self.assertIn("sensitive   = true", webhook)
-        self.assertIn("ephemeral   = true", webhook)
-        self.assertIn(
-            "secret_string_wo         = var.alarm_discord_webhook_url",
-            observability,
-        )
-        self.assertIn(
-            "secret_string_wo_version = var.alarm_discord_webhook_secret_version",
-            observability,
-        )
+        self.assertNotIn("secret_string", observability)
         self.assertIn(
             'name                    = "/${local.name_prefix}/observability/alarm-discord-webhook"',
             observability,
         )
         self.assertNotIn("aws_secretsmanager_secret.discord_webhook.arn", observability)
-        notifier = section(
-            observability,
-            'resource "aws_lambda_function" "cloudwatch_alarm_notifier"',
-            'resource "aws_lambda_permission" "cloudwatch_alarms"',
-        )
         self.assertIn(
-            "aws_secretsmanager_secret_version.alarm_discord_webhook",
-            notifier,
+            "from = aws_secretsmanager_secret_version.alarm_discord_webhook",
+            observability,
         )
+        self.assertIn("destroy = false", observability)
 
     def test_alarm_notifier_has_precreated_logs_and_minimum_permissions(self) -> None:
         observability = read("infra/environments/dev/observability.tf")
@@ -189,6 +170,9 @@ class ObservabilityContractTests(unittest.TestCase):
         self,
     ) -> None:
         observability = read("infra/environments/dev/observability.tf")
+        runpod_observability = read(
+            "infra/environments/dev/runpod-observability.tf"
+        )
 
         self.assertEqual(
             observability.count(
@@ -201,6 +185,18 @@ class ObservabilityContractTests(unittest.TestCase):
                 "ok_actions    = [aws_sns_topic.cloudwatch_alarms.arn]"
             ),
             8,
+        )
+        self.assertEqual(
+            runpod_observability.count(
+                "alarm_actions = [aws_sns_topic.cloudwatch_alarms.arn]"
+            ),
+            3,
+        )
+        self.assertEqual(
+            runpod_observability.count(
+                "ok_actions    = [aws_sns_topic.cloudwatch_alarms.arn]"
+            ),
+            3,
         )
         for start, end in (
             (
@@ -218,6 +214,48 @@ class ObservabilityContractTests(unittest.TestCase):
             self.assertIn("datapoints_to_alarm = 1", alarm)
             self.assertIn("threshold           = 1", alarm)
             self.assertIn('treat_missing_data  = "notBreaching"', alarm)
+
+    def test_runpod_monitor_is_read_only_and_uses_project_metrics(self) -> None:
+        source = read("infra/environments/dev/runpod-observability.tf")
+        variables = read("infra/environments/dev/variables.tf")
+        policy = section(
+            source,
+            'resource "aws_iam_role_policy" "runpod_monitor"',
+            'resource "aws_lambda_function" "runpod_monitor"',
+        )
+
+        for allowed in (
+            '"secretsmanager:GetSecretValue"',
+            '"ssm:GetParameter"',
+            '"cloudwatch:PutMetricData"',
+            '"logs:CreateLogStream"',
+            '"logs:PutLogEvents"',
+        ):
+            self.assertIn(allowed, policy)
+        for forbidden in (
+            "ssm:PutParameter",
+            "ssm:SendCommand",
+            "ec2:TerminateInstances",
+            "runpod:",
+        ):
+            self.assertNotIn(forbidden, policy)
+        self.assertIn('"cloudwatch:namespace" = local.runtime_metric_namespace', policy)
+        self.assertIn(
+            'schedule_expression = "rate(${var.runpod_monitor_interval_minutes} minutes)"',
+            source,
+        )
+        self.assertIn('variable "runpod_monitor_interval_minutes"', variables)
+        self.assertIn('variable "runpod_runtime_warning_hours"', variables)
+        for metric in (
+            "RunPodMonitorHeartbeat",
+            "RunPodControlPlaneReachable",
+            "RunPodEndpointConsistent",
+            "RunPodSllmHealthy",
+            "RunPodSttHealthy",
+            "RunPodOrphanPodAgeMinutes",
+            "RunPodRuntimeHours",
+        ):
+            self.assertIn(metric, source)
 
 
 if __name__ == "__main__":

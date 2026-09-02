@@ -1,14 +1,14 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-31
+implementation: 기존 delivery 적용됨·Alarm 전용 전달과 RunPod 공유 F2 운영 코드 구현 및 외부 자원 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-09-01
 ---
 
 # 배포 및 운영 구조
 
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
 - **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
 
@@ -108,6 +108,29 @@ artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공
 
 Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. 이전 Backend와 호환되는 단계적 변경이나 통합 Pipeline을 사용한다.
 
+## RunPod 공유 F2 서빙과 endpoint 전환
+
+학습 담당자는 Infra 권한 없이 검증된 SLLM bundle 하나만 전달한다. Infra는 이를 private S3
+`releases/sllm/<release-id>/`에 불변 게시하고, private GHCR image가 한 GPU에서 `sllm`·`stt`를
+자동 기동한다. 현재 vLLM 버전의 외부 인증 완화를 위해 서비스별 key와 허용 경로를 검사하는 proxy를
+둔다. Team Template은 image·port·Secret·STT와 자원 기본값만 소유하며 SLLM 모델은 release manifest가
+소유한다.
+
+Pod는 필요할 때 Secure Cloud에 생성하고 작업 종료 시 삭제한다. Volume·SSH는 사용하지 않으며
+Pod에는 1시간 presigned S3 URL만 전달한다. 생성 health 성공 후 SSM `AI_VLLM_ENDPOINT_SET`을
+`active`로, 삭제 전에는 `offline`으로 바꾸고 같은 Backend image의 API·Worker만 재생성한다.
+refresh 실패 시 이전 JSON을 복원한다.
+
+F2 smoke는 배포 bundle의 합성 음성만 사용해 개발 세션·CSRF를 거쳐 실제
+`POST /api/v1/f2/analyses`를 호출한다. 응답 body, 전사와 인증값은 운영 도구 출력에 복사하지 않는다.
+
+최초 구축은 성공한 image digest의 `runpod-bootstrap-plan → 확인 → runpod-bootstrap` 한 경로를
+사용한다. SSM 제어 문서가 registry·Template ID, digest와 AI Secret 동기화 version을 소유하며
+개인 `.env`나 영구 `runpodctl` 설정을 요구하지 않는다. 기본 30분 읽기 전용 감시와 8시간 경고는
+기존 Alarm SNS·Discord로 전달한다. 실행·회전·수동 reconcile과 비용 절차는
+[RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다. 자동 중지는 없고 생성 작업자가 종료 시
+정확한 Pod ID로 삭제한다. 모델 정본은 private S3에 남는다.
+
 ## IAM과 비밀값
 
 - Pipeline service role은 세 개로 나눈다.
@@ -115,11 +138,9 @@ Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. �
 - CodeDeploy는 AWS 관리 service role을 사용한다.
 - EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write와 migration DB connect만 둔다.
 - 운영자 policy는 `pipeline_operator_user_names`에 지정한 기존 IAM 사용자에게 직접 연결하고 `team-readonly`에는 쓰기 권한을 추가하지 않는다.
-- OpenAI·선택적 vLLM key, 기존 delivery Discord webhook과 별도 Alarm Discord webhook은 Git에서
-  제외한 `secrets.auto.tfvars`에서 받는다. Alarm webhook은 Discord에서 새로 만들고 기존 delivery
-  webhook을 재사용하지 않는다.
-  Terraform ephemeral input과 Secrets Manager write-only version 인자로 전달해 plan·state에는 실제
-  값을 남기지 않는다. 회전할 때 각 secret version 번호를 함께 증가시킨다.
+- OpenAI·vLLM key, delivery·Alarm Discord webhook, RunPod 운영·감시 key와 GHCR credential의 정본은
+  AWS Secrets Manager다. Terraform은 컨테이너만 만들고 값은 TTY bootstrap/rotation 명령이
+  AWSCURRENT로 관리한다. Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
 - RDS runtime 비밀번호와 migration IAM token은 서비스가 자동 생성하는 기존 경계를 유지한다.
 - state, Build log, artifact, release manifest와 Discord 메시지에 DB URL, IAM token, API key 또는 webhook을 기록하지 않는다.
 
@@ -144,8 +165,8 @@ CloudWatch Alarm은 별도 SNS topic과 별도 Lambda를 사용한다. 기존 �
 1. 애플리케이션·Docker·Compose·ADR 변경을 작업 PR로 `dev`에 병합한다.
 2. 기존 IAM 운영자 목록과 최소 권한 Pipeline policy attachment를 승인한다.
 3. 통합 변경 감지 `false`, ASG health `EC2`로 plan과 apply를 승인한다.
-4. ignored `secrets.auto.tfvars`의 수동 비밀값과 version을 검토한 Terraform plan을 적용하고
-   Secrets Manager의 `AWSCURRENT`가 갱신됐는지 확인한다.
+4. Secret version 삭제·민감정보가 없는 Terraform saved plan을 적용하고 `secret-status`로
+   Secrets Manager 컨테이너의 AWSCURRENT 상태를 확인한다.
 5. Backend, Frontend, 통합 순서로 최초 수동 배포한다.
 6. 실패 주입으로 Backend rollback, Frontend index 복원과 알림을 검증한다.
 7. 별도 Terraform 변경으로 통합 감지를 `true`, ASG health를 `ELB`로 전환한다.
@@ -158,6 +179,5 @@ CloudWatch Alarm은 별도 SNS topic과 별도 Lambda를 사용한다. 기존 �
 - Deep 전환은 `plan → show → 승인 → saved-plan apply → 상태·drift 검증` 순서를 지키며, suspend 중 일반 `dev-plan`은 active edge 복구를 제안하므로 전용 drift 명령을 사용한다.
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.
 - Terraform은 계속 `preflight → fmt/validate → plan → 승인 → apply → 검증 → drift` 수동 절차를 따른다.
-- RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)의 기존 경계를 유지한다.
-- 로컬 F2 종단 간 검증의 Qwen·Whisper Pod 실행과 SSH tunnel 절차는
-  [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다.
+- RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)와 RunPod runbook의
+  경계를 유지한다.
