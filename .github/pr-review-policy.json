@@ -26,6 +26,7 @@
       "bun.lock",
       "bun.lockb",
       "uv.lock",
+      "requirements.lock",
       "poetry.lock",
       "Pipfile.lock",
       "Cargo.lock",
