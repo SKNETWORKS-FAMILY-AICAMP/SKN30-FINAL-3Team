@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # 런타임 및 기술 후보
@@ -22,7 +22,7 @@ updated: 2026-09-01
 | IaC | Terraform | 결정; [ADR-0007](../decisions/ADR-0007-terraform-iac.md) |
 | Runtime AWS integration | AWS SDK for Python (`boto3`) | 제안 |
 | Model API | OpenAI·OpenAI-compatible vLLM adapter | 구현됨; F2는 작업명 `sllm`·`stt`, active/offline endpoint 사용 |
-| GPU runtime | private S3 release로 생성·삭제하는 RunPod shared F2 Pod | 결정; 코드 구현·외부 자원 미적용, Infra ADR-0017 |
+| GPU runtime | private S3 release로 생성·삭제하는 RunPod shared F2 Pod | 결정; 코드 구현·외부 자원 미적용, [ADR-0020](../decisions/ADR-0020-sllm-release-handoff.md) |
 | Application CI/CD | 통합 자동·Backend 수동·Frontend 수동 CodePipeline V2 | 결정; 기존 main source 적용, dev/Verify·Build 분리 미적용 |
 
 ## 역할 분리 후보

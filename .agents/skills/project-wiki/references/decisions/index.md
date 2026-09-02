@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # 결정 인덱스
@@ -14,7 +14,7 @@ updated: 2026-09-01
 | [ADR-0005](ADR-0005-requirements-management.md) | 승인됨 | 제품 요구사항을 분할 정본과 얇은 라우터로 관리 |
 | [ADR-0006](ADR-0006-ai-backend-boundary.md) | 승인됨 | AI와 Backend의 프레임워크·영속성 경계 분리 |
 | [ADR-0007](ADR-0007-terraform-iac.md) | 부분 대체됨 | Terraform IaC 정본과 초기 IAM 접근 사용 |
-| [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md) | 부분 대체됨 | EC2 Backend·설치형 AI·RunPod와 초기 전달 경로 사용 |
+| [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md) | 부분 대체됨 | EC2 Backend·설치형 AI·RunPod 상위 구조 유지; 전달은 ADR-0011, RunPod 운영은 ADR-0020 적용 |
 | [ADR-0009](ADR-0009-dev-demo-operating-constraints.md) | 부분 대체됨 | 2026-09-23 종료, CloudFront 동일 origin, Billing 미사용과 pgvector migration 경계 |
 | [ADR-0010](ADR-0010-pr-policy-ai-review-discord.md) | 부분 대체됨 | GitHub Actions 기반 결정적 분할·통합 PR AI 리뷰와 Discord 결과 전달 |
 | [ADR-0011](ADR-0011-dev-cicd-pipeline-modes.md) | 부분 대체됨 | dev 자동 통합과 Backend·Frontend 수동 독립 CodePipeline 운영 |

@@ -7,12 +7,20 @@ updated: 2026-09-02
 
 - 상태: 승인됨·코드 구현, 외부 자원 미적용
 - 결정일: 2026-09-01
+- 상위 런타임 유지: [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md)의
+  `EC2 Backend + 설치형 brokerage-ai + RunPod 추론` 구조
+- 부분 대체: [Infra ADR-0002](../../../infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)의
+  개발자별 RunPod 운영, 시연 기간 Pod 유지, 조건부 Network Volume 조항
 
 ## 맥락
 
 학습 담당자가 RunPod 서빙 인프라까지 직접 운영하고 모델을 개인 PC에만 보관하면 학습 실험의
 자율성과 dev 배포 책임이 섞인다. RunPod Pod는 정지 후 같은 GPU 재사용을 보장하지 않으므로
 영속 Pod·Volume을 전제로 한 stop/start 운영도 맞지 않는다.
+
+ADR-0008의 애플리케이션·GPU 런타임 배치는 유지한다. 다만 Infra ADR-0002의 초기 RunPod 운영은
+모델 정본과 공유 dev 운영 주체가 불명확하고 유휴 Pod·Volume 비용이 남으므로, S3 release를
+정본으로 사용하는 공유 Pod create/delete 방식으로 대체한다.
 
 ## 결정
 
