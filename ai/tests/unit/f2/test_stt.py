@@ -79,6 +79,7 @@ async def test_f2_runtime_composes_runpod_stt_and_qwen_and_closes_clients() -> N
 
     config = bind_ai_config(
         {
+            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "http://localhost:8001/v1",
             "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
         },

@@ -117,6 +117,7 @@ def test_enabled_worker_requires_an_explicit_llm_provider() -> None:
     configured = require_ai_provider(
         "test",
         {
+            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
             "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
         },
@@ -128,6 +129,7 @@ def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> Non
     configured = require_ai_provider(
         "dev",
         {
+            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
             "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
         },
@@ -145,6 +147,7 @@ def test_enabled_worker_merges_ai_local_files_without_mutating_process_environme
 
     (tmp_path / ".env.local").write_text(
         "AI_REQUEST_TIMEOUT_SECONDS=10\n"
+        "AI_F2_PROVIDER_STATUS=active\n"
         "AI_VLLM_SLLM_BASE_URL=http://localhost:8000/v1\n"
         "AI_VLLM_STT_BASE_URL=http://localhost:8002/v1\n",
         encoding="utf-8",

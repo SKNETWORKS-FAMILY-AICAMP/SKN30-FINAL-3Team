@@ -114,6 +114,24 @@ def _vllm_endpoint(
     )
 
 
+def _required_f2_endpoint(
+    source: Mapping[str, str],
+    *,
+    base_url_name: str,
+    api_key_name: str,
+) -> ProviderEndpointConfig:
+    endpoint = _vllm_endpoint(
+        source,
+        base_url_name=base_url_name,
+        api_key_name=api_key_name,
+    )
+    if endpoint is None:
+        raise ConfigurationError(
+            f"{base_url_name} is required when AI_F2_PROVIDER_STATUS is active"
+        )
+    return endpoint
+
+
 def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiConfig:
     try:
         selected_profile = AiProfile(profile)
@@ -125,12 +143,7 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
     try:
         raw_f2_status = _optional(source, "AI_F2_PROVIDER_STATUS")
         if raw_f2_status is None:
-            f2_status = (
-                F2ProviderStatus.ACTIVE
-                if _optional(source, "AI_VLLM_SLLM_BASE_URL")
-                and _optional(source, "AI_VLLM_STT_BASE_URL")
-                else F2ProviderStatus.OFFLINE
-            )
+            f2_status = F2ProviderStatus.OFFLINE
         else:
             try:
                 f2_status = F2ProviderStatus(raw_f2_status)
@@ -149,7 +162,7 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
             openai=openai_config,
             vllm=VllmConfig(
                 sllm=(
-                    _vllm_endpoint(
+                    _required_f2_endpoint(
                         source,
                         base_url_name="AI_VLLM_SLLM_BASE_URL",
                         api_key_name="AI_VLLM_SLLM_API_KEY",
@@ -163,7 +176,7 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
                     api_key_name="AI_VLLM_EMBEDDING_API_KEY",
                 ),
                 stt=(
-                    _vllm_endpoint(
+                    _required_f2_endpoint(
                         source,
                         base_url_name="AI_VLLM_STT_BASE_URL",
                         api_key_name="AI_VLLM_STT_API_KEY",
