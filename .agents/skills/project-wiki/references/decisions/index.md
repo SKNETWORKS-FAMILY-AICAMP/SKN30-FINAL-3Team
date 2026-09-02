@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # 결정 인덱스
@@ -21,11 +21,13 @@ updated: 2026-08-31
 | [ADR-0012](ADR-0012-retain-iam-access.md) | 승인됨 | Identity Center 전환을 폐기하고 기존 개인 IAM·MFA·역할 접근 유지 |
 | [ADR-0013](ADR-0013-dev-integration-pr-flow.md) | 승인됨 | `dev` 개발 통합, `main` 릴리스 PR과 Hong1008 기본 승인 책임 사용 |
 | [ADR-0014](ADR-0014-f3-prototype-synthetic-input.md) | 승인됨 | F3 프로토타입 합성 입력의 마스킹 생략과 실사용 데이터 연결 전 종료 조건 |
-| [ADR-0015](ADR-0015-environment-configuration-ownership.md) | 승인됨 | tracked `.env.local`, 개인 `.env`, Terraform 공개 설정과 write-only 비밀값의 소유권 분리 |
+| [ADR-0015](ADR-0015-environment-configuration-ownership.md) | 부분 대체됨 | tracked `.env.local`, 개인 `.env`, Terraform 공개 설정과 초기 write-only 비밀값 소유권 분리 |
 | [ADR-0016](ADR-0016-pr-review-cross-chunk-evidence.md) | 승인됨 | 제한된 PR head 전체 파일·동일 PR 정책 근거 공유와 명시적 `high` 오탐 기각 |
 | [ADR-0017](ADR-0017-shared-dev-development-session.md) | 승인됨 | 공유 AWS를 애플리케이션 dev로 분류하고 합성 고정 계정의 개발 세션만 허용 |
 | [ADR-0018](ADR-0018-f3-save-trigger-anchor-card-scope.md) | 승인됨 | F1 저장 트리거를 앵커 포지션 카드까지로 한정하고 후보 조회·판정은 사용자 요청이 같은 실행을 이어받아 수행 |
 | [ADR-0019](ADR-0019-minimal-error-observability.md) | 승인됨 | Backend 미처리 500과 AI 최종 실패만 기존 AWS 경로로 알리고 공개 오류·Frontend 복구 경계를 정규화 |
+| [ADR-0020](ADR-0020-sllm-release-handoff.md) | 승인됨·코드 구현, 외부 자원 미적용 | 학습자의 bundle 전달, Infra의 private S3 승격, RunPod create/delete와 F2 offline 계약 사용 |
+| [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, Secrets Manager 값 정본, 읽기 전용 감시와 수동 reconcile 사용 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

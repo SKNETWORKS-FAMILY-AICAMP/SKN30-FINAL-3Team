@@ -141,7 +141,7 @@ Frontend는 HTTP `status`, `code`, `request_id`를 보존해 기능별 안전 �
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod Whisper로 전사하고 Qwen으로 분석해 검토용 제안을 동기 반환 |
+| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod `stt`로 전사하고 `sllm`으로 분석해 검토용 제안을 동기 반환 |
 
 요청은 `multipart/form-data`이며 `audio`, `ledger_type`, `current_fields`,
 `privacy_confirmed`를 받는다. `audio`는 비어 있지 않은 WAV·MP3·M4A이고 현재 상한은 25 MiB다.
@@ -161,10 +161,10 @@ SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 
 `docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
 음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
 
-F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한다. Backend는 시작할 때 F2 pipeline을
-항상 초기화하므로 모든 실행 환경에 `AI_VLLM_LLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`이 필요하며,
-둘 중 하나가 없으면 애플리케이션 시작이 설정 오류로 실패한다. endpoint 설정은 유효하지만 RunPod가
-중지됐거나 Provider 요청·응답을 사용할 수 없으면 분석 요청을 503 `F2_UNAVAILABLE`로 종료한다.
+F2 route는 별도 사용자 기능 플래그 없이 항상 공개한다. Infra endpoint set이 `active`일 때만
+Backend가 `AI_VLLM_SLLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`로 pipeline을 초기화한다. `offline`이면
+Backend는 정상 기동하고 분석 요청만 503 `F2_UNAVAILABLE`로 종료한다. `active`인데 URL이 없으면
+부분 활성화를 허용하지 않고 애플리케이션 시작을 설정 오류로 실패시킨다.
 
 ### 오류 코드
 
@@ -178,7 +178,7 @@ F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한�
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
-| F2_UNAVAILABLE | 503 | RunPod STT·LLM Provider에 연결할 수 없거나 Provider 요청·응답을 사용할 수 없음 |
+| F2_UNAVAILABLE | 503 | RunPod endpoint가 offline이거나 STT·SLLM Provider 요청·응답을 사용할 수 없음 |
 | F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 | INTERNAL_SERVER_ERROR | 500 | 공개할 수 없는 예상 밖 Backend 오류 |
 

@@ -28,6 +28,11 @@ class AiProfile(StrEnum):
     PROD = "prod"
 
 
+class F2ProviderStatus(StrEnum):
+    ACTIVE = "active"
+    OFFLINE = "offline"
+
+
 class ProviderEndpointConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -45,7 +50,7 @@ class OpenAIConfig(BaseModel):
 class VllmConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    llm: ProviderEndpointConfig | None = None
+    sllm: ProviderEndpointConfig | None = None
     embedding: ProviderEndpointConfig | None = None
     stt: ProviderEndpointConfig | None = None
 
@@ -53,8 +58,9 @@ class VllmConfig(BaseModel):
 class F2Config(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    llm_model: str = Field(default="Qwen/Qwen3-4B", min_length=1)
-    stt_model: str = Field(default="openai/whisper-large-v3-turbo", min_length=1)
+    provider_status: F2ProviderStatus = F2ProviderStatus.OFFLINE
+    sllm_model: str = Field(default="sllm", min_length=1)
+    stt_model: str = Field(default="stt", min_length=1)
     stt_language: str = Field(default="ko", min_length=1)
 
 
@@ -117,6 +123,19 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
     openai_api_key = _optional(source, "AI_OPENAI_API_KEY")
     openai_config: OpenAIConfig | None = None
     try:
+        raw_f2_status = _optional(source, "AI_F2_PROVIDER_STATUS")
+        if raw_f2_status is None:
+            f2_status = (
+                F2ProviderStatus.ACTIVE
+                if _optional(source, "AI_VLLM_SLLM_BASE_URL")
+                and _optional(source, "AI_VLLM_STT_BASE_URL")
+                else F2ProviderStatus.OFFLINE
+            )
+        else:
+            try:
+                f2_status = F2ProviderStatus(raw_f2_status)
+            except ValueError as exc:
+                raise ConfigurationError("AI_F2_PROVIDER_STATUS must be active or offline") from exc
         if openai_api_key is not None:
             openai_config = OpenAIConfig(
                 base_url=_http_url(
@@ -129,25 +148,34 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
             request_timeout_seconds=_positive_float(source, "AI_REQUEST_TIMEOUT_SECONDS", 60),
             openai=openai_config,
             vllm=VllmConfig(
-                llm=_vllm_endpoint(
-                    source,
-                    base_url_name="AI_VLLM_LLM_BASE_URL",
-                    api_key_name="AI_VLLM_LLM_API_KEY",
+                sllm=(
+                    _vllm_endpoint(
+                        source,
+                        base_url_name="AI_VLLM_SLLM_BASE_URL",
+                        api_key_name="AI_VLLM_SLLM_API_KEY",
+                    )
+                    if f2_status is F2ProviderStatus.ACTIVE
+                    else None
                 ),
                 embedding=_vllm_endpoint(
                     source,
                     base_url_name="AI_VLLM_EMBEDDING_BASE_URL",
                     api_key_name="AI_VLLM_EMBEDDING_API_KEY",
                 ),
-                stt=_vllm_endpoint(
-                    source,
-                    base_url_name="AI_VLLM_STT_BASE_URL",
-                    api_key_name="AI_VLLM_STT_API_KEY",
+                stt=(
+                    _vllm_endpoint(
+                        source,
+                        base_url_name="AI_VLLM_STT_BASE_URL",
+                        api_key_name="AI_VLLM_STT_API_KEY",
+                    )
+                    if f2_status is F2ProviderStatus.ACTIVE
+                    else None
                 ),
             ),
             f2=F2Config(
-                llm_model=_optional(source, "AI_F2_LLM_MODEL") or "Qwen/Qwen3-4B",
-                stt_model=(_optional(source, "AI_F2_STT_MODEL") or "openai/whisper-large-v3-turbo"),
+                provider_status=f2_status,
+                sllm_model=_optional(source, "AI_F2_SLLM_MODEL") or "sllm",
+                stt_model=_optional(source, "AI_F2_STT_MODEL") or "stt",
                 stt_language=_optional(source, "AI_F2_STT_LANGUAGE") or "ko",
             ),
         )

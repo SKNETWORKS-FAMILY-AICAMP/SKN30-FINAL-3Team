@@ -110,3 +110,25 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 
 같은 test split에서 base 4B와 adapter의 accuracy, macro F1, 클래스별 recall, JSON 파싱 실패,
 지연시간과 VRAM을 비교한다. validation 성능만으로 최종 모델을 확정하지 않는다.
+
+## 4. Infra 전달 bundle 생성
+
+학습 담당자는 AWS·RunPod 권한 없이 로컬에서 학습과 평가를 마친다. Infra에는 학습 폴더나
+체크포인트가 아니라 아래 명령이 만든 `tar.gz` 파일 하나만 전달한다.
+
+```bash
+uv run --locked --project ai python ai/training/f2_sLLM/package_release.py \
+  --release-id consultation-v1 \
+  --training-output /local/models/f2-consultation-v1 \
+  --evaluation-summary ai/eval/f2_sLLM/results/<run-id>/summary.json \
+  --dataset-release f2-1.0.0 \
+  --output /local/handoff/consultation-v1.tar.gz
+```
+
+공유 dev의 `sllm`은 전체 상담분석 capability이므로 `--task full` 평가 결과만 포장된다.
+현재 classification-only adapter는 학습 실험에는 사용할 수 있지만 이 전달 절차로 승격할 수 없다.
+bundle에는 PEFT adapter, 로컬 경로를 제거한 평가 요약, 기반 모델의 불변 revision과 데이터
+checksum만 포함된다. 원본 데이터·전사·예측 JSONL·checkpoint·비밀값은 포함되지 않는다.
+
+학습 담당자의 책임은 bundle 생성과 checksum 전달까지다. S3 게시, RunPod 생성, dev endpoint
+변경은 Infra 담당자가 수행한다.
