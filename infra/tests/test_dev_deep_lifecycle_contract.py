@@ -115,12 +115,12 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         justfile = read("infra/justfile")
         stop_recipe = section(
             justfile,
-            "dev-deep-stop: require-dev-secrets",
+            "dev-deep-stop:",
             "# deep suspend 상태",
         )
         start_recipe = section(
             justfile,
-            "dev-deep-start: require-dev-secrets",
+            "dev-deep-start:",
             "# Terraform state의 edge mode",
         )
 

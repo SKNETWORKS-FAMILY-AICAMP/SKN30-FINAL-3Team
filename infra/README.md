@@ -22,6 +22,10 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 - `scripts/verify-account-link.sh`: state bucket·원격 state 읽기와 dev init/validate 검증
 - `scripts/manage_db_access.py`: DB 역할, runtime Secret, IAM migration과 검증 관리
 - `scripts/manage_dev_power.py`: 지정 Infra 운영자의 dev RDS·ASG start/stop/status 관리
+- `runpod/`: 공유 F2 private image, dependency lock, 불변 Team Template 명세와 운영 runbook
+- `scripts/manage_runpod.py`: AWS 제어 문서를 사용하는 공유 Pod doctor/create/status/delete와 기본 dry-run reconcile 관리
+- `scripts/manage_runpod_control.py`: digest 기반 RunPod bootstrap과 Secrets Manager 상태·회전 관리
+- `scripts/manage_sllm_artifact.py`: 전달받은 SLLM bundle 검증과 private S3 불변 게시
 
 Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. 실제 두 번째 환경이나 반복 자원이 생기기 전에는 module과 workspace를 추가하지 않는다.
 
@@ -79,23 +83,16 @@ just setup-existing 2026-09-23
 
 이 명령은 AWS profile, 커밋하지 않는 `backend.hcl`과 `dev.tfvars`, Terraform init과 읽기 전용 연결 검증만 수행한다. AWS 자원을 생성하거나 변경하지 않는다. 기존 `dev.tfvars`가 있으면 `target_account_id`와 `expires_at`이 요청값과 같은지만 검증하고 계정 블록을 포함한 전체 내용을 보존한다. 두 기본값이 다르면 `--force`로도 자동 수정하지 않고 중단한다.
 
-### 수동 비밀값 준비
+### 운영 비밀값 준비
 
-Setup과 `just verify-account`는 비밀값 없이 실행할 수 있다. 실제 dev plan 전에 AI provider key와
-delivery·Alarm용으로 각각 만든 Discord webhook처럼 사람이 제공하는 비밀값을 별도 ignored
-tfvars에 준비한다.
+Setup, `just verify-account`와 Terraform plan/apply는 비밀값 없이 실행한다. Terraform은 AI,
+delivery·Alarm Discord, RunPod 운영·감시 API key와 GHCR credential의 Secret 컨테이너만 만들고
+값·version은 관리하지 않는다.
 
-```bash
-cp environments/dev/secrets.example.tfvars environments/dev/secrets.auto.tfvars
-chmod 600 environments/dev/secrets.auto.tfvars
-```
-
-- `ai_provider_api_keys`: `AI_OPENAI_API_KEY`, `AI_VLLM_LLM_API_KEY`, `AI_VLLM_STT_API_KEY`는 필수이고 Embedding 등 다른 vLLM API key는 필요할 때 추가한다.
-- `discord_webhook_url`: 기존 CodePipeline·CodeDeploy 알림용 Discord webhook HTTPS URL을 입력한다.
-- `alarm_discord_webhook_url`: 사람이 Discord에서 CloudWatch Alarm 전용 webhook을 새로 생성한 뒤 그 HTTPS URL을 입력한다. 기존 delivery webhook을 복사하거나 재사용하지 않는다.
-- 각 `*_secret_version`: 비밀값을 바꿀 때 함께 1씩 증가시킨다.
-
-Terraform은 `.auto.tfvars`를 plan과 saved-plan apply에서 자동으로 다시 읽는다. Ephemeral 비밀값은 plan/state에 저장되지 않으므로 승인된 plan과 apply 사이에 이 파일을 수정하지 않는다.
+Terraform 적용 뒤 `just secret-status`로 AWSCURRENT 존재만 확인하고, 최초
+`just runpod-bootstrap <image@digest>`에서 누락값을 TTY 비표시로 입력한다. AI Secret은 기존 renderer 호환 평면
+`AI_*_API_KEY` JSON이고 F2 key 두 개는 도구가 생성한다. 회전은 `just secret-rotate <target>`을
+사용한다. 실제 값, hash와 PAT는 tfvars, 명령 인자, plan/state, 로그나 Discord에 넣지 않는다.
 
 ### Terraform 변경
 
@@ -120,7 +117,9 @@ just dev-destroy
 
 `dev-show`로 저장된 plan의 자원, 교체, 삭제와 비용을 검토하고 승인을 받은 뒤에만 `dev-apply`를 실행한다. deep 전원 명령도 전용 saved plan을 먼저 만들고 `show`로 전체 변경을 검토해야 하며, 실행 시 다른 시점에 만든 일반 `dev.tfplan`을 사용하지 않는다. dev root가 소유한 환경을 영구 삭제할 때는 `dev-destroy-plan`으로 `dev-destroy.tfplan`을 생성하고 `dev-destroy-show`로 삭제 대상과 보존 대상을 검토한 뒤 `dev-destroy`를 실행한다. bootstrap root의 state bucket과 계정 baseline은 이 destroy plan의 대상이 아니다. bootstrap root 변경에는 같은 순서의 `bootstrap-plan`, `bootstrap-show`, `bootstrap-apply`, `bootstrap-drift`를 사용한다. apply와 destroy recipe는 실행 전에 추가 확인을 요구한다.
 
-`dev-plan`, `dev-apply`, `dev-drift`, 모든 deep plan/apply/drift 명령, `dev-destroy-plan`, `dev-destroy`는 `secrets.auto.tfvars`가 비어 있지 않은 일반 파일이고 group/other 권한 bit가 모두 꺼져 있을 때만 시작한다(`0600` 또는 `0400` 계열). Setup, `verify-account`, 저장된 plan의 `show`와 상태 조회에는 이 gate를 적용하지 않는다. AI·Discord 평문이 `dev.tfplan`, `terraform show -json` 또는 state에 나타나면 apply하지 않는다.
+saved plan에서 기존 Secret version의 `removed`가 값을 삭제하지 않는지, 새 Secret version resource와
+민감정보가 없는지 확인한다. AI·Discord·RunPod·GHCR 평문 또는 hash가 `dev.tfplan`,
+`terraform show -json`이나 state에 나타나면 apply하지 않는다.
 
 `just fmt`는 Terraform 파일을 수정하므로 포맷이 필요할 때만 실행한다. `just verify-account`는 state와 AWS 계정 연결을 읽기 전용으로 검증한다.
 
@@ -181,6 +180,17 @@ just dev-drift
 Deep suspend 중에는 기본값이 active인 일반 `dev-plan`, `dev-apply`, `dev-drift`를 사용하지 않는다. 일반 plan은 ALB 재생성과 CloudFront 재활성화를 제안한다. suspended 상태 검증에는 `dev-deep-drift`를 사용하고, 통합·Backend·Frontend Pipeline과 DB migration도 실행하지 않는다. 중단이나 timeout이 발생하면 Console에서 임의로 생성·삭제하지 말고 `dev-deep-status`와 해당 모드의 새 plan을 확인한 뒤 실패한 단계만 재시도한다.
 
 중단되거나 예상과 다른 상태가 보이면 start/stop을 반복하기 전에 `just dev-status`로 현재 상태를 확인한다. 전원 전환 중에는 Terraform plan/apply와 DB migration을 병행하지 않는다.
+
+## RunPod 공유 F2 서빙
+
+공유 F2 dev Pod는 Terraform 자원이 아니다. 학습 담당자는 Infra 권한 없이 검증된 bundle 하나만
+전달하고, Infra 담당자가 private S3에 불변 게시한다. `scripts/manage_runpod.py`는 기본 dry-run으로
+doctor/create/status/delete와 active/offline endpoint 전환을 제공한다. 학습 Pod와 개인 실험은 이
+경계에 포함하지 않는다.
+
+정상 호출은 서로 다른 API key가 적용된 RunPod HTTPS proxy를 사용한다. Pod에는 1시간 presigned
+S3 URL만 전달하고 AWS credential, SSH, Volume을 사용하지 않는다. 최초 준비와 릴리스 운영은
+[RunPod 공유 F2 runbook](runpod/README.md)을 따른다. 삭제 후에도 S3 release는 보존된다.
 
 ## DB 계정 초기화와 migration
 

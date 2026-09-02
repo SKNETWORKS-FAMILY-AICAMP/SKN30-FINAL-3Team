@@ -111,10 +111,12 @@ resource "aws_secretsmanager_secret" "alarm_discord_webhook" {
   recovery_window_in_days = 7
 }
 
-resource "aws_secretsmanager_secret_version" "alarm_discord_webhook" {
-  secret_id                = aws_secretsmanager_secret.alarm_discord_webhook.id
-  secret_string_wo         = var.alarm_discord_webhook_url
-  secret_string_wo_version = var.alarm_discord_webhook_secret_version
+removed {
+  from = aws_secretsmanager_secret_version.alarm_discord_webhook
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 data "archive_file" "cloudwatch_alarm_notifier" {
@@ -194,7 +196,6 @@ resource "aws_lambda_function" "cloudwatch_alarm_notifier" {
   depends_on = [
     aws_cloudwatch_log_group.cloudwatch_alarm_notifier,
     aws_iam_role_policy.cloudwatch_alarm_notifier,
-    aws_secretsmanager_secret_version.alarm_discord_webhook,
   ]
 }
 

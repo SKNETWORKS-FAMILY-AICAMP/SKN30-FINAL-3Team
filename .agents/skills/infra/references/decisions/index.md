@@ -19,6 +19,9 @@ updated: 2026-09-02
 | [ADR-0010](ADR-0010-dev-ec2-instance-class.md) | 승인됨 | 개발 환경 EC2 instance class를 `t3.small`로 축소 |
 | [ADR-0011](ADR-0011-dev-delivery-implementation.md) | 부분 대체됨 | 통합·Backend·Frontend Pipeline, CodeDeploy, rollback과 Discord delivery 구현 |
 | [ADR-0012](ADR-0012-existing-iam-operators.md) | 승인됨 | 기존 IAM 운영자에 최소 권한 Pipeline policy 직접 연결 |
-| [ADR-0013](ADR-0013-dev-environment-materialization.md) | 승인됨 | Terraform 설정 정본, write-only 수동 비밀과 프로세스별 환경파일 사용 |
+| [ADR-0013](ADR-0013-dev-environment-materialization.md) | 부분 대체됨 | Terraform 공개 설정 정본, 초기 write-only 수동 비밀과 프로세스별 환경파일 사용 |
 | [ADR-0014](ADR-0014-dev-deep-power-lifecycle.md) | 승인됨 | ALB 삭제·CloudFront 비활성화를 포함한 검토 가능한 dev deep 전원 운영 |
-| [ADR-0015](ADR-0015-cloudwatch-alarm-discord-delivery.md) | 승인됨·코드 구현, 미적용 | CloudWatch Alarm을 전용 SNS·Lambda와 새 Discord webhook Secret으로 분리 전달 |
+| [ADR-0015](ADR-0015-cloudwatch-alarm-discord-delivery.md) | 부분 대체됨·코드 구현, 미적용 | CloudWatch Alarm을 전용 SNS·Lambda와 새 Discord webhook Secret으로 분리 전달 |
+| [ADR-0016](ADR-0016-runpod-shared-f2-serving.md) | 대체됨 | 영속 Volume과 stop/start 기반 RunPod 공유 F2 서빙 운영 |
+| [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md) | 부분 대체됨·코드 구현, 외부 자원 미적용 | private S3 SLLM release와 RunPod create/delete, active/offline endpoint로 공유 dev 서빙 |
+| [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, AWS 값 정본·회전, 읽기 전용 감시와 수동 reconcile |

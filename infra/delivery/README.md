@@ -8,9 +8,9 @@
 - `.github/workflows/pr-policy-review.yml`의 별도 사용자 변경은 이 delivery 변경과 섞지 않는다.
 - `pipeline_operator_user_names`가 승인된 기존 IAM 사용자만 포함하고 `student` 외 추가 사용자가 없는지 확인한다.
 - `SKN30_FINAL` Connection이 `AVAILABLE`이고 승인된 repository만 접근하는지 확인한다.
-- ignored `infra/environments/dev/secrets.auto.tfvars`에 AI provider key, 기존 delivery Discord
-  webhook과 새 Alarm 전용 Discord webhook을 각각 입력하고 각 version counter가 실제 값과 함께
-  증가했는지 확인한다. Alarm webhook은 Discord에서 새로 만들고 기존 webhook을 재사용하지 않는다.
+- `just -f infra/justfile secret-status`로 AI provider key, 기존 delivery Discord webhook과 새 Alarm
+  전용 Discord webhook의 AWSCURRENT 존재만 확인한다. 값은 TTY 기반 bootstrap/rotation 명령으로
+  넣으며 Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
 - Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다. Frontend
   Verify에는 env·auth·최상위 오류 복구·F2·F3 계약, `typecheck`과 원장 테스트가 모두 포함된다.
 
@@ -98,7 +98,9 @@ terraform plan -var-file=dev.tfvars -out=dev.tfplan
 terraform apply dev.tfplan
 ```
 
-`secrets.auto.tfvars`는 두 명령 모두 같은 directory에서 자동으로 읽힌다. 이 파일은 비어 있지 않은 일반 파일이어야 하고 group/other 권한 bit가 모두 꺼져 있어야 한다(`chmod 600`). Ephemeral 값은 saved plan에 포함되지 않으므로 plan과 apply 사이에 파일을 수정하지 않는다. AI provider key, delivery Discord webhook 또는 Alarm Discord webhook을 바꿀 때는 각각 대응하는 `*_secret_version`도 증가시킨다. plan JSON과 state에 비밀 평문이 보이면 적용을 중단한다.
+Terraform은 Secret 컨테이너만 관리한다. saved plan에 Secret version 생성·삭제나 AI provider key,
+Discord webhook과 그 hash가 보이면 적용을 중단한다. 값 회전은 `secret-rotate`와 대상별 fixture로
+검증한다.
 
 구성의 import block이 기존 Connection ARN을 state로 가져온다. plan에서 Connection replacement 또는 destroy가 보이면 적용하지 않는다.
 
