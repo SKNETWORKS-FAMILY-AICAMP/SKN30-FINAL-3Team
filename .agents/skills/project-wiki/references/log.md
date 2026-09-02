@@ -1,10 +1,24 @@
 ---
 status: 구현됨
-updated: 2026-08-27
+updated: 2026-09-02
 ---
 
 # 위키 변경 로그
 
+- 2026-09-02: RunPod 감시 로그의 endpoint 상태를 `active`·`offline` allowlist로 제한하고 그 밖의 SSM 값을 고정 `invalid`로 일반화했다. 배포·운영 문서의 대체된 Infra ADR-0016 참조는 현재 정본인 ADR-0017·0018로 교체했다.
+- 2026-09-02: RunPod 제어면 API 장애를 Provider 정상으로 오인하지 않도록 감시 계약을 명확히 했다. 장애 주기에는 heartbeat와 API 도달 실패만 기록하고, 확인할 수 없는 endpoint 일치·Provider health·orphan·runtime·비용 metric은 발행하지 않는다.
+- 2026-09-02: ADR-0008의 EC2 Backend·설치형 AI·RunPod 추론 상위 구조는 유지하고, ADR-0020이 Infra ADR-0002의 개발자별 Pod·시연 기간 Pod 유지·조건부 Network Volume 조항만 부분 대체함을 양쪽 ADR과 인덱스에 명시했다. 런타임 인덱스의 GPU runtime 정본 링크도 ADR-0020으로 정규화했다.
+- 2026-09-02: SLLM 공유 dev 승격에 미확정 정량 임계값을 고정하지 않고, 파인튜닝 담당자가 `full` 평가 지표를 검토해 선택 모델·평가 실행·사유를 명시한 `promotion-approval:v1`을 승인하도록 ADR-0020을 구체화했다. 패키징 도구는 승인 상태와 평가 연결을 검증하며 비교 평가의 모든 모델 통과를 요구하지 않는다.
+- 2026-09-01: RunPod 최초 구축을 digest 기반 `plan → 확인 → bootstrap`으로 통합하고 운영 비밀값 정본을 AWS Secrets Manager로 옮겼다. Terraform은 Secret 컨테이너만 소유하고 기존 version은 값 삭제 없이 state에서 분리한다. 기본 30분 읽기 전용 감시와 8시간 실행 경고, 기존 Alarm Discord 경로와 기본 dry-run 수동 reconcile을 추가하되 자동 Pod 삭제·endpoint 전환과 기존 active/offline·Backend 503 계약 변경은 제외했다.
+- 2026-09-01: 학습자는 Infra 권한 없이 검증된 SLLM bundle만 전달하고 Infra가 private S3에 불변 게시하도록 경계를 확정했다. 공유 F2 RunPod는 Volume·SSH 없는 create/delete lifecycle과 `sllm`·`stt` 작업명, active/offline endpoint를 사용하며 offline F2 요청은 Backend 503으로 처리한다.
+
+- 2026-08-31: CloudWatch Alarm Discord 메시지에 검증된 `AlarmArn` 기반 Alarm 링크와 별도 장애 대응 Runbook을 추가하고, 정확한 Backend·AI 알람 두 개에는 미리 채운 Logs Insights 링크를 제공한다. 애플리케이션 `ALARM`만 전이 시각 ±10분의 허용 필드 1건을 최대 2초 best-effort 조회하며 시간 초과 쿼리는 중단한다. 조회 실패는 기본 알림을 막지 않고 Discord 전송 실패만 SNS 재시도하며, `source`는 라우팅이 아닌 선택적 기능 문맥으로 한정했다.
+- 2026-08-31: AI·Backend pre-commit Ruff 대상을 모듈 아래 Git 추적 Python 파일 전체로 넓혀 CodeBuild의 모듈 전체 검사와 일치시켰다. 에이전트는 Python 변경을 마치기 전에 루트 `AGENTS.md`의 모듈별 `ruff check --fix`와 `ruff format`을 실행하며, `ai/eval`·`ai/training`도 제외하지 않는다. Pyright의 기존 `src`·`tests` 검사 범위와 CodeBuild 최종 검증은 유지한다.
+- 2026-08-31: 개발 환경 오류 관측을 예상하지 못한 Backend 500과 F2·F3 AI 최종 실패 두 이벤트로 한정하고, `/api/v1` framework 404·405·422 envelope와 F2 안전 오류 문구·React 복구 경계를 정규화했다. 기존 CloudWatch·SNS·Discord만 사용하며 기존 delivery notifier는 유지하고, CloudWatch Alarm은 별도 SNS·Lambda와 새 Discord webhook Secret으로 전달한다. 외부 관측성 제품, 브라우저 telemetry, 전면 로그 스키마 이관과 token·queue·heartbeat 지표는 운영 비용을 고려해 제외했다.
+- 2026-08-31: F3-CR-01·02의 저장 트리거가 하는 일을 앵커 포지션 카드 생성까지로 줄이고 API 계약의 자동 접수·Worker 선점·상태 수명주기 절을 같은 범위로 대체했다. 저장이 만든 실행은 ANCHOR_READY에서 멈추고 Worker 선점·최대 시도 정리 대상에서 빠진다. 사용자가 QUEUED·RUNNING·ANCHOR_READY 어느 때 판정을 요청해도 같은 실행이 그 의도를 이어받으며, 주차 뒤의 계획된 첫 선점은 재시도 횟수를 쓰지 않는다. 앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용은 없다. 세대 상세의 액션 레일 [교차 판정]은 여닫기가 아니라 판정 요청으로 되돌렸고, 섹션의 [교차 판정 실행]과 같은 실행을 요청한다.
+- 2026-08-31: 상세 저장이 F3 후보 패널을 자동으로 열던 화면 동작을 없애고, 세대 상세에 [교차 판정] 섹션을 두고 실행과 여닫기를 분리했다. 섹션 안의 [교차 판정 실행]이 판정을 시작하고, 액션 레일의 [교차 판정]은 그 섹션을 여닫기만 한다. 패널을 여는 순간 화면도 실행을 확보하므로 저장마다 패널이 열리면 F3-CR-03·04를 버튼 실행으로 바꾼 이유가 저장 경로로 되살아난다. F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 그대로 유지한다.
+- 2026-08-31: 프로젝트 요청자가 F3-BR-12·13의 기존 상위 15건 규칙을 최초 카드화·AI 판정 상위 5건으로 대체하도록 승인했다. 승인 주체·결정일·대체 범위를 사용자 지시 출처 manifest와 요구사항 변경 이력에 기록하고 F3 AI 계약에 연결했다.
+- 2026-08-27: F3 최초 카드화·판정 상한을 상위 5건으로 조정했다. 전체 SQL 후보·순위·페이징은 유지하고 `candidate-selection:v3`의 상위 5건만 포지션 카드를 순차 생성해 앵커 1장과 후보 1~5장을 한 번에 판정한다. 화면은 상위 판정 건수와 전체 후보 건수를 구분해 표시한다. Worker 실패 로그에는 고정 단계·분류·예외 타입·시도 횟수를, 후보 카드 실패 로그에는 후보 순번·전체 건수를 남기되 예외 메시지·상담 본문·전체 프롬프트·모델 원문 응답은 기록하지 않는다.
 - 2026-08-27: 로컬 전용이던 검토된 F3 합성 reset·seed·verify 세 파일을 공유 dev에도 명시적으로 적용할 수 있도록 ADR-0017을 확장했다. 개인 IAM·SSM·15분 DB token을 사용하는 Infra `seed-f3 --apply`만 허용하고 대상 dev RDS·고정 파일 순서·`F3_SYNTHETIC` reset 범위·29개 전부 PASS를 강제하며 prod·임의 DB·임의 SQL 적용은 계속 금지한다.
 - 2026-08-27: F3-CR-03·04의 교차 판정 트리거를 상세 진입 자동 실행에서 상세의 [교차 판정] 버튼 실행으로 변경했다. 장부를 조회하기만 해도 불필요한 판정 비용이 생기는 것을 막으며, F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 유지한다.
 - 2026-08-27: F2 기능 플래그 제거와 Backend runtime 상시 초기화 결정에 맞춰 API 계약에서 비활성 상태를 제거하고, 필수 LLM·STT endpoint 누락은 시작 오류, 실행 중 Provider 사용 불가는 503 `F2_UNAVAILABLE`로 구분함.

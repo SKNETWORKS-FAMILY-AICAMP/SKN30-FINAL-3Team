@@ -9,14 +9,14 @@ repos:
         name: ai ruff check --fix
         entry: uv run --locked --project ai ruff check --fix
         language: system
-        files: ^ai/(src|tests)/.*\.py$
+        files: ^ai/.*\.py$
         types:
           - python
       - id: ai-ruff-format
         name: ai ruff format
         entry: uv run --locked --project ai ruff format
         language: system
-        files: ^ai/(src|tests)/.*\.py$
+        files: ^ai/.*\.py$
         types:
           - python
       - id: ai-pyright
@@ -29,14 +29,14 @@ repos:
         name: backend ruff check --fix
         entry: uv run --locked --project backend ruff check --fix
         language: system
-        files: ^backend/(src|tests)/.*\.py$
+        files: ^backend/.*\.py$
         types:
           - python
       - id: backend-ruff-format
         name: backend ruff format
         entry: uv run --locked --project backend ruff format
         language: system
-        files: ^backend/(src|tests)/.*\.py$
+        files: ^backend/.*\.py$
         types:
           - python
       - id: backend-pyright

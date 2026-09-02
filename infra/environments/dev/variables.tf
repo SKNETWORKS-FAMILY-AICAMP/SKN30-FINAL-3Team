@@ -125,62 +125,33 @@ variable "app_asg_health_check_type" {
   }
 }
 
-variable "ai_provider_api_keys" {
-  description = "Secrets Manager에 write-only로 반영할 AI provider 환경변수 이름과 API key"
-  type        = map(string)
-  sensitive   = true
-  ephemeral   = true
+variable "runpod_monitor_interval_minutes" {
+  description = "읽기 전용 RunPod 감시 Lambda 실행 주기(분)"
+  type        = number
+  default     = 30
 
   validation {
     condition = (
-      contains(keys(var.ai_provider_api_keys), "AI_OPENAI_API_KEY") &&
-      contains(keys(var.ai_provider_api_keys), "AI_VLLM_LLM_API_KEY") &&
-      contains(keys(var.ai_provider_api_keys), "AI_VLLM_STT_API_KEY") &&
-      alltrue([
-        for name, value in var.ai_provider_api_keys :
-        can(regex("^AI_[A-Z0-9_]+_API_KEY$", name)) &&
-        trimspace(value) != "" &&
-        length(regexall("[[:space:]]", value)) == 0
-      ])
+      var.runpod_monitor_interval_minutes >= 5 &&
+      var.runpod_monitor_interval_minutes <= 60 &&
+      var.runpod_monitor_interval_minutes == floor(var.runpod_monitor_interval_minutes) &&
+      var.runpod_monitor_interval_minutes % 5 == 0
     )
-    error_message = "ai_provider_api_keys에는 비어 있지 않은 AI_OPENAI_API_KEY, AI_VLLM_LLM_API_KEY, AI_VLLM_STT_API_KEY와 AI_*_API_KEY 형식의 키만 지정해야 합니다."
+    error_message = "runpod_monitor_interval_minutes는 5~60 사이의 5분 단위 정수여야 합니다."
   }
 }
 
-variable "ai_provider_secret_version" {
-  description = "AI provider key 변경을 Secrets Manager 새 version으로 반영하는 단조 증가 정수"
+variable "runpod_runtime_warning_hours" {
+  description = "공유 RunPod가 연속 실행될 때 경고할 시간"
   type        = number
-
-  validation {
-    condition     = var.ai_provider_secret_version >= 1 && var.ai_provider_secret_version == floor(var.ai_provider_secret_version)
-    error_message = "ai_provider_secret_version은 1 이상의 정수여야 합니다."
-  }
-}
-
-variable "discord_webhook_url" {
-  description = "Discord 알림 Lambda가 사용할 webhook URL"
-  type        = string
-  sensitive   = true
-  ephemeral   = true
+  default     = 8
 
   validation {
     condition = (
-      (
-        startswith(var.discord_webhook_url, "https://discord.com/api/webhooks/") ||
-        startswith(var.discord_webhook_url, "https://discordapp.com/api/webhooks/")
-      ) &&
-      length(regexall("[[:space:]]", var.discord_webhook_url)) == 0
+      var.runpod_runtime_warning_hours >= 1 &&
+      var.runpod_runtime_warning_hours <= 24 &&
+      var.runpod_runtime_warning_hours == floor(var.runpod_runtime_warning_hours)
     )
-    error_message = "discord_webhook_url은 Discord HTTPS webhook URL이어야 합니다."
-  }
-}
-
-variable "discord_webhook_secret_version" {
-  description = "Discord webhook 변경을 Secrets Manager 새 version으로 반영하는 단조 증가 정수"
-  type        = number
-
-  validation {
-    condition     = var.discord_webhook_secret_version >= 1 && var.discord_webhook_secret_version == floor(var.discord_webhook_secret_version)
-    error_message = "discord_webhook_secret_version은 1 이상의 정수여야 합니다."
+    error_message = "runpod_runtime_warning_hours는 1~24 사이의 정수여야 합니다."
   }
 }

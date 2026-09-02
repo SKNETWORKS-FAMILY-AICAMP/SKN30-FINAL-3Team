@@ -36,11 +36,32 @@ const NAME_SEPARATOR = ", ";
 const ROLE = { landlord: "LANDLORD", tenant: "TENANT" } as const;
 
 /** 전용 컬럼이 없어 custom_fields에 실리는 열. */
-const CUSTOM_KEYS = { spec: "spec", brokerageName: "brokerage_name" } as const;
+const CUSTOM_KEYS = {
+  spec: "spec",
+  brokerageName: "brokerage_name",
+  parking: "parking",
+  tax: "tax_memo",
+} as const;
 
 function readCustomText(fields: Record<string, unknown>, key: string): string {
   const value = fields[key];
   return typeof value === "string" ? value : "";
+}
+
+/**
+ * 전용 컬럼이 없는 열을 `custom_fields`로 되돌린다.
+ *
+ * 생성과 수정이 같은 함수를 쓴다. 한쪽에만 키를 추가하면 새로 만든 세대에는 값이 남고
+ * 고친 세대에서는 사라지는, 눈으로 찾기 어려운 차이가 생긴다.
+ */
+function customFieldsPayload(row: PropertyRow): Record<string, unknown> {
+  return {
+    ...row.customFields,
+    [CUSTOM_KEYS.spec]: row.spec,
+    [CUSTOM_KEYS.brokerageName]: row.brokerage,
+    [CUSTOM_KEYS.parking]: row.parking,
+    [CUSTOM_KEYS.tax]: row.tax,
+  };
 }
 
 function textOrEmpty(value: string | null | undefined): string {
@@ -178,6 +199,8 @@ export function toPropertyRow(dto: PropertyUnitRowDto, assigneeName = ""): Prope
     builtIn: textOrEmpty(dto.built_in_features),
     facilityState: textOrEmpty(dto.facility_condition),
     brokerage: readCustomText(dto.custom_fields, CUSTOM_KEYS.brokerageName),
+    parking: readCustomText(dto.custom_fields, CUSTOM_KEYS.parking),
+    tax: readCustomText(dto.custom_fields, CUSTOM_KEYS.tax),
 
     raw: {
       price: textOrEmpty(listing?.price_raw_text),
@@ -298,11 +321,7 @@ export function toUnitCreatePayload(row: PropertyRow): PropertyUnitCreateDto | n
     facility_condition: emptyToNull(row.facilityState),
     assigned_user_id: row.assigneeId,
     memo: emptyToNull(row.memo),
-    custom_fields: {
-      ...row.customFields,
-      [CUSTOM_KEYS.spec]: row.spec,
-      [CUSTOM_KEYS.brokerageName]: row.brokerage,
-    },
+    custom_fields: customFieldsPayload(row),
     parties: toPartyWritePayload(row),
   };
 }
@@ -328,11 +347,7 @@ export function toUnitUpdatePayload(row: PropertyRow): PropertyUnitUpdateDto | n
     lifecycle_status: toCode(LIFECYCLE_STATUS, row.householdState),
     assigned_user_id: row.assigneeId,
     memo: emptyToNull(row.memo),
-    custom_fields: {
-      ...row.customFields,
-      [CUSTOM_KEYS.spec]: row.spec,
-      [CUSTOM_KEYS.brokerageName]: row.brokerage,
-    },
+    custom_fields: customFieldsPayload(row),
     /*
      * 인물은 상세를 한 번이라도 읽어 현재 값을 아는 행에서만 보낸다. 이 요청은 "보낸 목록이
      * 곧 전체"라는 뜻이라, 아직 인물을 모르는 행에서 빈 배열을 보내면 서버에 있는 임대인이
@@ -342,14 +357,21 @@ export function toUnitUpdatePayload(row: PropertyRow): PropertyUnitUpdateDto | n
   };
 }
 
-/** 매물 건에 담을 값이 하나라도 있는지. 없으면 매물을 만들지 않는다(F1-GR-01). */
+/**
+ * 매물 건에 담을 값이 하나라도 있는지. 없으면 매물을 만들지 않는다(F1-GR-01).
+ *
+ * 명도는 `property_listing.handover_condition`이 소유한다. 여기서 세지 않으면 명도만 적고
+ * 저장한 세대에서 그 값이 갈 곳이 없어 조용히 사라진다. 거래유형 플래그가 모두 꺼진 매물 건은
+ * F3 후보 조회가 유형별 `available IS TRUE`를 요구하므로 후보로 올라오지 않는다.
+ */
 export function hasListingValues(row: PropertyRow): boolean {
   return (
     row.saleFlag === "Y" ||
     row.leaseFlag === "Y" ||
     row.monthlyFlag === "Y" ||
     row.listingType !== "" ||
-    emptyToNull(row.receivedAt) != null
+    emptyToNull(row.receivedAt) != null ||
+    emptyToNull(row.clearance) != null
   );
 }
 
@@ -366,8 +388,15 @@ function listingFields(row: PropertyRow): PropertyListingCreateDto {
     is_jeonse_available: isJeonse,
     jeonse_deposit_amount: isJeonse ? parseMoney(row.leaseDeposit || row.price) : null,
     is_monthly_rent_available: isMonthly,
-    monthly_rent_deposit_amount: isMonthly ? (rentPair.first ?? parseMoney(row.deposit)) : null,
-    monthly_rent_amount: isMonthly ? (rentPair.second ?? parseMoney(row.rent)) : null,
+    /*
+     * 월세 조건은 「보증금 / 차임」 칸에서만 온다.
+     *
+     * 비어 있을 때 세대의 `deposit`·`rent`로 떨어지면 안 된다. 그 둘은 **현재 임대차**,
+     * 즉 지금 살고 있는 세입자의 조건이라 내놓는 매물 조건과 다른 값이다. 사용자가 적지
+     * 않은 금액을 지어내느니 비워 두는 편이 맞다.
+     */
+    monthly_rent_deposit_amount: isMonthly ? rentPair.first : null,
+    monthly_rent_amount: isMonthly ? rentPair.second : null,
     // 사용자가 마지막으로 본 대표 금액 문자열을 원문으로 남긴다(F1-DM-11).
     price_raw_text: emptyToNull(row.raw?.price || row.price),
     handover_condition: emptyToNull(row.clearance),
@@ -475,6 +504,8 @@ export function createPropertyDraftRow(localId: string): PropertyRow {
     builtIn: "",
     facilityState: "",
     brokerage: "",
+    parking: "",
+    tax: "",
 
     raw: { price: "", tenancy: "" },
   };

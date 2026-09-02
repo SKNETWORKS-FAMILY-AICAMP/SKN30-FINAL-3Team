@@ -7,7 +7,12 @@ from typing import Any, cast
 from uuid import uuid4
 
 import pytest
-from brokerage_ai.core.errors import ProviderResponseError, ProviderTimeoutError
+from brokerage_ai.core.errors import (
+    ProviderOutputInvalidError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
 from brokerage_ai.f3 import BrokerageJudgmentContractError, PositionCardContractError
 from sqlmodel import Session
 
@@ -54,6 +59,43 @@ def test_errors_have_one_execution_outcome(
     expected: pipeline.StepOutcome,
 ) -> None:
     assert pipeline.classify(error) is expected
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("RUNNING", pipeline.FailureStage.ANCHOR_CARD),
+        ("ANCHOR_READY", pipeline.FailureStage.CANDIDATE_SELECTION),
+        ("CANDIDATES_READY", pipeline.FailureStage.CANDIDATE_CARDS),
+        ("CANDIDATE_CARDS_READY", pipeline.FailureStage.JUDGMENT),
+        ("JUDGING", pipeline.FailureStage.JUDGMENT),
+        ("QUEUED", pipeline.FailureStage.EXECUTION),
+    ],
+)
+def test_saved_status_has_a_safe_failure_stage(
+    status: str, expected: pipeline.FailureStage
+) -> None:
+    assert pipeline.failure_stage(status) is expected
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (LeaseNotHeldError("raw"), pipeline.FailureCategory.LEASE),
+        (InputVersionChangedError("raw"), pipeline.FailureCategory.INPUT_CHANGED),
+        (CachedCardUnavailableError("raw"), pipeline.FailureCategory.CACHE_INVALIDATED),
+        (ProviderOutputInvalidError("raw"), pipeline.FailureCategory.OUTPUT_CONTRACT),
+        (ProviderTimeoutError(), pipeline.FailureCategory.PROVIDER_TIMEOUT),
+        (ProviderRateLimitError(), pipeline.FailureCategory.PROVIDER_RATE_LIMIT),
+        (ProviderResponseError(), pipeline.FailureCategory.PROVIDER_RESPONSE),
+        (PositionCardContractError("raw"), pipeline.FailureCategory.OUTPUT_CONTRACT),
+        (RuntimeError("raw"), pipeline.FailureCategory.UNKNOWN),
+    ],
+)
+def test_errors_have_a_safe_failure_category(
+    error: BaseException, expected: pipeline.FailureCategory
+) -> None:
+    assert pipeline.failure_category(error) is expected
 
 
 @pytest.mark.parametrize(
@@ -107,6 +149,98 @@ def test_saved_status_selects_exactly_one_stage(
 
     assert result is expected
     assert calls == ([] if called is None else [called])
+
+
+class ParkingSession:
+    """주차 UPDATE 의 commit·rollback 만 기록하는 최소 session 대역."""
+
+    def __init__(self) -> None:
+        self.settled: list[str] = []
+
+    def commit(self) -> None:
+        self.settled.append("commit")
+
+    def rollback(self) -> None:
+        self.settled.append("rollback")
+
+
+def test_ledger_save_run_stops_after_the_anchor_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """저장이 만든 실행은 앵커 카드까지만 한다 (F3-CR-01·02, ADR-0018).
+
+    후보 조회를 부르지 않는 것이 계약이다. 상태만 보고 다음 단계를 고르면 저장 하나가
+    모델 판정까지 완주한다.
+    """
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+    monkeypatch.setattr(pipeline.repository, "park_ledger_save_run", lambda *_a, **_k: 1)
+
+    parked = run_in("ANCHOR_READY")
+    parked.trigger_type = "LEDGER_SAVE"
+    session = ParkingSession()
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, session), parked, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.SKIPPED
+    assert calls == []
+    assert session.settled == ["commit"]
+
+
+def test_user_request_during_the_anchor_step_is_not_parked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """읽은 뒤 승격된 실행은 주차하지 않고 후보 조회로 이어 간다.
+
+    Worker 가 실행을 읽은 값만 믿고 주차하면 그 사이 들어온 사용자 요청이 다음 lease
+    만료까지 묻힌다. 주차 UPDATE 가 0행을 바꾸면 승격된 것으로 보고 계속 간다.
+    """
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+    monkeypatch.setattr(pipeline.repository, "park_ledger_save_run", lambda *_a, **_k: 0)
+
+    stale = run_in("ANCHOR_READY")
+    stale.trigger_type = "LEDGER_SAVE"
+    session = ParkingSession()
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, session), stale, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.ADVANCED
+    assert calls == ["candidates"]
+    assert session.settled == ["rollback"]
+
+
+def test_resumed_run_continues_from_the_anchor_card(monkeypatch: pytest.MonkeyPatch) -> None:
+    """사용자 요청으로 옮겨진 실행은 같은 상태에서 후보 조회로 이어진다."""
+    calls: list[str] = []
+
+    def candidates(*_args: Any, **_kwargs: Any) -> None:
+        calls.append("candidates")
+
+    monkeypatch.setattr(pipeline, "store_candidate_selection", candidates)
+
+    resumed = run_in("ANCHOR_READY")
+    resumed.trigger_type = "USER_REQUEST"
+    result = asyncio.run(
+        pipeline._advance(
+            cast(Session, object()), resumed, "worker-test", pipeline.ExecutionBindings()
+        )
+    )
+
+    assert result is pipeline.StepOutcome.ADVANCED
+    assert calls == ["candidates"]
 
 
 class RecordingSession:
@@ -199,6 +333,102 @@ def test_contract_failure_stores_a_generic_terminal_error(
     assert outcome is pipeline.StepOutcome.FAILED_TERMINAL
     assert failure_calls[0]["failure_code"] == "EXECUTION_FAILED"
     assert "model output body" not in repr(failure_calls)
+
+
+def test_failure_log_contains_only_safe_classification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_message = "customer phone 010-0000-0000"
+    events: list[tuple[str, dict[str, object]]] = []
+
+    class RecordingLogger:
+        def warning(self, event: str, **values: object) -> None:
+            events.append((event, values))
+
+        def error(self, event: str, **values: object) -> None:
+            events.append((event, values))
+
+    monkeypatch.setattr(pipeline, "logger", RecordingLogger())
+    outcome, _, _ = advance_with_error(monkeypatch, PositionCardContractError(raw_message))
+
+    assert outcome is pipeline.StepOutcome.FAILED_TERMINAL
+    assert [event for event, _values in events] == [
+        "f3_step_failed",
+        "ai_terminal_failure",
+    ]
+    warning = events[0][1]
+    assert warning == {
+        "run_id": 17,
+        "status": "RUNNING",
+        "failure_stage": "ANCHOR_CARD",
+        "attempt": 2,
+        "outcome": "FAILED_TERMINAL",
+        "failure_category": "OUTPUT_CONTRACT",
+        "error_type": "PositionCardContractError",
+        "error_location": warning["error_location"],
+    }
+    terminal = events[1][1]
+    assert terminal == {
+        "component": "ai",
+        "source": "f3",
+        "run_id": 17,
+        "status": "FAILED_TERMINAL",
+        "failure_stage": "ANCHOR_CARD",
+        "attempt": 2,
+        "failure_category": "OUTPUT_CONTRACT",
+        "error_type": "PositionCardContractError",
+        "error_location": warning["error_location"],
+    }
+    assert raw_message not in repr(events)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ProviderTimeoutError(),
+        InputVersionChangedError("changed"),
+        LeaseNotHeldError("lost"),
+    ],
+)
+def test_non_terminal_outcomes_do_not_emit_terminal_alarm_events(
+    monkeypatch: pytest.MonkeyPatch, error: BaseException
+) -> None:
+    events: list[str] = []
+
+    class RecordingLogger:
+        def warning(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+        def error(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+    monkeypatch.setattr(pipeline, "logger", RecordingLogger())
+    advance_with_error(monkeypatch, error)
+
+    assert "ai_terminal_failure" not in events
+
+
+def test_lost_lease_during_terminal_commit_does_not_emit_an_alarm_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    class RecordingLogger:
+        def warning(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+        def error(self, event: str, **_values: object) -> None:
+            events.append(event)
+
+    monkeypatch.setattr(pipeline, "logger", RecordingLogger())
+    outcome, _, _ = advance_with_error(
+        monkeypatch,
+        PositionCardContractError("invalid"),
+        fail_count=0,
+    )
+
+    assert outcome is pipeline.StepOutcome.LEASE_LOST
+    assert "ai_terminal_failure" not in events
 
 
 @pytest.mark.parametrize("kind", ["retry", "failure"])

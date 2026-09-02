@@ -41,6 +41,25 @@
 - 비밀값과 개인정보를 저장소, 로그, 예시 데이터 또는 프롬프트에 기록하지 않는다.
 - 현재 기술 후보를 팀이 승인한 결정으로 표현하지 않는다.
 
+## Python 포맷 및 린트
+
+- `ai/`의 Python 파일을 변경하면 작업을 마치기 전에 저장소 루트에서 다음 명령을 실행한다.
+
+  ```bash
+  uv run --locked --project ai ruff check --fix ai
+  uv run --locked --project ai ruff format ai
+  ```
+
+- `backend/`의 Python 파일을 변경하면 작업을 마치기 전에 저장소 루트에서 다음 명령을 실행한다.
+
+  ```bash
+  uv run --locked --project backend ruff check --fix backend
+  uv run --locked --project backend ruff format backend
+  ```
+
+- 명령이 파일을 수정하면 변경 내용을 다시 검토한다. 두 모듈을 모두 변경하면 두 모듈의 명령을
+  모두 실행하며, `eval/`, `training/`처럼 `src/`와 `tests/` 밖의 Python 파일도 제외하지 않는다.
+
 ## Git
 
 브랜치 생성, 변경 범위, PR, 검토와 병합 작업 전 [브랜치 및 PR 정책](.agents-rule/git.md)을 읽고 따른다. `.agents-rule/git.md`가 해당 정책의 유일한 정본이다.

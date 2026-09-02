@@ -16,15 +16,26 @@ EXPECTED_KEYS = {
     "split",
     "contains_real_personal_data",
 }
-SOURCE_LABELS = {"매도의뢰", "매수의뢰", "공동중개", "단순문의"}
-OUTPUT_LABELS = {"매도의뢰", "매수문의", "공동중개", "단순문의"}
-LABEL_NORMALIZATION = {"매수의뢰": "매수문의"}
+SOURCE_LABELS = {
+    "매도의뢰",
+    "매수의뢰",
+    "매수문의",
+    "공동중개",
+    "단순문의",
+    "기타상담",
+}
+OUTPUT_LABELS = {"매도의뢰", "매수문의", "기타상담"}
+LABEL_NORMALIZATION = {
+    "매수의뢰": "매수문의",
+    "공동중개": "기타상담",
+    "단순문의": "기타상담",
+}
 SHUFFLE_SEED = 20260819
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="F2 상담 유형별 JSONL 네 개를 검증하고 하나로 병합한다."
+        description="F2 원천 의도 JSONL 네 개를 3개 상담 유형 데이터로 병합한다."
     )
     parser.add_argument("inputs", nargs=4, type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -43,8 +54,8 @@ def read_jsonl(path: Path) -> list[dict[str, object]]:
             if set(value) != EXPECTED_KEYS:
                 raise ValueError(f"{path}:{line_number}: schema mismatch")
             rows.append(value)
-    if len(rows) != 50:
-        raise ValueError(f"{path}: expected 50 rows, got {len(rows)}")
+    if not rows:
+        raise ValueError(f"{path}: no rows found")
     labels = {str(row["label"]) for row in rows}
     if len(labels) != 1 or not labels <= SOURCE_LABELS:
         raise ValueError(f"{path}: invalid labels {sorted(labels)}")
@@ -52,9 +63,6 @@ def read_jsonl(path: Path) -> list[dict[str, object]]:
 
 
 def validate_combined(rows: list[dict[str, object]]) -> None:
-    if len(rows) != 200:
-        raise ValueError(f"expected 200 rows, got {len(rows)}")
-
     for key in ("scenario_id", "source_group_id", "transcript"):
         values = [str(row[key]) for row in rows]
         if len(set(values)) != len(values):
@@ -62,16 +70,14 @@ def validate_combined(rows: list[dict[str, object]]) -> None:
 
     if any(row["contains_real_personal_data"] is not False for row in rows):
         raise ValueError("contains_real_personal_data must be false")
-    if {str(row["dataset_version"]) for row in rows} != {"0.2.0"}:
-        raise ValueError("all source rows must use dataset_version 0.2.0")
     if {str(row["split"]) for row in rows} != {"unassigned"}:
         raise ValueError("all source rows must have split=unassigned")
 
     label_counts = {
         label: sum(row["label"] == label for row in rows) for label in OUTPUT_LABELS
     }
-    if label_counts != {label: 50 for label in OUTPUT_LABELS}:
-        raise ValueError(f"unexpected label distribution: {label_counts}")
+    if any(count == 0 for count in label_counts.values()):
+        raise ValueError(f"missing rows for some output labels: {label_counts}")
 
 
 def main() -> None:
@@ -80,6 +86,7 @@ def main() -> None:
     for row in rows:
         label = str(row["label"])
         row["label"] = LABEL_NORMALIZATION.get(label, label)
+        row["dataset_version"] = "0.4.0"
 
     validate_combined(rows)
     random.Random(SHUFFLE_SEED).shuffle(rows)

@@ -10,9 +10,12 @@ bash -n \
   infra/deploy/scripts/before_install.sh \
   infra/deploy/scripts/after_install.sh \
   infra/deploy/scripts/application_start.sh \
+  infra/deploy/scripts/refresh_ai_endpoints.sh \
+  infra/deploy/scripts/smoke_f2.sh \
   infra/deploy/scripts/validate_service.sh
 python3 -m unittest \
   infra.tests.test_delivery_common \
   infra.tests.test_delivery_pipeline_contract \
   infra.tests.test_render_env \
+  infra.tests.test_smoke_f2 \
   -v

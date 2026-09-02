@@ -19,5 +19,4 @@ evaluation:
   allowed_consultation_types:
     - 매도의뢰
     - 매수문의
-    - 공동중개
-    - 단순문의
+    - 기타상담

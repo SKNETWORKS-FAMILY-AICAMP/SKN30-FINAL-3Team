@@ -114,18 +114,29 @@ def test_enabled_worker_requires_an_explicit_llm_provider() -> None:
     with pytest.raises(ConfigurationError, match="LLM provider"):
         require_ai_provider("test", {})
 
-    configured = require_ai_provider("test", {"AI_VLLM_LLM_BASE_URL": "http://localhost:8000/v1"})
-    assert configured.vllm.llm is not None
+    configured = require_ai_provider(
+        "test",
+        {
+            "AI_F2_PROVIDER_STATUS": "active",
+            "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
+            "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
+        },
+    )
+    assert configured.vllm.sllm is not None
 
 
 def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> None:
     configured = require_ai_provider(
         "dev",
-        {"AI_VLLM_LLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1"},
+        {
+            "AI_F2_PROVIDER_STATUS": "active",
+            "AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
+            "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
+        },
     )
 
     assert configured.profile is AiProfile.DEV
-    assert configured.vllm.llm is not None
+    assert configured.vllm.sllm is not None
 
 
 def test_enabled_worker_merges_ai_local_files_without_mutating_process_environment(
@@ -135,15 +146,18 @@ def test_enabled_worker_merges_ai_local_files_without_mutating_process_environme
     import brokerage_ai.core.config as ai_config_module
 
     (tmp_path / ".env.local").write_text(
-        "AI_REQUEST_TIMEOUT_SECONDS=10\nAI_VLLM_LLM_BASE_URL=http://localhost:8000/v1\n",
+        "AI_REQUEST_TIMEOUT_SECONDS=10\n"
+        "AI_F2_PROVIDER_STATUS=active\n"
+        "AI_VLLM_SLLM_BASE_URL=http://localhost:8000/v1\n"
+        "AI_VLLM_STT_BASE_URL=http://localhost:8002/v1\n",
         encoding="utf-8",
     )
     (tmp_path / ".env").write_text(
-        "AI_VLLM_LLM_API_KEY=personal-secret\n",
+        "AI_VLLM_SLLM_API_KEY=personal-secret\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(ai_config_module, "AI_ROOT", tmp_path)
-    monkeypatch.delenv("AI_VLLM_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("AI_VLLM_SLLM_API_KEY", raising=False)
 
     config = require_ai_provider(
         "local",
@@ -151,10 +165,10 @@ def test_enabled_worker_merges_ai_local_files_without_mutating_process_environme
     )
 
     assert config.request_timeout_seconds == 30
-    assert config.vllm.llm is not None
-    assert config.vllm.llm.api_key is not None
-    assert config.vllm.llm.api_key.get_secret_value() == "personal-secret"
-    assert "AI_VLLM_LLM_API_KEY" not in os.environ
+    assert config.vllm.sllm is not None
+    assert config.vllm.sllm.api_key is not None
+    assert config.vllm.sllm.api_key.get_secret_value() == "personal-secret"
+    assert "AI_VLLM_SLLM_API_KEY" not in os.environ
 
 
 class FakeSession:

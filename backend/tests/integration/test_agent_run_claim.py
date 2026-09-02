@@ -28,7 +28,7 @@ INSERT_RUN = text(
     " status, trigger_type, requested_by, created_at, started_at, attempt_count, lease_owner,"
     " lease_expires_at)"
     " VALUES (:brokerage_id, :run_group_id, :parent_run_id, :run_type, 'BROKERAGE_WORKFLOW',"
-    " :status, 'USER_REQUEST', :requested_by, :created_at, :started_at, :attempt_count,"
+    " :status, :trigger_type, :requested_by, :created_at, :started_at, :attempt_count,"
     " :lease_owner, :lease_expires_at) RETURNING id"
 )
 
@@ -46,6 +46,7 @@ def insert_run(
     attempt_count: int = 0,
     lease_owner: str | None = None,
     lease_expires_at: datetime | None = None,
+    trigger_type: str = "USER_REQUEST",
 ) -> int:
     return session.execute(
         INSERT_RUN,
@@ -55,6 +56,7 @@ def insert_run(
             "parent_run_id": parent_run_id,
             "run_type": run_type,
             "status": status,
+            "trigger_type": trigger_type,
             "requested_by": requested_by,
             "created_at": created_at or datetime.now(UTC),
             "started_at": started_at,
@@ -301,6 +303,110 @@ def test_expired_run_over_the_attempt_limit_is_terminated_and_not_claimed(
         assert stored["lease_owner"] is None
         assert stored["lease_expires_at"] is None
         assert stored["attempt_count"] == service.MAX_CLAIM_ATTEMPTS
+
+
+@requires_database
+def test_parking_loses_to_a_user_request_that_arrived_first() -> None:
+    """읽은 뒤 승격된 실행은 주차되지 않는다.
+
+    Worker 가 앵커 카드를 저장하고 주차하기 전에 사용자 요청이 들어오는 창이 있다. 그때
+    낡은 trigger_type 만 믿고 주차하면 요청이 다음 lease 만료까지 묻히고 계획된 handoff 가
+    실패 재시도로 처리된다. 주차 UPDATE 가 조건에서 걸러 0행을 바꾸는지 본다.
+    """
+    with claim_session() as (session, brokerage_id, user_id):
+        lease_until = datetime.now(UTC) + timedelta(seconds=300)
+        run_id = insert_run(
+            session,
+            brokerage_id,
+            user_id,
+            status="ANCHOR_READY",
+            trigger_type="LEDGER_SAVE",
+            attempt_count=1,
+            lease_owner=WORKER_A,
+            lease_expires_at=lease_until,
+        )
+
+        # 사용자 요청이 먼저 도착해 승격한다.
+        assert repository.resume_ledger_save_run(session, run_id, brokerage_id, "USER_REQUEST") == 1
+        session.commit()
+
+        # 뒤늦은 주차 시도는 조건에 걸려 아무 행도 바꾸지 못한다.
+        parked = repository.park_ledger_save_run(session, run_id, brokerage_id, WORKER_A, 1)
+        session.commit()
+
+        assert parked == 0
+        stored = stored_run(session, run_id)
+        assert stored["trigger_type"] == "USER_REQUEST"
+        assert stored["status"] == "ANCHOR_READY"
+
+
+@requires_database
+def test_parking_clears_the_lease_so_a_later_request_is_claimed_at_once() -> None:
+    """주차는 lease 를 비우고, 그 뒤 들어온 요청은 곧바로 선점된다."""
+    with claim_session() as (session, brokerage_id, user_id):
+        lease_until = datetime.now(UTC) + timedelta(seconds=300)
+        run_id = insert_run(
+            session,
+            brokerage_id,
+            user_id,
+            status="ANCHOR_READY",
+            trigger_type="LEDGER_SAVE",
+            attempt_count=1,
+            lease_owner=WORKER_A,
+            lease_expires_at=lease_until,
+        )
+
+        assert repository.park_ledger_save_run(session, run_id, brokerage_id, WORKER_A, 1) == 1
+        session.commit()
+
+        parked_row = stored_run(session, run_id)
+        assert parked_row["lease_owner"] is None
+        assert parked_row["lease_expires_at"] is None
+        # 주차 상태에서는 lease 가 없어도 선점하지 않는다.
+        assert service.claim_next_run(session, WORKER_B) is None
+
+        assert repository.resume_ledger_save_run(session, run_id, brokerage_id, "USER_REQUEST") == 1
+        session.commit()
+
+        claimed = service.claim_next_run(session, WORKER_B)
+        assert claimed is not None and claimed.id == run_id
+        # 유효한 lease 가 남아 만료를 기다리는 일이 없어야 한다.
+        assert claimed.attempt_count == 1
+
+
+@requires_database
+def test_parked_ledger_save_run_waits_and_resumes_at_the_attempt_limit() -> None:
+    """재시도 상한에서 앵커 카드에 성공해도 기다렸다가 판정을 이어갈 수 있다."""
+    with claim_session() as (session, brokerage_id, user_id):
+        run_id = insert_run(
+            session,
+            brokerage_id,
+            user_id,
+            status="ANCHOR_READY",
+            trigger_type="LEDGER_SAVE",
+            attempt_count=service.MAX_CLAIM_ATTEMPTS,
+            started_at=datetime(2026, 8, 19, 1, 0, tzinfo=UTC),
+            lease_owner=WORKER_A,
+            lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
+        )
+
+        assert service.claim_next_run(session, WORKER_B) is None
+
+        stored = stored_run(session, run_id)
+        assert stored["status"] == "ANCHOR_READY"
+        assert stored["failure_code"] is None
+        assert stored["completed_at"] is None
+        assert stored["attempt_count"] == service.MAX_CLAIM_ATTEMPTS
+
+        changed = repository.resume_ledger_save_run(session, run_id, brokerage_id, "USER_REQUEST")
+        session.commit()
+        claimed = service.claim_next_run(session, WORKER_B)
+
+        assert changed == 1
+        assert claimed is not None and claimed.id == run_id
+        assert claimed.status == "ANCHOR_READY"
+        # 사용자 요청에 따른 계획된 handoff는 실패 재시도로 세지 않는다.
+        assert claimed.attempt_count == service.MAX_CLAIM_ATTEMPTS
 
 
 @requires_database

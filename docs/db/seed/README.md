@@ -29,37 +29,21 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 
 ## 로컬 적용
 
-`docs/db/migrate/`의 migration을 먼저 끝까지 적용한 뒤 실행한다.
+`docs/db/migrate/`의 migration을 먼저 끝까지 적용하고 API와 Worker를 중지한 뒤 실행한다.
+`backend/.env`에는 로컬 PostgreSQL을 가리키는 `DB_URL`이 설정되어 있어야 한다.
 
-`infra/local/.env`의 로컬 DB 설정을 현재 셸에 불러온다. 아래 명령은 그 파일의
-`POSTGRES_USER`와 `POSTGRES_DB`를 사용하며 특정 계정·DB 이름을 고정하지 않는다.
-
-```bash
-set -a
-source infra/local/.env
-set +a
-```
+`backend/`에서 다음 관리 명령을 실행한다. `--confirm-reset`은 기존 합성 사무소의 장부와 실행
+결과를 지우고 재적재한다는 명시적 확인이며, 이 옵션 없이는 실행하지 않는다.
 
 ```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/001_F3_SYNTHETIC_RESET.sql
+cd backend
+uv run python src/manage.py seed-f3-synthetic --confirm-reset
 ```
 
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/002_F3_SYNTHETIC_SEED.sql
-```
-
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/003_F3_SYNTHETIC_VERIFY.sql
-```
-
-두 파일을 순서대로 돌리면 몇 번을 반복해도 같은 상태가 된다. 검증 결과의 마지막 열이
-전부 `PASS`여야 다음 단계로 넘어간다.
+명령은 `APP_ENV=local`이고 `DB_URL` 호스트가 `localhost` 또는 loopback IP일 때만 동작한다.
+임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` seed → `003` verify를 고정 순서로
+실행한다. 29개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
+`verification_checks`를 출력한다. 몇 번을 반복해도 합성 사무소 ID와 같은 데이터 상태를 유지한다.
 
 ## 공유 dev 적용
 
@@ -91,7 +75,7 @@ F3 작업이 없을 때만 실행한다.
 
 ```dotenv
 AUTH_DEVELOPMENT_ENABLED=true
-AUTH_DEVELOPMENT_BROKERAGE_ID=<002 출력값>
+AUTH_DEVELOPMENT_BROKERAGE_ID=<brokerage_id 출력값>
 AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 ```
 
@@ -117,15 +101,33 @@ Worker가 직접 만들어야 파이프라인 전체가 검증된다. 결과를 
 
 ## 케이스 구성
 
-양쪽 앵커를 모두 확인할 수 있게 매물 기준 3건과 구입장 기준 2건을 둔다.
+작은 회귀 케이스 A~E에 대량 케이스 F~I를 더한다. 전체 데이터는 단지 5개, 세대 36개,
+인물 87명, 매물 36건, 구입장 48건, 상담 로그 169건이다. 이 중 대량 확장분은 매물 30건과
+구입장 40건이며, 별도 합성 단지에 격리해 기존 A~E의 후보 수를 바꾸지 않는다.
 
 | 케이스 | 앵커 | `seed_key` | 기대 후보 수 | 무엇을 확인하나 |
 |---|---|---|---:|---|
 | A | 매물 (매매 28.8억) | `L1` | 3 | 강한·약한·기각 후보가 한 실행에 함께 나온다 |
 | B | 구입장 (매수 29억) | `R1` | 2 | 반대 방향 앵커도 같은 파이프라인을 탄다 |
-| C | 매물 (월세) | `L5` | 0 | 호환되는 구분의 구입장이 아예 없다 |
+| C | 매물 (월세) | `L5` | 0 | 해당 단지를 희망하는 월세 구입장이 없다 |
 | D | 구입장 (매도) | `R8` | 0 | 대응하는 매물 거래 유형이 없는 구분이다 |
 | E | 매물 (전세 21.5억) | `L4` | 1 | SQL은 통과하지만 시점이 결정적으로 어긋난다 |
+| F | 매물 (대량 매매) | `BL01` | 19 | 전체 후보 19건 중 상위 5건만 카드화한다 |
+| G | 구입장 (대량 매수) | `BR01` | 12 | 반대 방향에서도 다수 매물을 안정적으로 찾는다 |
+| H | 매물 (대량 전세) | `BL13` | 12 | 전세 보증금 가격 축으로 후보를 찾는다 |
+| I | 매물 (대량 월세) | `BL23` | 10 | 월세 보증금·월 차임 가격 축을 보존한다 |
+
+### 대량 케이스 분포
+
+| 단지 `seed_key` | 거래 유형 | 매물 | 구입장 | 장부 키 범위 |
+|---|---|---:|---:|---|
+| `C3` | 매매·매수 | 12 | 18 | `BL01`~`BL12`, `BR01`~`BR18` |
+| `C4` | 전세 | 10 | 12 | `BL13`~`BL22`, `BR19`~`BR30` |
+| `C5` | 월세 | 8 | 10 | `BL23`~`BL30`, `BR31`~`BR40` |
+
+대량 행은 `custom_fields.dataset = "BULK"` 또는 단지의 `extra_info.dataset = "BULK"`로도
+구분할 수 있다. 각 매물·구입장에는 합성 상담 로그가 2건씩 있으며, 번호에 따라 가격 유연성,
+입주 시점과 연락 가능성 표현이 달라진다.
 
 ### 케이스 A의 후보 3건
 
@@ -185,6 +187,7 @@ ORDER BY seed_key;
 
 - `status`가 `COMPLETED`인가
 - `candidate_selection.total_count`가 위 표의 기대 후보 수와 같은가
+- 케이스 F에서 `candidate_selection.total_count=19`이고 `selected_for_cards=true`가 5건인가
 - `anchor_card.evidence`에 저장된 상담 로그를 가리키는 근거가 있는가
 - `candidates[].match_grade`가 `STRONG`·`WEAK`·`REJECTED` 중 하나인가
 - `REJECTED` 후보에 `rejection_reason`이 있는가

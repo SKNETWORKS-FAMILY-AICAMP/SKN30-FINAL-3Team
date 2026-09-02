@@ -19,11 +19,11 @@ F3는 F1에 누적된 구조화 데이터와 상담 로그에서 양측의 실�
 
 한 문장으로 요약하면 다음과 같다.
 
-> 사용자의 저장 또는 상세의 [교차 판정] 버튼에 반응해 Backend가 복구 가능한 F3 작업을 만들고, AI가 격리된 양측 대리와 Backend 조회 capability를 사용해 후보를 판정하며, Backend가 검증한 최종 결과를 F1을 막지 않는 패널에 표시한다.
+> 저장은 앵커 포지션 카드를 만들어 두고, 상세의 판정 요청 버튼이 그 실행을 이어받아 Backend가 복구 가능한 F3 작업을 진행하고, AI가 격리된 양측 대리와 Backend 조회 capability를 사용해 후보를 판정하며, Backend가 검증한 최종 결과를 F1을 막지 않는 패널에 표시한다.
 
 ### 포함 범위
 
-- 매물·손님 저장 및 상세의 [교차 판정] 버튼에서 시작하는 핵심 교차 판정
+- 매물·손님 저장이 만드는 앵커 포지션 카드와, 상세의 판정 요청 버튼에서 시작하는 핵심 교차 판정
 - 매물 대리와 손님 대리의 포지션 카드 생성 및 캐시
 - 가격·평형·날짜·상태를 사용하는 결정적 SQL 후보 추출
 - 전문검색과 pgvector 의미 검색을 결합한 상담 로그 근거 검색
@@ -53,7 +53,7 @@ F3는 F1에 누적된 구조화 데이터와 상담 로그에서 양측의 실�
 
 | 모듈 | F3에서 소유하는 책임 | 소유하지 않는 책임 |
 |---|---|---|
-| Frontend | 상세의 [교차 판정] 버튼 실행, 저장 후 활성 실행 확인, 진행 구독, 단계 결과·최종 판정·근거·피드백 표시 | SQL·검색, Agent 실행, 결과 영속화 |
+| Frontend | 상세의 판정 요청 버튼(레일 [교차 판정], 섹션 [교차 판정 실행]), 진행 구독, 단계 결과·최종 판정·근거·피드백 표시 | SQL·검색, Agent 실행, 결과 영속화 |
 | Backend | 인증·인가, 자동 트리거, 영속 작업·Worker, 입력 버전, 결정적 후보 SQL, 로그 원문·전문검색·벡터 저장, capability 구현, 캐시·결과·피드백 저장 | 프롬프트, Agent 역할, LangGraph 상태와 중개 판단 |
 | AI | 공개 실행·임베딩 facade, 매물·손님 대리, 포지션 카드, 도구 정의·호출 정책, 워크플로, 중개 판정, 출력·근거 일관성 검증 | DB·Repository·트랜잭션, 사용자 권한 판정, F1 데이터 변경 |
 | Data | 합성·비식별 평가 사례, 정답·slice, 분할, manifest·체크섬, 데이터 품질과 계보 | 온라인 검색·판정, 모델·프롬프트 실행, 운영 DB |
@@ -83,7 +83,7 @@ flowchart LR
         IDX --> SEARCH
     end
 
-    FE -->|"저장·[교차 판정]"| API
+    FE -->|"저장·판정 실행"| API
     API -->|"단계 진행·최종 결과"| FE
     WK -->|"프레임워크 중립 호출"| AIF
 
@@ -148,7 +148,7 @@ pgvector 유사도는 거래 후보를 포함·제외하거나 SQL 후보 점수
 | 포지션 카드 `negotiation_side` 어휘 `LISTING`·`REQUIREMENT` | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md); Backend `AnchorType`과 값이 같고 OQ-012를 종료함 |
 | 포지션 카드 Backend–AI 요청·결과 DTO와 근거 규칙 (`position-card:v1`) | 결정 | [F3 AI 계약](../../../.agents/skills/project-wiki/references/contracts/f3-ai.md) |
 | 포지션 카드 생성·저장 수직 슬라이스 | 구현됨 | 합성 snapshot, 주입 생성기 호출, fencing, 카드·가격·근거 저장과 `ANCHOR_READY` 전이. Worker handler 연결 포함 |
-| 중개 판정 생성·저장 수직 슬라이스 | 구현됨 | 앵커 1장과 후보 1~15장 일괄 판정, 저장 직전 fencing, 결과·근거 원자 저장과 `JUDGING`·`COMPLETED` 전이. Worker handler 연결 포함 |
+| 중개 판정 생성·저장 수직 슬라이스 | 구현됨 | 앵커 1장과 후보 1~5장 일괄 판정, 저장 직전 fencing, 결과·근거 원자 저장과 `JUDGING`·`COMPLETED` 전이. Worker handler 연결 포함 |
 | FastAPI·SQLAlchemy 계열·PostgreSQL·pgvector·SSE | 후보 | 팀 승인 전에는 제품 채택으로 간주하지 않음 |
 | 로컬/외부 모델 제공자와 구체 임베딩 모델 | 미확정 | 지연·비용·개인정보 전송 조건에 영향 |
 

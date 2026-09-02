@@ -44,7 +44,7 @@ ai/eval/f2_sLLM/
 ```
 
 - `scenario_id`, `transcript`, `label`은 필수다.
-- `label`은 `매도의뢰`, `매수문의`, `공동중개`, `단순문의` 중 하나다.
+- `label`은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다.
 - 정확도, macro F1, 클래스별 precision·recall·F1, 혼동 행렬을 계산한다.
 - JSON 파싱 실패와 허용되지 않은 라벨 출력은 제외하지 않고 오답으로 계산한다.
 
@@ -70,8 +70,8 @@ ai/eval/f2_sLLM/
 }
 ```
 
-- `sample_id`, `transcript`, `ledger_type`, `expected`는 필수다.
-- `consultation_type`은 `매도의뢰`, `매수문의`, `공동중개`, `단순문의` 중 하나다.
+- `sample_id`, `transcript`, `ledger_type`, `expected`는 필수다. `full`은 기존 행의 장부 불일치까지 검증한다.
+- `consultation_type`은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다.
 - `fields`에는 음성에서 확인된 값만 넣는다.
 - 합성 데이터도 정답과 근거를 사람이 검수한 뒤 평가 릴리스로 발행한다.
 - 최종 테스트 릴리스는 프롬프트 수정이나 QLoRA 학습에 사용하지 않는다.
@@ -120,6 +120,18 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
   --dataset data/f2_llm/releases/0.2.0/test.jsonl \
   --task classification \
   --models Qwen/Qwen3-0.6B Qwen/Qwen3-1.7B
+```
+
+QLoRA 학습 결과는 기반 모델 하나와 어댑터 경로를 함께 지정한다. 이때 평가 환경에도
+`peft`가 설치되어 있어야 한다.
+
+```bash
+ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
+  --dataset data/f2_llm/releases/<version>/test.jsonl \
+  --task classification \
+  --models Qwen/Qwen3-4B \
+  --quantization 4bit \
+  --adapter-path /workspace/models/f2-qwen3-4b-qlora-v1/adapter
 ```
 
 ## 결과와 판단 기준

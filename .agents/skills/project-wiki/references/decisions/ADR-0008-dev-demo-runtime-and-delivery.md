@@ -1,12 +1,14 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-09-02
 ---
 
 # ADR-0008: 개발·시연 런타임과 수동 전달 경로
 
 - 상태: 부분 대체됨
 - 전달 결정 대체: [ADR-0011](ADR-0011-dev-cicd-pipeline-modes.md)
+- RunPod 운영 구체화: [ADR-0020](ADR-0020-sllm-release-handoff.md). 이 결정의 EC2 Backend,
+  설치형 `brokerage-ai`, RunPod 추론이라는 상위 런타임 구조는 유지한다.
 - 결정일: 2026-08-18
 - 보완 결정: [ADR-0009](ADR-0009-dev-demo-operating-constraints.md)
 

@@ -173,6 +173,101 @@ resource "aws_s3_bucket_policy" "workload_tls_only" {
   depends_on = [aws_s3_bucket_public_access_block.workload]
 }
 
+resource "aws_iam_policy" "sllm_release_publisher" {
+  name        = "${local.name_prefix}-sllm-release-publisher"
+  description = "Publish and read immutable SLLM release bundles in the private model bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ListSllmReleases"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.workload["data_model"].arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["releases/sllm", "releases/sllm/*"]
+          }
+        }
+      },
+      {
+        Sid    = "PublishAndReadSllmReleases"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+        ]
+        Resource = "${aws_s3_bucket.workload["data_model"].arn}/releases/sllm/*"
+      },
+      {
+        Sid    = "UpdateSllmEndpointSet"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:PutParameter",
+        ]
+        Resource = [
+          aws_ssm_parameter.ai_vllm_endpoint_set.arn,
+          aws_ssm_parameter.runpod_control_set.arn,
+        ]
+      },
+      {
+        Sid    = "ManageRunPodOperationalSecrets"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:PutSecretValue",
+        ]
+        Resource = concat(
+          [aws_secretsmanager_secret.application["ai_provider"].arn],
+          [aws_secretsmanager_secret.discord_webhook.arn],
+          [aws_secretsmanager_secret.alarm_discord_webhook.arn],
+          [for secret in aws_secretsmanager_secret.runpod : secret.arn],
+        )
+      },
+      {
+        Sid    = "VerifyRotatedDiscordWebhooks"
+        Effect = "Allow"
+        Action = ["lambda:InvokeFunction"]
+        Resource = [
+          aws_lambda_function.discord_notifier.arn,
+          aws_lambda_function.cloudwatch_alarm_notifier.arn,
+        ]
+      },
+      {
+        Sid      = "DiscoverDevApplicationInstance"
+        Effect   = "Allow"
+        Action   = ["ec2:DescribeInstances"]
+        Resource = "*"
+      },
+      {
+        Sid    = "RefreshDevApplicationEndpoints"
+        Effect = "Allow"
+        Action = ["ssm:SendCommand"]
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript",
+        ]
+      },
+      {
+        Sid      = "ReadEndpointRefreshResult"
+        Effect   = "Allow"
+        Action   = ["ssm:GetCommandInvocation"]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "sllm_release_publisher" {
+  for_each = var.pipeline_operator_user_names
+
+  user       = each.value
+  policy_arn = aws_iam_policy.sllm_release_publisher.arn
+}
+
 resource "aws_ecr_repository" "backend_ai" {
   name                 = "${local.name_prefix}-backend-ai"
   image_tag_mutability = "IMMUTABLE"

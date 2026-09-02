@@ -14,7 +14,7 @@ from sqlmodel import Session
 
 from core.config import Config
 from domain.agent_execution import service
-from domain.agent_execution.models import AnchorType
+from domain.agent_execution.models import USER_REQUEST_TRIGGER_TYPE, AnchorType
 from domain.authentication.dependencies import get_authentication_context, get_current_user
 from domain.authentication.models import AuthenticationContext, CurrentUser, UserRole
 from domain.authentication.service import hash_token
@@ -115,8 +115,8 @@ def test_listing_anchor_queues_a_single_run_for_the_current_user(config: Config)
         assert run["requested_by"] == user_id
         assert run["run_type"] == "CROSS_JUDGMENT"
         assert run["agent_type"] == "BROKERAGE_WORKFLOW"
-        # 매물 저장이 만든 실행을 화면 요청이 재사용한다.
-        assert run["trigger_type"] == "LEDGER_SAVE"
+        # 매물 저장이 만든 실행을 화면 요청이 재사용하고 사용자 요청으로 승격한다.
+        assert run["trigger_type"] == USER_REQUEST_TRIGGER_TYPE
         assert run["parent_run_id"] is None
         assert run["model_config_id"] is None
         assert run["target_listing_id"] == listing["id"]

@@ -37,9 +37,10 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
 입력으로 STT 상담 텍스트와 현재 장부 종류만 받습니다.
 
 반드시 다음 규칙을 지키세요.
-- 상담 유형은 매도의뢰, 매수문의, 공동중개, 단순문의 중 하나로 분류합니다.
+- 매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류합니다.
+- 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류합니다.
 - 매물장에서 매수문의이거나 구입장에서 매도의뢰이면 ledger_mismatch를 true로 둡니다.
-- ledger_mismatch가 true이면 fields와 evidence는 빈 객체로 둡니다.
+- ledger_mismatch가 true이거나 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
 - 원문에서 명확히 확인된 값만 fields에 넣습니다.
 - 불명확한 숫자, 날짜, 동, 호 또는 충돌하는 값은 확정하지 말고 uncertainties에 적습니다.
 - 기존 장부 값을 추측하거나 자동으로 덮어쓰지 않습니다.
@@ -48,7 +49,7 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
 
 출력 형식:
 {
-  "consultation_type": "매도의뢰|매수문의|공동중개|단순문의",
+  "consultation_type": "매도의뢰|매수문의|기타상담",
   "ledger_mismatch": false,
   "fields": {"필드명": "값"},
   "evidence": {"필드명": "원문 근거"},
@@ -59,9 +60,10 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
 CLASSIFICATION_SYSTEM_PROMPT = """당신은 부동산 상담 유형 분류기입니다.
 입력으로 STT 상담 텍스트만 받습니다.
 
-상담 유형을 매도의뢰, 매수문의, 공동중개, 단순문의 중 하나로 분류하세요.
+매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류하세요.
+그 밖의 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류하세요.
 설명이나 마크다운 없이 다음 형식의 JSON 객체 하나만 출력하세요.
-{"consultation_type": "매도의뢰|매수문의|공동중개|단순문의"}"""
+{"consultation_type": "매도의뢰|매수문의|기타상담"}"""
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,11 @@ def parse_args() -> argparse.Namespace:
         help="실행 결과 루트",
     )
     parser.add_argument("--limit", type=int, help="구조 확인용 최대 사례 수")
+    parser.add_argument(
+        "--adapter-path",
+        type=Path,
+        help="평가할 PEFT/LoRA 어댑터 경로(--models로 기반 모델 하나를 지정해야 함)",
+    )
     return parser.parse_args()
 
 
@@ -322,7 +329,7 @@ def percentile(values: list[float], fraction: float) -> float | None:
 def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> dict[str, Any]:
     """한 모델의 모든 사례를 모아 최종 비교 지표를 계산한다.
 
-    분류는 네 상담 유형의 클래스별 F1과 Macro F1을 계산한다. 필드 추출은 모든 사례의
+    분류는 세 상담 유형의 클래스별 F1과 Macro F1을 계산한다. 필드 추출은 모든 사례의
     TP·FP·FN을 합산해 Precision·Recall·F1을 계산한다. JSON 파싱 실패는 숨기지 않고
     json_parse_rate에서 실패로 반영한다.
     """
@@ -483,6 +490,7 @@ def run_model(
     output_path: Path,
     allowed_types: list[str],
     task: str,
+    adapter_path: Path | None = None,
 ) -> dict[str, Any]:
     """Qwen 모델 하나를 불러와 모든 평가 사례를 실행한다.
 
@@ -509,6 +517,10 @@ def run_model(
     # AutoModelForCausalLM은 config.json의 model_type을 확인해 내부적으로 적절한
     # Qwen CausalLM 클래스를 선택한다. 따라서 코드에 Qwen3ForCausalLM 이름이 없어도 된다.
     model = AutoModelForCausalLM.from_pretrained(spec.model_id, **model_load_kwargs(quantization))
+    if adapter_path is not None:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, adapter_path)
 
     # Dropout 같은 학습 전용 동작을 끄고 평가 모드로 전환한다.
     model.eval()
@@ -612,6 +624,7 @@ def run_model(
         {
             "model_id": spec.model_id,
             "label": spec.label,
+            "adapter_path": str(adapter_path.resolve()) if adapter_path else None,
             "load_seconds": load_seconds,
             "peak_cuda_memory_bytes": (
                 torch.cuda.max_memory_allocated() if torch.cuda.is_available() else None
@@ -641,6 +654,11 @@ def main() -> None:
     # 3. models.yaml의 네 후보를 ModelSpec 목록으로 만든다.
     # --models를 지정했다면 그중 요청된 모델만 남는다.
     specs = select_models(config, args.models)
+    if args.adapter_path is not None:
+        if len(specs) != 1:
+            raise ValueError("--adapter-path 사용 시 --models로 기반 모델 하나만 지정해야 합니다")
+        if not args.adapter_path.is_dir():
+            raise FileNotFoundError(args.adapter_path)
     generation = config["generation"]
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_dir = args.output_dir / run_id
@@ -661,6 +679,7 @@ def main() -> None:
                 output_path,
                 allowed_types,
                 args.task,
+                args.adapter_path,
             )
         )
 
@@ -672,6 +691,7 @@ def main() -> None:
         "sample_count": len(samples),
         "task": args.task,
         "quantization": args.quantization,
+        "adapter_path": str(args.adapter_path.resolve()) if args.adapter_path else None,
         "generation": generation,
         "models": summaries,
     }

@@ -4,13 +4,18 @@ import { CheckCircleIcon, ExpandIcon, InfoCircleIcon, MicrophoneIcon, SaveIcon, 
 import { PROTOTYPE_ASSUMPTIONS } from "../config/prototypeAssumptions.js";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
 import { carrySavedIdentity } from "./ledger/index.ts";
-import { DEAL_TYPE_CHOICES, dealTypePatch, dealTypeValue } from "./ledger/model/dealType.ts";
+import { DEAL_TYPE_CHOICES, dealTypePatch, dealTypeValue, priceFieldPatch } from "./ledger/model/dealType.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import RelationEditModal from "./RelationEditModal.jsx";
 import "@patternfly/react-core/dist/styles/base.css";
 import "./DetailWorkspace.css";
 
-const EMPTY_ROW = { id: "", complex: "", building: "", unit: "", saveState: "임시저장", aiState: "대기", householdState: "일반", area: "", listingType: "매매", price: "", deposit: "", rent: "", expiry: "", owner: "", relationship: "본인", tenant: "", phone: "", direction: "", floor: "", rooms: "", baths: "", lastContact: "", log: "", assignee: "", source: "", consent: "", memo: "", parking: "", moveIn: "", tax: "", duplicateCheck: false, people: [] };
+/*
+ * 값이 없는 칸의 기본값. `listingType`은 비워 둔다. '매매'를 기본값으로 두면 매물이 아닌
+ * 세대까지 매매 건으로 보이고, 화면과 저장값이 어긋나는 원인이 된다.
+ * 「입주 가능일」은 명도(`clearance`)와 같은 값을 받던 중복 칸이라 없앴다.
+ */
+const EMPTY_ROW = { id: "", complex: "", building: "", unit: "", saveState: "임시저장", aiState: "대기", householdState: "일반", area: "", listingType: "", price: "", deposit: "", rent: "", expiry: "", owner: "", relationship: "본인", tenant: "", phone: "", direction: "", floor: "", rooms: "", baths: "", lastContact: "", log: "", assignee: "", assigneeId: null, source: "", consent: "", memo: "", parking: "", tax: "", clearance: "", duplicateCheck: false, people: [] };
 
 function normalizeRow(row) { const normalized = { ...EMPTY_ROW, ...(row || {}) }; normalized.saveState = normalized.saveState === "저장 완료" ? "저장 완료" : "임시저장"; normalized.price = normalized.price || (normalized.listingType === "매매" ? normalized.salePrice : normalized.listingType === "전세" ? normalized.leaseDeposit : normalized.rentCondition) || ""; normalized.phone = normalized.phone || normalized.ownerPhone || ""; if (typeof normalized.duplicateCheck !== "boolean") normalized.duplicateCheck = Boolean(normalized.id && normalized.complex && normalized.building && normalized.unit); return normalized; }
 function splitPeople(value) { return String(value || "").split(/[·,\/\n]+/).map((name) => name.trim()).filter(Boolean); }
@@ -97,7 +102,22 @@ function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
   </div>;
 }
 
-function DetailField({ id, label, value, onChange, type = "text", placeholder = "입력", span }) { return <div className="detail-field" data-span={span}><label className="detail-field__label" htmlFor={id}>{label}</label><TextInput id={id} type={type} value={value ?? ""} placeholder={placeholder} onChange={(_event, nextValue) => onChange(nextValue)} /></div>; }
+/** 한 줄 입력 칸. `readOnly`는 서버가 채우는 파생값에 쓴다. 그 값은 `hint`로 이유를 밝힌다. */
+function DetailField({ id, label, value, onChange, type = "text", placeholder = "입력", span, readOnly = false, hint }) {
+  return <div className="detail-field" data-span={span}>
+    <label className="detail-field__label" htmlFor={id}>{label}</label>
+    <TextInput
+      id={id}
+      type={type}
+      value={value ?? ""}
+      placeholder={readOnly ? "" : placeholder}
+      readOnlyVariant={readOnly ? "default" : undefined}
+      aria-describedby={hint ? `${id}-hint` : undefined}
+      onChange={readOnly ? undefined : (_event, nextValue) => onChange(nextValue)}
+    />
+    {hint && <span className="detail-field__hint" id={`${id}-hint`}>{hint}</span>}
+  </div>;
+}
 /** 여러 줄로 적는 짧은 메모 칸. 스펙처럼 한 줄로는 모자란 항목에 쓴다. */
 function DetailTextAreaField({ id, label, value, onChange, placeholder = "입력", className = "" }) { return <div className={`detail-field detail-field--area ${className}`.trim()}><label className="detail-field__label" htmlFor={id}>{label}</label><TextArea id={id} value={value ?? ""} placeholder={placeholder} resizeOrientation="vertical" onChange={(_event, nextValue) => onChange(nextValue)} /></div>; }
 /**
@@ -137,10 +157,26 @@ function DetailPhoneField({ id, label, value, onChange }) {
   </div>;
 }
 
-function DetailSelect({ id, label, value, options, onChange }) { return <div className="detail-field"><label className="detail-field__label" htmlFor={id}>{label}</label><FormSelect id={id} value={value || options[0]} onChange={(_event, nextValue) => onChange(nextValue)}>{options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}</FormSelect></div>; }
+/**
+ * 선택 칸.
+ *
+ * 값이 비었을 때 첫 항목을 대신 보여주지 않는다. 그렇게 하면 화면은 '매매'가 골라진 것처럼
+ * 보이는데 내부 값은 비어 있어, 사용자가 드롭다운을 건드리지 않고 금액만 적으면 저장 때
+ * 거래유형 플래그가 모두 꺼진 채로 나가 금액이 사라진다. 비어 있으면 비어 있다고 보여준다.
+ */
+function DetailSelect({ id, label, value, options, onChange, placeholder = "선택하세요" }) {
+  const isEmpty = !value;
+  return <div className="detail-field">
+    <label className="detail-field__label" htmlFor={id}>{label}</label>
+    <FormSelect id={id} value={value ?? ""} onChange={(_event, nextValue) => onChange(nextValue)}>
+      {isEmpty && <FormSelectOption isPlaceholder value="" label={placeholder} />}
+      {options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}
+    </FormSelect>
+  </div>;
+}
 function StateSummary({ label, value, status }) { return <div className="detail-workspace__state-item" aria-live="polite"><span>{label}</span><Label status={status} isCompact>{value}</Label></div>; }
 
-export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onDeleteComplex, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0, complexOptions = [], onCreateComplex }) {
+export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onDeleteComplex, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0, complexOptions = [], onCreateComplex, currentUser = null }) {
   const [draft, setDraft] = useState(() => normalizeRow(row));
   const baselineRef = useRef(normalizeRow(row));
   const [f2Open, setF2Open] = useState(false);
@@ -195,6 +231,26 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
 
   const stagePatch = (patch) => setDraft((current) => ({ ...current, ...patch }));
   const stageField = (field, value) => stagePatch({ [field]: value });
+  /*
+   * 담당자.
+   *
+   * 서버는 이름이 아니라 `assigned_user_id`를 받는데 사무소 직원 목록을 주는 API가 계약에 없다.
+   * 그래서 이름을 자유 입력으로 받으면 어떤 id로도 바뀌지 못하고 늘 null로 저장돼 사라진다.
+   * id를 확실히 아는 사람은 로그인한 본인뿐이므로, 지킬 수 있는 범위인 본인 배정만 연다.
+   * 직원 목록 엔드포인트가 생기면 이 자리를 선택기로 넓힌다.
+   */
+  const assignedToMe = currentUser != null && draft.assigneeId === currentUser.id;
+  const assignedToOther = draft.assigneeId != null && !assignedToMe;
+  const assigneeHint = currentUser == null
+    ? "로그인 세션이 없어 담당자를 배정할 수 없습니다"
+    : assignedToOther
+      ? `현재 담당: ${draft.assignee || "다른 담당자"} · 체크하면 본인으로 바뀝니다`
+      : "다른 담당자 배정은 직원 목록이 생긴 뒤 열립니다";
+  const stageAssignToMe = (checked) => stagePatch(
+    checked && currentUser != null
+      ? { assigneeId: currentUser.id, assignee: currentUser.displayName }
+      : { assigneeId: null, assignee: "" },
+  );
   /* 거래유형은 그리드와 같은 규칙을 쓴다. 여기만 단일 선택으로 두면 상세를 열고 저장하는 것만으로 다른 유형이 지워진다. */
   const stageListingType = (value) => {
     const patch = dealTypePatch(value);
@@ -205,13 +261,8 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
         : draft.rentCondition;
     stagePatch({ ...patch, price: typedPrice || draft.price || "" });
   };
-  const stagePrimaryPrice = (value) => stagePatch({
-    price: value,
-    ...(draft.listingType === "매매" ? { salePrice: value } : {}),
-    ...(draft.listingType === "전세" ? { leaseDeposit: value } : {}),
-    ...(draft.listingType === "월세" ? { rentCondition: value } : {}),
-  });
-  const stageTypedPrice = (field, value, listingType) => stagePatch({ [field]: value, ...(draft.listingType === listingType ? { price: value } : {}) });
+  /* 유형을 고르지 않은 채 금액만 적어도 값을 잃지 않는다. 규칙은 dealType 모듈이 소유한다. */
+  const stageTypedPrice = (field, value) => stagePatch(priceFieldPatch(draft, field, value));
   const people = useMemo(() => peopleForDraft(draft), [draft]);
   /*
    * 임대인 전화.
@@ -365,18 +416,19 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
               onDelete={onDeleteComplex}
             />{String(draft.id).startsWith("DRAFT-") && <Button variant="link" isInline onClick={() => setComplexQuickAddOpen(true)}>새 단지 추가</Button>}{complexQuickAddOpen && <div className="detail-complex-quick-add"><strong>새 단지 빠른 추가</strong><label htmlFor="detail-new-complex-name">단지명</label><TextInput id="detail-new-complex-name" value={newComplexName} validated={complexQuickAddError ? "error" : "default"} onChange={(_event, value) => setNewComplexName(value)} /><label htmlFor="detail-new-complex-address">주소</label><TextInput id="detail-new-complex-address" value={newComplexAddress} onChange={(_event, value) => setNewComplexAddress(value)} />{complexQuickAddError && <span role="alert">{complexQuickAddError}</span>}<div className="f2-actions"><Button size="sm" onClick={createComplex}>추가 후 선택</Button><Button size="sm" variant="link" onClick={() => setComplexQuickAddOpen(false)}>취소</Button></div></div>}{complexQuickAddStatus && <span className="detail-complex-quick-add__status" role="status">{complexQuickAddStatus}</span>}</div><div className="detail-inline-fields"><DetailField id="detail-building" label="동" value={draft.building} onChange={(value) => stageField("building", value)} /><DetailField id="detail-unit" label="호" value={draft.unit} onChange={(value) => stageField("unit", value)} /></div><div className="detail-inline-fields"><DetailField id="detail-area" label="평형" value={draft.area} onChange={(value) => stageField("area", value)} /><DetailField id="detail-direction" label="향" value={draft.direction} onChange={(value) => stageField("direction", value)} /></div><DetailField id="detail-type" label="타입" value={draft.type} onChange={(value) => stageField("type", value)} /></div>
 
-            <div className="detail-info-column"><h3>현재 임대차</h3><div className="detail-inline-fields"><DetailField id="detail-deposit" label="보증금(현)" value={draft.deposit} onChange={(value) => stageField("deposit", value)} /><DetailField id="detail-rent" label="차임(현)" value={draft.rent} onChange={(value) => stageField("rent", value)} /></div><DetailField id="detail-loan" label="융자" value={draft.loan} onChange={(value) => stageField("loan", value)} /><DetailField id="detail-expiry" label="계약 만기일" type="date" value={draft.expiry} onChange={(value) => stageField("expiry", value)} /><DetailTextOrDateField id="detail-clearance" label="명도" value={draft.clearance} onChange={(value) => stageField("clearance", value)} /></div>
+            {/* 명도는 세대가 아니라 매물 건(handover_condition)에 저장된다. 매물 조건 옆으로 옮겼다. */}
+            <div className="detail-info-column"><h3>현재 임대차</h3><div className="detail-inline-fields"><DetailField id="detail-deposit" label="보증금(현)" value={draft.deposit} onChange={(value) => stageField("deposit", value)} /><DetailField id="detail-rent" label="차임(현)" value={draft.rent} onChange={(value) => stageField("rent", value)} /></div><DetailField id="detail-loan" label="융자" value={draft.loan} onChange={(value) => stageField("loan", value)} /><DetailField id="detail-expiry" label="계약 만기일" type="date" value={draft.expiry} onChange={(value) => stageField("expiry", value)} /></div>
 
-            <div className="detail-info-column"><h3>업무 관리</h3><DetailSelect id="detail-household-state" label="업무 상태" value={draft.householdState} options={["일반", "매물화", "거래진행"]} onChange={(value) => stageField("householdState", value)} /><DetailField id="detail-assignee" label="담당자" span={2} value={draft.assignee} onChange={(value) => stageField("assignee", value)} /><DetailField id="detail-last-contact" label="최근 상담일" type="date" value={draft.lastContact} onChange={(value) => stageField("lastContact", value)} /><div className="detail-inline-fields"><DetailField id="detail-parking" label="주차" value={draft.parking} onChange={(value) => stageField("parking", value)} /><DetailField id="detail-tax" label="세금 메모" value={draft.tax} onChange={(value) => stageField("tax", value)} /></div></div>
+            <div className="detail-info-column"><h3>업무 관리</h3><DetailSelect id="detail-household-state" label="업무 상태" value={draft.householdState} options={["일반", "매물화", "거래진행"]} onChange={(value) => stageField("householdState", value)} /><div className="detail-field" data-span={2}><span className="detail-field__label" id="detail-assignee-label">담당자</span><Checkbox id="detail-assignee" label="나에게 배정" aria-labelledby="detail-assignee-label detail-assignee" isChecked={assignedToMe} isDisabled={currentUser == null} onChange={(_event, checked) => stageAssignToMe(checked)} /><span className="detail-field__hint">{assigneeHint}</span></div><DetailField id="detail-last-contact" label="최근 상담일" type="date" value={draft.lastContact} readOnly hint="상담 로그를 추가하면 갱신됩니다" /><div className="detail-inline-fields"><DetailField id="detail-parking" label="주차" value={draft.parking} onChange={(value) => stageField("parking", value)} /><DetailField id="detail-tax" label="세금 메모" value={draft.tax} onChange={(value) => stageField("tax", value)} /></div></div>
           </div>
         </section>
 
         <section id="detail-section-ledger-fields" className="detail-section" aria-labelledby="detail-ledger-fields-heading">
           <div className="detail-section__heading"><Title headingLevel="h2" id="detail-ledger-fields-heading" size="md">매물 조건과 시설</Title></div>
           <div className="detail-info-grid">
-            <div className="detail-info-column"><h3>거래 조건</h3><DetailSelect id="detail-listing-type" label="거래 유형" value={dealTypeValue(draft)} options={DEAL_TYPE_CHOICES} onChange={stageListingType} /><DetailField id="detail-received-at" label="접수일" type="date" value={draft.receivedAt} onChange={(value) => stageField("receivedAt", value)} /><DetailField id="detail-move-in" label="입주 가능일" type="date" value={draft.moveIn} onChange={(value) => stageField("moveIn", value)} /></div>
+            <div className="detail-info-column"><h3>거래 조건</h3><DetailSelect id="detail-listing-type" label="거래 유형" value={dealTypeValue(draft)} options={DEAL_TYPE_CHOICES} onChange={stageListingType} /><DetailField id="detail-received-at" label="접수일" type="date" value={draft.receivedAt} onChange={(value) => stageField("receivedAt", value)} /><DetailTextOrDateField id="detail-clearance" label="명도" value={draft.clearance} onChange={(value) => stageField("clearance", value)} /></div>
 
-            <div className="detail-info-column"><h3>거래 금액</h3><DetailField id="detail-sale-price" label="매매가" value={draft.salePrice} onChange={(value) => stageTypedPrice("salePrice", value, "매매")} /><DetailField id="detail-lease-deposit" label="전세보증금" value={draft.leaseDeposit} onChange={(value) => stageTypedPrice("leaseDeposit", value, "전세")} /><DetailField id="detail-rent-condition" label="보증금 / 차임" value={draft.rentCondition} onChange={(value) => stageTypedPrice("rentCondition", value, "월세")} /></div>
+            <div className="detail-info-column"><h3>거래 금액</h3><DetailField id="detail-sale-price" label="매매가" value={draft.salePrice} onChange={(value) => stageTypedPrice("salePrice", value)} /><DetailField id="detail-lease-deposit" label="전세보증금" value={draft.leaseDeposit} onChange={(value) => stageTypedPrice("leaseDeposit", value)} /><DetailField id="detail-rent-condition" label="보증금 / 차임" value={draft.rentCondition} onChange={(value) => stageTypedPrice("rentCondition", value)} /></div>
 
             {/* 가장 길게 쓰는 상담 로그가 오른쪽 열을 세로로 다 쓰고, 시설과 비고는 그 아래 남는 두 칸을 가로로 채운다. */}
             <div className="detail-info-column detail-info-column--log" id="detail-section-log">
@@ -387,9 +439,27 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
             <div className="detail-info-column detail-info-column--facility"><h3>시설·연락 보조</h3><div className="detail-inline-fields"><DetailTextAreaField id="detail-spec" className="detail-field--spec" label="스펙" value={draft.spec} onChange={(value) => stageField("spec", value)} /><DetailField id="detail-built-in" label="붙박이" value={draft.builtIn} onChange={(value) => stageField("builtIn", value)} /><DetailField id="detail-facility-state" label="시설 상태" value={draft.facilityState} onChange={(value) => stageField("facilityState", value)} /><DetailField id="detail-brokerage" label="임대부동산" value={draft.brokerage} onChange={(value) => stageField("brokerage", value)} /><DetailPhoneField id="detail-owner-phone" label="임대인 전화" value={draft.phone} onChange={stageOwnerPhone} /><DetailPhoneField id="detail-tenant-phone" label="임차인 전화" value={draft.tenantPhone} onChange={(value) => stageField("tenantPhone", value)} /></div><div className="detail-people-card" aria-labelledby="detail-people-heading"><h4 id="detail-people-heading">연락 동의 인물<span>O/X, 값 없음은 X</span></h4><div className="detail-people-list">{people.map((person) => <div className="detail-person-row" key={person.id}><div><strong>{person.name || "성명 미입력"}</strong><span>{person.role} · {person.relationship || "관계 미입력"} · 등록 {person.position || 1}번</span></div><span className={`detail-consent-badge detail-consent-badge--${person.consent === "O" ? "yes" : "no"}`} aria-label={`연락 동의 ${person.consent === "O" ? "O" : "X"}`}>{person.consent === "O" ? "O" : "X"}</span><span>{person.phone || "연락처 없음"}{person.tag ? ` · ${person.tag}` : ""}</span><Button variant="link" aria-label={`${person.name || "인물"} 관계 수정`} onClick={() => { setRelationTarget(person); setRelationOpen(true); }}>수정</Button></div>)}{!people.length && <p className="detail-empty-state">등록된 인물이 없습니다.</p>}</div></div></div>
           </div>
         </section>
-        {crossMatchPanel}
+        {/*
+          * 교차 판정 실행 시점은 사용자가 정한다(F3-CR-03·04).
+          *
+          * 패널이 열리는 순간 실행이 확보되므로, 이 섹션을 저장이나 상세 진입으로 열지
+          * 않는다. 저장이 접수한 실행은 서버에 남아 있고 버튼을 누르면 같은 입력 버전의
+          * 활성 실행을 그대로 이어받는다.
+          *
+          * 액션 레일과 이 섹션의 버튼은 같은 실행을 요청한다. 둘 다 저장이 만들어 둔 앵커
+          * 카드를 이어받아 후보 조회부터 진행한다. 여닫기 컨트롤이 아니므로 aria-expanded를
+          * 붙이지 않고, aria-controls도 패널이 실제로 있을 때만 가리킨다.
+          */}
+        <section id="detail-section-cross-match" className={`detail-section${isCrossMatchOpen ? " detail-section--cross-match-open" : ""}`} aria-labelledby={isCrossMatchOpen ? "cross-match-panel-title" : "detail-cross-match-heading"} data-screen-id="F3-PNL-010" data-requirement-ids="F3-CR-03~04">
+          {/* 패널이 열리면 패널 자신의 머리말이 같은 제목과 [닫기]를 들고 있다. 여기서 또 그리면 제목이 둘이 된다. */}
+          {!isCrossMatchOpen && <div className="detail-section__heading">
+            <div><Title headingLevel="h2" id="detail-cross-match-heading" size="md" tabIndex={-1}>교차 판정</Title><span>{isDirty ? "저장된 매물 건을 기준으로 판정합니다. 지금 화면의 미저장 변경은 반영되지 않습니다." : "저장된 매물 건을 기준으로 조건이 맞는 손님 후보를 찾습니다."}</span></div>
+            <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)}>교차 판정 실행</Button>
+          </div>}
+          {crossMatchPanel}
+        </section>
       </main>
-      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
+      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
     </div>
     {replaceDecision && <div className="detail-workspace__decision-layer" role="presentation"><section className="detail-workspace__decision-card" role="alertdialog" aria-modal="true" aria-labelledby="replace-decision-title" aria-describedby="replace-decision-effect"><div className="decision-card__icon decision-card__icon--warning"><MicrophoneIcon aria-hidden="true" /></div><Title headingLevel="h2" id="replace-decision-title" size="lg">이미 입력된 값을 음성 메모 값으로 바꿀까요?</Title><p id="replace-decision-effect">아래 {replaceDecision.replacements.length}개 칸에는 이미 값이 있습니다. 바꾸면 기존 값은 이 화면에서 되돌릴 수 없습니다. 어느 쪽을 골라도 장부에 저장하지는 않습니다.</p><ul className="decision-card__replacements">{replaceDecision.replacements.map((item) => <li key={item.fieldKey}><strong>{item.field}</strong><span><em>현재</em>{item.current}</span><span><em>음성 메모</em>{item.next}</span></li>)}</ul>{f2KeptFieldCount > 0 && <p className="decision-card__kept">비어 있던 {f2KeptFieldCount}개 칸은 어느 쪽을 골라도 채웁니다.</p>}<div className="decision-card__actions"><Button variant="primary" onClick={replaceWithF2}>음성 메모 값으로 대체</Button><Button ref={keepExistingRef} variant="secondary" onClick={keepExistingOverF2}>기존 값 유지</Button></div></section></div>}
     </ModalBody>
@@ -466,8 +536,9 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     >
       <ModalHeader title="중복 검사 완료를 체크해 주세요" titleIconVariant="warning" labelId="duplicate-block-title" />
       <ModalBody className="detail-workspace__duplicate-modal-body">
-        <p id="duplicate-block-effect">오른쪽 작업 영역의 <strong>중복 검사 완료</strong>에 체크한 뒤 다시 저장해 주세요.</p>
-        <p className="duplicate-modal__note">지금 내용을 남겨 두려면 임시저장을 쓸 수 있습니다. 중복 검사를 마친 뒤 다시 저장하면 저장 완료가 됩니다.</p>
+        <p id="duplicate-block-effect">같은 세대를 두 번 등록하면 상담 이력이 갈라져 나중에 합칠 수 없습니다. 그래서 저장 전에 확인을 받습니다.</p>
+        <p className="duplicate-modal__note">화면 <strong>오른쪽 「주요 작업」 맨 위</strong>의 <strong>중복 검사 완료</strong> 체크박스에 체크한 뒤 다시 [저장]을 누르세요. [돌아가서 체크하기]를 누르면 그 체크박스로 바로 이동합니다.</p>
+        <p className="duplicate-modal__note">지금 적은 내용을 먼저 남겨 두려면 [임시저장]을 쓰세요. 입력값은 그대로 서버에 저장되고, 중복 검사를 마친 뒤 다시 저장하면 저장 완료가 됩니다.</p>
       </ModalBody>
       <ModalFooter>
         <Button id="detail-duplicate-block-confirm" variant="primary" onClick={closeDuplicateBlock} isDisabled={isSaving}>돌아가서 체크하기</Button>

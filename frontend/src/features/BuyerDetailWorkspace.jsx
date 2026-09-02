@@ -32,7 +32,9 @@ const EMPTY_BUYER = {
   content: "",
   stage: "",
   completion: "진행",
-  assignee: "김이순",
+  // 서버는 `assigned_user_id`를 받는다. 이름을 지어 넣으면 저장되지 않는 값이 화면에만 남는다.
+  assignee: "",
+  assigneeId: null,
   background: "",
   expiry: "",
   classification: "",
@@ -54,7 +56,7 @@ function SelectField({ id, label, value, options, onChange }) {
   return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><FormSelect id={id} value={value} onChange={(_event, next) => onChange(next)}>{options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}</FormSelect></label>;
 }
 
-export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0 }) {
+export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0, currentUser = null }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY_BUYER, ...(row || {}) }));
   const [f2Open, setF2Open] = useState(false);
   const [closeDecision, setCloseDecision] = useState(false);
@@ -104,6 +106,20 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
   const completionReady = Boolean(draft.buyer?.trim() && draft.category && (draft.complex?.trim() || draft.area?.trim()) && draft.budget?.trim());
   const consented = draft.consent === "동의";
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
+  /* 매물장 상세와 같은 제약이다. 직원 목록 API가 없어 id를 아는 사람은 본인뿐이다. */
+  const assignedToMe = currentUser != null && draft.assigneeId === currentUser.id;
+  const assignedToOther = draft.assigneeId != null && !assignedToMe;
+  const assigneeHint = currentUser == null
+    ? "로그인 세션이 없어 담당자를 배정할 수 없습니다"
+    : assignedToOther
+      ? `현재 담당: ${draft.assignee || "다른 담당자"} · 체크하면 본인으로 바뀝니다`
+      : "다른 담당자 배정은 직원 목록이 생긴 뒤 열립니다";
+  const assignToMe = (checked) => setDraft((current) => ({
+    ...current,
+    ...(checked && currentUser != null
+      ? { assigneeId: currentUser.id, assignee: currentUser.displayName }
+      : { assigneeId: null, assignee: "" }),
+  }));
 
   /*
    * 저장을 막는 사유.
@@ -207,7 +223,7 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
           </Alert>
         </div>}
         <div className="detail-info-grid">
-          <section className="detail-info-column"><h3>손님과 접수</h3><Field id="buyer-name" label="이름·별칭" value={draft.buyer} onChange={(value) => update("buyer", value)} /><Field id="buyer-phone" label="전화번호" type="tel" inputMode="tel" autoComplete="tel" placeholder="010-0000-0000" value={draft.phone} onChange={(value) => update("phone", nextPhoneInput(draft.phone, value))} /><Field id="buyer-date" label="접수일" type="date" value={draft.date} onChange={(value) => update("date", value)} /><Field id="buyer-assignee" label="담당자" value={draft.assignee} onChange={(value) => update("assignee", value)} /></section>
+          <section className="detail-info-column"><h3>손님과 접수</h3><Field id="buyer-name" label="이름·별칭" value={draft.buyer} onChange={(value) => update("buyer", value)} /><Field id="buyer-phone" label="전화번호" type="tel" inputMode="tel" autoComplete="tel" placeholder="010-0000-0000" value={draft.phone} onChange={(value) => update("phone", nextPhoneInput(draft.phone, value))} /><Field id="buyer-date" label="접수일" type="date" value={draft.date} onChange={(value) => update("date", value)} /><div className="detail-field"><span className="detail-field__label" id="buyer-assignee-label">담당자</span><Checkbox id="buyer-assignee" label="나에게 배정" aria-labelledby="buyer-assignee-label buyer-assignee" isChecked={assignedToMe} isDisabled={currentUser == null} onChange={(_event, checked) => assignToMe(checked)} /><span className="detail-field__hint">{assigneeHint}</span></div></section>
           <section className="detail-info-column"><h3>희망 조건</h3><SelectField id="buyer-category" label="거래 구분" value={draft.category} options={DEMAND_TYPES} onChange={(value) => update("category", value)} /><Field id="buyer-complex" label="희망 단지·지역" value={draft.complex} onChange={(value) => update("complex", value)} /><Field id="buyer-area" label="희망 평형" value={draft.area} onChange={(value) => update("area", value)} /><Field id="buyer-budget" label="금액 조건" value={draft.budget} onChange={(value) => update("budget", value)} /><Field id="buyer-move-date" label="이사일" type="date" value={draft.moveDate} onChange={(value) => update("moveDate", value)} /></section>
           <section className="detail-info-column"><h3>진행 관리</h3><Field id="buyer-stage" label="진행 단계" value={draft.stage} onChange={(value) => update("stage", value)} /><SelectField id="buyer-completion" label="완료 여부" value={draft.completion} options={["진행", "완료"]} onChange={(value) => update("completion", value)} /><Field id="buyer-expiry" label="만기일" type="date" value={draft.expiry} onChange={(value) => update("expiry", value)} /><Field id="buyer-classification" label="분류" value={draft.classification} onChange={(value) => update("classification", value)} /><Field id="buyer-brokerage" label="관련 부동산" value={draft.brokerage} onChange={(value) => update("brokerage", value)} /></section>
         </div>
@@ -222,7 +238,7 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
       <div className="detail-workspace__action-row">
         <Button variant="primary" icon={<SaveIcon />} onClick={() => save()} isLoading={isSaving} isDisabled={isSaving}>저장</Button>
         <Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button>
-        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button>
+        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button>
         <Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button>
       </div>
       <span className="buyer-detail-workspace__save-state" aria-live="polite">{dirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span>

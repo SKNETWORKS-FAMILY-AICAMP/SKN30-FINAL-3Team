@@ -515,10 +515,12 @@ export function AppShell() {
     closeDetail();
   };
   const saveDetail = (nextRow) => {
+    /*
+     * 거래 금액 세 열은 상세가 이미 유지한다(DetailWorkspace의 priceFieldPatch).
+     * 여기서 다시 조립하면 안 된다. 월세 분기가 사용자가 적은 매물 보증금·차임 대신
+     * **현재 임대차**의 deposit·rent로 덮어써서 입력값을 잃은 적이 있다.
+     */
     const propertyColumns = isBuyerDetail ? {} : {
-      salePrice: nextRow.listingType === "매매" ? nextRow.price || "" : nextRow.salePrice || "",
-      leaseDeposit: nextRow.listingType === "전세" ? nextRow.price || nextRow.deposit || "" : nextRow.leaseDeposit || "",
-      rentCondition: nextRow.listingType === "월세" ? [nextRow.deposit, nextRow.rent].filter(Boolean).join(" / ") : nextRow.rentCondition || "",
       ownerPhone: nextRow.phone || nextRow.ownerPhone || "",
     };
     const savedRow = {
@@ -534,11 +536,14 @@ export function AppShell() {
     // 낙관적 반영 후 서버에 보낸다. 실패하면 행의 sync 상태가 남고 사용자에게 알린다.
     updateRow(savedRow);
     /*
-     * 저장 트리거는 그대로 둔다(F3-CR-01·02). 저장이 성공하면 서버가 실행을 접수하므로,
-     * 화면이 패널을 닫아 두면 이미 도는 판정의 결과를 아무도 보지 못한다.
-     * 화면이 보내는 실행 요청은 같은 입력 버전의 활성 실행을 재사용한다.
+     * 저장은 패널을 열지 않는다.
+     *
+     * 서버 쪽 저장 트리거는 그대로다(F3-CR-01·02). 다만 패널이 열리는 순간 화면도 실행을
+     * 확보하므로(useCrossJudgment의 enabled), 저장할 때마다 패널을 열면 결과를 볼 생각이
+     * 없는 저장에서도 판정이 돌고 사용자가 요청하지 않은 화면 전환이 일어난다.
+     * 결과를 볼 시점은 상세의 [교차 판정] 섹션에서 사용자가 정한다(F3-CR-03·04).
+     * 그때 보내는 실행 요청은 저장이 접수한, 같은 입력 버전의 활성 실행을 재사용한다.
      */
-    setCrossMatchOpen(true);
     const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
     return ledger.saveRow(savedRow).then(
@@ -557,7 +562,7 @@ export function AppShell() {
   const handleEvidenceOpen = () => {
     const targetId = isBuyerDetail ? "buyer-content" : "detail-log";
     const target = document.getElementById(targetId);
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+    scrollIntoViewRespectingMotion(target, { block: "center" });
     window.requestAnimationFrame(() => target?.focus());
   };
   const openCrossMatch = () => {
@@ -692,12 +697,14 @@ export function AppShell() {
           </div>
         </div> : <div className="f1-control-strip f1-control-strip--buyer">
           <div className="f1-control-strip__left-group">
+            {/* 매물장과 같은 자리·같은 순서에 둔다. 장부를 오갈 때 행 추가를 다시 찾지 않게 한다. */}
+            <Button icon={<AddCircleOIcon />} onClick={handleAddBuyerRow}>행 추가</Button>
             <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
           </div>
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
 
-        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onAddRow={handleAddBuyerRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
+        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
         <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>
@@ -707,6 +714,7 @@ export function AppShell() {
         row={detailRow}
         isOpen={Boolean(detailRow)}
         focusF2Request={f2FocusRequest}
+        currentUser={user}
         onClose={closeDetail}
         onDiscard={discardDetail}
         onDelete={deleteRowFromDetail}
@@ -720,6 +728,7 @@ export function AppShell() {
         row={detailRow}
         isOpen={Boolean(detailRow)}
         focusF2Request={f2FocusRequest}
+        currentUser={user}
         complexOptions={complexOptions}
         onCreateComplex={handleCreateComplex}
         onDeleteComplex={handleDeleteComplex}

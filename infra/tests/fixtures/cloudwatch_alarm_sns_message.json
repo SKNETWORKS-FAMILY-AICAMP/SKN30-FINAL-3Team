@@ -1,0 +1,33 @@
+{
+  "AlarmName": "skn30-final-3team-dev-backend-unhandled-errors",
+  "AlarmDescription": "Unhandled Backend errors occurred",
+  "AWSAccountId": "000000000000",
+  "AlarmConfigurationUpdatedTimestamp": "2026-08-31T00:00:00.000+0000",
+  "NewStateValue": "ALARM",
+  "NewStateReason": "Threshold Crossed: 1 datapoint was greater than or equal to the threshold (1.0).",
+  "StateChangeTime": "2026-08-31T00:05:00.000+0000",
+  "Region": "Asia Pacific (Seoul)",
+  "AlarmArn": "arn:aws:cloudwatch:ap-northeast-2:000000000000:alarm:skn30-final-3team-dev-backend-unhandled-errors",
+  "OldStateValue": "OK",
+  "OKActions": [
+    "arn:aws:sns:ap-northeast-2:000000000000:skn30-final-3team-dev-cloudwatch-alarms"
+  ],
+  "AlarmActions": [
+    "arn:aws:sns:ap-northeast-2:000000000000:skn30-final-3team-dev-cloudwatch-alarms"
+  ],
+  "InsufficientDataActions": [],
+  "Trigger": {
+    "MetricName": "BackendUnhandledErrorCount",
+    "Namespace": "skn30-final-3team/dev",
+    "StatisticType": "Statistic",
+    "Statistic": "SUM",
+    "Unit": "Count",
+    "Dimensions": [],
+    "Period": 300,
+    "EvaluationPeriods": 1,
+    "DatapointsToAlarm": 1,
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "Threshold": 1.0,
+    "TreatMissingData": "notBreaching"
+  }
+}

@@ -781,6 +781,7 @@ def test_a_changed_attempt_count_is_rejected() -> None:
 # --- AI 결과 거절 ---------------------------------------------------------------
 
 
+@requires_database
 def test_every_open_trade_type_is_stored_in_the_price_child_table() -> None:
     with db_session() as session:
         fixture = Fixture(session)

@@ -281,9 +281,9 @@ def test_a_request_with_no_candidate_cannot_be_built() -> None:
         )
 
 
-def test_a_request_rejects_more_than_fifteen_candidates() -> None:
+def test_a_request_rejects_more_than_five_candidates() -> None:
     with pytest.raises(ValidationError):
-        request(tuple(range(2, 18)))
+        request(tuple(range(2, 8)))
 
 
 # ── 요청·결과 교차 검증 ────────────────────────────────────────────────────────

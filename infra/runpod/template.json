@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "name": "skn30-f2-serving-v2",
+  "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:REPLACE_AFTER_FIRST_PUBLISH",
+  "container_disk_gb": 30,
+  "ports": [
+    "8001/http",
+    "8002/http"
+  ],
+  "env": {
+    "AI_VLLM_SLLM_API_KEY": "{{ RUNPOD_SECRET_AI_VLLM_SLLM_API_KEY }}",
+    "AI_VLLM_STT_API_KEY": "{{ RUNPOD_SECRET_AI_VLLM_STT_API_KEY }}",
+    "F2_STT_MODEL_ID": "openai/whisper-large-v3-turbo",
+    "F2_STT_MODEL_REVISION": "41f01f3fe87f28c78e2fbf8b568835947dd65ed9",
+    "F2_SLLM_MAX_MODEL_LEN": "4096",
+    "F2_SLLM_GPU_MEMORY_UTILIZATION": "0.65",
+    "F2_STT_GPU_MEMORY_UTILIZATION": "0.20"
+  },
+  "docker_start_cmd": "python,/opt/f2-runtime/scripts/supervisor.py"
+}

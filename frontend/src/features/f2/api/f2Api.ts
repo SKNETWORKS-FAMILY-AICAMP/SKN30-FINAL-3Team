@@ -1,5 +1,5 @@
 import { APP_ENV } from "../../../config/env.ts";
-import { getCsrfToken } from "../../../shared/api/index.ts";
+import { ApiError, apiErrorFromResponse, getCsrfToken } from "../../../shared/api/index.ts";
 import type { LedgerType } from "../model/consultationRouting.ts";
 import { routeConsultation } from "../model/consultationRouting.ts";
 
@@ -49,7 +49,8 @@ const PROPERTY_FIELDS: Record<string, FieldBinding> = {
   "전세보증금": { fieldKey: "deposit", label: "전세보증금" },
   "월세 보증금": { fieldKey: "deposit", label: "월세 보증금" },
   "월세 차임": { fieldKey: "rent", label: "월세 차임" },
-  "명도 조건": { fieldKey: "moveIn", label: "명도 조건" },
+  // 상세의 명도 칸이다. 예전 `moveIn`은 같은 값을 받던 중복 칸이라 없앴다.
+  "명도 조건": { fieldKey: "clearance", label: "명도 조건" },
   "임대인": { fieldKey: "owner", label: "임대인" },
   "임대인 전화": { fieldKey: "phone", label: "임대인 전화" },
   "임차인": { fieldKey: "tenant", label: "임차인" },
@@ -155,19 +156,15 @@ function decodeAnalysis(value: unknown, ledgerType: LedgerType, draft: Record<st
   };
 }
 
-async function errorMessage(response: Response): Promise<string> {
-  try {
-    const body = asRecord(await response.json(), "오류");
-    if (typeof body["message"] === "string") return body["message"];
-  } catch {
-    // JSON 오류 계약이 아니면 상태 코드만 사용한다.
-  }
-  return `음성메모 분석 요청이 실패했습니다 (HTTP ${response.status}).`;
-}
-
 export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<VoiceAnalysis> {
   const csrfToken = getCsrfToken();
-  if (csrfToken == null) throw new Error("세션을 확인한 뒤 다시 시도해 주세요.");
+  if (csrfToken == null) {
+    throw new ApiError({
+      kind: "unauthorized",
+      message: "CSRF 토큰이 없습니다.",
+      code: "UNAUTHENTICATED",
+    });
+  }
 
   const form = new FormData();
   form.append("audio", input.audio, input.audio.name);
@@ -175,18 +172,46 @@ export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<Vo
   form.append("current_fields", JSON.stringify(currentFields(input.ledgerType, input.draft)));
   form.append("privacy_confirmed", "true");
 
-  const response = await fetch(
-    `${APP_ENV.apiBaseUrl.replace(/\/$/, "")}/f2/analyses`,
-    {
+  let response: Response;
+  try {
+    response = await fetch(`${APP_ENV.apiBaseUrl.replace(/\/$/, "")}/f2/analyses`, {
       method: "POST",
       credentials: "include",
       headers: { Accept: "application/json", "X-CSRF-Token": csrfToken },
       body: form,
       signal: input.signal,
-    },
-  );
-  if (!response.ok) throw new Error(await errorMessage(response));
-  return decodeAnalysis(await response.json(), input.ledgerType, input.draft);
+    });
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw new ApiError({ kind: "canceled", message: "요청이 취소되었습니다.", cause });
+    }
+    throw new ApiError({ kind: "offline", message: "네트워크 요청에 실패했습니다.", cause });
+  }
+
+  if (!response.ok) throw await apiErrorFromResponse(response);
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (cause) {
+    throw new ApiError({
+      kind: "contract",
+      message: "F2 응답을 JSON으로 해석하지 못했습니다.",
+      status: response.status,
+      cause,
+    });
+  }
+
+  try {
+    return decodeAnalysis(payload, input.ledgerType, input.draft);
+  } catch (cause) {
+    throw new ApiError({
+      kind: "contract",
+      message: cause instanceof Error ? cause.message : "F2 응답이 계약과 다릅니다.",
+      status: response.status,
+      cause,
+    });
+  }
 }
 
 export interface IntakeAnalysis extends VoiceAnalysis {

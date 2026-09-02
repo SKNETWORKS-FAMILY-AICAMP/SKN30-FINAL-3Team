@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-08-31
 ---
 
 # API 계약 규칙
@@ -35,7 +35,19 @@ updated: 2026-08-27
 
 서버 세션 원문과 CSRF 원문은 각각 별도의 HttpOnly·SameSite=Lax Cookie로 전달하며, 서버 DB에는 두 값의 SHA-256 해시만 보관한다. `/auth/me`는 브라우저가 보낸 CSRF Cookie를 해당 세션의 해시와 상수 시간 비교한 뒤 같은 원문을 응답해 화면 메모리를 다시 채운다. 이 GET은 CSRF 토큰을 새로 만들거나 DB의 `csrf_token_hash`를 변경하지 않으므로 새로고침과 여러 탭이 서로의 토큰을 무효화하지 않는다. CSRF 원문을 반환하는 세션 발급·확인 응답은 `Cache-Control: no-store`로 캐시를 금지한다. CSRF Cookie가 없거나 세션의 해시와 다르면 403으로 거절한다. 상태 변경 요청은 응답으로 받은 값을 `X-CSRF-Token`에 실어야 한다. 로그아웃은 서버 세션을 폐기하고 두 Cookie를 함께 삭제한다. 배포된 dev에서는 두 Cookie에 `Secure`도 적용하고 세션을 유휴 30분·절대 12시간으로 제한한다. 개발 세션 route는 설정된 local·dev에만 등록하고 prod에는 등록하지 않는다. 공개 dev URL을 아는 사용자는 모두 같은 합성 계정 세션을 발급받을 수 있으므로 실제 개인정보와 인증정보를 사용하지 않는다. 실제 비밀번호 로그인 계약은 현재 MVP 범위에 포함하지 않는다.
 
-오류 응답은 code, message, request_id를 포함하고 인증 실패는 401, 권한 부족은 403으로 구분한다.
+오류 응답은 `code`, `message`, `request_id`를 포함하고 인증 실패는 401, 권한 부족은 403으로
+구분한다. 이 envelope는 애플리케이션이 직접 만든 오류뿐 아니라 `/api/v1`의 route 404,
+method 405와 요청 검증 422에도 적용한다. 생존·준비 상태를 확인하는 `/health/*`는 공개 업무 API
+계약이 아니므로 framework 응답 형식을 유지할 수 있다. 예상하지 못한 예외는 500
+`INTERNAL_SERVER_ERROR`의 고정 안전 문구로 변환하고 예외 원문이나 traceback을 응답하지 않는다.
+
+`request_id`는 canonical UUID 문자열이다. 요청의 `X-Request-ID`도 이 형식일 때만 전파하고 그 밖의
+값은 서버가 새 UUID로 교체한다.
+
+Frontend는 HTTP `status`, `code`, `request_id`를 보존해 기능별 안전 문구와 복구 동작을 정한다.
+서버 `message`를 그대로 사용자 문구로 쓰지 않는다. 현재 F2 multipart 경로도 공통 오류 응답
+변환기를 사용하며, 계약에 없는 4xx는 일시적 5xx가 아니라 `contract` 오류로 분류한다. 세부 관측
+조건과 로그 안전 필드는 [오류 관측 계약](observability.md)을 따른다.
 
 ## F1 장부 계약 (제안)
 
@@ -129,7 +141,7 @@ updated: 2026-08-27
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod Whisper로 전사하고 Qwen으로 분석해 검토용 제안을 동기 반환 |
+| POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod `stt`로 전사하고 `sllm`으로 분석해 검토용 제안을 동기 반환 |
 
 요청은 `multipart/form-data`이며 `audio`, `ledger_type`, `current_fields`,
 `privacy_confirmed`를 받는다. `audio`는 비어 있지 않은 WAV·MP3·M4A이고 현재 상한은 25 MiB다.
@@ -137,7 +149,9 @@ updated: 2026-08-27
 객체다. `privacy_confirmed`가 true가 아니면 422로 거절한다. Backend는 세션에서 사용자 문맥을
 검증하지만 사용자·사무소 식별자는 모델에 보내지 않는다.
 
-응답은 상담 유형, 장부 불일치 여부, 필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
+응답의 상담 유형은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다. `기타상담`은 공동중개·단순문의와
+불명확하거나 혼합된 상담을 합친 값이며 장부 필드 제안을 반환하지 않는다. 그 밖에 장부 불일치 여부,
+필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
 상담 로그 초안과 서버가 확인한 주의 문구 확인 시각을 반환한다. 전사 전문, 모델 진단, 요청자와
 Provider 오류 원문은 반환하지 않는다. 제안 응답만으로 장부를 저장하지 않으며 Frontend가 선택한 값을
 부모 상세의 미저장 draft에 반영한다.
@@ -147,10 +161,10 @@ SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 
 `docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
 음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
 
-F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한다. Backend는 시작할 때 F2 pipeline을
-항상 초기화하므로 모든 실행 환경에 `AI_VLLM_LLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`이 필요하며,
-둘 중 하나가 없으면 애플리케이션 시작이 설정 오류로 실패한다. endpoint 설정은 유효하지만 RunPod가
-중지됐거나 Provider 요청·응답을 사용할 수 없으면 분석 요청을 503 `F2_UNAVAILABLE`로 종료한다.
+F2 route는 별도 사용자 기능 플래그 없이 항상 공개한다. Infra endpoint set이 `active`일 때만
+Backend가 `AI_VLLM_SLLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`로 pipeline을 초기화한다. `offline`이면
+Backend는 정상 기동하고 분석 요청만 503 `F2_UNAVAILABLE`로 종료한다. `active`인데 URL이 없으면
+부분 활성화를 허용하지 않고 애플리케이션 시작을 설정 오류로 실패시킨다.
 
 ### 오류 코드
 
@@ -160,11 +174,13 @@ F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한�
 | COMPLEX_HAS_UNITS | 422 | 세대가 남아 있는 단지를 삭제하려 함 |
 | FORBIDDEN | 403 | 역할 권한이 부족하거나 CSRF 토큰이 일치하지 않음 |
 | NOT_FOUND | 404 | 대상이 없거나 다른 중개사무소 소유임 |
+| METHOD_NOT_ALLOWED | 405 | `/api/v1` 경로에 허용되지 않은 HTTP method를 사용함 |
 | ROW_VERSION_CONFLICT | 409 | 요청의 `row_version`이 저장된 값과 다름 |
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
-| F2_UNAVAILABLE | 503 | RunPod STT·LLM Provider에 연결할 수 없거나 Provider 요청·응답을 사용할 수 없음 |
+| F2_UNAVAILABLE | 503 | RunPod endpoint가 offline이거나 STT·SLLM Provider 요청·응답을 사용할 수 없음 |
 | F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
+| INTERNAL_SERVER_ERROR | 500 | 공개할 수 없는 예상 밖 Backend 오류 |
 
 세대 상태, 현 임대차 상태와 매물 상태의 값 목록은 아직 확정하지 않았다. 확정 전까지 서버는 이 값들을 고정된 열거형으로 검증하지 않고 문자열로 통과시킨다.
 
@@ -245,6 +261,12 @@ F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한�
 
 다음 네 저장이 성공하면 Backend가 F3 실행을 자동 접수한다 (F3-CR-01, F3-CR-02).
 
+이 실행이 자동으로 수행하는 범위는 **앵커 포지션 카드 생성까지**다 ([ADR-0018](../decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md)). 앵커 카드를 저장해
+`ANCHOR_READY`가 되면 실행은 거기서 멈추고, 후보 조회·후보 카드·중개 판정은 사용자가
+`POST /api/v1/f3/runs`로 판정을 요청할 때 이어서 수행한다 (F3-CR-01~04, 2026-08-31 개정).
+저장 하나가 모델 판정까지 완주하던 종전 계약을 대체한다. 결과를 볼 의사가 없는 저장에서도
+판정 비용이 들었고, 그 비용을 사용자가 선택한 적이 없기 때문이다.
+
 | 저장 경로 | 앵커 | 접수 조건 |
 |---|---|---|
 | `POST /api/v1/property-units/{unit_id}/listings` | 매물 | 신규 등록 |
@@ -260,7 +282,15 @@ F2는 별도 기능 플래그 없이 Backend의 기본 runtime으로 동작한�
 F1 응답 형태에는 실행 ID나 F3 상태를 추가하지 않는다. 화면은 `POST /api/v1/f3/runs`로 실행을
 확인하며, 같은 앵커·입력 버전의 활성 실행이면 저장 시 자동 생성된 실행 ID를 그대로 돌려받는다.
 자동 실행의 `trigger_type`은 `LEDGER_SAVE`이고 직접 실행 요청의 `USER_REQUEST`와 구분한다. 기존
-활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다.
+활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다. **예외는
+`LEDGER_SAVE` 실행에 사용자의 판정 요청이 들어온 경우다.** 실행이 `QUEUED`면 다음 최초 선점이
+전체 판정을 수행하고, `RUNNING`이면 현재 lease의 Worker가 앵커 카드 뒤로 계속 진행하도록
+`trigger_type`을 요청자의 값으로 옮긴다. `ANCHOR_READY`에서 멈춰 있으면 기존 lease를 비우고
+같은 실행을 즉시 선점 가능하게 해 후보 조회부터 이어서 진행한다. 이 계획된 이어받기 선점은 실패
+재시도가 아니므로 `attempt_count`를 늘리지 않는다. `requested_by`는 최초 값을 유지한다. 이어받기는
+앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용이 없고, 화면은 종전과 같은 실행 ID를
+돌려받는다. `trigger_type`이 바뀌면 자동 접수에서 시작했다는 사실과 이전 상태는
+`f3_ledger_save_run_resumed` 로그로 남는다.
 
 PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 서비스가 저장 직전에 비교한 **실제 변경
 필드**로 판단한다. 메모·담당자 같은 운영 필드만 바꾸거나 가격·예산 등 기존과 같은 값을 다시
@@ -349,7 +379,11 @@ Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 
 원자 저장하면 `COMPLETED`, 입력 버전·상담 범위가 실행 중 바뀌면 `SUPERSEDED`, lease 최대 시도
 초과나 영구 오류이면 `FAILED_TERMINAL`이다. `ANCHOR_READY`,
 `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`은 중간 상태라 `completed_at`을 채우지
-않고 `COMPLETED`에서 채운다. 후보가 0건이면 모델 호출과 `JUDGING` 없이 빈 결과를 확정하고
+않고 `COMPLETED`에서 채운다. `ANCHOR_READY`는 자동 접수된 실행이 사용자 요청을 기다리며 머무는
+지점이기도 하다. 이 상태의 `LEDGER_SAVE` 실행은 Worker 선점과 최대 시도 초과 정리에서 모두
+제외되므로 시도 횟수가 늘지 않고 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료되지도 않는다. 사용자가 끝내 판정을 요청하지 않으면
+실행은 `ANCHOR_READY`로 남으며, 보존 기간이 지난 실행 정리는 `retention_until`·`purged_at`을
+쓰는 별도 작업의 범위다. 후보가 0건이면 모델 호출과 `JUDGING` 없이 빈 결과를 확정하고
 `CANDIDATE_CARDS_READY`에서 바로 `COMPLETED`로 간다. Worker polling·handler가 이 유스케이스를
 상태 순서대로 호출한다. 그 밖의 상태는 아직 만들지 않는다.
 
@@ -366,10 +400,11 @@ Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 
 `GET /api/v1/f3/runs/{run_id}/result`는 상태를 변경하지 않으므로 CSRF 토큰을 요구하지 않는다.
 상태 조회와 동일하게 세션의 `brokerage_id`, 루트 `CROSS_JUDGMENT`, 숫자 `run_id >= 1` 조건으로
 격리하며 없는 실행·다른 사무소 실행·하위 실행·다른 실행 유형은 모두 404로 답한다.
+상한 조정 전 `candidate-selection:v2`로 완료된 과거 결과와 현재 `v3` 결과를 모두 조회한다.
 
 후보 목록은 `limit`과 `offset`으로 페이지 처리한다. `limit` 기본값은 20이고 범위는 1..100,
 `offset` 기본값은 0이며 0 이상이다. 범위를 벗어나면 422로 답한다. 페이지 대상은 카드화된 상위
-15건만이 아니라 결정적 SQL에 포함된 **전체 후보**다. 카드화·판정되지 않은 후보도 목록에 남고
+5건만이 아니라 결정적 SQL에 포함된 **전체 후보**다. 카드화·판정되지 않은 후보도 목록에 남고
 `selected_for_cards=false`, 판정·근거 필드는 `null` 또는 빈 목록으로 반환한다.
 
 진행 중인 실행은 완료를 가장하지 않고 마지막으로 영속화된 안전 단계까지만 반환한다.
@@ -461,7 +496,11 @@ F3-TR-02의 정정은 이번 계약에 포함하지 않는다. 정정은 값을 
 
 Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행을 가져간다. 선점 대상은 루트
 `CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 구현된 진행
-상태(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다. 최초
+상태(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다.
+다만 `trigger_type`이 `LEDGER_SAVE`이고 상태가 `ANCHOR_READY`인 실행은 선점 대상에서 제외한다.
+저장이 자동으로 하는 일은 앵커 카드까지이므로 lease가 만료돼도 다시 집어가지 않는다. 사용자가
+판정을 요청해 `trigger_type`이 옮겨지면 lease가 없는 계획된 handoff로 즉시 선점 대상이 되며,
+그 첫 선점은 `attempt_count`를 늘리지 않는다. 최초
 `QUEUED`만 `RUNNING`으로 바꾸고
 재선점한 진행 상태는 보존한다. `JUDGING`을 재선점하면 최초 판정 바인딩과 후보 집합을 다시
 검증한 뒤 중개 판정 호출부터 안전하게 재실행한다. 5분짜리 lease와 시도 횟수를 기록하며,
@@ -473,7 +512,10 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 
 배포용 Worker 프로세스(`backend/src/worker.py`)는 `claim_next_run`을 RDS polling으로 호출하고,
 저장된 상태를 기준으로 앵커 카드 → 후보 SQL → 후보 카드 → 중개 판정 유스케이스를 같은 lease
-아래에서 진행한다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
+아래에서 진행한다. 자동 접수된 실행은 앵커 카드를 저장한 뒤 같은 lease 안에서 더 진행하지 않고
+`ANCHOR_READY`에 남기며 그 자리에서 lease를 비운다. 이 주차는 `trigger_type`을 조건에 넣은
+갱신이라 사용자 판정 요청과 같은 행에서 직렬화된다. Worker가 실행을 읽은 뒤 주차하기 전에
+요청이 들어왔으면 주차하지 않고 후보 조회로 이어 간다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
 일시 Provider 오류는 상태를 보존하고 lease를 즉시 만료시켜 다음 선점이 재시도하며, 영구 계약·
 설정 오류는 `FAILED_TERMINAL`, 입력 변경은 `SUPERSEDED`로 기록한다. raw 예외와 Provider 원문은
 failure 컬럼에 저장하지 않는다.

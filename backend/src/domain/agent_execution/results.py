@@ -25,6 +25,10 @@ from domain.agent_execution.models import (
 )
 from domain.agent_execution.service import require_cross_judgment_run
 
+READABLE_CANDIDATE_SELECTION_SCHEMAS = frozenset(
+    {"candidate-selection:v2", CANDIDATE_SELECTION_SCHEMA_VERSION}
+)
+
 
 @dataclass(frozen=True)
 class CardView:
@@ -97,8 +101,8 @@ def _as_text(value: object) -> str | None:
 
 
 def _selection_entries(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    """현재 schema의 전체 SQL 후보 목록만 읽는다."""
-    if snapshot.get("schema") != CANDIDATE_SELECTION_SCHEMA_VERSION:
+    """현재 schema와 종료된 v2 실행의 전체 SQL 후보 목록을 읽는다."""
+    if snapshot.get("schema") not in READABLE_CANDIDATE_SELECTION_SCHEMAS:
         return []
     entries = snapshot.get("candidates")
     return (

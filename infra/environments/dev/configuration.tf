@@ -16,7 +16,22 @@ locals {
     }
     ai_provider = {
       name        = "/${local.name_prefix}/ai/provider-api-keys"
-      description = "AI provider API keys managed from the ignored secrets.auto.tfvars input"
+      description = "Container for flat AI_*_API_KEY JSON populated outside Terraform"
+    }
+  }
+
+  runpod_secret_names = {
+    operator_api_key = {
+      name        = "/${local.name_prefix}/runpod/operator-api-key"
+      description = "Container for the RunPod read-write operator API key populated outside Terraform"
+    }
+    monitor_api_key = {
+      name        = "/${local.name_prefix}/runpod/monitor-api-key"
+      description = "Container for the RunPod read-only monitoring API key populated outside Terraform"
+    }
+    ghcr_registry = {
+      name        = "/${local.name_prefix}/runpod/ghcr-registry"
+      description = "Container for GHCR username and read-only PAT JSON populated outside Terraform"
     }
   }
 
@@ -50,9 +65,28 @@ locals {
     ai = {
       AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
       AI_REQUEST_TIMEOUT_SECONDS = "60"
-      AI_VLLM_LLM_BASE_URL       = "https://xkgavic14hanqr-8001.proxy.runpod.net/v1"
-      AI_VLLM_STT_BASE_URL       = "https://xkgavic14hanqr-8002.proxy.runpod.net/v1"
     }
+  }
+
+  ai_vllm_endpoint_set_bootstrap = {
+    revision        = 0
+    status          = "offline"
+    pod_id          = null
+    sllm_release_id = null
+    sllm_base_url   = null
+    stt_base_url    = null
+    updated_at      = "1970-01-01T00:00:00Z"
+  }
+
+  runpod_control_set_bootstrap = {
+    schema_version                = 1
+    status                        = "uninitialized"
+    generation                    = 0
+    registry_auth_id              = null
+    template_id                   = null
+    image                         = null
+    ai_provider_secret_version_id = null
+    updated_at                    = "1970-01-01T00:00:00Z"
   }
 
   application_parameters = merge([
@@ -77,10 +111,24 @@ resource "aws_secretsmanager_secret" "application" {
   }
 }
 
-resource "aws_secretsmanager_secret_version" "ai_provider" {
-  secret_id                = aws_secretsmanager_secret.application["ai_provider"].id
-  secret_string_wo         = jsonencode(var.ai_provider_api_keys)
-  secret_string_wo_version = var.ai_provider_secret_version
+resource "aws_secretsmanager_secret" "runpod" {
+  for_each = local.runpod_secret_names
+
+  name                    = each.value.name
+  description             = each.value.description
+  recovery_window_in_days = 7
+
+  tags = {
+    Name = each.value.name
+  }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.ai_provider
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "aws_ssm_parameter" "application" {
@@ -94,6 +142,40 @@ resource "aws_ssm_parameter" "application" {
 
   tags = {
     Name = "/${local.name_prefix}/${each.value.path}"
+  }
+}
+
+resource "aws_ssm_parameter" "ai_vllm_endpoint_set" {
+  name        = "/${local.name_prefix}/ai/AI_VLLM_ENDPOINT_SET"
+  description = "Operational container for the atomic ephemeral RunPod SLLM and STT endpoint set"
+  type        = "String"
+  value       = jsonencode(local.ai_vllm_endpoint_set_bootstrap)
+  tier        = "Standard"
+
+  lifecycle {
+    # The RunPod runbook owns this operational value so both URLs cut over atomically.
+    ignore_changes = [value]
+  }
+
+  tags = {
+    Name = "/${local.name_prefix}/ai/AI_VLLM_ENDPOINT_SET"
+  }
+}
+
+resource "aws_ssm_parameter" "runpod_control_set" {
+  name        = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
+  description = "Non-sensitive RunPod bootstrap generation, immutable resource IDs, image digest, and secret synchronization state"
+  type        = "String"
+  value       = jsonencode(local.runpod_control_set_bootstrap)
+  tier        = "Standard"
+
+  lifecycle {
+    # The reviewed RunPod operator commands own this resumable operational value.
+    ignore_changes = [value]
+  }
+
+  tags = {
+    Name = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
   }
 }
 
@@ -134,5 +216,8 @@ output "application_secret_arns" {
 
 output "application_parameter_names" {
   description = "런타임 설정 주입 구성이 참조할 비민감 SSM parameter 이름"
-  value       = { for setting, parameter in aws_ssm_parameter.application : setting => parameter.name }
+  value = merge(
+    { for setting, parameter in aws_ssm_parameter.application : setting => parameter.name },
+    { ai_ai_vllm_endpoint_set = aws_ssm_parameter.ai_vllm_endpoint_set.name },
+  )
 }
