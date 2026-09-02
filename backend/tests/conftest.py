@@ -8,7 +8,8 @@ from core.config import Config, bind_config
 @pytest.fixture(autouse=True)
 def configure_test_f2_providers(monkeypatch: pytest.MonkeyPatch) -> None:
     """Backend lifespan이 외부 요청 없이 F2 provider client를 생성할 수 있게 한다."""
-    monkeypatch.setenv("AI_VLLM_LLM_BASE_URL", "http://127.0.0.1:18001/v1")
+    monkeypatch.setenv("AI_F2_PROVIDER_STATUS", "active")
+    monkeypatch.setenv("AI_VLLM_SLLM_BASE_URL", "http://127.0.0.1:18001/v1")
     monkeypatch.setenv("AI_VLLM_STT_BASE_URL", "http://127.0.0.1:18002/v1")
 
 

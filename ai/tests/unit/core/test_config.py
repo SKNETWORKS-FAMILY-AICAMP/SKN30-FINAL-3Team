@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 
 import brokerage_ai.core.config as config_module
-from brokerage_ai.core.config import AiProfile, bind_ai_config, load_ai_config
+from brokerage_ai.core.config import (
+    AiProfile,
+    F2ProviderStatus,
+    bind_ai_config,
+    load_ai_config,
+)
 from brokerage_ai.core.errors import ConfigurationError
 
 
@@ -98,18 +103,26 @@ def test_timeout_must_be_positive(value: str) -> None:
 
 
 def test_vllm_key_requires_matching_base_url() -> None:
-    with pytest.raises(ConfigurationError, match="AI_VLLM_LLM_BASE_URL"):
-        bind_ai_config({"AI_VLLM_LLM_API_KEY": "secret"}, AiProfile.LOCAL)
+    with pytest.raises(ConfigurationError, match="AI_VLLM_SLLM_BASE_URL"):
+        bind_ai_config(
+            {
+                "AI_F2_PROVIDER_STATUS": "active",
+                "AI_VLLM_SLLM_API_KEY": "secret",
+                "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
+            },
+            AiProfile.LOCAL,
+        )
 
 
 def test_f2_runpod_endpoints_and_models_are_bound() -> None:
     config = bind_ai_config(
         {
-            "AI_VLLM_LLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
+            "AI_F2_PROVIDER_STATUS": "active",
+            "AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
             "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
             "AI_VLLM_STT_API_KEY": "stt-secret",
-            "AI_F2_LLM_MODEL": "Qwen/Qwen3-4B",
-            "AI_F2_STT_MODEL": "openai/whisper-large-v3-turbo",
+            "AI_F2_SLLM_MODEL": "sllm",
+            "AI_F2_STT_MODEL": "stt",
         },
         AiProfile.LOCAL,
     )
@@ -117,21 +130,77 @@ def test_f2_runpod_endpoints_and_models_are_bound() -> None:
     assert config.vllm.stt is not None
     assert config.vllm.stt.api_key is not None
     assert config.vllm.stt.api_key.get_secret_value() == "stt-secret"
-    assert config.f2.llm_model == "Qwen/Qwen3-4B"
-    assert config.f2.stt_model == "openai/whisper-large-v3-turbo"
+    assert config.f2.provider_status is F2ProviderStatus.ACTIVE
+    assert config.f2.sllm_model == "sllm"
+    assert config.f2.stt_model == "stt"
+
+
+def test_f2_endpoints_do_not_activate_provider_without_explicit_status() -> None:
+    config = bind_ai_config(
+        {
+            "AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
+            "AI_VLLM_SLLM_API_KEY": "retained-secret",
+            "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
+            "AI_VLLM_STT_API_KEY": "retained-secret-2",
+        },
+        AiProfile.DEV,
+    )
+
+    assert config.f2.provider_status is F2ProviderStatus.OFFLINE
+    assert config.vllm.sllm is None
+    assert config.vllm.stt is None
+
+
+@pytest.mark.parametrize(
+    ("source", "missing_url"),
+    [
+        (
+            {"AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1"},
+            "AI_VLLM_SLLM_BASE_URL",
+        ),
+        (
+            {"AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1"},
+            "AI_VLLM_STT_BASE_URL",
+        ),
+    ],
+)
+def test_active_f2_requires_both_provider_endpoints(
+    source: dict[str, str], missing_url: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=missing_url):
+        bind_ai_config(
+            {"AI_F2_PROVIDER_STATUS": "active", **source},
+            AiProfile.DEV,
+        )
 
 
 def test_invalid_provider_url_is_sanitized() -> None:
     with pytest.raises(ConfigurationError) as caught:
         bind_ai_config(
             {
-                "AI_VLLM_LLM_BASE_URL": "not-a-url",
-                "AI_VLLM_LLM_API_KEY": "sensitive-value",
+                "AI_F2_PROVIDER_STATUS": "active",
+                "AI_VLLM_SLLM_BASE_URL": "not-a-url",
+                "AI_VLLM_SLLM_API_KEY": "sensitive-value",
+                "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
             },
             AiProfile.LOCAL,
         )
 
     assert "sensitive-value" not in str(caught.value)
+
+
+def test_offline_f2_does_not_bind_vllm_secrets_without_urls() -> None:
+    config = bind_ai_config(
+        {
+            "AI_F2_PROVIDER_STATUS": "offline",
+            "AI_VLLM_SLLM_API_KEY": "retained-secret",
+            "AI_VLLM_STT_API_KEY": "retained-secret-2",
+        },
+        AiProfile.DEV,
+    )
+
+    assert config.vllm.sllm is None
+    assert config.vllm.stt is None
 
 
 def test_secret_string_is_masked() -> None:

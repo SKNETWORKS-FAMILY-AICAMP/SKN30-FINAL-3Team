@@ -27,7 +27,9 @@ async def test_runtime_reuses_client_for_equal_vllm_endpoints_and_closes_once() 
     config = bind_ai_config(
         {
             "AI_REQUEST_TIMEOUT_SECONDS": "12.5",
-            "AI_VLLM_LLM_BASE_URL": "http://localhost:8000/v1",
+            "AI_F2_PROVIDER_STATUS": "active",
+            "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
+            "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
             "AI_VLLM_EMBEDDING_BASE_URL": "http://localhost:8000/v1",
         },
         AiProfile.LOCAL,

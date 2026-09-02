@@ -122,7 +122,7 @@ def run_disabled_worker(
 def require_ai_provider(profile: str, environ: Mapping[str, str] | None = None) -> AiConfig:
     """실행을 선점하기 전에 LLM Provider 설정이 하나 이상 있는지 확인한다."""
     config = load_ai_config(profile, environ)
-    if config.openai is None and config.vllm.llm is None:
+    if config.openai is None and config.vllm.sllm is None:
         raise ConfigurationError(
             "WORKER_ENABLED=true requires at least one configured LLM provider"
         )

@@ -77,7 +77,7 @@ def create_ai_runtime(
         llm_providers.append(openai_adapter)
         embedding_providers.append(openai_adapter)
 
-    vllm_llm_client = client_for(config.vllm.llm) if config.vllm.llm is not None else None
+    vllm_llm_client = client_for(config.vllm.sllm) if config.vllm.sllm is not None else None
     vllm_embedding_client = (
         client_for(config.vllm.embedding) if config.vllm.embedding is not None else None
     )

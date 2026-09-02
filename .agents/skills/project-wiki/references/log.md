@@ -1,9 +1,14 @@
 ---
 status: 구현됨
-updated: 2026-08-31
+updated: 2026-09-02
 ---
 
 # 위키 변경 로그
+
+- 2026-09-02: ADR-0008의 EC2 Backend·설치형 AI·RunPod 추론 상위 구조는 유지하고, ADR-0020이 Infra ADR-0002의 개발자별 Pod·시연 기간 Pod 유지·조건부 Network Volume 조항만 부분 대체함을 양쪽 ADR과 인덱스에 명시했다. 런타임 인덱스의 GPU runtime 정본 링크도 ADR-0020으로 정규화했다.
+- 2026-09-02: SLLM 공유 dev 승격에 미확정 정량 임계값을 고정하지 않고, 파인튜닝 담당자가 `full` 평가 지표를 검토해 선택 모델·평가 실행·사유를 명시한 `promotion-approval:v1`을 승인하도록 ADR-0020을 구체화했다. 패키징 도구는 승인 상태와 평가 연결을 검증하며 비교 평가의 모든 모델 통과를 요구하지 않는다.
+- 2026-09-01: RunPod 최초 구축을 digest 기반 `plan → 확인 → bootstrap`으로 통합하고 운영 비밀값 정본을 AWS Secrets Manager로 옮겼다. Terraform은 Secret 컨테이너만 소유하고 기존 version은 값 삭제 없이 state에서 분리한다. 기본 30분 읽기 전용 감시와 8시간 실행 경고, 기존 Alarm Discord 경로와 기본 dry-run 수동 reconcile을 추가하되 자동 Pod 삭제·endpoint 전환과 기존 active/offline·Backend 503 계약 변경은 제외했다.
+- 2026-09-01: 학습자는 Infra 권한 없이 검증된 SLLM bundle만 전달하고 Infra가 private S3에 불변 게시하도록 경계를 확정했다. 공유 F2 RunPod는 Volume·SSH 없는 create/delete lifecycle과 `sllm`·`stt` 작업명, active/offline endpoint를 사용하며 offline F2 요청은 Backend 503으로 처리한다.
 
 - 2026-08-31: CloudWatch Alarm Discord 메시지에 검증된 `AlarmArn` 기반 Alarm 링크와 별도 장애 대응 Runbook을 추가하고, 정확한 Backend·AI 알람 두 개에는 미리 채운 Logs Insights 링크를 제공한다. 애플리케이션 `ALARM`만 전이 시각 ±10분의 허용 필드 1건을 최대 2초 best-effort 조회하며 시간 초과 쿼리는 중단한다. 조회 실패는 기본 알림을 막지 않고 Discord 전송 실패만 SNS 재시도하며, `source`는 라우팅이 아닌 선택적 기능 문맥으로 한정했다.
 - 2026-08-31: AI·Backend pre-commit Ruff 대상을 모듈 아래 Git 추적 Python 파일 전체로 넓혀 CodeBuild의 모듈 전체 검사와 일치시켰다. 에이전트는 Python 변경을 마치기 전에 루트 `AGENTS.md`의 모듈별 `ruff check --fix`와 `ruff format`을 실행하며, `ai/eval`·`ai/training`도 제외하지 않는다. Pyright의 기존 `src`·`tests` 검사 범위와 CodeBuild 최종 검증은 유지한다.

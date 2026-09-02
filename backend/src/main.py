@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import structlog
 from brokerage_ai import load_ai_config
+from brokerage_ai.core.config import F2ProviderStatus
 from brokerage_ai.f2 import F2Runtime, create_f2_runtime
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import (
@@ -71,16 +72,19 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        runtime = (
-            f2_runtime_factory()
-            if f2_runtime_factory is not None
-            else create_f2_runtime(load_ai_config(resolved_config.app.environment.value))
-        )
-        app.state.f2_pipeline = runtime.pipeline
+        runtime: F2Runtime | None = None
+        ai_config = load_ai_config(resolved_config.app.environment.value)
+        if ai_config.f2.provider_status is F2ProviderStatus.ACTIVE:
+            if f2_runtime_factory is not None:
+                runtime = f2_runtime_factory()
+            else:
+                runtime = create_f2_runtime(ai_config)
+        app.state.f2_pipeline = runtime.pipeline if runtime is not None else None
         try:
             yield
         finally:
-            await runtime.close()
+            if runtime is not None:
+                await runtime.close()
 
     app = FastAPI(
         title="Brokerage Backend",
