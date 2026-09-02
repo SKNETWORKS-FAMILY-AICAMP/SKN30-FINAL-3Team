@@ -76,3 +76,28 @@ def test_offline_f2_does_not_initialize_runtime(
             assert app.state.f2_pipeline is None
 
     asyncio.run(run_lifespan())
+
+
+def test_offline_f2_does_not_call_injected_runtime_factory(
+    make_config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = make_config({"APP_ENV": "dev", "DB_TARGET": "development"})
+    ai_config = cast(
+        AiConfig,
+        SimpleNamespace(f2=SimpleNamespace(provider_status=F2ProviderStatus.OFFLINE)),
+    )
+    monkeypatch.setattr(main, "load_ai_config", lambda _profile: ai_config)
+
+    def unexpected_factory() -> F2Runtime:
+        raise AssertionError("offline F2 must not call an injected runtime factory")
+
+    async def run_lifespan() -> None:
+        app = create_app(
+            config=config,
+            readiness_probe=lambda _request: True,
+            f2_runtime_factory=unexpected_factory,
+        )
+        async with app.router.lifespan_context(app):
+            assert app.state.f2_pipeline is None
+
+    asyncio.run(run_lifespan())

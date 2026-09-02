@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # ADR-0020: SLLM 릴리스 전달과 임시 dev 서빙
@@ -16,8 +16,11 @@ updated: 2026-09-01
 
 ## 결정
 
-- 학습 담당자는 `infra/` 접근 없이 로컬에서 학습·평가한다. 전체 상담분석 평가를 통과한 PEFT
-  adapter와 최소 manifest를 bundle 하나로 만들어 Infra 담당자에게 전달한다.
+- 학습 담당자는 `infra/` 접근 없이 로컬에서 학습·평가한다. 정량 승격 임계값은 아직 고정하지
+  않으며, `full` 평가 지표를 검토한 담당자가 선택 모델·평가 실행·승인 사유를 명시한
+  `promotion-approval:v1`을 만든다. 패키징 도구는 상태가 `approved`이고 선택 모델과 평가 실행이
+  실제 요약에 일치할 때만 PEFT adapter와 최소 manifest를 bundle로 만든다. 비교를 위해 함께
+  평가한 다른 모델까지 모두 통과할 필요는 없다.
 - Infra 담당자는 bundle을 재검증하고 private S3 `releases/sllm/<release-id>/`에 불변 게시한다.
   원본 데이터, 전사, checkpoint와 비밀값은 전달하거나 게시하지 않는다.
 - 공유 dev RunPod는 필요할 때 Secure Cloud Pod를 생성하고 작업 종료 시 삭제한다. Volume은 두지

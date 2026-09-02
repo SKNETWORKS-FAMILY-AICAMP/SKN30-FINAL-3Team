@@ -15,6 +15,8 @@ from typing import Any
 
 CAPABILITY = "f2-consultation-analysis"
 SERVED_MODEL_NAME = "sllm"
+PROMOTION_APPROVAL_SCHEMA_VERSION = 1
+PROMOTION_DECISION_OWNER = "fine-tuning-owner"
 RELEASE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{2,63}\Z")
 MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 COMMIT = re.compile(r"[0-9a-f]{40}\Z")
@@ -81,12 +83,58 @@ def tree_sha256(root: Path, files: list[Path]) -> str:
     return digest.hexdigest()
 
 
+def validate_promotion_approval(
+    evaluation: dict[str, Any], approval: dict[str, Any]
+) -> dict[str, Any]:
+    if approval.get("schema_version") != PROMOTION_APPROVAL_SCHEMA_VERSION:
+        raise ReleaseError("promotion approval schema_version must be 1")
+    if approval.get("status") != "approved":
+        raise ReleaseError("promotion approval status must be approved")
+
+    evaluation_run_id = evaluation.get("run_id")
+    if not isinstance(evaluation_run_id, str) or not evaluation_run_id.strip():
+        raise ReleaseError("evaluation summary must contain a non-empty run_id")
+    if approval.get("evaluation_run_id") != evaluation_run_id:
+        raise ReleaseError("promotion approval evaluation_run_id must match the evaluation summary")
+
+    models = evaluation.get("models")
+    if not isinstance(models, list) or not models:
+        raise ReleaseError("evaluation summary must contain at least one model result")
+    labels = [model.get("label") for model in models if isinstance(model, dict)]
+    if len(labels) != len(models) or any(
+        not isinstance(label, str) or not label.strip() for label in labels
+    ):
+        raise ReleaseError("every evaluation model result must contain a non-empty label")
+    if len(set(labels)) != len(labels):
+        raise ReleaseError("evaluation model labels must be unique")
+
+    selected_model = approval.get("selected_model")
+    if selected_model not in labels:
+        raise ReleaseError("promotion approval selected_model must exist in evaluation results")
+    if approval.get("decision_owner") != PROMOTION_DECISION_OWNER:
+        raise ReleaseError("promotion approval decision_owner must be fine-tuning-owner")
+    rationale = approval.get("rationale")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ReleaseError("promotion approval rationale must be a non-empty string")
+
+    return {
+        "schema_version": PROMOTION_APPROVAL_SCHEMA_VERSION,
+        "status": "approved",
+        "evaluation_run_id": evaluation_run_id,
+        "selected_model": selected_model,
+        "decision_owner": PROMOTION_DECISION_OWNER,
+        "rationale": rationale.strip(),
+    }
+
+
 def build_manifest(
     *,
     release_id: str,
     metadata: dict[str, Any],
     evaluation: dict[str, Any],
     evaluation_sha256: str,
+    approval: dict[str, Any],
+    approval_sha256: str,
     adapter_dir: Path,
     files: list[Path],
     dataset_release: str,
@@ -107,8 +155,6 @@ def build_manifest(
         raise ReleaseError("base model revision must be an immutable 40-character commit")
     if evaluation.get("task") != "full":
         raise ReleaseError("consultation-analysis release requires a full-task evaluation summary")
-    if not isinstance(evaluation.get("models"), list) or not evaluation["models"]:
-        raise ReleaseError("evaluation summary must contain at least one model result")
 
     hashes: dict[str, str] = {}
     for split in ("train", "validation"):
@@ -143,6 +189,10 @@ def build_manifest(
             "task": "full",
             "summary_path": "evaluation-summary.json",
             "summary_sha256": evaluation_sha256,
+            "promotion_status": approval["status"],
+            "selected_model": approval["selected_model"],
+            "approval_path": "promotion-approval.json",
+            "approval_sha256": approval_sha256,
         },
     }
 
@@ -152,6 +202,7 @@ def package_release(
     release_id: str,
     training_output: Path,
     evaluation_summary: Path,
+    promotion_approval: Path,
     dataset_release: str,
     output: Path,
 ) -> dict[str, Any]:
@@ -161,16 +212,22 @@ def package_release(
     adapter_dir = training_output / "adapter"
     metadata = json_object(metadata_path, "run metadata")
     evaluation = json_object(evaluation_summary, "evaluation summary")
+    approval = validate_promotion_approval(
+        evaluation, json_object(promotion_approval, "promotion approval")
+    )
     public_evaluation = {
         name: value for name, value in evaluation.items() if name not in {"dataset", "adapter_path"}
     }
     evaluation_bytes = (json.dumps(public_evaluation, ensure_ascii=False, indent=2) + "\n").encode()
+    approval_bytes = (json.dumps(approval, ensure_ascii=False, indent=2) + "\n").encode()
     files = adapter_files(adapter_dir)
     manifest = build_manifest(
         release_id=release_id,
         metadata=metadata,
         evaluation=evaluation,
         evaluation_sha256=hashlib.sha256(evaluation_bytes).hexdigest(),
+        approval=approval,
+        approval_sha256=hashlib.sha256(approval_bytes).hexdigest(),
         adapter_dir=adapter_dir,
         files=files,
         dataset_release=dataset_release,
@@ -189,6 +246,11 @@ def package_release(
         evaluation_info.mode = 0o600
         evaluation_info.mtime = 0
         archive.addfile(evaluation_info, io.BytesIO(evaluation_bytes))
+        approval_info = tarfile.TarInfo("promotion-approval.json")
+        approval_info.size = len(approval_bytes)
+        approval_info.mode = 0o600
+        approval_info.mtime = 0
+        archive.addfile(approval_info, io.BytesIO(approval_bytes))
         for path in files:
             archive.add(
                 path,
@@ -211,6 +273,7 @@ def parser() -> argparse.ArgumentParser:
     cli.add_argument("--release-id", required=True)
     cli.add_argument("--training-output", type=Path, required=True)
     cli.add_argument("--evaluation-summary", type=Path, required=True)
+    cli.add_argument("--promotion-approval", type=Path, required=True)
     cli.add_argument("--dataset-release", required=True)
     cli.add_argument("--output", type=Path, required=True)
     return cli
@@ -223,6 +286,7 @@ def main() -> int:
             release_id=arguments.release_id,
             training_output=arguments.training_output,
             evaluation_summary=arguments.evaluation_summary,
+            promotion_approval=arguments.promotion_approval,
             dataset_release=arguments.dataset_release,
             output=arguments.output,
         )

@@ -116,18 +116,37 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 학습 담당자는 AWS·RunPod 권한 없이 로컬에서 학습과 평가를 마친다. Infra에는 학습 폴더나
 체크포인트가 아니라 아래 명령이 만든 `tar.gz` 파일 하나만 전달한다.
 
+현재 정량 승격 임계값은 고정하지 않는다. 파인튜닝 담당자는 `full` 평가 지표를 검토하고 공유 dev에
+올릴 모델 하나를 선택한 뒤 다음 형식의 승인 파일을 만든다. `evaluation_run_id`는 평가 요약의
+`run_id`, `selected_model`은 같은 요약의 `models[].label` 중 하나여야 한다.
+
+```json
+{
+  "schema_version": 1,
+  "status": "approved",
+  "evaluation_run_id": "20260902T010203Z",
+  "selected_model": "qwen3-4b",
+  "decision_owner": "fine-tuning-owner",
+  "rationale": "전체 상담분석 지표와 오류 사례를 검토해 공유 dev 승격을 승인함"
+}
+```
+
+`rationale`에는 평가 판단 요약만 쓰고 상담 원문, 예측 원문, 로컬 경로와 비밀값을 넣지 않는다.
+
 ```bash
 uv run --locked --project ai python ai/training/f2_sLLM/package_release.py \
   --release-id consultation-v1 \
   --training-output /local/models/f2-consultation-v1 \
   --evaluation-summary ai/eval/f2_sLLM/results/<run-id>/summary.json \
+  --promotion-approval /local/approvals/consultation-v1.json \
   --dataset-release f2-1.0.0 \
   --output /local/handoff/consultation-v1.tar.gz
 ```
 
 공유 dev의 `sllm`은 전체 상담분석 capability이므로 `--task full` 평가 결과만 포장된다.
 현재 classification-only adapter는 학습 실험에는 사용할 수 있지만 이 전달 절차로 승격할 수 없다.
-bundle에는 PEFT adapter, 로컬 경로를 제거한 평가 요약, 기반 모델의 불변 revision과 데이터
+package 단계는 metric 임계값을 판정하지 않고 승인 상태·평가 실행·선택 모델 연결을 검증한다.
+bundle에는 PEFT adapter, 로컬 경로를 제거한 평가 요약과 승인, 기반 모델의 불변 revision과 데이터
 checksum만 포함된다. 원본 데이터·전사·예측 JSONL·checkpoint·비밀값은 포함되지 않는다.
 
 학습 담당자의 책임은 bundle 생성과 checksum 전달까지다. S3 게시, RunPod 생성, dev endpoint

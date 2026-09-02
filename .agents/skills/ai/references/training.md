@@ -8,8 +8,10 @@
 - 데이터 분할과 계보는 Data가 소유하며 `data/scripts/split_f2_sllm_dataset.py`로
   `source_group_id` 단위 train·validation·test 분할한다.
 - AI 학습 입력 변환, QLoRA 실행과 어댑터 산출물은 AI가 소유한다.
-- 학습 담당자는 Infra 권한 없이 실험하며, 전체 상담분석 `full` 평가를 통과한 결과만
-  `package_release.py`로 경로가 제거된 SLLM bundle을 만든다. 이 bundle이 Infra와의 유일한
+- 학습 담당자는 Infra 권한 없이 실험하며, 전체 상담분석 `full` 평가 지표를 검토한 뒤 선택한
+  모델의 공유 dev 승격을 명시적으로 승인한다. 정량 임계값은 아직 고정하지 않고 담당자가 승인
+  사유를 남기며, `package_release.py`는 평가 실행·선택 모델과 연결된 승인만 받아 경로가 제거된
+  SLLM bundle을 만든다. 비교 모델 전체의 통과는 요구하지 않는다. 이 bundle이 Infra와의 유일한
   모델 전달 계약이다.
 - 운영 AI Python 환경과 학습 환경은 분리한다. 학습 README의 Python 3.12는 실행 예시이며
   공통 Python 버전 결정이 아니다.
