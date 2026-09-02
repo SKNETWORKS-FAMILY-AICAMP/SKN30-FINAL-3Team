@@ -192,6 +192,39 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(runpod.template_creates, 1)
         self.assertEqual(aws.control_value["status"], "ready")
 
+    def test_apply_resumes_matching_template_created_before_control_record(self):
+        aws = FakeAws()
+        aws.control_value.update(
+            {
+                "status": "provisioning",
+                "generation": 1,
+                "image": IMAGE,
+                "registry_auth_id": "registry-1",
+                "ai_provider_secret_version_id": "version-ai",
+            }
+        )
+        runpod = FakeRunpod()
+        runpod.secret_values = set(MODULE.F2_SECRET_NAMES)
+        runpod.registry_values = [
+            {"id": "registry-1", "name": "skn30-final-3team-dev-ghcr-g1"}
+        ]
+        template = MODULE.template_payload(
+            MODULE.DEFAULT_TEMPLATE,
+            IMAGE,
+            "registry-1",
+            "skn30-final-3team-dev-f2-template-g1",
+        )
+        runpod.template_values = [{**template, "id": "template-1"}]
+
+        with patch.object(
+            MODULE, "RunpodClient", return_value=runpod
+        ), redirect_stdout(io.StringIO()):
+            result = MODULE.Bootstrapper(aws).apply(IMAGE)
+
+        self.assertEqual(result["template_id"], "template-1")
+        self.assertEqual(runpod.template_creates, 0)
+        self.assertEqual(aws.control_value["status"], "ready")
+
     def test_duplicate_registry_name_is_rejected(self):
         aws = FakeAws()
         runpod = FakeRunpod()
@@ -203,6 +236,19 @@ class BootstrapTests(unittest.TestCase):
             MODULE, "RunpodClient", return_value=runpod
         ), self.assertRaises(MODULE.ToolError):
             MODULE.Bootstrapper(aws).apply(IMAGE)
+
+    def test_template_validation_accepts_omitted_default_fields(self):
+        expected = MODULE.template_payload(
+            MODULE.DEFAULT_TEMPLATE,
+            IMAGE,
+            "registry-1",
+            "skn30-final-3team-dev-f2-template-g1",
+        )
+        actual = dict(expected)
+        for field in ("dockerEntrypoint", "isPublic", "isServerless", "volumeInGb"):
+            actual.pop(field)
+
+        MODULE.validate_template(actual, expected)
 
     def test_http_failure_does_not_expose_key_or_response_body(self):
         secret = "runpod-private-key"
@@ -220,6 +266,23 @@ class BootstrapTests(unittest.TestCase):
         with self.assertRaises(MODULE.ToolError) as raised:
             client.pods()
         self.assertNotIn(secret, str(raised.exception))
+
+    def test_graphql_uses_api_key_query_parameter_without_bearer_header(self):
+        captured = {}
+
+        def success(request, _timeout):
+            captured["url"] = request.full_url
+            captured["authorization"] = request.get_header("Authorization")
+            captured["user_agent"] = request.get_header("User-agent")
+            return b'{"data":{"myself":{"secrets":[]}}}'
+
+        client = MODULE.RunpodClient("test-api-key", requester=success)
+        self.assertEqual(client.secret_names(), set())
+        self.assertEqual(
+            captured["url"], f"{MODULE.RUNPOD_GRAPHQL_URL}?api_key=test-api-key"
+        )
+        self.assertIsNone(captured["authorization"])
+        self.assertEqual(captured["user_agent"], MODULE.RUNPOD_GRAPHQL_USER_AGENT)
 
     def test_f2_and_ghcr_rotation_reject_active_endpoint_before_secret_write(self):
         for target in ("f2", "ghcr"):
