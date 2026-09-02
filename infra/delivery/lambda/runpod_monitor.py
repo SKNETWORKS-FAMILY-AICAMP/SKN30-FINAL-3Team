@@ -14,6 +14,7 @@ import boto3
 
 RUNPOD_PODS_URL = "https://rest.runpod.io/v1/pods"
 SHARED_POD_NAME = "skn30-f2-serving-dev"
+ENDPOINT_STATUSES = frozenset({"active", "offline"})
 F2_KEYS = {
     "RunPodSllmHealthy": "AI_VLLM_SLLM_API_KEY",
     "RunPodSttHealthy": "AI_VLLM_STT_API_KEY",
@@ -75,6 +76,11 @@ def _pod_id(pod: Mapping[str, Any]) -> str | None:
 
 def _pod_status(pod: Mapping[str, Any]) -> str:
     return str(pod.get("desiredStatus") or pod.get("status") or "UNKNOWN").upper()
+
+
+def _safe_endpoint_status(endpoint: Mapping[str, Any]) -> str:
+    value = endpoint.get("status")
+    return value if isinstance(value, str) and value in ENDPOINT_STATUSES else "invalid"
 
 
 def _timestamp(value: Any) -> datetime | None:
@@ -218,7 +224,7 @@ def handler(_event: Mapping[str, Any], _context: Any) -> dict[str, Any]:
     summary = {
         "event": "runpod-monitor",
         "outcome": outcome,
-        "endpoint_status": endpoint.get("status", "unknown"),
+        "endpoint_status": _safe_endpoint_status(endpoint),
         "metric_count": len(metrics),
     }
     print(json.dumps(summary, sort_keys=True))

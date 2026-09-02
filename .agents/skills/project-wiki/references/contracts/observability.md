@@ -106,6 +106,8 @@ F3 이벤트는 DB 종료 상태 commit 뒤 한 번 기록을 **시도하는 bes
   heartbeat와 도달 실패 metric만 남기고 확인할 수 없는 endpoint 일치, Provider health, orphan,
   runtime과 비용 metric은 발행하지 않는다. 외부 오류 본문, URL, Pod 응답, key와 hash는 기록하지
   않는다.
+- 감시 로그의 endpoint 상태는 `active`·`offline`만 기록하고 누락, 타입 오류와 그 밖의 값은 원문
+  대신 고정된 `invalid`로 기록한다.
 - Lambda에는 Secret·Parameter 읽기와 지정 namespace metric 쓰기만 허용한다. endpoint·Pod를
   변경하지 않으며 `PutParameter`, `SendCommand`, 자동 삭제 권한은 없다.
 

@@ -91,6 +91,16 @@ class ObserveTests(unittest.TestCase):
 
 
 class HandlerTests(unittest.TestCase):
+    def test_endpoint_status_log_value_is_allowlisted(self):
+        for value in ("active", "offline"):
+            with self.subTest(value=value):
+                self.assertEqual(MODULE._safe_endpoint_status({"status": value}), value)
+        for value in (None, "", "active\nforged-log", ["active"], {"state": "active"}):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    MODULE._safe_endpoint_status({"status": value}), "invalid"
+                )
+
     def test_control_plane_failure_omits_unobserved_metrics(self):
         secrets_client = Mock()
         secrets_client.get_secret_value.side_effect = [
