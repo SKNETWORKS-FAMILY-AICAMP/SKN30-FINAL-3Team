@@ -11,6 +11,33 @@ ZIPKEKE(Propeller AI) 제품 소개용 정적 랜딩 페이지와 그 생성 자
 |---|---|
 | [index.html](index.html) | 현재 랜딩 페이지. Tailwind CDN 기반 단일 HTML. 빌드 없이 브라우저에서 바로 연다 |
 | [prompts/how-it-works.md](prompts/how-it-works.md) | 상단 내비게이션 `How it works` 페이지를 UI 생성 AI로 만들기 위한 프롬프트 |
+| [assets/](assets/) | 집크크 로고와 에이전트 아이콘. 아래 표 참고 |
+
+## 로고
+
+| 파일 | 쓰이는 곳 | 배경 | 원본 파일명 |
+|---|---|---|---|
+| `assets/logo-header.png` | 헤더 좌측 상단 | 밝은 배경 (`background` `#f8f9ff`) | `집크크_logo_page.png` |
+| `assets/logo-footer.png` | 푸터 좌측 하단 | 어두운 배경 (`on-primary-fixed` `#131b2e`) | `집크크_logo_dark_page.png` |
+| `assets/logo-main.png` | 미배치. 텍스트 없는 메인 로고 | 어두운 배경 | `집크크_logo_white.png` |
+| `assets/logo-main-text.png` | 미배치. 텍스트 포함 메인 로고 | 밝은 배경 | `집크크_logo_white_text.png` |
+| `assets/logo-main-text-dark.png` | 미배치. 텍스트 포함, 어두운 배경용 | 어두운 배경 | `집크크_logo_dark_text.png` |
+
+로고 파일은 배경이 투명이 아니라 각 토큰 색으로 채워져 있다. 배경이 다른 자리에 쓰려면 그 배경에 맞는 변형을 쓰거나 투명 배경 원본을 새로 받아야 한다.
+
+## 에이전트 아이콘
+
+`다중 에이전트 아키텍처` 섹션의 카드 3장에 쓴다. 모두 `h-20 w-20` 박스 안에서 `object-contain`으로 표시한다.
+
+| 파일 | 쓰이는 곳 | 원본 파일명 |
+|---|---|---|
+| `assets/icon-property-agent.png` | Property Agent 카드 | `property_agent_icon.png` |
+| `assets/icon-customer-agent.png` | Customer Agent 카드 | `customer_agent_icon.png` |
+| `assets/icon-matching-agent.png` | Matching Agent 카드 | `matching_agent_icon.png` |
+
+종전에는 Property·Customer 두 카드가 Material Symbols 아이콘(`home_work`, `person_search`)을 쓰고 있었다. 세 카드를 같은 이미지 방식으로 맞췄다.
+
+Property·Customer 아이콘의 원본은 1254px·1296px에 합계 1.5MB였다. 80px 자리에 쓰기에 과해서 긴 변 256px로 축소해 넣었다(각 42KB·31KB). 더 큰 크기가 필요하면 원본을 다시 받아 축소 배율만 바꾼다.
 
 ## How it works 페이지 만드는 순서
 
@@ -37,4 +64,5 @@ ZIPKEKE(Propeller AI) 제품 소개용 정적 랜딩 페이지와 그 생성 자
 
 - `이동 중에도 접근` 카드의 "모바일과 데스크톱 실시간 동기화" 문구는 요구사항 문서에 근거가 없다.
 - `등록 매물 128건` `등록 고객 84명`은 예시값인데 실적처럼 읽힌다.
-- 로고와 삽화 4개가 `lh3.googleusercontent.com` 외부 URL을 참조한다. 생성형 도구가 발급한 임시 URL이라 만료될 수 있으므로, 유지할 페이지라면 이미지를 저장소로 옮기는 편이 안전하다.
+- 기능 카드 1의 삽화 1개가 아직 `lh3.googleusercontent.com` 외부 URL을 참조한다. 생성형 도구가 발급한 임시 URL이라 만료되면 페이지가 깨진다. 로고와 아이콘은 저장소 파일로 옮겼고, 이 삽화도 같은 방식으로 옮기는 편이 안전하다.
+- 그 삽화는 생성형 도구가 만든 가상의 제품 화면이라 한글이 뭉개져 있고 화면 안 수치도 실제 값이 아니다. 실제 화면 캡처나 추상화된 삽화로 교체가 필요하다.
