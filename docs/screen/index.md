@@ -11,6 +11,7 @@ updated: 2026-08-14
 |---|---|
 | [Screen Matrix](SCREEN_MATRIX_F1_F2_F3.md) | Screen ID, 화면 소유, 주요 상태, 요구사항 연결 또는 화면 이동을 확인할 때 |
 | [화면구조 분석](화면구조_분석_F1_F2_F3.md) | IA, Page·Panel·Modal 경계, 화면 구성 또는 기능 간 결합 관계를 확인할 때 |
+| [랜딩 How it works 생성 프롬프트](../../site/prompts/how-it-works.md) | 소개용 랜딩 페이지를 UI 생성 AI로 만들거나, 대외 설명 문구가 F1·F2·F3 동작과 어긋나지 않는지 확인할 때. 실제 페이지 파일은 [site/](../../site/)에 있다 |
 
 ## 적용 기준
 
