@@ -19,6 +19,7 @@ COPY pyproject.toml requirements.lock ./
 RUN uv pip install \
       --system \
       --break-system-packages \
+      --no-deps \
       --require-hashes \
       --no-cache \
       --requirement requirements.lock \

@@ -188,6 +188,7 @@ class ImageAndTemplateTests(unittest.TestCase):
     def test_dockerfile_is_locked_and_has_no_model_hardcode(self) -> None:
         dockerfile = (RUNPOD_ROOT / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("FROM runpod/pytorch@sha256:", dockerfile)
+        self.assertIn("--no-deps", dockerfile)
         self.assertIn("--require-hashes", dockerfile)
         self.assertIn("import artifact_bootstrap", dockerfile)
         self.assertNotIn("AutoConfig.from_pretrained", dockerfile)
