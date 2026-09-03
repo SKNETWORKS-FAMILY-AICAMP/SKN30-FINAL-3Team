@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-17
+updated: 2026-09-03
 ---
 
 # 요구사항 인덱스
@@ -67,6 +67,16 @@ F2의 처리·필드·완료 기준 일부는 아직 독립 요구사항 ID가 �
 | [문안 생성·F1 연동](f3/generation-and-integration.md) | `F3-GN`, `F3-IF`, 로그·일정 쓰기 |
 | [신뢰·비기능·개인정보](f3/trust-nfr-privacy.md) | `F3-TR`, `F3-NF`, `F3-SE` |
 | [제외·수용·미해결](f3/scope-acceptance-open.md) | F3 제외 범위, 멀티 에이전트 검증, 질문 |
+
+## F4 업무 비서
+
+| 문서 | 주요 검색 의도·ID |
+|---|---|
+| [개요·구성·공통](f4/overview-and-common.md) | `F4-CM`, 구성 서비스, F1 알림 요구사항과의 대응 |
+| [Time Keeper 일정·할 일](f4/time-keeper.md) | `F4-TK`, 대상 일정, 조회 범위, 브리핑, 수용 기준 |
+| [제외·미착수·미해결](f4/scope-and-open-questions.md) | 뉴스·문자 초안·블로그 초안의 미착수 사유, F4 제외 범위 |
+
+F4의 네 서비스 중 Time Keeper만 구현됐다. 나머지 셋은 설계 전이므로 상세 문서를 미리 만들지 않는다.
 
 ## 출처와 추적
 

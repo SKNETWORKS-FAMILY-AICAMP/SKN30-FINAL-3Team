@@ -101,8 +101,8 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
         <ModalBody>
           <div
             className="time-keeper"
-            data-screen-id="F1-MOD-160"
-            data-requirement-ids="F1-AL-01, F1-AL-03, F1-AL-04"
+            data-screen-id="F4-MOD-010"
+            data-requirement-ids="F4-TK-08, F4-TK-12~21, F1-AL-01, F1-AL-03, F1-AL-04"
           >
             <AgendaList agenda={agenda} />
             {agenda.asOf != null && <p className="time-keeper__asof">기준일 {agenda.asOf}</p>}
