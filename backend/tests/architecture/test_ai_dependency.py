@@ -8,7 +8,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 def imported_roots(path: Path) -> set[str]:
     roots: set[str] = set()
-    tree = ast.parse(path.read_text(), filename=str(path))
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             roots.update(alias.name.split(".", 1)[0] for alias in node.names)

@@ -14,7 +14,7 @@ def migration_files() -> list[Path]:
 def test_migration_names_and_sequence() -> None:
     files = migration_files()
 
-    assert [int(path.name[:3]) for path in files] == list(range(1, 17))
+    assert [int(path.name[:3]) for path in files] == list(range(1, 18))
     assert all(NAME_PATTERN.fullmatch(path.name) for path in files)
 
 
@@ -22,7 +22,7 @@ def test_migrations_have_linear_dependencies_and_tool_owned_transactions() -> No
     files = migration_files()
 
     for index, path in enumerate(files):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         expected = "-- depends:" if index == 0 else f"-- depends: {files[index - 1].stem}"
         assert expected in text
         assert "\nBEGIN;" not in text
@@ -31,7 +31,7 @@ def test_migrations_have_linear_dependencies_and_tool_owned_transactions() -> No
 
 def test_migrations_use_business_names() -> None:
     forbidden = re.compile(r"(?i)(?:\bf[123]\b|f[123]_terminology_placeholder)")
-    text = "\n".join(path.read_text() for path in migration_files())
+    text = "\n".join(path.read_text(encoding="utf-8") for path in migration_files())
 
     assert forbidden.search(text) is None
     assert "CREATE TABLE agent_run" in text
@@ -40,13 +40,13 @@ def test_migrations_use_business_names() -> None:
 
 
 def test_schema_baseline_contains_27_tables() -> None:
-    text = "\n".join(path.read_text() for path in migration_files())
+    text = "\n".join(path.read_text(encoding="utf-8") for path in migration_files())
 
     assert len(re.findall(r"(?m)^CREATE TABLE ", text)) == 27
 
 
 def test_all_tables_and_columns_have_comments() -> None:
-    text = "\n".join(path.read_text() for path in migration_files())
+    text = "\n".join(path.read_text(encoding="utf-8") for path in migration_files())
     expected_tables: set[str] = set()
     expected_columns: set[tuple[str, str]] = set()
 
@@ -75,4 +75,4 @@ def test_all_tables_and_columns_have_comments() -> None:
 def test_yoyo_can_parse_all_sql_migrations() -> None:
     migrations = read_migrations(str(MIGRATION_DIRECTORY))
 
-    assert len(migrations) == 16
+    assert len(migrations) == 17

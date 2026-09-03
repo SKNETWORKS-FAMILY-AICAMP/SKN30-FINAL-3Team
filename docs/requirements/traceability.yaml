@@ -1,5 +1,5 @@
 version: 1
-updated: "2026-08-31"
+updated: "2026-09-03"
 
 # 상세 요구사항은 분할 Markdown 정본에만 둔다.
 # 구현 또는 테스트가 생긴 PR에서 요구사항 ID별 경로를 추가한다.
@@ -33,3 +33,74 @@ requirements:
     implementation:
       - frontend/src/AppShell.jsx
       - frontend/src/features/DetailWorkspace.jsx
+  - id: F4-TK-02
+    summary: 세대·손님의 임대차 만기를 일정 목록에 포함
+    implementation:
+      - backend/src/domain/time_keeper/repository.py
+    tests:
+      - backend/tests/api/test_time_keeper.py
+  - id: F4-TK-04
+    summary: 마지막 접촉에 주기를 더해 재연락 기한 생성
+    implementation:
+      - backend/src/domain/time_keeper/repository.py
+      - backend/src/domain/time_keeper/models.py
+    tests:
+      - backend/tests/api/test_time_keeper.py
+  - id: F4-TK-05
+    summary: 매물 접수일에 주기를 더해 조건 재확인 기한 생성
+    implementation:
+      - backend/src/domain/time_keeper/repository.py
+    tests:
+      - backend/tests/api/test_time_keeper.py
+  - id: F4-TK-07
+    summary: 앞으로 볼 기간과 되돌아볼 기간을 함께 적용
+    implementation:
+      - backend/src/domain/time_keeper/models.py
+    tests:
+      - backend/tests/unit/test_time_keeper_window.py
+      - backend/tests/api/test_time_keeper.py
+  - id: F4-TK-10
+    summary: 종류별 상한으로 한 종류가 목록을 독차지하지 않게 제한
+    implementation:
+      - backend/src/domain/time_keeper/repository.py
+    tests:
+      - backend/tests/api/test_time_keeper.py
+  - id: F4-TK-12
+    summary: 건수가 0인 종류를 응답과 화면에서 모두 제외
+    implementation:
+      - backend/src/domain/time_keeper/repository.py
+      - frontend/src/features/timeKeeper/model/viewModel.ts
+      - frontend/src/features/timeKeeper/AgendaList.tsx
+    tests:
+      - backend/tests/api/test_time_keeper.py
+      - frontend/tests/time-keeper.test.ts
+  - id: F4-TK-15
+    summary: 서버 기준일로 계산한 남은 일수를 화면이 그대로 사용
+    implementation:
+      - backend/src/domain/time_keeper/models.py
+      - frontend/src/features/timeKeeper/model/viewModel.ts
+    tests:
+      - backend/tests/unit/test_time_keeper_window.py
+      - frontend/tests/time-keeper.test.ts
+  - id: F4-TK-08
+    summary: 상단바 알림 버튼이 일정 목록을 연다
+    implementation:
+      - frontend/src/AppShell.jsx
+      - frontend/src/features/timeKeeper/TimeKeeperNotification.tsx
+  - id: F4-TK-18
+    summary: 업무 시작 시각 이후 첫 접속에 브리핑을 한 번 연다
+    implementation:
+      - frontend/src/features/timeKeeper/model/briefing.ts
+      - frontend/src/features/timeKeeper/hooks/useDailyBriefing.ts
+    tests:
+      - frontend/tests/time-keeper-briefing.test.ts
+  - id: F4-TK-19
+    summary: 같은 업무일에는 브리핑을 다시 열지 않는다
+    implementation:
+      - frontend/src/features/timeKeeper/model/briefing.ts
+    tests:
+      - frontend/tests/time-keeper-briefing.test.ts
+  - id: F4-TK-20
+    summary: 알릴 것이 없는 날은 브리핑을 열지 않는다
+    implementation:
+      - frontend/src/features/timeKeeper/TimeKeeperNotification.tsx

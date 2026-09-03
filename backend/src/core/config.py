@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Any
 
 from dotenv import dotenv_values
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field, SecretStr, model_validator
 from core.errors import ConfigurationError
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_WORKER_READY_FILE = Path(gettempdir()) / "brokerage-worker-ready"
 
 
 class AppEnvironment(StrEnum):
@@ -93,7 +95,7 @@ class LogConfig(BaseModel):
 
 class WorkerConfig(BaseModel):
     enabled: bool = False
-    ready_file: Path = Path("/tmp/brokerage-worker-ready")
+    ready_file: Path = DEFAULT_WORKER_READY_FILE
     worker_id: str | None = None
 
     @model_validator(mode="after")
@@ -242,7 +244,7 @@ def bind_config(source: Mapping[str, str]) -> Config:
         ),
         worker=WorkerConfig(
             enabled=_boolean(source, "WORKER_ENABLED", False),
-            ready_file=Path(source.get("WORKER_READY_FILE", "/tmp/brokerage-worker-ready")),
+            ready_file=Path(source.get("WORKER_READY_FILE", str(DEFAULT_WORKER_READY_FILE))),
             worker_id=_optional(source, "WORKER_ID"),
         ),
         f2=F2Config(

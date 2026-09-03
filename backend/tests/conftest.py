@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 
 import pytest
 
@@ -27,6 +28,7 @@ def config_values(**overrides: str) -> dict[str, str]:
         "HTTP_ALLOWED_HOSTS": '["testserver","localhost"]',
         "LOG_LEVEL": "INFO",
         "LOG_FORMAT": "console",
+        "WORKER_READY_FILE": str(Path(__file__).resolve().parent / ".worker-ready"),
     }
     values.update(overrides)
     return values
