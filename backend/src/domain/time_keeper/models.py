@@ -245,25 +245,27 @@ def days_until_due(due: date, as_of: date) -> int:
     return (due - as_of).days
 
 
-def recontact_contact_bounds(window: AgendaWindow) -> tuple[datetime, datetime]:
-    """재연락 기한이 창 안에 드는 ``last_contact_at`` 구간. 아래는 닫히고 위는 열린다.
+def recontact_contact_deadline(window: AgendaWindow) -> datetime:
+    """재연락 대상이 되는 ``last_contact_at`` 의 위쪽 경계. 열린 구간이다.
 
-    조건을 컬럼이 아니라 상수 쪽에 둔다. ``날짜(last_contact_at) + 주기 BETWEEN a AND b`` 로 쓰면
-    컬럼에 연산이 붙어 인덱스를 타지 못하고 매번 전체를 훑는다. 같은 뜻을 ``last_contact_at`` 자체의
-    범위로 옮기면 부분 인덱스를 그대로 쓴다.
+    **아래쪽 경계는 두지 않는다.** 밀린 연락은 시간이 지난다고 사라지지 않고 오히려 급해진다.
+    되돌아보는 창(``overdue_days``)을 여기에도 걸면 1년 방치된 손님이 목록에서 빠지는데, 그
+    손님이야말로 F1-AL-03 이 말하는 "일정 기간 이상 접촉이 없는" 대상이다. 기한 이른 순 정렬과
+    종류별 상한이 분량을 잡고, 밀린 전체 건수는 종류별 총계가 알린다.
 
-    경계는 사무소 시간대의 자정이다. 위쪽을 열어 두는 이유는 마지막 날 하루를 통째로 담기 위해서다.
+    조건을 컬럼이 아니라 상수 쪽에 둔다. ``날짜(last_contact_at) + 주기 <= 기준`` 으로 쓰면 컬럼에
+    연산이 붙어 인덱스를 타지 못한다. 같은 뜻을 ``last_contact_at`` 자체의 상한으로 옮긴다.
+
+    경계는 사무소 시간대의 자정이며 위쪽을 열어 마지막 날 하루를 통째로 담는다.
     """
     shift = timedelta(days=window.recontact_days)
-    lower = datetime.combine(window.earliest - shift, time.min, tzinfo=KST)
-    upper = datetime.combine(window.latest - shift + timedelta(days=1), time.min, tzinfo=KST)
-    return lower, upper
+    return datetime.combine(window.latest - shift + timedelta(days=1), time.min, tzinfo=KST)
 
 
-def revalidation_received_bounds(window: AgendaWindow) -> tuple[date, date]:
-    """재확인 기한이 창 안에 드는 ``received_at`` 구간. 양끝을 포함한다.
+def revalidation_received_deadline(window: AgendaWindow) -> date:
+    """재확인 대상이 되는 ``received_at`` 의 위쪽 경계. 이 날짜를 포함한다.
 
-    ``received_at`` 은 DATE 라 시간대 변환 없이 날짜끼리 옮기면 된다.
+    재연락과 같은 이유로 아래쪽 경계를 두지 않는다. 오래 묵은 매물일수록 조건이 아직 유효한지
+    확인할 필요가 크다. ``received_at`` 은 DATE 라 시간대 변환 없이 날짜끼리 옮기면 된다.
     """
-    shift = timedelta(days=window.revalidation_days)
-    return window.earliest - shift, window.latest - shift
+    return window.latest - timedelta(days=window.revalidation_days)

@@ -164,9 +164,38 @@ def test_recontact_is_derived_from_the_last_contact_and_the_configured_period(
         assert categories(default_window) == ["CLIENT_RECONTACT"]
         assert default_window["items"][0]["days_until_due"] == 2
 
-        # 주기를 7일로 줄이면 21일 전에 기한이 지났으므로 되돌아보는 창(7일) 밖으로 나간다.
+        # 주기를 7일로 줄이면 기한이 21일 전으로 밀리지만 재연락은 아래쪽 경계가 없어 남는다.
         shorter = client.get(AGENDA, params={"recontact_days": 7}).json()
-        assert shorter["total"] == 0
+        assert categories(shorter) == ["CLIENT_RECONTACT"]
+        assert shorter["items"][0]["days_until_due"] == -21
+
+
+@requires_database
+def test_long_neglected_targets_stay_on_the_list(config: Config) -> None:
+    """F1-AL-03은 "일정 기간 이상 접촉이 없는" 대상을 알리라고 한다.
+
+    되돌아보는 창을 재연락에도 걸면 오래 방치된 대상이 빠지는데, 그 대상이야말로 알려야 할
+    사람이다. 기한 이른 순 정렬이라 가장 오래 방치된 쪽이 위에 온다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        recent = create_consented_party(session, brokerage_id, user_id, "최근 손님")
+        stale = create_consented_party(session, brokerage_id, user_id, "방치 손님")
+        recent_id = create_requirement(client, recent)
+        stale_id = create_requirement(client, stale)
+        set_last_contact(session, "property_requirement", recent_id, 25)
+        set_last_contact(session, "property_requirement", stale_id, 400)
+
+        body = client.get(AGENDA).json()
+
+        assert body["total"] == 2
+        names = [item["contacts"][0]["party"]["name"] for item in body["items"]]
+        assert names == ["방치 손님", "최근 손님"]
+        # 400일 전 접촉 + 주기 30일 → 370일 지남
+        assert body["items"][0]["days_until_due"] == -370
+
+        # 되돌아보는 창을 0으로 줄여도 밀린 재연락은 그대로 남는다.
+        without_overdue = client.get(AGENDA, params={"overdue_days": 0}).json()
+        assert without_overdue["total"] == 2
 
 
 @requires_database

@@ -98,8 +98,17 @@ function clientItem(
   };
 }
 
+/** 주기 규칙으로 만드는 종류. 서버와 같이 되돌아보는 창을 적용하지 않는다. */
+const RULE_CATEGORIES = new Set([
+  "LISTING_RECONTACT",
+  "CLIENT_RECONTACT",
+  "LISTING_REVALIDATION",
+]);
+
 /** 기한이 이른 순. 지난 건, 오늘, 앞으로가 모두 한 번씩 나오게 둔다. */
 const ITEMS: readonly AgendaItemDto[] = [
+  // 1년 넘게 접촉이 없는 손님. 되돌아보는 창에 걸리지 않고 목록 맨 위에 온다.
+  clientItem("CLIENT_RECONTACT", -370, 39, "묵은손님", "010-1111-0000"),
   unitItem("TENANCY_EXPIRY", -2, "101", "1503", [
     { role: "TENANT", name: "박임차", phone: "010-2345-6789" },
   ]),
@@ -124,8 +133,11 @@ export const mockTransport: TimeKeeperTransport = {
 
     const withinDays = query.withinDays ?? 90;
     const overdueDays = query.overdueDays ?? 7;
+    // 주기로 만드는 종류는 아래쪽 경계가 없다. 밀린 연락과 확인은 시간이 지나도 사라지지 않는다.
     const matched = ITEMS.filter(
-      (item) => item.days_until_due >= -overdueDays && item.days_until_due <= withinDays,
+      (item) =>
+        item.days_until_due <= withinDays &&
+        (RULE_CATEGORIES.has(item.category) || item.days_until_due >= -overdueDays),
     );
     const perCategoryLimit = query.perCategoryLimit ?? 3;
     const offset = query.offset ?? 0;

@@ -550,7 +550,7 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 | 질의 변수 | 기본값 | 범위 | 의미 |
 |---|---|---|---|
 | `within_days` | 90 | 1~730 | 앞으로 며칠까지 볼지. F1-AL-01의 "기본 3개월"을 일수로 옮긴 값 |
-| `overdue_days` | 7 | 0~365 | 이미 지난 기한을 며칠까지 함께 볼지 |
+| `overdue_days` | 7 | 0~365 | 이미 지난 기한을 며칠까지 함께 볼지. **장부에 날짜가 적힌 종류에만 적용한다** |
 | `recontact_days` | 30 | 1~365 | 마지막 접촉 후 며칠이면 재연락 대상으로 볼지 (F1-AL-03) |
 | `revalidation_days` | 30 | 1~365 | 매물 접수 후 며칠이면 조건 재확인 대상으로 볼지 |
 | `per_category_limit` | 3 | 1~100 | 한 종류에서 실을 최대 건수 |
@@ -574,6 +574,11 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 | `LISTING_RECONTACT` | `property_unit.last_contact_at` + `recontact_days` | 주기 규칙 |
 | `CLIENT_RECONTACT` | `property_requirement.last_contact_at` + `recontact_days` | 주기 규칙 |
 | `LISTING_REVALIDATION` | `property_listing.received_at` + `revalidation_days` | 주기 규칙 |
+
+주기 규칙으로 만드는 세 종류에는 `overdue_days` 를 적용하지 않는다. 밀린 연락과 확인은 시간이 지난다고
+사라지지 않고 오히려 급해지므로 아래쪽 경계를 두지 않는다. 1년 전에 접촉한 손님도 목록에 남으며
+기한 이른 순 정렬이라 가장 오래 방치된 쪽이 위에 온다. 분량은 `per_category_limit` 이 잡고, 밀린
+전체 건수는 `categories` 의 총계가 알린다.
 
 계약 체결일, 계약금·중도금·잔금 지급일, 임장·매물 방문일, 신고·서류 제출 기한과 명도일은
 **대응 데이터가 없어 이 계약에 없다.** 앞의 넷은 계약·일정 테이블(F1-CT-01~03, F1-SC-01~05)이

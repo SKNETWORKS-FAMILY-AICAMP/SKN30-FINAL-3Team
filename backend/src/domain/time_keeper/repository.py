@@ -10,8 +10,8 @@
 모든 갈래의 ``WHERE``는 migration 002·009·017이 만든 부분 인덱스 조건과 **같은 모양**으로 둔다.
 조건이 어긋나면 인덱스를 두고도 전체 스캔이 된다. 두 가지를 지킨다.
 
-1. 주기로 만드는 갈래는 기한을 컬럼에서 계산하지 않고 상수 쪽으로 옮겨 원본 컬럼의 범위 조건으로
-   쓴다. 컬럼에 연산이 붙으면 범위 조건이 인덱스를 타지 못한다.
+1. 주기로 만드는 갈래는 기한을 컬럼에서 계산하지 않고 상수 쪽으로 옮겨 원본 컬럼의 조건으로
+   쓴다. 컬럼에 연산이 붙으면 인덱스를 타지 못한다. 이 갈래는 아래쪽 경계가 없어 상한 하나만 건다.
 2. 삭제 조건은 ``is_deleted = FALSE`` 로 쓴다. ``IS FALSE`` 로 쓰면 PostgreSQL 이 부분 인덱스의
    ``WHERE is_deleted = FALSE`` 와 같은 조건임을 증명하지 못해 인덱스를 후보에서 뺀다. 실제 계획을
    비교해 확인한 차이다.
@@ -27,7 +27,6 @@ from sqlalchemy import (
     Date,
     String,
     Subquery,
-    and_,
     cast,
     false,
     func,
@@ -53,8 +52,8 @@ from domain.time_keeper.models import (
     AgendaWindow,
     RequirementAgendaDetail,
     UnitAgendaDetail,
-    recontact_contact_bounds,
-    revalidation_received_bounds,
+    recontact_contact_deadline,
+    revalidation_received_deadline,
 )
 
 # 종료된 구입 의뢰와 내려간 매물의 일정은 알리지 않는다. F1이 아직 상태 값 목록을 확정하지
@@ -106,10 +105,12 @@ def _no_id() -> Any:
     return cast(null(), BigInteger)
 
 
-def _contacted_within(timestamp_column: Any, window: AgendaWindow) -> Any:
-    """재연락 기한이 창 안에 드는 마지막 접촉 시각 범위. 원본 컬럼에 그대로 건다."""
-    lower, upper = recontact_contact_bounds(window)
-    return and_(timestamp_column >= lower, timestamp_column < upper)
+def _recontact_due(timestamp_column: Any, window: AgendaWindow) -> Any:
+    """재연락할 때가 된 대상. 원본 컬럼의 상한 하나로 건다.
+
+    아래쪽 경계가 없어 오래 방치된 대상일수록 기한이 앞서고 목록 위에 온다.
+    """
+    return timestamp_column < recontact_contact_deadline(window)
 
 
 def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
@@ -137,7 +138,7 @@ def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
             requirement_id=_no_id(),
             conditions=[*live_unit, last_contact.is_not(None)],
             window=window,
-            in_window=_contacted_within(last_contact, window),
+            in_window=_recontact_due(last_contact, window),
         ),
     ]
 
@@ -158,7 +159,7 @@ def _listing_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
                 received.is_not(None),
             ],
             window=window,
-            in_window=received.between(*revalidation_received_bounds(window)),
+            in_window=received <= revalidation_received_deadline(window),
         )
     ]
 
@@ -197,7 +198,7 @@ def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
             requirement_id=col(PropertyRequirement.id),
             conditions=[*live_requirement, last_contact.is_not(None)],
             window=window,
-            in_window=_contacted_within(last_contact, window),
+            in_window=_recontact_due(last_contact, window),
         )
     )
     return members
