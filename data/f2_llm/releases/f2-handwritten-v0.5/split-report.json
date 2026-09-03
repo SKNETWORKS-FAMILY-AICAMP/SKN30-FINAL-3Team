@@ -1,0 +1,110 @@
+{
+  "source": {
+    "path": "data/f2_llm/working/f2_handwritten_dialogue_scenarios.privacy_safe.v0.5.jsonl",
+    "sha256": "93b29d8aee3d256976bba391a407e9d16728e3e2f689440b20ffdc7e3eb0be29",
+    "count": 1508,
+    "full_output_rows": 1508,
+    "ledger_distribution": {
+      "매물장": 752,
+      "구입장": 756
+    },
+    "cell_distribution": {
+      "매물장+매도의뢰": 504,
+      "구입장+매수문의": 484,
+      "매물장+기타상담": 160,
+      "구입장+기타상담": 160,
+      "구입장+매도의뢰": 112,
+      "매물장+매수문의": 88
+    },
+    "ledger_mismatch_count": 200,
+    "rows_with_fields": 988,
+    "rows_without_fields": 520
+  },
+  "split_policy": {
+    "group_key": "source_group_id",
+    "stratify_key": "label",
+    "validation_per_label_target": 50,
+    "test_per_label_target": 50,
+    "seed": 20260820
+  },
+  "outputs": {
+    "train": {
+      "path": "data/f2_llm/releases/f2-handwritten-v0.5/train.jsonl",
+      "sha256": "ba0d1680a708f674c1c07b250078d76a11f22fbf1ac98f79396f8bd7382e708f",
+      "count": 1196,
+      "label_distribution": {
+        "매도의뢰": 512,
+        "매수문의": 468,
+        "기타상담": 216
+      },
+      "full_output_rows": 1196,
+      "ledger_distribution": {
+        "매물장": 592,
+        "구입장": 604
+      },
+      "cell_distribution": {
+        "매물장+매도의뢰": 416,
+        "구입장+매수문의": 396,
+        "구입장+기타상담": 112,
+        "매물장+기타상담": 104,
+        "구입장+매도의뢰": 96,
+        "매물장+매수문의": 72
+      },
+      "ledger_mismatch_count": 168,
+      "rows_with_fields": 812,
+      "rows_without_fields": 384
+    },
+    "validation": {
+      "path": "data/f2_llm/releases/f2-handwritten-v0.5/validation.jsonl",
+      "sha256": "0d0393163ce7dc00cb06f04e5baec889b5189fc8f493fab1a7a78454ba42eefe",
+      "count": 156,
+      "label_distribution": {
+        "매도의뢰": 52,
+        "매수문의": 52,
+        "기타상담": 52
+      },
+      "full_output_rows": 156,
+      "ledger_distribution": {
+        "매물장": 72,
+        "구입장": 84
+      },
+      "cell_distribution": {
+        "구입장+매수문의": 44,
+        "매물장+매도의뢰": 44,
+        "구입장+기타상담": 32,
+        "매물장+기타상담": 20,
+        "매물장+매수문의": 8,
+        "구입장+매도의뢰": 8
+      },
+      "ledger_mismatch_count": 16,
+      "rows_with_fields": 88,
+      "rows_without_fields": 68
+    },
+    "test": {
+      "path": "data/f2_llm/releases/f2-handwritten-v0.5/test.jsonl",
+      "sha256": "de57e85ab9e517cd215e2dd2764d724e7d53ab9b7bc4df5d678fb69bec2562ec",
+      "count": 156,
+      "label_distribution": {
+        "매도의뢰": 52,
+        "매수문의": 52,
+        "기타상담": 52
+      },
+      "full_output_rows": 156,
+      "ledger_distribution": {
+        "매물장": 88,
+        "구입장": 68
+      },
+      "cell_distribution": {
+        "매물장+매도의뢰": 44,
+        "구입장+매수문의": 44,
+        "매물장+기타상담": 36,
+        "구입장+기타상담": 16,
+        "매물장+매수문의": 8,
+        "구입장+매도의뢰": 8
+      },
+      "ledger_mismatch_count": 16,
+      "rows_with_fields": 88,
+      "rows_without_fields": 68
+    }
+  }
+}

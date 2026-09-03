@@ -1,4 +1,16 @@
-"""F2 장부 필드 추출·근거·요약 평가용 합성 full-output v0.4 초안을 생성한다."""
+"""F2 장부 필드 추출·근거·요약 학습·평가용 합성 full-output v0.5 초안을 생성한다.
+
+v0.4에서 바뀐 점은 네 가지다.
+
+1. 장부 배정을 blueprint 밖으로 꺼내 (장부, 상담 유형) 셀별 목표 건수로 직접 통제한다.
+2. 분할 단위를 blueprint 하나에서 (blueprint, 대화 형태) 조합으로 쪼개 그룹 수를 늘린다.
+3. 필드 값이 없는 대화 문장에만 STT 표기 흔들림을 넣는다.
+4. 대화 형태 10개 중 3개는 핵심 사실만 남겨 짧은 상담에서도 필드 정답이 존재하게 한다.
+
+필드 제안이 금지된 구간(장부 불일치·기타상담)은 재포장 도구가 짧은 사례를 따로 공급한다.
+이 생성기도 같은 구간을 긴 사례로 남겨 둔다. 빈 필드 정답이 전부 짧은 문장에만 붙으면 모델이
+길이로 필드 유무를 가르는 지름길을 배우기 때문이다.
+"""
 
 from __future__ import annotations
 
@@ -7,19 +19,56 @@ import math
 import re
 import statistics
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# 상담 로그 초안 규칙을 재포장 도구와 하나로 유지한다. 두 산출물의 summary 형식이 갈라지면
+# 모델이 필드 유무를 요약 문체로 구분해 버린다.
+from rewrap_classification_to_full_output import is_ledger_mismatch, key_sentences
+
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = (
-    ROOT / "f2_llm" / "working" / "f2_full_output_scenarios.privacy_safe.v0.4.jsonl"
+    ROOT / "f2_llm" / "working" / "f2_full_output_scenarios.privacy_safe.v0.5.jsonl"
 )
-DATASET_VERSION = "0.4.0"
+DATASET_VERSION = "0.5.0"
 SOURCE_TYPE = "fully_synthetic_from_deterministic_blueprint"
 REVIEW_STATUS = "generated_unreviewed"
-ROWS_PER_LABEL = 300
-VARIANTS_PER_BLUEPRINT = 30
 PLACEHOLDER_PHONE = "010-1234-5678"
+
+# 한 blueprint를 몇 가지 대화 형태로 펼칠지. 형태가 분할 단위의 일부라 그룹 수를 좌우한다.
+SHAPES_PER_BLUEPRINT = 10
+# 핵심 사실과 본인 식별 문장만 남기는 압축형. shape는 그룹 키의 일부이므로
+# 압축형과 확장형이 서로 다른 split으로 헤어져도 그룹 내 누수는 생기지 않는다.
+COMPACT_SHAPES = frozenset({1, 2, 3})
+
+
+@dataclass(frozen=True)
+class CellSpec:
+    """(현재 장부, 상담 유형) 조합과 그 조합을 만들 blueprint·반복 수."""
+
+    slug: str
+    label: str
+    ledger_type: str
+    blueprints: tuple[int, ...]
+    rows_per_group: int
+    index_base: int
+
+
+# blueprint 0~7은 장부가 맞는 필드 보유 사례, 8~9는 장부가 어긋난 사례로 이미 나뉘어 있다.
+# 기타상담은 OTHER_BLUEPRINTS를 앞뒤로 갈라 그룹마다 장부를 하나로 고정한다.
+CELLS = (
+    CellSpec("sell-on-property", "매도의뢰", "매물장", tuple(range(8)), 4, 0),
+    CellSpec("buy-on-buyer", "매수문의", "구입장", tuple(range(8)), 4, 3000),
+    CellSpec("buy-on-property", "매수문의", "매물장", (8, 9), 2, 6000),
+    CellSpec("sell-on-buyer", "매도의뢰", "구입장", (8, 9), 2, 9000),
+    CellSpec("other-on-property", "기타상담", "매물장", tuple(range(5)), 2, 12000),
+    CellSpec("other-on-buyer", "기타상담", "구입장", tuple(range(5, 10)), 2, 15000),
+)
+
+LABEL_IDENTITY_OFFSET = {"매도의뢰": 0, "매수문의": 1000, "기타상담": 2000}
+
+STT_FILLERS = ("어", "그", "음", "저기")
 
 LABELS = ("매도의뢰", "매수문의", "기타상담")
 LEDGERS = ("매물장", "구입장")
@@ -161,6 +210,21 @@ CONVERSATION_CLOSINGS = (
     "같은 말을 반복했더라도 임의로 합쳐서 다른 값으로 만들지는 말아 주세요.",
 )
 
+REPEAT_CUE = "방금 말씀하신 핵심 부분을 같은 표현으로 한 번만 다시 확인하겠습니다."
+CLOSING_CUE = "네, 자동 저장하지 않고 제안 목록과 상담 로그 초안으로만 보여드리겠습니다."
+
+# STT 표기 흔들림을 넣어도 되는 문장. 생성기가 맥락용으로 끼워 넣는 문장만 해당한다.
+# 상담 내용을 담은 문장은 필드 값과 근거, 본인 이름 발화를 품고 있어 원문 그대로 두어야 한다.
+FILLER_TEXTS = frozenset(
+    DIALOGUE_OPENINGS
+    + CUSTOMER_CONTEXTS
+    + INTERRUPTIONS
+    + AGENT_ACKNOWLEDGEMENTS
+    + CONVERSATION_CLOSINGS
+    + tuple(line for review in MID_CALL_REVIEWS for line in review)
+    + (REPEAT_CUE, CLOSING_CUE)
+)
+
 Fragment = tuple[str, dict[str, str]]
 
 
@@ -198,51 +262,100 @@ def fragment(text: str, **fields: str) -> Fragment:
     return text, fields
 
 
-def expand_dialogue(
-    *, label: str, blueprint: int, variant: int, fragments: list[Fragment]
-) -> tuple[list[Fragment], list[str]]:
-    """핵심 사실 사이에 안전한 대화 맥락을 끼워 실제 통화처럼 길고 비정형으로 만든다."""
+def apply_stt_noise(text: str, seed: int) -> str:
+    """필드 값이 없는 대화 문장에만 STT 표기 흔들림을 넣는다.
 
-    shift = variant % len(fragments)
+    필드 근거 문장은 건드리지 않는다. evidence는 원문 부분문자열이어야 하고 필드 값도 원문
+    표현이어야 해서, 값이 들어간 문장을 흔들면 정답 계약이 깨진다. 실제 STT 오류는 값 자체도
+    망가뜨리므로 이 축은 표면 노이즈만 다룬다는 한계를 manifest에 적는다.
+    """
+
+    mode = seed % 4
+    if mode == 0:
+        return text
+    if mode == 1:
+        return f"{STT_FILLERS[seed % len(STT_FILLERS)]}, {text}"
+    if mode == 2:
+        # STT가 문장 끝 구두점을 놓치는 경우.
+        return text.rstrip(".")
+    words = text.split(" ")
+    if len(words) < 3:
+        return text
+    # 어절 경계가 뭉개져 앞 두 어절이 붙는 경우.
+    return " ".join([words[0] + words[1], *words[2:]])
+
+
+def expand_dialogue(
+    *, label: str, blueprint: int, shape: int, fragments: list[Fragment]
+) -> tuple[list[Fragment], list[str]]:
+    """핵심 사실 사이에 안전한 대화 맥락을 끼워 실제 통화처럼 길고 비정형으로 만든다.
+
+    대화 형태는 shape가 결정한다. 같은 (blueprint, shape)를 공유하는 행은 같은 그룹이 되고
+    슬롯 값만 달라진다. 분할은 그룹 단위라 이 행들이 서로 다른 split으로 흩어지지 않는다.
+    """
+
+    shift = shape % len(fragments)
     ordered = fragments[shift:] + fragments[:shift]
+    if shape in COMPACT_SHAPES:
+        tags = ["short_dialogue", "compact_dialogue", "unlabeled_multi_speaker_stt"]
+        if shift:
+            tags.append("reordered_facts")
+        if label == "기타상담":
+            tags.append("no_field_proposal")
+        return ordered, tags
+
     expanded: list[Fragment] = [
-        fragment(DIALOGUE_OPENINGS[(blueprint + variant) % len(DIALOGUE_OPENINGS)]),
-        fragment(CUSTOMER_CONTEXTS[(blueprint * 2 + variant) % len(CUSTOMER_CONTEXTS)]),
+        fragment(DIALOGUE_OPENINGS[(blueprint + shape) % len(DIALOGUE_OPENINGS)]),
+        fragment(CUSTOMER_CONTEXTS[(blueprint * 2 + shape) % len(CUSTOMER_CONTEXTS)]),
     ]
     for position, item in enumerate(ordered):
         expanded.append(item)
         if position == 0:
             expanded.append(
-                fragment(AGENT_ACKNOWLEDGEMENTS[(blueprint + variant * 2) % len(AGENT_ACKNOWLEDGEMENTS)])
+                fragment(AGENT_ACKNOWLEDGEMENTS[(blueprint + shape * 2) % len(AGENT_ACKNOWLEDGEMENTS)])
             )
         elif position == 1:
             expanded.append(
-                fragment(INTERRUPTIONS[(blueprint * 3 + variant) % len(INTERRUPTIONS)])
+                fragment(INTERRUPTIONS[(blueprint * 3 + shape) % len(INTERRUPTIONS)])
             )
-    repeated = variant % 4 == 0
+    repeated = shape % 4 == 0
     if repeated:
         expanded.extend(
             [
-                fragment("방금 말씀하신 핵심 부분을 같은 표현으로 한 번만 다시 확인하겠습니다."),
+                fragment(REPEAT_CUE),
                 ordered[0],
             ]
         )
-    review = MID_CALL_REVIEWS[(blueprint * 2 + variant) % len(MID_CALL_REVIEWS)]
+    review = MID_CALL_REVIEWS[(blueprint * 2 + shape) % len(MID_CALL_REVIEWS)]
     expanded.extend(fragment(text) for text in review)
     expanded.extend(
         [
-            fragment(CONVERSATION_CLOSINGS[(blueprint + variant * 3) % len(CONVERSATION_CLOSINGS)]),
-            fragment("네, 자동 저장하지 않고 제안 목록과 상담 로그 초안으로만 보여드리겠습니다."),
+            fragment(CONVERSATION_CLOSINGS[(blueprint + shape * 3) % len(CONVERSATION_CLOSINGS)]),
+            fragment(CLOSING_CUE),
         ]
     )
+
+    noised: list[Fragment] = []
+    noise_applied = False
+    for position, (item_text, item_fields) in enumerate(expanded):
+        if item_text not in FILLER_TEXTS:
+            # 상담 내용 문장은 원문 그대로 둔다.
+            noised.append((item_text, item_fields))
+            continue
+        changed = apply_stt_noise(item_text, blueprint * 7 + shape * 3 + position)
+        noise_applied = noise_applied or changed != item_text
+        noised.append((changed, item_fields))
+
     tags = ["long_dialogue", "unlabeled_multi_speaker_stt", "interleaved_context", "disfluency"]
     if shift:
         tags.append("reordered_facts")
     if repeated:
         tags.append("repeated_statement")
+    if noise_applied:
+        tags.append("stt_surface_noise")
     if label == "기타상담":
         tags.append("no_field_proposal")
-    return expanded, tags
+    return noised, tags
 
 
 def build_expected(
@@ -268,9 +381,15 @@ def build_expected(
         field_summary = ", ".join(f"{name} {value}" for name, value in fields.items())
         summary = f"{label} 상담의 확인된 조건: {field_summary}."
     elif mismatch:
-        summary = f"{label} 상담이지만 현재 {ledger_type}과 일치하지 않아 상담 로그만 작성함."
+        summary = (
+            f"{label}로 판단했으나 현재 장부가 {ledger_type}이라 필드를 제안하지 않았습니다."
+            f" 상담 요지: {key_sentences(transcript)}"
+        )
     else:
-        summary = "장부 필드 제안 대상이 아닌 기타상담 내용을 안내용 로그로 정리함."
+        summary = (
+            "장부 필드 제안 대상이 아닌 기타상담이라 상담 로그만 남깁니다."
+            f" 상담 요지: {key_sentences(transcript)}"
+        )
     if uncertainties:
         summary = f"{summary} 추가 확인: {'; '.join(uncertainties)}."
     return transcript, {
@@ -490,82 +609,141 @@ OTHER_BLUEPRINTS = (
 )
 
 
-def make_records(label: str) -> list[dict[str, Any]]:
+def build_core_fragments(
+    cell: CellSpec, blueprint: int, index: int
+) -> tuple[list[Fragment], list[str]]:
+    """blueprint가 만드는 장부가 셀 목표와 어긋나지 않는지 확인하며 핵심 문장을 만든다."""
+
+    if cell.label == "매도의뢰":
+        ledger_type, fragments, uncertainties = property_fragments(blueprint, index)
+    elif cell.label == "매수문의":
+        ledger_type, fragments, uncertainties = buyer_fragments(blueprint, index)
+    else:
+        value = values(index + LABEL_IDENTITY_OFFSET["기타상담"])
+        ledger_type = cell.ledger_type
+        fragments = [
+            fragment(OTHER_BLUEPRINTS[blueprint].format(**value)),
+            fragment("필드 제안 없이 상담 로그만 작성해 주세요."),
+        ]
+        uncertainties = []
+    if ledger_type != cell.ledger_type:
+        raise ValueError(
+            f"{cell.slug}: blueprint {blueprint}의 장부 {ledger_type}가 "
+            f"셀 목표 {cell.ledger_type}와 다릅니다"
+        )
+    return fragments, uncertainties
+
+
+def identity_fragment(label: str, customer_name: str) -> Fragment:
+    """모든 사례에 합성 고객의 본인 이름 발화를 남긴다."""
+
+    if label == "매도의뢰":
+        return fragment(
+            f"제 이름은 {customer_name}이고 이 매물의 임대인입니다.", 임대인=customer_name
+        )
+    if label == "매수문의":
+        return fragment(
+            f"제 이름은 {customer_name}이고 제가 직접 구입할 집을 찾고 있습니다.",
+            **{"구입자 이름": customer_name},
+        )
+    return fragment(f"제 이름은 {customer_name}이고 오늘은 일반 문의로 연락드렸습니다.")
+
+
+def group_id_of(cell: CellSpec, blueprint: int, shape: int) -> str:
+    return f"f2-full-v05-{cell.slug}-bp{blueprint:02d}-s{shape:02d}"
+
+
+def cell_targets() -> dict[str, int]:
+    """셀별 목표 건수. 여섯 조합은 서로 겹치지 않는다."""
+
+    return {
+        f"{cell.ledger_type}+{cell.label}": (
+            len(cell.blueprints) * SHAPES_PER_BLUEPRINT * cell.rows_per_group
+        )
+        for cell in CELLS
+    }
+
+
+def group_targets() -> dict[str, int]:
+    return {
+        group_id_of(cell, blueprint, shape): cell.rows_per_group
+        for cell in CELLS
+        for blueprint in cell.blueprints
+        for shape in range(SHAPES_PER_BLUEPRINT)
+    }
+
+
+def compact_target_counts() -> tuple[int, int]:
+    """압축형 전체 건수와 그중 필드 정답이 있는 건수를 반환한다."""
+
+    compact_rows = sum(
+        len(cell.blueprints) * len(COMPACT_SHAPES) * cell.rows_per_group for cell in CELLS
+    )
+    compact_rows_with_fields = sum(
+        len(cell.blueprints) * len(COMPACT_SHAPES) * cell.rows_per_group
+        for cell in CELLS
+        if cell.label != "기타상담" and not is_ledger_mismatch(cell.ledger_type, cell.label)
+    )
+    return compact_rows, compact_rows_with_fields
+
+
+def make_records() -> list[dict[str, Any]]:
+    """셀 목표표를 따라 (blueprint, 대화 형태) 그룹마다 정해진 수만큼 사례를 만든다."""
+
     rows: list[dict[str, Any]] = []
-    slug = {"매도의뢰": "sell", "매수문의": "buy", "기타상담": "other"}[label]
-    for blueprint in range(10):
-        for variant in range(VARIANTS_PER_BLUEPRINT):
-            ordinal = blueprint * VARIANTS_PER_BLUEPRINT + variant + 1
-            if label == "매도의뢰":
-                ledger_type, fragments, uncertainties = property_fragments(blueprint, ordinal)
-            elif label == "매수문의":
-                ledger_type, fragments, uncertainties = buyer_fragments(blueprint, ordinal)
-            else:
-                value = values(ordinal + 2000)
-                ledger_type = LEDGERS[ordinal % 2]
-                text = OTHER_BLUEPRINTS[blueprint].format(**value)
-                fragments = [fragment(text), fragment("필드 제안 없이 상담 로그만 작성해 주세요.")]
-                uncertainties = []
-            identity_offset = {"매도의뢰": 0, "매수문의": 1000, "기타상담": 2000}[label]
-            customer_name = values(ordinal + identity_offset)["name"]
-            if label == "매도의뢰":
-                fragments.append(
-                    fragment(
-                        f"제 이름은 {customer_name}이고 이 매물의 임대인입니다.",
-                        임대인=customer_name,
+    for cell in CELLS:
+        ordinal = 0
+        for blueprint in cell.blueprints:
+            for shape in range(SHAPES_PER_BLUEPRINT):
+                for _ in range(cell.rows_per_group):
+                    ordinal += 1
+                    index = cell.index_base + ordinal
+                    core, uncertainties = build_core_fragments(cell, blueprint, index)
+                    customer_name = values(index + LABEL_IDENTITY_OFFSET[cell.label])["name"]
+                    fragments = [*core, identity_fragment(cell.label, customer_name)]
+                    if shape not in COMPACT_SHAPES:
+                        fragments.append(
+                            fragment(
+                                f"연락 가능 시간은 {9 + ordinal % 10}시 "
+                                f"{(ordinal // 10) % 6 * 10:02d}분 이후입니다."
+                            )
+                        )
+                    fragments, difficulty_tags = expand_dialogue(
+                        label=cell.label,
+                        blueprint=blueprint,
+                        shape=shape,
+                        fragments=fragments,
                     )
-                )
-            elif label == "매수문의":
-                fragments.append(
-                    fragment(
-                        f"제 이름은 {customer_name}이고 제가 직접 구입할 집을 찾고 있습니다.",
-                        **{"구입자 이름": customer_name},
+                    transcript, expected = build_expected(
+                        label=cell.label,
+                        ledger_type=cell.ledger_type,
+                        fragments=fragments,
+                        uncertainties=uncertainties,
                     )
-                )
-            else:
-                fragments.append(
-                    fragment(f"제 이름은 {customer_name}이고 오늘은 일반 문의로 연락드렸습니다.")
-                )
-            contact_hour = 9 + variant % 10
-            contact_minute = (variant // 10) * 10
-            fragments.append(
-                fragment(f"연락 가능 시간은 {contact_hour}시 {contact_minute:02d}분 이후입니다.")
-            )
-            fragments, difficulty_tags = expand_dialogue(
-                label=label,
-                blueprint=blueprint,
-                variant=variant,
-                fragments=fragments,
-            )
-            transcript, expected = build_expected(
-                label=label,
-                ledger_type=ledger_type,
-                fragments=fragments,
-                uncertainties=uncertainties,
-            )
-            if expected["ledger_mismatch"]:
-                difficulty_tags.append("ledger_mismatch")
-            if expected["uncertainties"]:
-                difficulty_tags.append("uncertain_or_conflicting_values")
-            if len(expected["fields"]) >= 5:
-                difficulty_tags.append("many_fields")
-            difficulty_tags.append("spoken_self_identification")
-            rows.append(
-                {
-                    "sample_id": f"f2-full-v04-{slug}-{ordinal:04d}",
-                    "dataset_version": DATASET_VERSION,
-                    "label": label,
-                    "transcript": transcript,
-                    "ledger_type": ledger_type,
-                    "expected": expected,
-                    "source_type": SOURCE_TYPE,
-                    "source_group_id": f"f2-full-v04-{slug}-blueprint-{blueprint:02d}",
-                    "split": "unassigned",
-                    "contains_real_personal_data": False,
-                    "review_status": REVIEW_STATUS,
-                    "difficulty_tags": difficulty_tags,
-                }
-            )
+                    if expected["ledger_mismatch"]:
+                        difficulty_tags.append("ledger_mismatch")
+                        difficulty_tags.append("suppressed_field_values")
+                    if expected["uncertainties"]:
+                        difficulty_tags.append("uncertain_or_conflicting_values")
+                    if len(expected["fields"]) >= 5:
+                        difficulty_tags.append("many_fields")
+                    difficulty_tags.append("spoken_self_identification")
+                    rows.append(
+                        {
+                            "sample_id": f"f2-full-v05-{cell.slug}-{ordinal:04d}",
+                            "dataset_version": DATASET_VERSION,
+                            "label": cell.label,
+                            "transcript": transcript,
+                            "ledger_type": cell.ledger_type,
+                            "expected": expected,
+                            "source_type": SOURCE_TYPE,
+                            "source_group_id": group_id_of(cell, blueprint, shape),
+                            "split": "unassigned",
+                            "contains_real_personal_data": False,
+                            "review_status": REVIEW_STATUS,
+                            "difficulty_tags": difficulty_tags,
+                        }
+                    )
     return rows
 
 
@@ -584,8 +762,9 @@ def validate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "review_status",
         "difficulty_tags",
     }
-    if len(rows) != ROWS_PER_LABEL * len(LABELS):
-        raise ValueError(f"expected 900 rows, got {len(rows)}")
+    targets = cell_targets()
+    if len(rows) != sum(targets.values()):
+        raise ValueError(f"expected {sum(targets.values())} rows, got {len(rows)}")
     if any(set(row) != expected_keys for row in rows):
         raise ValueError("full-output schema mismatch")
     ids = [row["sample_id"] for row in rows]
@@ -596,8 +775,9 @@ def validate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         raise ValueError("duplicate transcript")
 
     label_counts = Counter(row["label"] for row in rows)
-    if label_counts != Counter({label: ROWS_PER_LABEL for label in LABELS}):
-        raise ValueError(f"unexpected label distribution: {label_counts}")
+    cell_counts = Counter(f"{row['ledger_type']}+{row['label']}" for row in rows)
+    if cell_counts != Counter(targets):
+        raise ValueError(f"unexpected cell distribution: {dict(cell_counts)}")
 
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     field_counts: Counter[str] = Counter()
@@ -641,6 +821,8 @@ def validate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         for field_name, cited in evidence.items():
             if not isinstance(cited, str) or cited not in row["transcript"]:
                 raise ValueError(f"evidence is not grounded: {row['sample_id']}:{field_name}")
+        if expected["ledger_mismatch"] != is_ledger_mismatch(row["ledger_type"], row["label"]):
+            raise ValueError(f"ledger mismatch rule violated: {row['sample_id']}")
         if expected["ledger_mismatch"]:
             mismatch_count += 1
         if (expected["ledger_mismatch"] or row["label"] == "기타상담") and fields:
@@ -651,25 +833,60 @@ def validate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             raise ValueError(f"spoken buyer name not extracted: {row['sample_id']}")
         field_counts.update(fields.keys())
 
+    expected_group_sizes = group_targets()
+    if set(groups) != set(expected_group_sizes):
+        raise ValueError("source_group_id set does not match the cell plan")
     for group_id, group_rows in groups.items():
-        if len(group_rows) != VARIANTS_PER_BLUEPRINT:
-            raise ValueError(f"{group_id}: expected {VARIANTS_PER_BLUEPRINT} variants")
-        if len({row["label"] for row in group_rows}) != 1:
-            raise ValueError(f"{group_id}: multiple labels")
-    transcript_lengths = [len(row["transcript"]) for row in rows]
-    if min(transcript_lengths) < 400 or max(transcript_lengths) > 1200:
+        if len(group_rows) != expected_group_sizes[group_id]:
+            raise ValueError(
+                f"{group_id}: expected {expected_group_sizes[group_id]} rows, "
+                f"got {len(group_rows)}"
+            )
+        # 그룹은 분할 단위다. 한 그룹이 두 조합에 걸치면 그룹째 빠질 때 조합이 통째로 사라진다.
+        if len({(row["label"], row["ledger_type"]) for row in group_rows}) != 1:
+            raise ValueError(f"{group_id}: multiple label/ledger combinations")
+    compact_rows = [row for row in rows if "compact_dialogue" in row["difficulty_tags"]]
+    compact_rows_with_fields = [row for row in compact_rows if row["expected"]["fields"]]
+    expected_compact_rows, expected_compact_rows_with_fields = compact_target_counts()
+    if len(compact_rows) != expected_compact_rows:
         raise ValueError(
-            f"transcript length outside 400..1200: {min(transcript_lengths)}..{max(transcript_lengths)}"
+            f"expected {expected_compact_rows} compact rows, got {len(compact_rows)}"
+        )
+    if len(compact_rows_with_fields) != expected_compact_rows_with_fields:
+        raise ValueError(
+            "unexpected compact rows with fields: "
+            f"expected {expected_compact_rows_with_fields}, got {len(compact_rows_with_fields)}"
+        )
+
+    transcript_lengths = [len(row["transcript"]) for row in rows]
+    if min(transcript_lengths) < 80 or max(transcript_lengths) > 1200:
+        raise ValueError(
+            f"transcript length outside 80..1200: {min(transcript_lengths)}..{max(transcript_lengths)}"
         )
     ordered_lengths = sorted(transcript_lengths)
     p95_index = max(0, math.ceil(len(ordered_lengths) * 0.95) - 1)
+
+    def length_summary(selected: list[dict[str, Any]]) -> dict[str, float | int]:
+        lengths = sorted(len(row["transcript"]) for row in selected)
+        return {
+            "minimum": lengths[0],
+            "median": statistics.median(lengths),
+            "maximum": lengths[-1],
+        }
+
     return {
         "rows": len(rows),
-        "labels": dict(label_counts),
+        "labels": dict(sorted(label_counts.items())),
+        "cells": dict(sorted(cell_counts.items())),
         "source_groups": len(groups),
-        "variants_per_group": VARIANTS_PER_BLUEPRINT,
+        "shapes_per_blueprint": SHAPES_PER_BLUEPRINT,
+        "rows_per_group": dict(
+            sorted({cell.slug: cell.rows_per_group for cell in CELLS}.items())
+        ),
         "ledger_mismatch_rows": mismatch_count,
         "rows_with_fields": sum(bool(row["expected"]["fields"]) for row in rows),
+        "compact_rows": len(compact_rows),
+        "compact_rows_with_fields": len(compact_rows_with_fields),
         "field_annotation_counts": dict(sorted(field_counts.items())),
         "difficulty_counts": dict(sorted(difficulty_counts.items())),
         "transcript_character_length": {
@@ -678,11 +895,21 @@ def validate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "p95": ordered_lengths[p95_index],
             "maximum": max(transcript_lengths),
         },
+        "transcript_character_length_by_field_presence": {
+            "with_fields": length_summary(
+                [row for row in rows if row["expected"]["fields"]]
+            ),
+            "without_fields": length_summary(
+                [row for row in rows if not row["expected"]["fields"]]
+            ),
+        },
+        "compact_transcript_character_length": length_summary(compact_rows),
+        "compact_with_fields_character_length": length_summary(compact_rows_with_fields),
     }
 
 
 def main() -> None:
-    rows = [row for label in LABELS for row in make_records(label)]
+    rows = make_records()
     report = validate(rows)
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_PATH.open("w", encoding="utf-8") as output:
