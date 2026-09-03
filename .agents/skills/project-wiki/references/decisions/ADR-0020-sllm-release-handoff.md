@@ -1,16 +1,18 @@
 ---
 status: 결정
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # ADR-0020: SLLM 릴리스 전달과 임시 dev 서빙
 
-- 상태: 승인됨·코드 구현, 외부 자원 미적용
+- 상태: 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용
 - 결정일: 2026-09-01
 - 상위 런타임 유지: [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md)의
   `EC2 Backend + 설치형 brokerage-ai + RunPod 추론` 구조
 - 부분 대체: [Infra ADR-0002](../../../infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)의
   개발자별 RunPod 운영, 시연 기간 Pod 유지, 조건부 Network Volume 조항
+- 후속 대체: release schema·승인·검증과 base-only는
+  [ADR-0022](ADR-0022-sllm-release-v2-base-only.md)를 적용한다.
 
 ## 맥락
 

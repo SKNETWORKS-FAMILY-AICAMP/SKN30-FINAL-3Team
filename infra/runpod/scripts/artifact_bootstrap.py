@@ -25,6 +25,20 @@ RELEASE_ROOT = Path("/opt/f2-models")
 EVALUATION_SUMMARY = "evaluation-summary.json"
 PROMOTION_APPROVAL = "promotion-approval.json"
 PROMOTION_DECISION_OWNER = "fine-tuning-owner"
+V2_ADAPTER_FILES = {
+    "README.md",
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "added_tokens.json",
+    "chat_template.jinja",
+    "generation_config.json",
+    "merges.txt",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer.model",
+    "tokenizer_config.json",
+    "vocab.json",
+}
 
 
 class BootstrapError(RuntimeError):
@@ -52,9 +66,11 @@ DIRECT_OPENER = urllib.request.build_opener(
 @dataclass(frozen=True)
 class Release:
     release_id: str
+    release_mode: str
     base_model_id: str
     base_model_revision: str
-    adapter_path: str
+    adapter_path: str | None
+    release_stage: str = "verified"
 
 
 def _required(source: dict[str, str], name: str) -> str:
@@ -83,6 +99,23 @@ def _verify_sha256(path: Path, expected: Any, label: str) -> None:
         raise BootstrapError(f"{label} is unreadable") from error
     if actual != expected:
         raise BootstrapError(f"{label} checksum does not match the release manifest")
+
+
+def _adapter_tree_sha256(root: Path) -> tuple[str, int, int]:
+    digest = hashlib.sha256()
+    size = 0
+    count = 0
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = path.relative_to(root).as_posix().encode()
+        content = hashlib.sha256(path.read_bytes()).digest()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        digest.update(content)
+        size += path.stat().st_size
+        count += 1
+    return digest.hexdigest(), size, count
 
 
 def _download(url: str, expected_sha256: str, output: Path) -> None:
@@ -165,8 +198,9 @@ def _extract(archive_path: Path, destination: Path) -> dict[str, Any]:
 def _validate(
     manifest: dict[str, Any], expected_release_id: str, destination: Path
 ) -> Release:
+    schema_version = manifest.get("schema_version")
     if (
-        manifest.get("schema_version") != 1
+        schema_version not in {1, 2}
         or manifest.get("release_id") != expected_release_id
         or manifest.get("capability") != "f2-consultation-analysis"
         or manifest.get("served_model_name") != "sllm"
@@ -183,6 +217,76 @@ def _validate(
         raise BootstrapError("release base model id is invalid")
     if not isinstance(revision, str) or COMMIT.fullmatch(revision) is None:
         raise BootstrapError("release base model revision is invalid")
+    release_mode = "lora" if schema_version == 1 else manifest.get("release_mode")
+    if release_mode not in {"lora", "base"}:
+        raise BootstrapError("release mode is invalid")
+
+    release_stage = (
+        "verified" if schema_version == 1 else manifest.get("release_stage", "verified")
+    )
+    if release_stage not in {"verified", "dev"}:
+        raise BootstrapError("release stage is invalid")
+    if release_stage == "dev":
+        evaluation = manifest.get("evaluation")
+        if not expected_release_id.startswith("dev-"):
+            raise BootstrapError("dev release id must start with dev-")
+        if (
+            not isinstance(evaluation, dict)
+            or set(evaluation) != {"status", "dataset_release"}
+            or evaluation.get("status") != "not-evaluated"
+            or not isinstance(evaluation.get("dataset_release"), str)
+            or not evaluation["dataset_release"].strip()
+            or (destination / EVALUATION_SUMMARY).exists()
+            or (destination / PROMOTION_APPROVAL).exists()
+        ):
+            raise BootstrapError("dev release evaluation marker is invalid")
+        adapter = destination / "adapter"
+        adapter_manifest = manifest.get("adapter")
+        if release_mode == "base":
+            if (
+                adapter.exists()
+                or adapter_manifest is not None
+                or manifest.get("training") is not None
+            ):
+                raise BootstrapError("base release must not contain an adapter")
+            adapter_path = None
+        else:
+            adapter_files = (
+                {
+                    path.relative_to(adapter).as_posix()
+                    for path in adapter.rglob("*")
+                    if path.is_file()
+                }
+                if adapter.is_dir()
+                else set()
+            )
+            if (
+                not adapter.is_dir()
+                or not (adapter / "adapter_config.json").is_file()
+                or not (adapter / "adapter_model.safetensors").is_file()
+                or not isinstance(adapter_manifest, dict)
+                or not isinstance(manifest.get("training"), dict)
+                or (schema_version == 2 and bool(adapter_files - V2_ADAPTER_FILES))
+            ):
+                raise BootstrapError("release adapter is incomplete")
+            adapter_sha, adapter_size, adapter_count = _adapter_tree_sha256(adapter)
+            if (
+                adapter_manifest.get("sha256") != adapter_sha
+                or adapter_manifest.get("size_bytes") != adapter_size
+                or adapter_manifest.get("file_count") != adapter_count
+            ):
+                raise BootstrapError(
+                    "release adapter metadata does not match its files"
+                )
+            adapter_path = str(adapter)
+        return Release(
+            expected_release_id,
+            str(release_mode),
+            model_id,
+            revision,
+            adapter_path,
+            "dev",
+        )
 
     evaluation = manifest.get("evaluation")
     if not isinstance(evaluation, dict):
@@ -194,6 +298,15 @@ def _validate(
         or evaluation.get("promotion_status") != "approved"
     ):
         raise BootstrapError("release manifest promotion contract is invalid")
+    if schema_version == 2 and (
+        not isinstance(evaluation.get("dataset_release"), str)
+        or not evaluation["dataset_release"].strip()
+        or not isinstance(evaluation.get("dataset_sha256"), str)
+        or SHA256.fullmatch(evaluation["dataset_sha256"]) is None
+        or not isinstance(evaluation.get("source_summary_sha256"), str)
+        or SHA256.fullmatch(evaluation["source_summary_sha256"]) is None
+    ):
+        raise BootstrapError("release evaluation provenance is invalid")
     selected_model = evaluation.get("selected_model")
     if not isinstance(selected_model, str) or not selected_model.strip():
         raise BootstrapError("release manifest selected model is invalid")
@@ -201,7 +314,9 @@ def _validate(
     summary_path = destination / EVALUATION_SUMMARY
     approval_path = destination / PROMOTION_APPROVAL
     _verify_sha256(summary_path, evaluation.get("summary_sha256"), "evaluation summary")
-    _verify_sha256(approval_path, evaluation.get("approval_sha256"), "promotion approval")
+    _verify_sha256(
+        approval_path, evaluation.get("approval_sha256"), "promotion approval"
+    )
     summary = _json_object(summary_path, "evaluation summary")
     approval = _json_object(approval_path, "promotion approval")
     if summary.get("task") != "full":
@@ -219,8 +334,9 @@ def _validate(
         or selected_model not in labels
     ):
         raise BootstrapError("evaluation summary does not match the promoted model")
+    approval_version = 1 if schema_version == 1 else 2
     if (
-        approval.get("schema_version") != 1
+        approval.get("schema_version") != approval_version
         or approval.get("status") != "approved"
         or approval.get("evaluation_run_id") != evaluation_run_id
         or approval.get("selected_model") != selected_model
@@ -229,15 +345,74 @@ def _validate(
         or not approval["rationale"].strip()
     ):
         raise BootstrapError("promotion approval does not match the release manifest")
+    if schema_version == 2:
+        selected = next(
+            (
+                model
+                for model in models
+                if isinstance(model, dict) and model.get("label") == selected_model
+            ),
+            None,
+        )
+        if (
+            summary.get("dataset_release") != evaluation["dataset_release"]
+            or summary.get("dataset_sha256") != evaluation["dataset_sha256"]
+            or summary.get("release_mode") != release_mode
+            or approval.get("release_mode") != release_mode
+            or not isinstance(selected, dict)
+            or selected.get("model_id") != model_id
+            or selected.get("resolved_model_revision") != revision
+            or selected.get("adapter_sha256")
+            != (
+                manifest.get("adapter", {}).get("sha256")
+                if release_mode == "lora" and isinstance(manifest.get("adapter"), dict)
+                else None
+            )
+        ):
+            raise BootstrapError(
+                "release evaluation provenance does not match the manifest"
+            )
 
     adapter = destination / "adapter"
-    if (
-        not adapter.is_dir()
-        or not (adapter / "adapter_config.json").is_file()
-        or not (adapter / "adapter_model.safetensors").is_file()
-    ):
-        raise BootstrapError("release adapter is incomplete")
-    return Release(expected_release_id, model_id, revision, str(adapter))
+    adapter_manifest = manifest.get("adapter")
+    if release_mode == "base":
+        if (
+            adapter.exists()
+            or adapter_manifest is not None
+            or manifest.get("training") is not None
+        ):
+            raise BootstrapError("base release must not contain an adapter")
+        adapter_path = None
+    else:
+        adapter_files = (
+            {
+                path.relative_to(adapter).as_posix()
+                for path in adapter.rglob("*")
+                if path.is_file()
+            }
+            if adapter.is_dir()
+            else set()
+        )
+        if (
+            not adapter.is_dir()
+            or not (adapter / "adapter_config.json").is_file()
+            or not (adapter / "adapter_model.safetensors").is_file()
+            or not isinstance(adapter_manifest, dict)
+            or not isinstance(manifest.get("training"), dict)
+            or (schema_version == 2 and bool(adapter_files - V2_ADAPTER_FILES))
+        ):
+            raise BootstrapError("release adapter is incomplete")
+        adapter_sha, adapter_size, adapter_count = _adapter_tree_sha256(adapter)
+        if (
+            adapter_manifest.get("sha256") != adapter_sha
+            or adapter_manifest.get("size_bytes") != adapter_size
+            or adapter_manifest.get("file_count") != adapter_count
+        ):
+            raise BootstrapError("release adapter metadata does not match its files")
+        adapter_path = str(adapter)
+    return Release(
+        expected_release_id, str(release_mode), model_id, revision, adapter_path
+    )
 
 
 def bootstrap(environment: dict[str, str] | None = None) -> Release:
@@ -267,7 +442,9 @@ def bootstrap(environment: dict[str, str] | None = None) -> Release:
         stage.rename(destination)
     return Release(
         release_id,
+        release.release_mode,
         release.base_model_id,
         release.base_model_revision,
-        str(destination / "adapter"),
+        str(destination / "adapter") if release.adapter_path is not None else None,
+        release.release_stage,
     )

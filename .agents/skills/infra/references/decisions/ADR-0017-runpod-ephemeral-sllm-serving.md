@@ -1,13 +1,18 @@
 ---
 status: 결정
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # ADR-0017: RunPod 임시 SLLM dev 서빙
 
-- 상태: 부분 대체됨·코드 구현, 외부 자원 미적용
+- 상태: 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용
 - 대체: [ADR-0016](ADR-0016-runpod-shared-f2-serving.md)
 - 확장: 최초 구축·비밀 회전·관측과 reconcile은 [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)이 대체한다.
+- 확장: LoRA·base release v2, S3 cross-hash와 모델명 health는
+  [프로젝트 ADR-0022](../../../project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md)를 적용한다.
+- 확장: 미평가 개발 실행은
+  [프로젝트 ADR-0023](../../../project-wiki/references/decisions/ADR-0023-sllm-dev-unevaluated-release.md)의
+  `dev-*` bundle과 전용 create 명령만 사용한다.
 
 ## 결정
 

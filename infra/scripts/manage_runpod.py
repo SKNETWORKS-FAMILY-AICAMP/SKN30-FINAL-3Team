@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -122,6 +123,19 @@ class HttpRequester(Protocol):
     def __call__(self, request: urllib.request.Request, timeout: float) -> bytes: ...
 
 
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        request: urllib.request.Request,
+        file_pointer: Any,
+        code: int,
+        message: str,
+        headers: Any,
+        new_url: str,
+    ) -> None:
+        return None
+
+
 def urlopen_request(request: urllib.request.Request, timeout: float) -> bytes:
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.read()
@@ -166,12 +180,12 @@ class RunpodApi:
         except (urllib.error.URLError, TimeoutError):
             raise ToolError(f"RunPod API {method} {path} was unreachable") from None
         except json.JSONDecodeError:
-            raise ToolError(f"RunPod API {method} {path} returned invalid JSON") from None
+            raise ToolError(
+                f"RunPod API {method} {path} returned invalid JSON"
+            ) from None
 
     def registry(self, registry_id: str) -> dict[str, Any]:
-        return one_object(
-            self.request("GET", f"/containerregistryauth/{registry_id}")
-        )
+        return one_object(self.request("GET", f"/containerregistryauth/{registry_id}"))
 
     def pods(self) -> list[dict[str, Any]]:
         return object_list(self.request("GET", "/pods"))
@@ -188,7 +202,9 @@ class RunpodApi:
         terminate_after: str | None,
     ) -> dict[str, Any]:
         if terminate_after is not None:
-            raise ToolError("automatic Pod termination is outside the operating contract")
+            raise ToolError(
+                "automatic Pod termination is outside the operating contract"
+            )
         return one_object(
             self.request(
                 "POST",
@@ -270,6 +286,13 @@ def load_template_spec(path: Path, *, allow_placeholder: bool = False) -> Templa
         "F2_SLLM_MODEL_REVISION",
         "F2_SLLM_LORA_PATH",
         "F2_SLLM_BUNDLE_URL",
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN",
+        "HUGGINGFACE_HUB_TOKEN",
+        "HUGGINGFACE_TOKEN",
+        "HUGGING_FACE_TOKEN",
+        "HF_ACCESS_TOKEN",
+        "HF_API_TOKEN",
     }
     if forbidden & env.keys():
         raise ToolError("Template must not hardcode a SLLM release or bundle URL")
@@ -330,9 +353,11 @@ def aws_operational_values(
         ai_raw = secrets_client.get_secret_value(
             SecretId=f"/{prefix}/ai/provider-api-keys"
         ).get("SecretString")
-        control_raw = ssm_client.get_parameter(
-            Name=f"/{prefix}/runpod/RUNPOD_CONTROL_SET"
-        ).get("Parameter", {}).get("Value")
+        control_raw = (
+            ssm_client.get_parameter(Name=f"/{prefix}/runpod/RUNPOD_CONTROL_SET")
+            .get("Parameter", {})
+            .get("Value")
+        )
     except ToolError:
         raise
     except (BotoCoreError, ClientError) as error:
@@ -391,20 +416,28 @@ def verify_pod(
         raise ToolError("shared Pod must use exactly one GPU")
 
 
-def request_models(base_url: str, api_key: str) -> dict[str, Any]:
+def request_models(base_url: str, api_key: str, expected_model: str) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base_url}/models", headers={"Authorization": f"Bearer {api_key}"}
     )
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), NoRedirectHandler()
+    )
     started = time.monotonic()
     try:
         with opener.open(request, timeout=15) as response:
             payload = json.loads(response.read(1024 * 1024))
-            ok = (
-                response.status == 200
-                and isinstance(payload, dict)
-                and isinstance(payload.get("data"), list)
+            data = payload.get("data") if isinstance(payload, dict) else None
+            model_ids = (
+                {
+                    item.get("id")
+                    for item in data
+                    if isinstance(item, dict) and isinstance(item.get("id"), str)
+                }
+                if isinstance(data, list)
+                else set()
             )
+            ok = response.status == 200 and expected_model in model_ids
             return {
                 "ok": ok,
                 "status": response.status,
@@ -423,7 +456,7 @@ class AwsOperations:
         self.parameter_name = parameter_name
         self.project = project
 
-    def release(self, release_id: str) -> tuple[dict[str, Any], str, str]:
+    def release(self, release_id: str) -> tuple[dict[str, Any], str]:
         if artifact.RELEASE_ID.fullmatch(release_id) is None:
             raise ToolError("release-id is invalid")
         prefix = artifact.release_prefix(release_id)
@@ -439,34 +472,75 @@ class AwsOperations:
                 str(manifest_path),
             )
             try:
-                manifest = artifact._validate_manifest(
-                    json.loads(manifest_path.read_text(encoding="utf-8"))
-                )
+                manifest_bytes = manifest_path.read_bytes()
+                manifest = artifact._validate_manifest(json.loads(manifest_bytes))
             except (OSError, json.JSONDecodeError, artifact.ToolError) as error:
                 raise ToolError("published SLLM release manifest is invalid") from error
-        head = self.client.run(
-            "s3api",
-            "head-object",
-            "--bucket",
-            self.bucket,
-            "--key",
-            f"{prefix}/bundle.tar.gz",
+        manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+        manifest_head = self.client.object_head(
+            bucket=self.bucket, key=f"{prefix}/release.json"
+        )
+        bundle_head = self.client.object_head(
+            bucket=self.bucket, key=f"{prefix}/bundle.tar.gz"
         )
         try:
-            bundle_sha = json.loads(head)["Metadata"]["sha256"]
-        except (KeyError, TypeError, json.JSONDecodeError) as error:
+            manifest_metadata = manifest_head["Metadata"]
+            bundle_metadata = bundle_head["Metadata"]
+            bundle_sha = bundle_metadata["sha256"]
+        except (KeyError, TypeError) as error:
             raise ToolError(
-                "published SLLM bundle is missing its checksum metadata"
+                "published SLLM release is missing checksum metadata"
             ) from error
         if (
             not isinstance(bundle_sha, str)
             or artifact.SHA256.fullmatch(bundle_sha) is None
+            or manifest_metadata.get("sha256") != manifest_sha
         ):
-            raise ToolError("published SLLM bundle checksum metadata is invalid")
-        url = self.client.presign(
+            raise ToolError("published SLLM release checksum metadata is inconsistent")
+        cross_hashes = (
+            manifest_metadata.get("bundle-sha256"),
+            bundle_metadata.get("release-manifest-sha256"),
+        )
+        if manifest["schema_version"] == 2 and cross_hashes != (
+            bundle_sha,
+            manifest_sha,
+        ):
+            raise ToolError("published SLLM v2 release cross-hashes are inconsistent")
+        if manifest["schema_version"] == 1 and cross_hashes not in {
+            (None, None),
+            (bundle_sha, manifest_sha),
+        }:
+            raise ToolError("published SLLM v1 release cross-hashes are inconsistent")
+        return manifest, bundle_sha
+
+    def presign(self, release_id: str) -> str:
+        prefix = artifact.release_prefix(release_id)
+        return self.client.presign(
             bucket=self.bucket, key=f"{prefix}/bundle.tar.gz", expires=3600
         )
-        return manifest, bundle_sha, url
+
+    def dev_instance_id(self) -> str:
+        instances = self.client.run(
+            "ec2",
+            "describe-instances",
+            "--filters",
+            f"Name=tag:Project,Values={self.project}",
+            "Name=tag:Environment,Values=dev",
+            "Name=instance-state-name,Values=running",
+            "--query",
+            "Reservations[].Instances[].InstanceId",
+            "--output",
+            "json",
+        )
+        try:
+            ids = json.loads(instances)
+        except json.JSONDecodeError as error:
+            raise ToolError(
+                "could not identify the dev application instance"
+            ) from error
+        if not isinstance(ids, list) or len(ids) != 1 or not isinstance(ids[0], str):
+            raise ToolError("expected exactly one running dev application instance")
+        return ids[0]
 
     def current_endpoint(self) -> dict[str, Any]:
         raw = self.client.run(
@@ -500,38 +574,23 @@ class AwsOperations:
             json.dumps(dict(value), separators=(",", ":")),
         )
 
-    def _run_dev_script(self, script: str, comment: str) -> None:
-        instances = self.client.run(
-            "ec2",
-            "describe-instances",
-            "--filters",
-            f"Name=tag:Project,Values={self.project}",
-            "Name=tag:Environment,Values=dev",
-            "Name=instance-state-name,Values=running",
-            "--query",
-            "Reservations[].Instances[].InstanceId",
-            "--output",
-            "json",
-        )
-        try:
-            ids = json.loads(instances)
-        except json.JSONDecodeError as error:
-            raise ToolError(
-                "could not identify the dev application instance"
-            ) from error
-        if not isinstance(ids, list) or len(ids) != 1 or not isinstance(ids[0], str):
-            raise ToolError("expected exactly one running dev application instance")
+    def _run_dev_script(
+        self, script: str, comment: str, *, instance_id: str | None = None
+    ) -> None:
+        instance_id = instance_id or self.dev_instance_id()
         response = self.client.run(
             "ssm",
             "send-command",
             "--instance-ids",
-            ids[0],
+            instance_id,
             "--document-name",
             "AWS-RunShellScript",
             "--comment",
             comment,
             "--parameters",
-            json.dumps({"commands": [f"sudo /opt/brokerage/revision/scripts/{script}"]}),
+            json.dumps(
+                {"commands": [f"sudo /opt/brokerage/revision/scripts/{script}"]}
+            ),
             "--query",
             "Command.CommandId",
             "--output",
@@ -546,7 +605,7 @@ class AwsOperations:
                 "--command-id",
                 command_id,
                 "--instance-id",
-                ids[0],
+                instance_id,
                 "--query",
                 "Status",
                 "--output",
@@ -566,6 +625,18 @@ class AwsOperations:
 
     def smoke(self) -> None:
         self._run_dev_script("smoke_f2.sh", "Smoke test ephemeral RunPod F2 release")
+
+    def smoke_offline(self) -> None:
+        self._run_dev_script("smoke_f2_offline.sh", "Smoke test offline F2 contract")
+
+    def preflight_backend(self) -> str:
+        instance_id = self.dev_instance_id()
+        self._run_dev_script(
+            "preflight_runpod_create.sh",
+            "Preflight Backend targets for ephemeral RunPod F2 release",
+            instance_id=instance_id,
+        )
+        return instance_id
 
 
 def endpoint_value(
@@ -603,14 +674,37 @@ class Controller:
     spec: TemplateSpec
     template_id: str
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
-    requester: Callable[[str, str], dict[str, Any]] = request_models
+    requester: Callable[[str, str, str], dict[str, Any]] = request_models
     sleeper: Callable[[float], None] = time.sleep
+
+    @staticmethod
+    def emit_reconcile_guidance(
+        pod_id: str, *, rollback_refresh_failed: bool, pod_delete_failed: bool
+    ) -> None:
+        actions = [
+            "just -f infra/justfile runpod-status",
+            "just -f infra/justfile runpod-reconcile",
+        ]
+        if rollback_refresh_failed:
+            actions.append(
+                "restore the intended SSM endpoint value, rerun the approved Backend "
+                "endpoint refresh, then run the matching active/offline smoke"
+            )
+        if pod_delete_failed:
+            actions.append(f"just -f infra/justfile runpod-delete {pod_id}")
+        emit(
+            "runpod-reconcile-required",
+            pod_id=pod_id,
+            rollback_refresh_failed=rollback_refresh_failed,
+            pod_delete_failed=pod_delete_failed,
+            actions=actions,
+        )
 
     def health(self, pod_id: str, keys: tuple[str, str]) -> dict[str, Any]:
         sllm, stt = proxy_urls(pod_id)
         return {
-            "sllm": self.requester(sllm, keys[0]),
-            "stt": self.requester(stt, keys[1]),
+            "sllm": self.requester(sllm, keys[0], "sllm"),
+            "stt": self.requester(stt, keys[1], "stt"),
         }
 
     def wait_ready(self, pod_id: str, keys: tuple[str, str]) -> dict[str, Any]:
@@ -633,23 +727,36 @@ class Controller:
         terminate_after: str | None,
         apply: bool,
         keys: tuple[str, str],
+        allow_dev_release: bool = False,
     ) -> None:
         if shared_pods(self.runpod.pods()):
             raise ToolError(
                 f"a Pod named {SHARED_POD_NAME!r} already exists; delete it first"
             )
-        manifest, bundle_sha, url = self.aws.release(release_id)
+        manifest, bundle_sha = self.aws.release(release_id)
+        release_stage = str(manifest.get("release_stage", "verified"))
+        if release_stage == "dev" and not allow_dev_release:
+            raise ToolError("dev release requires the explicit runpod-create-dev path")
+        if release_stage != "dev" and allow_dev_release:
+            raise ToolError("runpod-create-dev only accepts a dev release")
+        instance_id = self.aws.preflight_backend()
         emit(
             "pod-create-plan",
             release_id=release_id,
+            release_stage=release_stage,
+            evaluation_status=(
+                "not-evaluated" if release_stage == "dev" else "approved"
+            ),
             base_model=manifest["base_model"],
             gpu_id=gpu_id,
             cloud_type="SECURE",
             volume_disk_gb=0,
+            backend_instance_id=instance_id,
             apply=apply,
         )
         if not apply:
             return
+        url = self.aws.presign(release_id)
         created = self.runpod.create(
             template_id=self.template_id,
             gpu_id=gpu_id,
@@ -661,27 +768,45 @@ class Controller:
             terminate_after=terminate_after,
         )
         pod_id = resource_id(created)
+        rollback_refresh_failed = False
         try:
             health = self.wait_ready(pod_id, keys)
             previous = self.aws.current_endpoint()
             active = endpoint_value(
                 previous=previous, status="active", pod_id=pod_id, release_id=release_id
             )
-            self.aws.write_endpoint(active)
             try:
+                self.aws.write_endpoint(active)
                 self.aws.refresh()
                 self.aws.smoke()
             except Exception:
-                self.aws.write_endpoint(previous)
-                self.aws.refresh()
+                try:
+                    self.aws.write_endpoint(previous)
+                    self.aws.refresh()
+                except ToolError:
+                    rollback_refresh_failed = True
                 raise
-        except Exception:
-            self.runpod.delete(pod_id)
+        except Exception as error:
+            pod_delete_failed = False
+            try:
+                self.runpod.delete(pod_id)
+            except ToolError:
+                pod_delete_failed = True
+            if rollback_refresh_failed or pod_delete_failed:
+                self.emit_reconcile_guidance(
+                    pod_id,
+                    rollback_refresh_failed=rollback_refresh_failed,
+                    pod_delete_failed=pod_delete_failed,
+                )
+                raise ToolError(
+                    "Pod activation failed and automatic reconciliation is incomplete"
+                ) from error
             raise
         emit(
             "pod-create-complete",
             pod_id=pod_id,
             release_id=release_id,
+            release_stage=release_stage,
             proxy_urls=proxy_urls(pod_id),
             health=health,
             delete_command=f"just -f infra/justfile runpod-delete {pod_id}",
@@ -774,7 +899,7 @@ class Controller:
             self.aws.write_endpoint(offline)
             try:
                 self.aws.refresh()
-            except Exception:
+            except ToolError:
                 self.aws.write_endpoint(endpoint)
                 self.aws.refresh()
                 raise
@@ -790,7 +915,9 @@ class Controller:
                 shared_pod_id=pod_id,
             )
             raise ToolError("active endpoint and shared Pod IDs differ")
-        health = self.health(pod_id, keys) if pod_status(matches[0]) == "RUNNING" else {}
+        health = (
+            self.health(pod_id, keys) if pod_status(matches[0]) == "RUNNING" else {}
+        )
         if not health or not all(item.get("ok") is True for item in health.values()):
             emit(
                 "runpod-reconcile-plan",
@@ -822,18 +949,44 @@ class Controller:
             return
         previous = self.aws.current_endpoint()
         offline = endpoint_value(previous=previous, status="offline")
-        self.aws.write_endpoint(offline)
         try:
+            self.aws.write_endpoint(offline)
             self.aws.refresh()
-        except Exception:
-            self.aws.write_endpoint(previous)
-            self.aws.refresh()
+        except Exception as error:
+            rollback_refresh_failed = False
+            try:
+                self.aws.write_endpoint(previous)
+                self.aws.refresh()
+            except ToolError:
+                rollback_refresh_failed = True
+            if rollback_refresh_failed:
+                self.emit_reconcile_guidance(
+                    pod_id,
+                    rollback_refresh_failed=True,
+                    pod_delete_failed=False,
+                )
+                raise ToolError(
+                    "endpoint offline refresh failed and automatic rollback is incomplete"
+                ) from error
             raise
         try:
             self.runpod.delete(pod_id)
-        except Exception:
-            self.aws.write_endpoint(previous)
-            self.aws.refresh()
+        except Exception as error:
+            rollback_refresh_failed = False
+            try:
+                self.aws.write_endpoint(previous)
+                self.aws.refresh()
+            except ToolError:
+                rollback_refresh_failed = True
+            if rollback_refresh_failed:
+                self.emit_reconcile_guidance(
+                    pod_id,
+                    rollback_refresh_failed=True,
+                    pod_delete_failed=True,
+                )
+                raise ToolError(
+                    "Pod deletion failed and automatic endpoint rollback is incomplete"
+                ) from error
             raise
         emit(
             "pod-delete-complete",
@@ -893,8 +1046,10 @@ def parser() -> argparse.ArgumentParser:
     create.add_argument("--release-id", required=True)
     create.add_argument("--gpu-id", required=True)
     create.add_argument("--apply", action="store_true")
+    create.add_argument("--allow-dev-release", action="store_true")
     commands.add_parser("pod-status")
     commands.add_parser("pod-smoke")
+    commands.add_parser("pod-smoke-offline")
     delete = commands.add_parser("pod-delete")
     delete.add_argument("--pod-id", required=True)
     delete.add_argument("--workloads-stopped-confirmed", action="store_true")
@@ -942,6 +1097,10 @@ def main() -> int:
             aws.smoke()
             emit("pod-smoke-complete")
             return 0
+        if args.command == "pod-smoke-offline":
+            aws.smoke_offline()
+            emit("pod-smoke-offline-complete")
+            return 0
         controller = Controller(runpod, aws, spec, template_id, args.timeout_seconds)
         if args.command == "pod-create":
             controller.create(
@@ -950,6 +1109,7 @@ def main() -> int:
                 terminate_after=None,
                 apply=args.apply,
                 keys=operational.f2_keys,
+                allow_dev_release=args.allow_dev_release,
             )
         elif args.command == "pod-status":
             controller.status(operational.f2_keys)

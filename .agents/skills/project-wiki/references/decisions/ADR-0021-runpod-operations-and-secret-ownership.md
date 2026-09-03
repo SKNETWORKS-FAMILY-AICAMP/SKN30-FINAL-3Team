@@ -9,6 +9,8 @@ updated: 2026-09-01
 - 결정일: 2026-09-01
 - 부분 대체: [ADR-0015](ADR-0015-environment-configuration-ownership.md)의 Terraform 수동 비밀값 소유 방식
 - 유지: [ADR-0020](ADR-0020-sllm-release-handoff.md)의 create/delete와 active/offline 계약
+- 확장: release v2·base-only·bootstrap image generation guard는
+  [ADR-0022](ADR-0022-sllm-release-v2-base-only.md)를 적용한다.
 
 ## 결정
 

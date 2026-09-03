@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -78,11 +79,86 @@ class ModelSpec:
     label: str
 
 
+COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
+ALLOWED_ADAPTER_FILES = {
+    "README.md",
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "added_tokens.json",
+    "chat_template.jinja",
+    "generation_config.json",
+    "merges.txt",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer.model",
+    "tokenizer_config.json",
+    "vocab.json",
+}
+IGNORED_TRAINING_FILES = {"training_args.bin"}
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def adapter_tree_sha256(root: Path) -> str:
+    digest = hashlib.sha256()
+    files: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise ValueError(f"adapter contains a symlink: {path.relative_to(root)}")
+        if not path.is_file():
+            continue
+        relative_path = path.relative_to(root)
+        if any(part.startswith("checkpoint-") for part in relative_path.parts):
+            raise ValueError(f"adapter contains a checkpoint: {relative_path}")
+        if path.name in IGNORED_TRAINING_FILES:
+            continue
+        if relative_path.as_posix() not in ALLOWED_ADAPTER_FILES:
+            raise ValueError(f"adapter contains an unapproved file: {relative_path}")
+        files.append(path)
+    for path in files:
+        relative = path.relative_to(root).as_posix().encode()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        digest.update(bytes.fromhex(file_sha256(path)))
+    return digest.hexdigest()
+
+
+def resolved_model_revision(model: Any, tokenizer: Any) -> str:
+    model_revision = getattr(model.config, "_commit_hash", None)
+    tokenizer_revision = getattr(tokenizer, "init_kwargs", {}).get("_commit_hash")
+    if not isinstance(model_revision, str) or COMMIT_PATTERN.fullmatch(model_revision) is None:
+        raise ValueError("model did not resolve to an immutable Hugging Face commit")
+    if tokenizer_revision is not None and tokenizer_revision != model_revision:
+        raise ValueError("model and tokenizer resolved to different Hugging Face commits")
+    return model_revision
+
+
+def validate_requested_model_revision(value: str | None, model_count: int) -> str | None:
+    if value is None:
+        return None
+    if model_count != 1:
+        raise ValueError("--model-revision 사용 시 --models로 모델 하나만 지정해야 합니다")
+    if COMMIT_PATTERN.fullmatch(value) is None:
+        raise ValueError("--model-revision은 40자리 소문자 Hugging Face commit이어야 합니다")
+    return value
+
+
 def parse_args() -> argparse.Namespace:
     """데이터셋, 비교 모델, 양자화와 결과 저장 위치를 CLI 인자로 받는다."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True, help="평가 JSONL 경로")
+    parser.add_argument(
+        "--dataset-release",
+        required=True,
+        help="평가 데이터 release 식별자(package_release 입력과 동일해야 함)",
+    )
     parser.add_argument(
         "--task",
         choices=("classification", "full"),
@@ -99,6 +175,10 @@ def parse_args() -> argparse.Namespace:
         "--models",
         nargs="+",
         help="실행할 모델 ID 목록(기본: 설정의 전체 모델)",
+    )
+    parser.add_argument(
+        "--model-revision",
+        help="단일 모델 평가에 사용할 40자리 Hugging Face commit",
     )
     parser.add_argument(
         "--quantization",
@@ -491,6 +571,7 @@ def run_model(
     allowed_types: list[str],
     task: str,
     adapter_path: Path | None = None,
+    requested_model_revision: str | None = None,
 ) -> dict[str, Any]:
     """Qwen 모델 하나를 불러와 모든 평가 사례를 실행한다.
 
@@ -511,12 +592,23 @@ def run_model(
 
     # 1. spec.model_id에 맞는 토크나이저를 자동 선택한다.
     # Qwen 전용 클래스를 직접 지정하지 않아도 AutoTokenizer가 config를 보고 결정한다.
-    tokenizer = AutoTokenizer.from_pretrained(spec.model_id)
+    source_kwargs = (
+        {"revision": requested_model_revision} if requested_model_revision is not None else {}
+    )
+    tokenizer = AutoTokenizer.from_pretrained(spec.model_id, **source_kwargs)
 
     # 2. 실제 Qwen 가중치를 다운로드/캐시에서 읽어 메모리에 올린다.
     # AutoModelForCausalLM은 config.json의 model_type을 확인해 내부적으로 적절한
     # Qwen CausalLM 클래스를 선택한다. 따라서 코드에 Qwen3ForCausalLM 이름이 없어도 된다.
-    model = AutoModelForCausalLM.from_pretrained(spec.model_id, **model_load_kwargs(quantization))
+    model = AutoModelForCausalLM.from_pretrained(
+        spec.model_id,
+        **source_kwargs,
+        **model_load_kwargs(quantization),
+    )
+    model_revision = resolved_model_revision(model, tokenizer)
+    if requested_model_revision is not None and model_revision != requested_model_revision:
+        raise ValueError("model did not resolve to the requested Hugging Face commit")
+    adapter_hash = adapter_tree_sha256(adapter_path) if adapter_path is not None else None
     if adapter_path is not None:
         from peft import PeftModel
 
@@ -624,7 +716,9 @@ def run_model(
         {
             "model_id": spec.model_id,
             "label": spec.label,
+            "resolved_model_revision": model_revision,
             "adapter_path": str(adapter_path.resolve()) if adapter_path else None,
+            "adapter_sha256": adapter_hash,
             "load_seconds": load_seconds,
             "peak_cuda_memory_bytes": (
                 torch.cuda.max_memory_allocated() if torch.cuda.is_available() else None
@@ -654,6 +748,10 @@ def main() -> None:
     # 3. models.yaml의 네 후보를 ModelSpec 목록으로 만든다.
     # --models를 지정했다면 그중 요청된 모델만 남는다.
     specs = select_models(config, args.models)
+    requested_model_revision = validate_requested_model_revision(
+        args.model_revision,
+        len(specs),
+    )
     if args.adapter_path is not None:
         if len(specs) != 1:
             raise ValueError("--adapter-path 사용 시 --models로 기반 모델 하나만 지정해야 합니다")
@@ -680,6 +778,7 @@ def main() -> None:
                 allowed_types,
                 args.task,
                 args.adapter_path,
+                requested_model_revision,
             )
         )
 
@@ -687,11 +786,15 @@ def main() -> None:
     # 데이터 경로와 생성 설정을 함께 남겨 같은 조건으로 다시 실행할 수 있게 한다.
     summary = {
         "run_id": run_id,
+        "release_mode": "lora" if args.adapter_path else "base",
         "dataset": str(args.dataset.resolve()),
+        "dataset_release": args.dataset_release,
+        "dataset_sha256": file_sha256(args.dataset),
         "sample_count": len(samples),
         "task": args.task,
         "quantization": args.quantization,
         "adapter_path": str(args.adapter_path.resolve()) if args.adapter_path else None,
+        "adapter_sha256": adapter_tree_sha256(args.adapter_path) if args.adapter_path else None,
         "generation": generation,
         "models": summaries,
     }

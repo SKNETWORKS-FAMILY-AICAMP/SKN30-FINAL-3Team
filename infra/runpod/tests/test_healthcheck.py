@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 import unittest
@@ -50,6 +51,7 @@ class HealthcheckTests(unittest.TestCase):
 
     def test_check_uses_fixed_loopback_url_and_direct_opener(self) -> None:
         response = mock.MagicMock(status=200)
+        response.read.return_value = json.dumps({"data": [{"id": "sllm"}]}).encode()
         response.__enter__.return_value = response
         with (
             mock.patch.dict(os.environ, {"TEST_API_KEY": "k" * 43}, clear=True),
@@ -59,13 +61,30 @@ class HealthcheckTests(unittest.TestCase):
                 return_value=response,
             ) as open_request,
         ):
-            healthcheck.check(8001, "TEST_API_KEY")
+            healthcheck.check(8001, "TEST_API_KEY", "sllm")
 
         request = open_request.call_args.args[0]
         self.assertEqual(request.full_url, "http://127.0.0.1:8001/v1/models")
         self.assertEqual(request.get_header("Authorization"), f"Bearer {'k' * 43}")
         self.assertEqual(open_request.call_args.kwargs, {"timeout": 10})
-        response.read.assert_called_once_with()
+        response.read.assert_called_once_with(1024 * 1024)
+
+    def test_check_rejects_unexpected_model_id(self) -> None:
+        response = mock.MagicMock(status=200)
+        response.read.return_value = json.dumps(
+            {"data": [{"id": "wrong-model"}]}
+        ).encode()
+        response.__enter__.return_value = response
+        with (
+            mock.patch.dict(os.environ, {"TEST_API_KEY": "k" * 43}, clear=True),
+            mock.patch.object(
+                healthcheck.DIRECT_OPENER,
+                "open",
+                return_value=response,
+            ),
+            self.assertRaisesRegex(RuntimeError, "expected model"),
+        ):
+            healthcheck.check(8001, "TEST_API_KEY", "sllm")
 
 
 if __name__ == "__main__":

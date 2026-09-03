@@ -490,6 +490,16 @@ def template_payload(
     }
     if any(env.get(key) != value for key, value in required_refs.items()):
         raise ToolError("RunPod template F2 Secret references do not match the contract")
+    if {
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN",
+        "HUGGINGFACE_HUB_TOKEN",
+        "HUGGINGFACE_TOKEN",
+        "HUGGING_FACE_TOKEN",
+        "HF_ACCESS_TOKEN",
+        "HF_API_TOKEN",
+    } & env.keys():
+        raise ToolError("public-model Template must not inject a Hugging Face token")
     command = source.get("docker_start_cmd", "")
     docker_start = [item for item in str(command).split(",") if item]
     return {
@@ -612,6 +622,11 @@ class Bootstrapper:
             operator, _ = self.aws.secret_value(self.aws.settings.secrets["operator"])
             client = RunpodClient(operator)
             client.pods()
+            if not (
+                control.get("status") in {"ready", "provisioning"}
+                and control.get("image") == image
+            ):
+                ensure_offline_without_pod(self.aws, client)
             generation = self._generation(control, image)
             registry_name = f"{self.aws.settings.prefix}-ghcr-g{generation}"
             template_name = f"{self.aws.settings.prefix}-f2-template-g{generation}"
@@ -681,6 +696,11 @@ class Bootstrapper:
         client.pods()
         RunpodClient(monitor).pods()
         control = self.aws.control()
+        if not (
+            control.get("status") in {"ready", "provisioning"}
+            and control.get("image") == image
+        ):
+            ensure_offline_without_pod(self.aws, client)
         generation = self._generation(control, image)
         registry_name = f"{self.aws.settings.prefix}-ghcr-g{generation}"
         template_name = f"{self.aws.settings.prefix}-f2-template-g{generation}"
@@ -753,10 +773,10 @@ class Bootstrapper:
 
 def ensure_offline_without_pod(aws: AwsStore, client: RunpodClient) -> None:
     if aws.endpoint().get("status") != "offline":
-        raise ToolError("rotation requires the endpoint to be offline")
+        raise ToolError("operation requires the endpoint to be offline")
     pods = [pod for pod in client.pods() if pod.get("name") == SHARED_POD_NAME]
     if pods:
-        raise ToolError("rotation requires no shared RunPod Pod")
+        raise ToolError("operation requires no shared RunPod Pod")
 
 
 def rotate_secret(aws: AwsStore, target: str, template: Path) -> None:

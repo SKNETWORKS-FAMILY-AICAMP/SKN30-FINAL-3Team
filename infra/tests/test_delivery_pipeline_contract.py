@@ -14,6 +14,20 @@ def read(relative_path: str) -> str:
 
 
 class DeliveryPipelineContractTests(unittest.TestCase):
+    def test_justfile_exports_selected_aws_profile_to_runpod_tools(self) -> None:
+        justfile = read("infra/justfile")
+
+        self.assertIn('aws_profile := env_var_or_default("AWS_PROFILE", "skn30-session")', justfile)
+        self.assertIn("export AWS_PROFILE := aws_profile", justfile)
+        self.assertNotIn("$$(terraform", justfile)
+        self.assertEqual(
+            justfile.count(
+                'SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw '
+                'sllm_model_bucket_name)"'
+            ),
+            11,
+        )
+
     def test_runpod_image_publish_is_gated_before_digest_output(self) -> None:
         workflow = read(".github/workflows/runpod-image.yml")
 
@@ -258,11 +272,15 @@ class DeliveryPipelineContractTests(unittest.TestCase):
 
     def test_ai_endpoint_refresh_only_rerenders_and_recreates_consumers(self) -> None:
         refresh = read("infra/deploy/scripts/refresh_ai_endpoints.sh")
+        preflight = read("infra/deploy/scripts/preflight_runpod_create.sh")
+        offline_smoke = read("infra/deploy/scripts/smoke_f2_offline.sh")
         buildspec = read("infra/delivery/buildspec-backend-build.yml")
         verifier = read("infra/delivery/scripts/verify_deploy_scripts.sh")
 
         self.assertIn("cp -R infra/deploy/scripts _backend_release/scripts", buildspec)
         self.assertIn("refresh_ai_endpoints.sh", verifier)
+        self.assertIn("preflight_runpod_create.sh", verifier)
+        self.assertIn("smoke_f2_offline.sh", verifier)
         self.assertIn('scripts/render_env.py"', refresh)
         self.assertIn(
             "compose up --detach --no-deps --force-recreate --pull never api worker",
@@ -279,6 +297,10 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             "compose --profile migration run",
         ):
             self.assertNotIn(forbidden, refresh)
+        self.assertIn("{{.State.Running}}", preflight)
+        self.assertIn("{{.State.Health.Status}}", preflight)
+        self.assertNotIn("compose up", preflight)
+        self.assertIn("--expected-provider-status offline", offline_smoke)
 
     def test_development_auth_drives_backend_and_frontend_together(self) -> None:
         variables = read("infra/environments/dev/variables.tf")

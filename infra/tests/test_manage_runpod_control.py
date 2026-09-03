@@ -20,6 +20,7 @@ IMAGE = (
     "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:"
     + "a" * 64
 )
+NEW_IMAGE = IMAGE.rsplit(":", 1)[0] + ":" + "b" * 64
 
 
 class FakeAws:
@@ -123,6 +124,21 @@ class FakeRunpod:
 
 
 class BootstrapTests(unittest.TestCase):
+    @staticmethod
+    def ready_aws() -> FakeAws:
+        aws = FakeAws()
+        aws.control_value.update(
+            {
+                "status": "ready",
+                "generation": 1,
+                "image": IMAGE,
+                "registry_auth_id": "registry-1",
+                "template_id": "template-1",
+                "ai_provider_secret_version_id": "version-ai",
+            }
+        )
+        return aws
+
     def test_plan_is_read_only(self):
         aws = FakeAws()
         runpod = FakeRunpod()
@@ -141,6 +157,38 @@ class BootstrapTests(unittest.TestCase):
             MODULE.Bootstrapper(FakeAws()).plan(
                 "ghcr.io/example/f2-serving@sha256:" + "a" * 64
             )
+
+    def test_new_image_plan_rejects_active_endpoint(self):
+        aws = self.ready_aws()
+        aws.endpoint_value = {"status": "active", "pod_id": "pod-1"}
+        with patch.object(
+            MODULE, "RunpodClient", return_value=FakeRunpod()
+        ), self.assertRaisesRegex(MODULE.ToolError, "endpoint to be offline"):
+            MODULE.Bootstrapper(aws).plan(NEW_IMAGE)
+        self.assertEqual(aws.controls, [])
+
+    def test_new_image_apply_rejects_shared_pod(self):
+        aws = self.ready_aws()
+        runpod = FakeRunpod()
+        runpod.pod_values = [{"id": "pod-1", "name": MODULE.SHARED_POD_NAME}]
+        with patch.object(
+            MODULE, "RunpodClient", return_value=runpod
+        ), self.assertRaisesRegex(MODULE.ToolError, "no shared RunPod Pod"):
+            MODULE.Bootstrapper(aws).apply(NEW_IMAGE)
+        self.assertEqual(aws.controls, [])
+
+    def test_new_image_plan_creates_generation_only_when_offline_and_empty(self):
+        aws = self.ready_aws()
+        runpod = FakeRunpod()
+        runpod.secret_values = set(MODULE.F2_SECRET_NAMES)
+        with patch.object(
+            MODULE, "RunpodClient", return_value=runpod
+        ), redirect_stdout(io.StringIO()):
+            result = MODULE.Bootstrapper(aws).plan(NEW_IMAGE)
+        self.assertIn(
+            "create-template:skn30-final-3team-dev-f2-template-g2",
+            result["actions"],
+        )
 
     def test_apply_is_idempotent(self):
         aws = FakeAws()

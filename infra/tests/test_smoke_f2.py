@@ -93,6 +93,28 @@ class F2SmokeTests(unittest.TestCase):
 
         self.assertNotIn(private_body.decode(), str(raised.exception))
 
+    def test_offline_smoke_requires_503_f2_unavailable(self) -> None:
+        session_headers = Headers(
+            [
+                "brokerage_session=session-value; Secure; HttpOnly; Path=/",
+                "brokerage_csrf=csrf-cookie-value; Secure; HttpOnly; Path=/",
+            ]
+        )
+        responses = [
+            (
+                200,
+                session_headers,
+                json.dumps({"csrf_token": "csrf-response-value"}).encode(),
+            ),
+            (503, Headers(), json.dumps({"code": "F2_UNAVAILABLE"}).encode()),
+        ]
+        with mock.patch.object(smoke_f2, "_request", side_effect=responses):
+            smoke_f2.run(
+                "http://127.0.0.1:8000",
+                FIXTURE_PATH,
+                expected_provider_status="offline",
+            )
+
     def test_rejects_non_loopback_backend(self) -> None:
         with self.assertRaisesRegex(smoke_f2.SmokeFailure, "local HTTP Backend"):
             smoke_f2.run("https://example.com:443", FIXTURE_PATH)

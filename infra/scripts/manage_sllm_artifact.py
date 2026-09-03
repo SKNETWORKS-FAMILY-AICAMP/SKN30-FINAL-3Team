@@ -12,8 +12,9 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -27,6 +28,22 @@ MAX_BUNDLE_BYTES = 10 * 1024 * 1024 * 1024
 EVALUATION_SUMMARY = "evaluation-summary.json"
 PROMOTION_APPROVAL = "promotion-approval.json"
 PROMOTION_DECISION_OWNER = "fine-tuning-owner"
+RELEASE_MODES = {"lora", "base"}
+RELEASE_STAGES = {"verified", "dev"}
+V2_ADAPTER_FILES = {
+    "adapter/README.md",
+    "adapter/adapter_config.json",
+    "adapter/adapter_model.safetensors",
+    "adapter/added_tokens.json",
+    "adapter/chat_template.jinja",
+    "adapter/generation_config.json",
+    "adapter/merges.txt",
+    "adapter/special_tokens_map.json",
+    "adapter/tokenizer.json",
+    "adapter/tokenizer.model",
+    "adapter/tokenizer_config.json",
+    "adapter/vocab.json",
+}
 
 
 class ToolError(RuntimeError):
@@ -99,7 +116,7 @@ def _archive_tree_sha256(
 def _validate_manifest(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ToolError("release.json must contain a JSON object")
-    required = {
+    common = {
         "schema_version",
         "release_id",
         "capability",
@@ -110,10 +127,15 @@ def _validate_manifest(payload: Any) -> dict[str, Any]:
         "training",
         "evaluation",
     }
-    if set(payload) != required:
+    schema_version = payload.get("schema_version")
+    required = common if schema_version == 1 else common | {"release_mode"}
+    allowed = required if schema_version != 2 else required | {"release_stage"}
+    if (
+        schema_version not in {1, 2}
+        or not required.issubset(payload)
+        or set(payload) - allowed
+    ):
         raise ToolError("release.json has an invalid top-level schema")
-    if payload["schema_version"] != 1:
-        raise ToolError("unsupported SLLM release schema")
     if (
         not isinstance(payload["release_id"], str)
         or RELEASE_ID.fullmatch(payload["release_id"]) is None
@@ -124,6 +146,14 @@ def _validate_manifest(payload: Any) -> dict[str, Any]:
         or payload["served_model_name"] != SERVED_MODEL_NAME
     ):
         raise ToolError("release capability or served model name is invalid")
+    try:
+        created_at = datetime.fromisoformat(
+            str(payload["created_at"]).replace("Z", "+00:00")
+        )
+    except ValueError as error:
+        raise ToolError("release created_at must be an offset timestamp") from error
+    if created_at.utcoffset() is None:
+        raise ToolError("release created_at must be an offset timestamp")
     base = payload["base_model"]
     if not isinstance(base, dict) or set(base) != {"id", "revision"}:
         raise ToolError("base_model schema is invalid")
@@ -134,19 +164,73 @@ def _validate_manifest(payload: Any) -> dict[str, Any]:
         or COMMIT.fullmatch(base["revision"]) is None
     ):
         raise ToolError("base model revision must be immutable")
+    release_mode = "lora" if schema_version == 1 else payload["release_mode"]
+    if release_mode not in RELEASE_MODES:
+        raise ToolError("release_mode must be lora or base")
+    release_stage = (
+        "verified" if schema_version == 1 else payload.get("release_stage", "verified")
+    )
+    if release_stage not in RELEASE_STAGES:
+        raise ToolError("release_stage must be verified or dev")
+    if release_stage == "dev" and not payload["release_id"].startswith("dev-"):
+        raise ToolError("dev release_id must start with dev-")
     adapter = payload["adapter"]
-    if (
-        not isinstance(adapter, dict)
-        or adapter.get("format") != "peft-lora"
-        or adapter.get("path") != "adapter"
-    ):
-        raise ToolError("adapter schema is invalid")
-    if (
-        not isinstance(adapter.get("sha256"), str)
-        or SHA256.fullmatch(adapter["sha256"]) is None
-    ):
-        raise ToolError("adapter hash is invalid")
+    training = payload["training"]
+    if release_mode == "base":
+        if adapter is not None or training is not None:
+            raise ToolError(
+                "base release must not contain adapter or training metadata"
+            )
+    else:
+        required_adapter = {"format", "path", "sha256", "size_bytes", "file_count"}
+        if (
+            not isinstance(adapter, dict)
+            or set(adapter) != required_adapter
+            or adapter.get("format") != "peft-lora"
+            or adapter.get("path") != "adapter"
+        ):
+            raise ToolError("adapter schema is invalid")
+        if (
+            not isinstance(adapter.get("sha256"), str)
+            or SHA256.fullmatch(adapter["sha256"]) is None
+            or isinstance(adapter.get("size_bytes"), bool)
+            or not isinstance(adapter.get("size_bytes"), int)
+            or adapter["size_bytes"] < 1
+            or isinstance(adapter.get("file_count"), bool)
+            or not isinstance(adapter.get("file_count"), int)
+            or adapter["file_count"] < 2
+        ):
+            raise ToolError("adapter metadata is invalid")
+        expected_training = (
+            {"code_revision", "dataset_release", "train_sha256", "validation_sha256"}
+            if schema_version == 1
+            else {"code_revision", "train_sha256", "validation_sha256"}
+        )
+        if not isinstance(training, dict) or set(training) != expected_training:
+            raise ToolError("training metadata schema is invalid")
+        for name in ("train_sha256", "validation_sha256"):
+            if (
+                not isinstance(training[name], str)
+                or SHA256.fullmatch(training[name]) is None
+            ):
+                raise ToolError(f"training {name} is invalid")
+        code_revision = training["code_revision"]
+        if code_revision is not None and (
+            not isinstance(code_revision, str)
+            or COMMIT.fullmatch(code_revision) is None
+        ):
+            raise ToolError("training code_revision is invalid")
     evaluation = payload["evaluation"]
+    if release_stage == "dev":
+        if (
+            not isinstance(evaluation, dict)
+            or set(evaluation) != {"status", "dataset_release"}
+            or evaluation.get("status") != "not-evaluated"
+            or not isinstance(evaluation.get("dataset_release"), str)
+            or not evaluation["dataset_release"].strip()
+        ):
+            raise ToolError("dev release evaluation marker is invalid")
+        return payload
     required_evaluation = {
         "task",
         "summary_path",
@@ -156,6 +240,12 @@ def _validate_manifest(payload: Any) -> dict[str, Any]:
         "approval_path",
         "approval_sha256",
     }
+    if schema_version == 2:
+        required_evaluation |= {
+            "dataset_release",
+            "dataset_sha256",
+            "source_summary_sha256",
+        }
     if (
         not isinstance(evaluation, dict)
         or set(evaluation) != required_evaluation
@@ -182,6 +272,15 @@ def _validate_manifest(payload: Any) -> dict[str, Any]:
         or not evaluation["selected_model"].strip()
     ):
         raise ToolError("promoted model is invalid")
+    if schema_version == 2 and (
+        not isinstance(evaluation.get("dataset_release"), str)
+        or not evaluation["dataset_release"].strip()
+        or not isinstance(evaluation.get("dataset_sha256"), str)
+        or SHA256.fullmatch(evaluation["dataset_sha256"]) is None
+        or not isinstance(evaluation.get("source_summary_sha256"), str)
+        or SHA256.fullmatch(evaluation["source_summary_sha256"]) is None
+    ):
+        raise ToolError("evaluation dataset provenance is invalid")
     return payload
 
 
@@ -211,8 +310,21 @@ def _validate_promotion_contract(
         or selected_model not in labels
     ):
         raise ToolError("evaluation summary does not match the promoted model")
+    schema_version = manifest["schema_version"]
+    approval_version = 1 if schema_version == 1 else 2
+    required_approval = {
+        "schema_version",
+        "status",
+        "evaluation_run_id",
+        "selected_model",
+        "decision_owner",
+        "rationale",
+    }
+    if schema_version == 2:
+        required_approval.add("release_mode")
     if (
-        approval.get("schema_version") != 1
+        set(approval) != required_approval
+        or approval.get("schema_version") != approval_version
         or approval.get("status") != "approved"
         or approval.get("evaluation_run_id") != run_id
         or approval.get("selected_model") != selected_model
@@ -221,6 +333,33 @@ def _validate_promotion_contract(
         or not approval["rationale"].strip()
     ):
         raise ToolError("promotion approval does not match release.json")
+    if schema_version == 2:
+        selected = next(
+            (
+                model
+                for model in models
+                if isinstance(model, dict) and model.get("label") == selected_model
+            ),
+            None,
+        )
+        if (
+            summary.get("dataset_release") != evaluation["dataset_release"]
+            or summary.get("dataset_sha256") != evaluation["dataset_sha256"]
+            or summary.get("release_mode") != manifest["release_mode"]
+            or approval.get("release_mode") != manifest["release_mode"]
+            or not isinstance(selected, dict)
+            or selected.get("model_id") != manifest["base_model"]["id"]
+            or selected.get("resolved_model_revision")
+            != manifest["base_model"]["revision"]
+        ):
+            raise ToolError("v2 evaluation provenance does not match release.json")
+        expected_adapter_hash = (
+            manifest["adapter"]["sha256"]
+            if manifest["release_mode"] == "lora"
+            else None
+        )
+        if selected.get("adapter_sha256") != expected_adapter_hash:
+            raise ToolError("v2 evaluation adapter does not match release.json")
 
 
 @dataclass(frozen=True)
@@ -234,6 +373,14 @@ class InspectedBundle:
     @property
     def release_id(self) -> str:
         return str(self.manifest["release_id"])
+
+    @property
+    def release_mode(self) -> str:
+        return str(self.manifest.get("release_mode", "lora"))
+
+    @property
+    def release_stage(self) -> str:
+        return str(self.manifest.get("release_stage", "verified"))
 
 
 def inspect_bundle(path: Path) -> InspectedBundle:
@@ -269,29 +416,42 @@ def inspect_bundle(path: Path) -> InspectedBundle:
             } and not member.name.startswith("adapter/"):
                 raise ToolError(f"bundle contains an unapproved file: {member.name}")
         by_name = {member.name: member for member in members}
-        if {
-            "release.json",
-            EVALUATION_SUMMARY,
-            PROMOTION_APPROVAL,
-        } - by_name.keys():
-            raise ToolError("bundle is missing approved release metadata")
-        adapter_names = [name for name in names if name.startswith("adapter/")]
-        required = {"adapter/adapter_config.json", "adapter/adapter_model.safetensors"}
-        if not required.issubset(adapter_names):
-            raise ToolError("bundle is missing required PEFT adapter files")
+        if "release.json" not in by_name:
+            raise ToolError("bundle is missing release.json")
         manifest_bytes = _member_bytes(archive, by_name["release.json"])
         manifest = _validate_manifest(_json_object(manifest_bytes, "release.json"))
-        evaluation_bytes = _member_bytes(archive, by_name[EVALUATION_SUMMARY])
-        approval_bytes = _member_bytes(archive, by_name[PROMOTION_APPROVAL])
-        _validate_promotion_contract(manifest, evaluation_bytes, approval_bytes)
-        adapter_members = [by_name[name] for name in adapter_names]
-        adapter_sha256, adapter_size = _archive_tree_sha256(archive, adapter_members)
-        if adapter_sha256 != manifest["adapter"]["sha256"]:
-            raise ToolError("adapter hash does not match release.json")
-        if adapter_size != manifest["adapter"].get("size_bytes"):
-            raise ToolError("adapter size does not match release.json")
-        if len(adapter_members) != manifest["adapter"].get("file_count"):
-            raise ToolError("adapter file count does not match release.json")
+        release_mode = str(manifest.get("release_mode", "lora"))
+        release_stage = str(manifest.get("release_stage", "verified"))
+        promotion_names = {EVALUATION_SUMMARY, PROMOTION_APPROVAL}
+        if release_stage == "verified" and promotion_names - by_name.keys():
+            raise ToolError("bundle is missing approved release metadata")
+        if release_stage == "dev" and promotion_names & by_name.keys():
+            raise ToolError(
+                "dev bundle must not contain evaluation or approval metadata"
+            )
+        adapter_names = [name for name in names if name.startswith("adapter/")]
+        required = {"adapter/adapter_config.json", "adapter/adapter_model.safetensors"}
+        if release_mode == "lora" and not required.issubset(adapter_names):
+            raise ToolError("bundle is missing required PEFT adapter files")
+        if manifest["schema_version"] == 2 and set(adapter_names) - V2_ADAPTER_FILES:
+            raise ToolError("v2 bundle contains an unapproved adapter file")
+        if release_mode == "base" and adapter_names:
+            raise ToolError("base release bundle must not contain adapter files")
+        if release_stage == "verified":
+            evaluation_bytes = _member_bytes(archive, by_name[EVALUATION_SUMMARY])
+            approval_bytes = _member_bytes(archive, by_name[PROMOTION_APPROVAL])
+            _validate_promotion_contract(manifest, evaluation_bytes, approval_bytes)
+        if release_mode == "lora":
+            adapter_members = [by_name[name] for name in adapter_names]
+            adapter_sha256, adapter_size = _archive_tree_sha256(
+                archive, adapter_members
+            )
+            if adapter_sha256 != manifest["adapter"]["sha256"]:
+                raise ToolError("adapter hash does not match release.json")
+            if adapter_size != manifest["adapter"].get("size_bytes"):
+                raise ToolError("adapter size does not match release.json")
+            if len(adapter_members) != manifest["adapter"].get("file_count"):
+                raise ToolError("adapter file count does not match release.json")
     return InspectedBundle(path, manifest, manifest_bytes, file_sha256(path), size)
 
 
@@ -324,7 +484,13 @@ class AwsCli:
         return result.stdout.strip()
 
     def put_immutable(
-        self, *, bucket: str, key: str, body: Path, content_type: str, sha256: str
+        self,
+        *,
+        bucket: str,
+        key: str,
+        body: Path,
+        content_type: str,
+        metadata: Mapping[str, str],
     ) -> None:
         self.run(
             "s3api",
@@ -342,8 +508,78 @@ class AwsCli:
             "--if-none-match",
             "*",
             "--metadata",
-            f"sha256={sha256}",
+            ",".join(f"{name}={value}" for name, value in sorted(metadata.items())),
         )
+
+    def object_head(self, *, bucket: str, key: str) -> dict[str, Any] | None:
+        listed = self.run(
+            "s3api",
+            "list-objects-v2",
+            "--bucket",
+            bucket,
+            "--prefix",
+            key,
+            "--max-keys",
+            "2",
+            "--output",
+            "json",
+        )
+        try:
+            entries = json.loads(listed).get("Contents", [])
+        except (AttributeError, json.JSONDecodeError) as error:
+            raise ToolError("AWS CLI returned invalid S3 object listing") from error
+        if not any(
+            isinstance(item, dict) and item.get("Key") == key for item in entries
+        ):
+            return None
+        try:
+            head = json.loads(
+                self.run(
+                    "s3api",
+                    "head-object",
+                    "--bucket",
+                    bucket,
+                    "--key",
+                    key,
+                    "--output",
+                    "json",
+                )
+            )
+        except json.JSONDecodeError as error:
+            raise ToolError("AWS CLI returned invalid S3 object metadata") from error
+        if not isinstance(head, dict):
+            raise ToolError("AWS CLI returned invalid S3 object metadata")
+        return head
+
+    def ensure_immutable(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        body: Path,
+        content_type: str,
+        metadata: Mapping[str, str],
+    ) -> str:
+        existing = self.object_head(bucket=bucket, key=key)
+        if existing is not None:
+            actual = existing.get("Metadata")
+            if not isinstance(actual, dict) or actual != dict(metadata):
+                raise ToolError(f"immutable SLLM release object already differs: {key}")
+            return "retained-identical"
+        self.put_immutable(
+            bucket=bucket,
+            key=key,
+            body=body,
+            content_type=content_type,
+            metadata=metadata,
+        )
+        verified = self.object_head(bucket=bucket, key=key)
+        actual = verified.get("Metadata") if isinstance(verified, dict) else None
+        if not isinstance(actual, dict) or actual != dict(metadata):
+            raise ToolError(
+                f"published SLLM release object could not be verified: {key}"
+            )
+        return "created"
 
     def presign(self, *, bucket: str, key: str, expires: int) -> str:
         return self.run(
@@ -369,28 +605,39 @@ def publish(
     )
     if not apply:
         return
-    client.put_immutable(
+    manifest_sha256 = hashlib.sha256(bundle.manifest_bytes).hexdigest()
+    is_v2 = bundle.manifest["schema_version"] == 2
+    bundle_metadata = {"sha256": bundle.sha256}
+    manifest_metadata = {"sha256": manifest_sha256}
+    if is_v2:
+        bundle_metadata["release-manifest-sha256"] = manifest_sha256
+        manifest_metadata["bundle-sha256"] = bundle.sha256
+    bundle_state = client.ensure_immutable(
         bucket=bucket,
         key=f"{prefix}/bundle.tar.gz",
         body=bundle.path,
         content_type="application/gzip",
-        sha256=bundle.sha256,
+        metadata=bundle_metadata,
     )
     with tempfile.NamedTemporaryFile("wb", suffix=".json") as file:
         file.write(bundle.manifest_bytes)
         file.flush()
-        client.put_immutable(
+        manifest_state = client.ensure_immutable(
             bucket=bucket,
             key=f"{prefix}/release.json",
             body=Path(file.name),
             content_type="application/json",
-            sha256=hashlib.sha256(bundle.manifest_bytes).hexdigest(),
+            metadata=manifest_metadata,
         )
     emit(
         "sllm-publish-complete",
         bucket=bucket,
         prefix=prefix,
         release_id=bundle.release_id,
+        release_mode=bundle.release_mode,
+        release_stage=bundle.release_stage,
+        bundle_state=bundle_state,
+        manifest_state=manifest_state,
     )
 
 
@@ -421,6 +668,8 @@ def main() -> int:
             emit(
                 "sllm-bundle-valid",
                 release_id=bundle.release_id,
+                release_mode=bundle.release_mode,
+                release_stage=bundle.release_stage,
                 base_model=bundle.manifest["base_model"],
                 bundle_sha256=bundle.sha256,
                 size_bytes=bundle.size_bytes,

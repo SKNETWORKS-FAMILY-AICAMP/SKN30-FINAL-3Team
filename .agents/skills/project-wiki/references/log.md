@@ -1,10 +1,14 @@
 ---
 status: 구현됨
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # 위키 변경 로그
 
+- 2026-09-03: `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle과 release manifest의 S3 불변 게시 및 양방향 cross-hash를 확인해 RunPod 문서 상태를 “S3 dev release 게시 완료·RunPod/Terraform 미적용”으로 갱신했다. AI suite 종료 지연과 Terraform provider handshake 실패는 제한된 sandbox의 thread·provider IPC 제약으로 확인했으며 정상 실행 환경에서 AI 212개 테스트와 두 Terraform root validate가 통과했다.
+- 2026-09-03: 평가 전 adapter의 공유 개발 기동을 위해 ADR-0023을 승인하고 `release_stage=dev`, `dev-*` ID, `evaluation.status=not-evaluated`인 metadata bundle과 `runpod-create-dev(-plan)` 전용 경로를 추가했다. 평가·승인 파일만 생략하며 기반 commit·adapter checksum, 불변 게시, health·rollback·삭제 계약은 유지하고 일반 create는 dev bundle을 거부한다.
+
+- 2026-09-02: SLLM `release.json:v2`와 `promotion-approval:v2`를 승인해 LoRA·base-only를 같은 metadata bundle로 전달하고 평가 dataset·실제 Hugging Face commit·adapter checksum을 결속했다. v2 S3 객체 양방향 cross-hash와 동일 checksum 부분 게시 재개, 모델명 health, 공개 HF 전용 token 차단, 비용 전 create plan, image generation guard, rollback reconcile과 삭제 후 offline 503 smoke를 구현했다. v1 LoRA bundle과 기존 S3 객체는 마이그레이션 없이 계속 읽으며 Backend HTTP·F2 응답 계약은 유지한다.
 - 2026-09-02: RunPod 감시 로그의 endpoint 상태를 `active`·`offline` allowlist로 제한하고 그 밖의 SSM 값을 고정 `invalid`로 일반화했다. 배포·운영 문서의 대체된 Infra ADR-0016 참조는 현재 정본인 ADR-0017·0018로 교체했다.
 - 2026-09-02: RunPod 제어면 API 장애를 Provider 정상으로 오인하지 않도록 감시 계약을 명확히 했다. 장애 주기에는 heartbeat와 API 도달 실패만 기록하고, 확인할 수 없는 endpoint 일치·Provider health·orphan·runtime·비용 metric은 발행하지 않는다.
 - 2026-09-02: ADR-0008의 EC2 Backend·설치형 AI·RunPod 추론 상위 구조는 유지하고, ADR-0020이 Infra ADR-0002의 개발자별 Pod·시연 기간 Pod 유지·조건부 Network Volume 조항만 부분 대체함을 양쪽 ADR과 인덱스에 명시했다. 런타임 인덱스의 GPU runtime 정본 링크도 ADR-0020으로 정규화했다.

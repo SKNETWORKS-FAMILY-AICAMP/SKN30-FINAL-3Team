@@ -32,6 +32,13 @@ CONTROL_KEYS = {
     "AWS_SESSION_TOKEN",
     "GHCR_TOKEN",
     "GITHUB_TOKEN",
+    "HF_TOKEN",
+    "HUGGING_FACE_HUB_TOKEN",
+    "HUGGINGFACE_HUB_TOKEN",
+    "HUGGINGFACE_TOKEN",
+    "HUGGING_FACE_TOKEN",
+    "HF_ACCESS_TOKEN",
+    "HF_API_TOKEN",
 }
 
 
@@ -41,9 +48,10 @@ class ConfigurationError(ValueError):
 
 @dataclass(frozen=True)
 class RuntimeConfig:
+    release_mode: str
     sllm_model_id: str
     sllm_model_revision: str
-    sllm_adapter_path: str
+    sllm_adapter_path: str | None
     stt_model_id: str
     stt_model_revision: str
     sllm_max_model_len: int
@@ -105,6 +113,7 @@ def load_config(
     if hmac.compare_digest(sllm_key, stt_key):
         raise ConfigurationError("SLLM and STT API keys must be different")
     return RuntimeConfig(
+        release.release_mode,
         release.base_model_id,
         release.base_model_revision,
         release.adapter_path,
@@ -134,7 +143,7 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         "--tokenizer-revision",
         config.sllm_model_revision,
         "--served-model-name",
-        "sllm-base",
+        "sllm-base" if config.release_mode == "lora" else "sllm",
         "--port",
         "18001",
         "--dtype",
@@ -145,11 +154,16 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         str(config.sllm_gpu_memory_utilization),
         "--default-chat-template-kwargs",
         '{"enable_thinking":false}',
-        "--enable-lora",
-        "--lora-modules",
-        f"sllm={config.sllm_adapter_path}",
-        *common,
     ]
+    if config.release_mode == "lora":
+        if config.sllm_adapter_path is None:
+            raise ConfigurationError("lora release requires an adapter path")
+        sllm.extend(
+            ["--enable-lora", "--lora-modules", f"sllm={config.sllm_adapter_path}"]
+        )
+    elif config.release_mode != "base" or config.sllm_adapter_path is not None:
+        raise ConfigurationError("base release must not have an adapter path")
+    sllm.extend(common)
     stt = [
         executable,
         "serve",
@@ -191,7 +205,6 @@ def _model_environment(
 
 def _proxy_environment(environment: dict[str, str], api_key: str) -> dict[str, str]:
     result = _clean_environment(environment)
-    result.pop("HF_TOKEN", None)
     result["F2_PROXY_API_KEY"] = api_key
     return result
 
