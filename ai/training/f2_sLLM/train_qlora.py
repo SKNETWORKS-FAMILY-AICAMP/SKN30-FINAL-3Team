@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qwen3-4B를 F2 상담 유형 분류 데이터로 QLoRA 미세조정한다.
+"""Qwen3-4B를 F2 분류 또는 full-output 데이터로 QLoRA 미세조정한다.
 
 전체 실행 흐름
 1. CLI 인자와 YAML 설정을 읽고 입력 파일 및 출력 경로를 검증한다.
@@ -121,11 +121,12 @@ def git_revision() -> str | None:
         return None
 
 
-def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[str]]:
-    """SFT JSONL의 최소 계약과 split을 확인하고 ID·원천 그룹 집합을 반환한다."""
+def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[str], set[str]]:
+    """SFT JSONL의 최소 계약과 split을 확인하고 ID·그룹·과제를 반환한다."""
 
     ids: set[str] = set()
     groups: set[str] = set()
+    tasks: set[str] = set()
     with path.open(encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
             if not line.strip():
@@ -142,6 +143,9 @@ def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[st
                 raise ValueError(f"{path}:{line_number}: prompt 대화가 비어 있습니다")
             if not isinstance(sample["completion"], list) or not sample["completion"]:
                 raise ValueError(f"{path}:{line_number}: completion 대화가 비어 있습니다")
+            task = sample.get("task", "classification")
+            if task not in {"classification", "full"}:
+                raise ValueError(f"{path}:{line_number}: 알 수 없는 task {task!r}")
             sample_id = sample["id"]
             group_id = sample["source_group_id"]
             if not all(isinstance(value, str) and value.strip() for value in (sample_id, group_id)):
@@ -150,9 +154,50 @@ def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[st
                 raise ValueError(f"{path}:{line_number}: 중복 id {sample_id!r}")
             ids.add(sample_id)
             groups.add(group_id)
+            tasks.add(task)
     if not ids:
         raise ValueError(f"{path}: 데이터가 없습니다")
-    return ids, groups
+    return ids, groups, tasks
+
+
+def validate_token_lengths(
+    datasets_by_split: Any, tokenizer: Any, max_length: int
+) -> dict[str, dict[str, int | float]]:
+    """Qwen 채팅 템플릿 적용 후 prompt+completion이 잘리지 않는지 검사한다."""
+
+    if max_length < 1:
+        raise ValueError("model.max_length는 1 이상이어야 합니다")
+    stats: dict[str, dict[str, int | float]] = {}
+    overflow: list[tuple[str, str, int]] = []
+    for split_name, dataset in datasets_by_split.items():
+        lengths: list[int] = []
+        for sample in dataset:
+            encoded = tokenizer(
+                sample["prompt"] + sample["completion"],
+                add_special_tokens=False,
+            )
+            token_ids = encoded["input_ids"]
+            length = len(token_ids)
+            lengths.append(length)
+            if length > max_length:
+                overflow.append((split_name, sample["id"], length))
+        if not lengths:
+            raise ValueError(f"{split_name}: 렌더링된 데이터가 없습니다")
+        ordered = sorted(lengths)
+        stats[split_name] = {
+            "count": len(ordered),
+            "minimum": ordered[0],
+            "median": float(ordered[len(ordered) // 2]),
+            "maximum": ordered[-1],
+        }
+    if overflow:
+        examples = ", ".join(
+            f"{split}/{sample_id}={length}" for split, sample_id, length in overflow[:5]
+        )
+        raise ValueError(
+            f"prompt+completion이 model.max_length={max_length}를 초과합니다: {examples}"
+        )
+    return stats
 
 
 def main() -> None:
@@ -170,14 +215,22 @@ def main() -> None:
             raise FileNotFoundError(path)
     if args.train_data.resolve() == args.validation_data.resolve():
         raise ValueError("train-data와 validation-data는 서로 다른 파일이어야 합니다")
-    train_ids, train_groups = validate_sft_file(args.train_data, "train")
-    validation_ids, validation_groups = validate_sft_file(args.validation_data, "validation")
+    train_ids, train_groups, train_tasks = validate_sft_file(args.train_data, "train")
+    validation_ids, validation_groups, validation_tasks = validate_sft_file(
+        args.validation_data, "validation"
+    )
     if overlap := train_ids & validation_ids:
         raise ValueError(f"train/validation에 중복 id가 있습니다: {sorted(overlap)[:5]}")
     if overlap := train_groups & validation_groups:
         raise ValueError(
             f"train/validation에 중복 source_group_id가 있습니다: {sorted(overlap)[:5]}"
         )
+    if len(train_tasks) != 1 or train_tasks != validation_tasks:
+        raise ValueError(
+            "train/validation은 동일한 단일 task여야 합니다: "
+            f"train={sorted(train_tasks)}, validation={sorted(validation_tasks)}"
+        )
+    training_task = next(iter(train_tasks))
     if args.resume_from_checkpoint and not args.resume_from_checkpoint.is_dir():
         raise FileNotFoundError(args.resume_from_checkpoint)
 
@@ -214,7 +267,7 @@ def main() -> None:
     dtype = torch.bfloat16 if quantization["compute_dtype"] == "bfloat16" else torch.float16
 
     # 3. JSONL을 train/validation 두 split으로 읽는다. 각 레코드에는 대화형 prompt와
-    # 정답 completion이 들어 있으며, 원본 데이터의 label은 completion에 이미 반영되어 있다.
+    # 정답 completion이 들어 있으며, 원본 분류 label 또는 full expected가 이미 반영되어 있다.
     data = load_dataset(
         "json",
         data_files={"train": str(args.train_data), "validation": str(args.validation_data)},
@@ -260,13 +313,15 @@ def main() -> None:
         completion_text = full_text[len(prompt_text) :]
         if not completion_text:
             raise ValueError("렌더링된 completion이 비어 있습니다")
-        return {"prompt": prompt_text, "completion": completion_text}
+        return {"id": sample["id"], "prompt": prompt_text, "completion": completion_text}
 
     data = data.map(
         render_non_thinking,
         remove_columns=data["train"].column_names,
         desc="Qwen3 non-thinking chat template 적용",
     )
+    token_length_stats = validate_token_lengths(data, tokenizer, int(model_config["max_length"]))
+    data = data.remove_columns(["id"])
 
     # 5. BitsAndBytes 4bit 양자화 설정이다.
     # - NF4: 정규분포 형태의 사전학습 가중치에 적합한 4bit 표현
@@ -402,6 +457,8 @@ def main() -> None:
             },
         },
         "limits": {"max_samples": args.max_samples, "max_steps": args.max_steps},
+        "task": training_task,
+        "token_lengths": token_length_stats,
         "metrics": {"train": train_result.metrics, "evaluation": evaluation},
         "versions": {
             "torch": torch.__version__,
