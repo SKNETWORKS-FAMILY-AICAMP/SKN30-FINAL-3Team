@@ -1,9 +1,12 @@
 /**
- * 알림 버튼과 아침 일정 브리핑 창.
+ * 일정 버튼과 아침 브리핑 창.
  *
- * 두 진입이 같은 조회를 공유한다. 매일 아침 한 번 저절로 열리고, 그 뒤로는 상단바의 알림
+ * 두 진입이 같은 조회를 공유한다. 매일 아침 한 번 저절로 열리고, 그 뒤로는 상단바의 달력
  * 버튼으로 다시 연다. 「만기도래일 보기」가 현업에서 쓰이지 않은 이유가 사용자가 찾아 열어야만
  * 보이기 때문이므로 (F1 10.4), 찾아오게 만드는 쪽을 기본으로 둔다.
+ *
+ * 옆의 종 아이콘은 F1 알림 센터(F1-AL-04)의 자리이고 이 버튼과 소유가 다르다. 아이콘을 나눠
+ * 두면 "일정을 보러 가는 곳"과 "알림을 보러 가는 곳"이 화면에서 구분된다.
  *
  * 창을 열 때마다 다시 읽는다. 기준일이 하루 넘어가면 D-day가 통째로 하루씩 틀리는데, 사무소
  * PC는 화면을 켜 둔 채로 날짜를 넘기는 일이 흔하다.
@@ -11,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core";
-import { BellIcon } from "@patternfly/react-icons";
+import { OutlinedCalendarAltIcon } from "@patternfly/react-icons";
 import { AgendaList } from "./AgendaList.tsx";
 import { useAgenda } from "./hooks/useAgenda.ts";
 import { useDailyBriefing } from "./hooks/useDailyBriefing.ts";
@@ -58,7 +61,8 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
     if (total > 0) setOpen(true);
   }, [briefingAfterLoad, status, loadCount, total]);
 
-  const openFromBell = useCallback(() => {
+  /** 달력 버튼으로 여는 경로. 열 때마다 다시 읽어 기준일이 하루 밀린 목록을 보여주지 않는다. */
+  const openAgenda = useCallback(() => {
     reload();
     setOpen(true);
   }, [reload]);
@@ -69,12 +73,12 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
     <>
       <Button
         variant="plain"
-        aria-label={hasCount ? `알림. 예정된 일정 ${total}건` : "알림. 예정된 일정을 엽니다"}
+        aria-label={hasCount ? `다가오는 일정 ${total}건` : "다가오는 일정을 엽니다"}
         aria-haspopup="dialog"
-        onClick={openFromBell}
+        onClick={openAgenda}
         icon={
-          <span className="time-keeper__bell">
-            <BellIcon />
+          <span className="time-keeper__launcher">
+            <OutlinedCalendarAltIcon />
             {hasCount && (
               <Badge className="time-keeper__badge" isRead={false}>
                 {badgeLabel(total)}

@@ -1,8 +1,8 @@
-/* 만기 브리핑 창의 본문. 모달이 테두리와 여백을 이미 갖고 있어 여기서는 배경만 비운다. */
+/* 일정 브리핑 창의 본문. 모달이 테두리와 여백을 이미 갖고 있어 여기서는 배경만 비운다. */
 .time-keeper { display: flex; flex-direction: column; gap: 8px; }
 
-/* 상단바 알림 버튼. 배지를 종 아이콘 오른쪽 위에 겹친다. */
-.time-keeper__bell { position: relative; display: inline-flex; }
+/* 상단바 일정 버튼. 배지를 달력 아이콘 오른쪽 위에 겹친다. */
+.time-keeper__launcher { position: relative; display: inline-flex; }
 
 .time-keeper__badge {
   position: absolute;
