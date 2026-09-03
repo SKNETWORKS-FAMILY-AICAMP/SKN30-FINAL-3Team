@@ -223,6 +223,42 @@ def test_listing_revalidation_is_derived_from_the_received_date(config: Config) 
 
 
 @requires_database
+def test_listing_revalidation_excludes_deleted_parent_from_counts_and_page(
+    config: Config,
+) -> None:
+    """세대를 지워도 매물 이력은 남지만 그 매물의 일정은 어느 집계에도 나오지 않는다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, "삭제부모단지")
+        deleted_unit = create_unit(client, complex_id, unit_number="101")
+        visible_unit = create_unit(client, complex_id, unit_number="102")
+
+        deleted_listing = client.post(
+            f"/api/v1/property-units/{deleted_unit['unit']['id']}/listings",
+            json={"received_at": in_days(-40), "is_sale_available": True},
+        )
+        visible_listing = client.post(
+            f"/api/v1/property-units/{visible_unit['unit']['id']}/listings",
+            json={"received_at": in_days(-20), "is_sale_available": True},
+        )
+        assert deleted_listing.status_code == 201, deleted_listing.text
+        assert visible_listing.status_code == 201, visible_listing.text
+
+        deleted = client.delete(
+            f"/api/v1/property-units/{deleted_unit['unit']['id']}",
+            params={"row_version": deleted_unit["unit"]["row_version"]},
+        )
+        assert deleted.status_code == 204, deleted.text
+
+        body = client.get(AGENDA, params={"limit": 1}).json()
+
+        assert body["total"] == 1
+        assert body["categories"] == [{"category": "LISTING_REVALIDATION", "total": 1}]
+        assert len(body["items"]) == 1
+        assert body["items"][0]["listing_id"] == visible_listing.json()["id"]
+        assert body["items"][0]["unit_id"] == visible_unit["unit"]["id"]
+
+
+@requires_database
 def test_excludes_targets_beyond_the_requested_window(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "창단지")

@@ -65,6 +65,53 @@ export function writeLastBriefing(
   }
 }
 
+export interface DailyBriefingCoordinator {
+  /** 지금 새 브리핑 조회를 시작해야 하면 그 업무일을 반환한다. */
+  begin(now: Date): string | null;
+  /** 해당 업무일의 조회와 표시 대상 확인이 성공적으로 끝났음을 기록한다. */
+  complete(key: string): void;
+  /** 조회 실패를 알리고 같은 업무일을 다시 시도할 수 있게 한다. */
+  fail(key: string): void;
+  /** 기능이 비활성화될 때 끝나지 않은 시도를 해제한다. */
+  cancelPending(): void;
+}
+
+/**
+ * 브리핑 조회 한 번의 수명주기.
+ *
+ * due 판단만으로는 오늘 기록을 쓰지 않는다. 실제 일정 조회가 성공하고 표시 대상 유무까지
+ * 확인한 뒤 ``complete``가 호출되어야 소진한다. 저장소가 막혀도 현재 탭에서는 완료 업무일을
+ * 기억해 1분마다 같은 브리핑을 다시 열지 않는다.
+ */
+export function createDailyBriefingCoordinator(
+  storage: Storage | undefined = globalStorage(),
+): DailyBriefingCoordinator {
+  let pendingKey: string | null = null;
+  let completedInMemoryKey: string | null = null;
+
+  return {
+    begin(now) {
+      const key = businessDateKey(now);
+      if (pendingKey === key || completedInMemoryKey === key) return null;
+      if (!isBriefingDue(now, readLastBriefing(storage))) return null;
+      pendingKey = key;
+      return key;
+    },
+    complete(key) {
+      if (pendingKey !== key) return;
+      pendingKey = null;
+      completedInMemoryKey = key;
+      writeLastBriefing(key, storage);
+    },
+    fail(key) {
+      if (pendingKey === key) pendingKey = null;
+    },
+    cancelPending() {
+      pendingKey = null;
+    },
+  };
+}
+
 function globalStorage(): Storage | undefined {
   try {
     return typeof localStorage === "undefined" ? undefined : localStorage;

@@ -11,6 +11,5 @@ updated: 2026-09-03
 | OQ-009 | RDS 작업 polling에서 SQS·DLQ로 전환할 측정 조건과 소비·재시도 계약은 무엇인가? | 1차는 RDS polling이며 독립 재시도·지연 격리·Worker 확장이 어려워질 때만 SQS·DLQ 도입 | backend-ai 계약, 멱등성, DLQ, 배포 | 백엔드·에이전트·인프라 담당·팀 |
 | OQ-010 | 장부를 정하지 않은 신규 음성메모 접수를 한 번의 분석으로 끝낼 수 있는가? | `POST /api/v1/f2/analyses`는 `ledger_type`을 받아 그 장부의 제안만 만든다. Frontend는 매물장으로 먼저 분석하고 매수문의로 판정되면 같은 음성을 구입장 기준으로 한 번 더 보낸다([ADR-006](../../frontend/references/decisions/ADR-006-home-voice-intake.md)). 후보는 `ledger_type` 생략 허용, 판정 장부 기준 제안 반환, 전사 재사용 | F2 계약, RunPod 비용, 접수 지연, 임시 음성 보존 | 백엔드·에이전트 담당·팀 |
 | OQ-011 | F4 Time Keeper 일정 조회의 기준값을 사무소별 설정으로 둘 것인가? | 현재는 코드 기본값이다. 브리핑 시각 09:00, `within_days` 90, `overdue_days` 7, `recontact_days`·`revalidation_days` 30, `per_category_limit` 3. F1-AL-01은 만기 기준을 사무소가 정한다고 하고 F1-AL-05는 알림 규칙을 담당자별로 설정한다고 한다. `brokerage.settings` JSONB가 후보다 | API 계약, 화면 문구, 알림 빈도 | 기획·팀 |
-| OQ-012 | Time Keeper를 독립 기능 번호(F4)로 둘 것인가, F1 알림(F1-AL)의 구현으로 둘 것인가? | 사용자 요청은 F4다. `docs/requirements/f4/`와 `F4-CM`·`F4-TK` ID를 `제안` 상태로 올린 PR이 검토 중이며, 화면도 `F4-MOD-010`을 쓴다. 병합 승인이 곧 이 질문의 답이 되고 그때 문서 상태를 `결정`으로 올린다 | 요구사항 ID 체계, 화면 문서, 추적 정보, API 계약 상태 | 기획·팀 |
 
 질문이 해결되면 관련 정본 문서 또는 ADR에 결과를 반영하고 이 표에서 제거한다. Git 이력은 토론의 과거 상태를 보존한다.

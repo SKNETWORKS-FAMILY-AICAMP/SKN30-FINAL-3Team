@@ -12,6 +12,7 @@ import {
   BRIEFING_HOUR,
   businessDateKey,
   businessHour,
+  createDailyBriefingCoordinator,
   isBriefingDue,
   readLastBriefing,
   writeLastBriefing,
@@ -96,4 +97,56 @@ test("저장소가 막혀 있어도 브리핑이 멈추지 않는다", () => {
 test("저장소가 없는 실행 환경에서도 읽기가 실패하지 않는다", () => {
   assert.equal(readLastBriefing(undefined), null);
   assert.doesNotThrow(() => writeLastBriefing("2026-09-03", undefined));
+});
+
+test("브리핑은 조회를 시작할 때가 아니라 성공한 뒤에만 소진한다", () => {
+  const storage = memoryStorage();
+  const coordinator = createDailyBriefingCoordinator(storage);
+  const now = kst("2026-09-03", 9, 30);
+
+  const key = coordinator.begin(now);
+
+  assert.equal(key, "2026-09-03");
+  assert.equal(readLastBriefing(storage), null);
+  assert.equal(coordinator.begin(now), null, "조회 중에는 중복 요청하지 않는다");
+
+  assert.ok(key);
+  coordinator.complete(key);
+  assert.equal(readLastBriefing(storage), "2026-09-03");
+  assert.equal(coordinator.begin(now), null);
+});
+
+test("브리핑 조회가 실패하면 같은 업무일을 다시 시도할 수 있다", () => {
+  const storage = memoryStorage();
+  const coordinator = createDailyBriefingCoordinator(storage);
+  const now = kst("2026-09-03", 10);
+
+  const firstKey = coordinator.begin(now);
+  assert.equal(firstKey, "2026-09-03");
+
+  assert.ok(firstKey);
+  coordinator.fail(firstKey);
+
+  assert.equal(readLastBriefing(storage), null);
+  assert.equal(coordinator.begin(now), "2026-09-03");
+});
+
+test("저장소 쓰기가 막혀도 성공한 브리핑은 현재 탭에서 반복하지 않는다", () => {
+  const blocked = {
+    getItem() {
+      throw new Error("blocked");
+    },
+    setItem() {
+      throw new Error("blocked");
+    },
+  } as unknown as Storage;
+  const coordinator = createDailyBriefingCoordinator(blocked);
+  const now = kst("2026-09-03", 11);
+
+  const key = coordinator.begin(now);
+  assert.equal(key, "2026-09-03");
+  assert.ok(key);
+  coordinator.complete(key);
+
+  assert.equal(coordinator.begin(now), null);
 });

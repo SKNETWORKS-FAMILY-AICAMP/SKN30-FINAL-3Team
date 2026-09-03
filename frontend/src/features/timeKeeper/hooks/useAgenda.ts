@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, isCanceled } from "../../../shared/api/index.ts";
+import { ApiError, isCanceled } from "../../../shared/api/errors.ts";
 import { timeKeeperTransport } from "../api/timeKeeperTransport.ts";
 import type { AgendaQuery } from "../api/transport.ts";
 import type { AgendaCategorySummaryDto, AgendaItemDto } from "../model/dto.ts";
@@ -22,13 +22,8 @@ export interface AgendaState {
   withinDays: number | null;
   status: "loading" | "ready" | "error";
   error: ApiError | null;
-  /**
-   * 성공한 조회 횟수.
-   *
-   * 브리핑이 "다시 읽은 결과"로 열렸는지 구분하는 데 쓴다. `status`만 보면 재조회를 요청한
-   * 직후에도 직전 결과가 아직 `ready`라서, 밤새 켜 둔 화면이 어제 기준일로 브리핑을 연다.
-   */
-  loadCount: number;
+  /** 성공·실패로 끝난 조회 횟수. 브리핑이 자신이 요청한 재조회의 결과만 기다릴 때 쓴다. */
+  settlementCount: number;
   reload: () => void;
 }
 
@@ -44,7 +39,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
   const [windowDays, setWindowDays] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<ApiError | null>(null);
-  const [loadCount, setLoadCount] = useState(0);
+  const [settlementCount, setSettlementCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -74,7 +69,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
         setWindowDays(page.within_days);
         setStatus("ready");
         setError(null);
-        setLoadCount((current) => current + 1);
+        setSettlementCount((current) => current + 1);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted || isCanceled(cause)) return;
@@ -84,6 +79,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
             ? cause
             : new ApiError({ kind: "server", message: "일정 목록을 불러오지 못했습니다.", cause }),
         );
+        setSettlementCount((current) => current + 1);
       });
 
     return () => controller.abort();
@@ -111,9 +107,19 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
       withinDays: windowDays,
       status,
       error,
-      loadCount,
+      settlementCount,
       reload,
     }),
-    [items, categories, total, asOf, windowDays, status, error, loadCount, reload],
+    [
+      items,
+      categories,
+      total,
+      asOf,
+      windowDays,
+      status,
+      error,
+      settlementCount,
+      reload,
+    ],
   );
 }

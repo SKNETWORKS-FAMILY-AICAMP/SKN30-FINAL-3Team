@@ -27,6 +27,11 @@ export interface TimeKeeperNotificationProps {
   enabled?: boolean;
 }
 
+interface BriefingAttempt {
+  businessDateKey: string;
+  afterSettlement: number;
+}
+
 /** 배지에 적는 건수. 세 자리부터는 숫자 자체보다 "많다"가 정보다. */
 function badgeLabel(total: number): string {
   return total > 99 ? "99+" : String(total);
@@ -35,31 +40,36 @@ function badgeLabel(total: number): string {
 export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificationProps) {
   const [isOpen, setOpen] = useState(false);
   /**
-   * 브리핑이 재조회를 기다리는 중임을 나타낸다. 값은 요청 시점의 `loadCount`이며, 그보다 큰
-   * 결과가 도착해야 연다. `status`만 보면 재조회 직후에도 직전 결과가 `ready`라 낡은 기준일로
-   * 열린다.
+   * 브리핑이 재조회를 기다리는 중임을 나타낸다. 요청 시점보다 큰 `settlementCount`가 되어야
+   * 성공 또는 실패를 확정한다. `status`만 보면 재조회 직후에도 직전 결과가 `ready`라 낡은
+   * 기준일로 브리핑을 열 수 있다.
    */
-  const [briefingAfterLoad, setBriefingAfterLoad] = useState<number | null>(null);
+  const [briefingAttempt, setBriefingAttempt] = useState<BriefingAttempt | null>(null);
 
   const agenda = useAgenda({ limit: BRIEFING_LIMIT }, { enabled });
-  const { status, total, loadCount, reload, withinDays } = agenda;
+  const { status, total, settlementCount, reload, withinDays } = agenda;
 
-  useDailyBriefing({
+  const { complete: completeBriefing, fail: failBriefing } = useDailyBriefing({
     enabled,
-    onDue: useCallback(() => {
-      setBriefingAfterLoad(loadCount);
+    onDue: useCallback((businessDateKey: string) => {
+      setBriefingAttempt({ businessDateKey, afterSettlement: settlementCount });
       reload();
-    }, [loadCount, reload]),
+    }, [settlementCount, reload]),
   });
 
   useEffect(() => {
-    if (briefingAfterLoad == null) return;
-    if (status !== "ready" || loadCount <= briefingAfterLoad) return;
-    setBriefingAfterLoad(null);
-    // 알릴 것이 없는 날까지 창을 띄우면 다음 날부터 아무도 읽지 않는다. 하루 한 번이라는
-    // 기록은 이미 남았으므로 오늘 다시 뜨지는 않는다.
-    if (total > 0) setOpen(true);
-  }, [briefingAfterLoad, status, loadCount, total]);
+    if (briefingAttempt == null || settlementCount <= briefingAttempt.afterSettlement) return;
+
+    setBriefingAttempt(null);
+    if (status === "ready") {
+      // 조회가 성공하고 표시 대상 유무까지 확인한 뒤에만 오늘 브리핑을 소진한다. 빈 날도
+      // 성공한 확인이므로 기록하되 창은 열지 않는다.
+      if (total > 0) setOpen(true);
+      completeBriefing(briefingAttempt.businessDateKey);
+      return;
+    }
+    if (status === "error") failBriefing(briefingAttempt.businessDateKey);
+  }, [briefingAttempt, completeBriefing, failBriefing, settlementCount, status, total]);
 
   /** 달력 버튼으로 여는 경로. 열 때마다 다시 읽어 기준일이 하루 밀린 목록을 보여주지 않는다. */
   const openAgenda = useCallback(() => {

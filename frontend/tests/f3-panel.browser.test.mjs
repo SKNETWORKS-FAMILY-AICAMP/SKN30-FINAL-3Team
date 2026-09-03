@@ -36,6 +36,14 @@ let server;
 let browser;
 let baseUrl;
 
+/** F3 브라우저 검증이 실행 시각에 따라 자동 브리핑 모달에 가로막히지 않게 격리한다. */
+async function markDailyBriefingComplete(page) {
+  const businessDate = new Date(Date.now() + 9 * 60 * 60 * 1_000).toISOString().slice(0, 10);
+  await page.addInitScript((key) => {
+    window.localStorage.setItem("time-keeper.last-briefing", key);
+  }, businessDate);
+}
+
 function startDevServer() {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -84,6 +92,7 @@ after(async () => {
 
 /** 첫 화면은 홈이다. 장부 그리드를 보려면 상단바에서 매물장을 먼저 연다. */
 async function openPropertyLedger(page) {
+  await markDailyBriefingComplete(page);
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "매물장", exact: true }).click();
   const links = page.locator(".ledger-grid__detail-link");
@@ -121,6 +130,7 @@ async function openDetailAndRecordScroll(page) {
       return original.call(this, options);
     };
   });
+  await markDailyBriefingComplete(page);
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "매물장", exact: true }).click();
   const links = page.locator(".ledger-grid__detail-link");

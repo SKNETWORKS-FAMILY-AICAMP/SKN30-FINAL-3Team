@@ -9,8 +9,10 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from core.errors import ValidationError
+from domain.time_keeper import repository
 from domain.time_keeper.models import (
     KST,
     MAX_OVERDUE_DAYS,
@@ -129,3 +131,21 @@ def test_revalidation_deadline_shifts_the_received_date() -> None:
     assert revalidation_received_deadline(window) == date(2026, 11, 2)
     # 오래 묵은 매물일수록 조건 확인이 급하므로 아래쪽 경계를 두지 않는다.
     assert date(2020, 1, 1) <= revalidation_received_deadline(window)
+
+
+def test_listing_revalidation_query_requires_a_live_parent_in_the_same_brokerage() -> None:
+    window = build_window(date(2026, 9, 3), 90, 7, revalidation_days=30)
+
+    statement = repository._listing_members(42, window)[0]
+    sql = str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+    assert "FROM property_listing JOIN property_unit ON" in sql
+    assert "property_unit.brokerage_id = property_listing.brokerage_id" in sql
+    assert "property_unit.id = property_listing.unit_id" in sql
+    assert "property_unit.brokerage_id = 42" in sql
+    assert "property_unit.is_deleted = false" in sql

@@ -5,6 +5,7 @@ updated: 2026-09-03
 
 # 위키 변경 로그
 
+- 2026-09-03: 사용자 지시로 F4 기능 번호가 확정되어 이미 종료된 OQ-012가 미해결 목록에 남아 있던 불일치를 제거함.
 - 2026-09-03: 사용자 지시로 F4를 독립 기능으로 등록하고 Time Keeper를 그 안의 서비스로 정의해 `docs/requirements/f4/`와 `F4-CM`·`F4-TK` ID 체계를 신설함(OQ-012 종료). Time Keeper 일정 조회를 API 계약에 `제안`으로 등록하고, F1 장부의 날짜 컬럼에서 임대차 만기·구입 의뢰 만기·희망 입주일과 재연락·매물 조건 재확인을 종류별로 모으는 읽기 전용 조회와 상단바 알림·아침 브리핑 화면을 구현함. 계약·일정 테이블이 없어 계약 체결일, 지급일, 임장일, 신고 기한과 명도일은 제외하고 기준값·기능 번호·장기 미접촉 노출을 OQ-011~013으로 등록함.
 - 2026-09-03: `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle과 release manifest의 S3 불변 게시 및 양방향 cross-hash를 확인해 RunPod 문서 상태를 “S3 dev release 게시 완료·RunPod/Terraform 미적용”으로 갱신했다. AI suite 종료 지연과 Terraform provider handshake 실패는 제한된 sandbox의 thread·provider IPC 제약으로 확인했으며 정상 실행 환경에서 AI 212개 테스트와 두 Terraform root validate가 통과했다.
 - 2026-09-03: 평가 전 adapter의 공유 개발 기동을 위해 ADR-0023을 승인하고 `release_stage=dev`, `dev-*` ID, `evaluation.status=not-evaluated`인 metadata bundle과 `runpod-create-dev(-plan)` 전용 경로를 추가했다. 평가·승인 파일만 생략하며 기반 commit·adapter checksum, 불변 게시, health·rollback·삭제 계약은 유지하고 일반 create는 dev bundle을 거부한다.

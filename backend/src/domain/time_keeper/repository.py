@@ -145,21 +145,28 @@ def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
 
 def _listing_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
     received = col(PropertyListing.received_at)
+    member = _member(
+        AgendaCategory.LISTING_REVALIDATION,
+        received + window.revalidation_days,
+        unit_id=col(PropertyListing.unit_id),
+        listing_id=col(PropertyListing.id),
+        requirement_id=_no_id(),
+        conditions=[
+            col(PropertyListing.brokerage_id) == brokerage_id,
+            col(PropertyListing.is_deleted) == false(),
+            col(PropertyListing.status).in_(sorted(ACTIVE_LISTING_STATUSES)),
+            col(PropertyUnit.brokerage_id) == brokerage_id,
+            col(PropertyUnit.is_deleted) == false(),
+            received.is_not(None),
+        ],
+        window=window,
+        in_window=received <= revalidation_received_deadline(window),
+    )
     return [
-        _member(
-            AgendaCategory.LISTING_REVALIDATION,
-            received + window.revalidation_days,
-            unit_id=col(PropertyListing.unit_id),
-            listing_id=col(PropertyListing.id),
-            requirement_id=_no_id(),
-            conditions=[
-                col(PropertyListing.brokerage_id) == brokerage_id,
-                col(PropertyListing.is_deleted) == false(),
-                col(PropertyListing.status).in_(sorted(ACTIVE_LISTING_STATUSES)),
-                received.is_not(None),
-            ],
-            window=window,
-            in_window=received <= revalidation_received_deadline(window),
+        member.select_from(PropertyListing).join(
+            PropertyUnit,
+            (col(PropertyUnit.brokerage_id) == PropertyListing.brokerage_id)
+            & (col(PropertyUnit.id) == PropertyListing.unit_id),
         )
     ]
 

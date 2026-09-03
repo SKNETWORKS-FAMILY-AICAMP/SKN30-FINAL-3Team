@@ -7,6 +7,7 @@
 않는다는 것도 확인한다. Backend 는 이 계약을 SDK 없이 쓸 수 있어야 한다.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -60,14 +61,14 @@ def test_f3_ai_project_decisions_are_registered() -> None:
     contract_path = references / "contracts" / "f3-ai.md"
     assert contract_path.is_file()
 
-    contract = contract_path.read_text()
-    index = (references / "index.md").read_text()
-    log = (references / "log.md").read_text()
-    open_questions = (references / "open-questions.md").read_text()
-    privacy_policy = (references / "privacy" / "policy.md").read_text()
+    contract = contract_path.read_text(encoding="utf-8")
+    index = (references / "index.md").read_text(encoding="utf-8")
+    log = (references / "log.md").read_text(encoding="utf-8")
+    open_questions = (references / "open-questions.md").read_text(encoding="utf-8")
+    privacy_policy = (references / "privacy" / "policy.md").read_text(encoding="utf-8")
     prototype_decision = (
         references / "decisions" / "ADR-0014-f3-prototype-synthetic-input.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     assert "status: 결정" in contract
     assert "| `LISTING` |" in contract
@@ -82,12 +83,12 @@ def test_f3_ai_project_decisions_are_registered() -> None:
 def test_anchor_card_storage_is_registered_in_the_current_project_contracts() -> None:
     """코드가 진행됐는데 위키가 계속 미구현이라고 남는 회귀를 막는다."""
     references = REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references"
-    contract = (references / "contracts" / "f3-ai.md").read_text()
-    api_contract = (references / "contracts" / "api.md").read_text()
-    log = (references / "log.md").read_text()
+    contract = (references / "contracts" / "f3-ai.md").read_text(encoding="utf-8")
+    api_contract = (references / "contracts" / "api.md").read_text(encoding="utf-8")
+    log = (references / "log.md").read_text(encoding="utf-8")
     online_runtime = (
         REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     assert "| Cache key 버전 | `position-card:v3`" in contract
     assert "카드·거래 유형별 가격·근거 인용과 quote offset 저장" in contract
@@ -118,12 +119,15 @@ def test_importing_the_contract_has_no_configuration_or_client_side_effect() -> 
         " assert not leaked, leaked"
     )
 
+    platform_environment = {
+        name: os.environ[name] for name in ("SYSTEMROOT", "WINDIR") if name in os.environ
+    }
     completed = subprocess.run(
         [sys.executable, "-c", probe],
         capture_output=True,
         text=True,
         check=False,
-        env={},
+        env=platform_environment,
     )
 
     assert completed.returncode == 0, completed.stderr
