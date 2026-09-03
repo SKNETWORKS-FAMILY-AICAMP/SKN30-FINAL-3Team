@@ -5,7 +5,7 @@ import {
   Spinner, TextInput, Toolbar, ToolbarContent, ToolbarGroup, ToolbarItem,
 } from "@patternfly/react-core";
 import {
-  AddCircleOIcon, BellIcon, ColumnsIcon, EllipsisVIcon,
+  AddCircleOIcon, ColumnsIcon, EllipsisVIcon,
   ExclamationTriangleIcon, FilterIcon, HelpIcon, MicrophoneIcon, OutlinedCommentsIcon, SaveIcon, SearchIcon,
   UserIcon,
 } from "@patternfly/react-icons";
@@ -20,6 +20,7 @@ import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
 import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { HomeScreen } from "./features/HomeScreen.tsx";
+import { TimeKeeperNotification } from "./features/timeKeeper/index.ts";
 import VoiceMemoModal from "./features/VoiceMemoModal.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -615,7 +616,8 @@ export function AppShell() {
         <div className="masthead-actions">
           <Button className="f1-topbar__intake" variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="topbar-intake-help" onClick={() => setIntakeOpen(true)}>음성메모 입력</Button>
           <span id="topbar-intake-help" className="pf-v6-screen-reader">음성을 분석해 매도의뢰는 매물장, 매수문의는 구입장에 신규 행으로 추가합니다.</span>
-          <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
+          {/* 알림 버튼과 아침 만기 브리핑 창을 함께 소유한다. 상단바는 위치만 정한다. */}
+          <TimeKeeperNotification enabled={ledgerEnabled} />
           <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />
           <Button variant="plain" aria-label="사용자 메뉴" icon={<UserIcon />} />
           {user && (

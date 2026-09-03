@@ -1,0 +1,108 @@
+/* 만기 브리핑 창의 본문. 모달이 테두리와 여백을 이미 갖고 있어 여기서는 배경만 비운다. */
+.time-keeper { display: flex; flex-direction: column; gap: 8px; }
+
+/* 상단바 알림 버튼. 배지를 종 아이콘 오른쪽 위에 겹친다. */
+.time-keeper__bell { position: relative; display: inline-flex; }
+
+.time-keeper__badge {
+  position: absolute;
+  top: -6px;
+  left: 10px;
+  min-width: 16px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.time-keeper__asof { margin: 4px 0 0; color: #94a3b8; font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.time-keeper__state { margin: 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+.time-keeper__state--error { color: #b91c1c; }
+
+.time-keeper__retry {
+  padding: 0;
+  color: #0066cc;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.time-keeper__retry:focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
+
+.time-keeper__list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+.time-keeper__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #f1f5f9;
+}
+.time-keeper__row:first-child { border-top: 0; }
+
+.time-keeper__dday {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 3px 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  background: #f1f5f9;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+/* 지났거나 오늘인 건. 색만으로 구분하지 않도록 문구도 "지남"·"오늘 만기"로 다르다. */
+.time-keeper__dday--urgent { color: #991b1b; background: #fee2e2; }
+
+.time-keeper__body { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; gap: 3px; }
+.time-keeper__target { color: #0f172a; font-size: 14px; font-weight: 600; }
+
+.time-keeper__meta { display: flex; flex-wrap: wrap; gap: 8px; color: #64748b; font-size: 12px; }
+.time-keeper__date { font-variant-numeric: tabular-nums; }
+
+.time-keeper__contacts { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
+.time-keeper__contact { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
+.time-keeper__contact--none { color: #94a3b8; }
+
+.time-keeper__role { color: #64748b; }
+.time-keeper__name { color: #334155; font-weight: 600; }
+.time-keeper__phone { color: #334155; font-variant-numeric: tabular-nums; }
+.time-keeper__phone--none { color: #94a3b8; }
+
+.time-keeper__flag { color: #b45309; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .time-keeper { padding: 16px; }
+  .time-keeper__row { flex-direction: column; gap: 6px; }
+}
+
+/* 종류 옆에 붙는 짧은 행동 문구. 무엇을 하는 날인지 한 줄에서 읽히게 한다. */
+.time-keeper__action { color: #0f766e; font-weight: 500; }
+
+/* 종류별 묶음. 해당되는 종류만 그리므로 묶음 수가 날마다 다르다. */
+.time-keeper__groups { display: flex; flex-direction: column; gap: 18px; }
+
+.time-keeper__group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 2px;
+  font-size: 13px;
+}
+.time-keeper__group-name { color: #0f172a; font-weight: 700; }
+.time-keeper__group-count {
+  padding: 1px 7px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.time-keeper__more { margin: 6px 0 0; color: #64748b; font-size: 12px; }
