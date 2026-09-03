@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from enum import StrEnum
 
 from core.errors import ValidationError
@@ -243,3 +243,27 @@ def build_window(
 def days_until_due(due: date, as_of: date) -> int:
     """기한까지 남은 일수. 오늘이면 0이고 이미 지났으면 음수다."""
     return (due - as_of).days
+
+
+def recontact_contact_bounds(window: AgendaWindow) -> tuple[datetime, datetime]:
+    """재연락 기한이 창 안에 드는 ``last_contact_at`` 구간. 아래는 닫히고 위는 열린다.
+
+    조건을 컬럼이 아니라 상수 쪽에 둔다. ``날짜(last_contact_at) + 주기 BETWEEN a AND b`` 로 쓰면
+    컬럼에 연산이 붙어 인덱스를 타지 못하고 매번 전체를 훑는다. 같은 뜻을 ``last_contact_at`` 자체의
+    범위로 옮기면 부분 인덱스를 그대로 쓴다.
+
+    경계는 사무소 시간대의 자정이다. 위쪽을 열어 두는 이유는 마지막 날 하루를 통째로 담기 위해서다.
+    """
+    shift = timedelta(days=window.recontact_days)
+    lower = datetime.combine(window.earliest - shift, time.min, tzinfo=KST)
+    upper = datetime.combine(window.latest - shift + timedelta(days=1), time.min, tzinfo=KST)
+    return lower, upper
+
+
+def revalidation_received_bounds(window: AgendaWindow) -> tuple[date, date]:
+    """재확인 기한이 창 안에 드는 ``received_at`` 구간. 양끝을 포함한다.
+
+    ``received_at`` 은 DATE 라 시간대 변환 없이 날짜끼리 옮기면 된다.
+    """
+    shift = timedelta(days=window.revalidation_days)
+    return window.earliest - shift, window.latest - shift

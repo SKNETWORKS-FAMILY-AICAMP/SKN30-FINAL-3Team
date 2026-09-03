@@ -23,7 +23,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 
 ## 현재 기준선
 
-현재 기준선은 27개 테이블과 16개 전진 migration이다.
+현재 기준선은 27개 테이블과 17개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -43,6 +43,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 014_ALTER_AGENT_EXECUTION_CANDIDATE_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 후보 추출 완료 상태 lease 회수용 선점 인덱스 |
 | 015_ALTER_AGENT_EXECUTION_CANDIDATE_CARD_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 후보 카드 완료 상태 lease 회수용 선점 인덱스 |
 | 016_ALTER_AGENT_EXECUTION_JUDGMENT_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 중개 판정 중 상태 lease 회수용 선점 인덱스 |
+| 017_ALTER_PROPERTY_LEDGER_AGENDA_INDEX.sql | 매물·수요 원장 확장 | 0 | 일정·할 일 조회용 의뢰 만기·희망 입주일·최종 접촉·접수일 부분 인덱스 |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 

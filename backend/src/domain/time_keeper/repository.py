@@ -7,9 +7,14 @@
 `timestamptz`를 사무소 시간대의 날짜로 옮긴 뒤 더한다. 서버 시간대에 맡기면 배포 환경에 따라
 하루가 밀린다.
 
-만기 세 갈래의 ``WHERE``는 migration 002·009가 만든 부분 인덱스 조건과 같은 모양으로 둔다.
-조건이 어긋나면 인덱스를 두고도 전체 스캔이 된다. 규칙으로 만드는 갈래와
-``property_requirement.desired_move_in_date``에는 아직 전용 인덱스가 없다.
+모든 갈래의 ``WHERE``는 migration 002·009·017이 만든 부분 인덱스 조건과 **같은 모양**으로 둔다.
+조건이 어긋나면 인덱스를 두고도 전체 스캔이 된다. 두 가지를 지킨다.
+
+1. 주기로 만드는 갈래는 기한을 컬럼에서 계산하지 않고 상수 쪽으로 옮겨 원본 컬럼의 범위 조건으로
+   쓴다. 컬럼에 연산이 붙으면 범위 조건이 인덱스를 타지 못한다.
+2. 삭제 조건은 ``is_deleted = FALSE`` 로 쓴다. ``IS FALSE`` 로 쓰면 PostgreSQL 이 부분 인덱스의
+   ``WHERE is_deleted = FALSE`` 와 같은 조건임을 증명하지 못해 인덱스를 후보에서 뺀다. 실제 계획을
+   비교해 확인한 차이다.
 """
 
 from __future__ import annotations
@@ -22,7 +27,9 @@ from sqlalchemy import (
     Date,
     String,
     Subquery,
+    and_,
     cast,
+    false,
     func,
     literal,
     null,
@@ -46,6 +53,8 @@ from domain.time_keeper.models import (
     AgendaWindow,
     RequirementAgendaDetail,
     UnitAgendaDetail,
+    recontact_contact_bounds,
+    revalidation_received_bounds,
 )
 
 # 종료된 구입 의뢰와 내려간 매물의 일정은 알리지 않는다. F1이 아직 상태 값 목록을 확정하지
@@ -74,24 +83,39 @@ def _member(
     requirement_id: Any,
     conditions: Sequence[Any],
     window: AgendaWindow,
+    in_window: Any = None,
 ) -> Any:
+    """한 갈래를 만든다.
+
+    ``due`` 는 화면에 보일 기한 표현식이고 ``in_window`` 는 창 안인지 가리는 조건이다. 저장된
+    날짜는 둘이 같지만, 주기로 만드는 갈래는 컬럼에 연산이 붙지 않도록 조건을 따로 받는다.
+    """
     return select(
         _category(category),
         due.label("due_date"),
         unit_id.label("unit_id"),
         listing_id.label("listing_id"),
         requirement_id.label("requirement_id"),
-    ).where(*conditions, due.between(window.earliest, window.latest))
+    ).where(
+        *conditions,
+        due.between(window.earliest, window.latest) if in_window is None else in_window,
+    )
 
 
 def _no_id() -> Any:
     return cast(null(), BigInteger)
 
 
+def _contacted_within(timestamp_column: Any, window: AgendaWindow) -> Any:
+    """재연락 기한이 창 안에 드는 마지막 접촉 시각 범위. 원본 컬럼에 그대로 건다."""
+    lower, upper = recontact_contact_bounds(window)
+    return and_(timestamp_column >= lower, timestamp_column < upper)
+
+
 def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
     live_unit = [
         col(PropertyUnit.brokerage_id) == brokerage_id,
-        col(PropertyUnit.is_deleted).is_(False),
+        col(PropertyUnit.is_deleted) == false(),
     ]
     expiry = col(PropertyUnit.tenancy_expiry_date)
     last_contact = col(PropertyUnit.last_contact_at)
@@ -113,6 +137,7 @@ def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
             requirement_id=_no_id(),
             conditions=[*live_unit, last_contact.is_not(None)],
             window=window,
+            in_window=_contacted_within(last_contact, window),
         ),
     ]
 
@@ -128,11 +153,12 @@ def _listing_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
             requirement_id=_no_id(),
             conditions=[
                 col(PropertyListing.brokerage_id) == brokerage_id,
-                col(PropertyListing.is_deleted).is_(False),
+                col(PropertyListing.is_deleted) == false(),
                 col(PropertyListing.status).in_(sorted(ACTIVE_LISTING_STATUSES)),
                 received.is_not(None),
             ],
             window=window,
+            in_window=received.between(*revalidation_received_bounds(window)),
         )
     ]
 
@@ -140,7 +166,7 @@ def _listing_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
 def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
     live_requirement = [
         col(PropertyRequirement.brokerage_id) == brokerage_id,
-        col(PropertyRequirement.is_deleted).is_(False),
+        col(PropertyRequirement.is_deleted) == false(),
         col(PropertyRequirement.status).in_(sorted(ACTIVE_REQUIREMENT_STATUSES)),
     ]
     last_contact = col(PropertyRequirement.last_contact_at)
@@ -171,6 +197,7 @@ def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
             requirement_id=col(PropertyRequirement.id),
             conditions=[*live_requirement, last_contact.is_not(None)],
             window=window,
+            in_window=_contacted_within(last_contact, window),
         )
     )
     return members
@@ -275,7 +302,7 @@ def load_unit_details(
         .where(
             col(PropertyUnit.brokerage_id) == brokerage_id,
             col(PropertyUnit.id).in_(list(unit_ids)),
-            col(PropertyUnit.is_deleted).is_(False),
+            col(PropertyUnit.is_deleted) == false(),
         )
     )
     return {
@@ -301,7 +328,7 @@ def load_requirement_details(
     statement = select(PropertyRequirement).where(
         col(PropertyRequirement.brokerage_id) == brokerage_id,
         col(PropertyRequirement.id).in_(list(requirement_ids)),
-        col(PropertyRequirement.is_deleted).is_(False),
+        col(PropertyRequirement.is_deleted) == false(),
     )
     return {
         requirement.id or 0: RequirementAgendaDetail(
@@ -323,6 +350,6 @@ def load_parties(session: Session, brokerage_id: int, party_ids: Sequence[int]) 
     statement = select(Party).where(
         col(Party.brokerage_id) == brokerage_id,
         col(Party.id).in_(list(party_ids)),
-        col(Party.is_deleted).is_(False),
+        col(Party.is_deleted) == false(),
     )
     return {party.id or 0: party for party in session.execute(statement).scalars().all()}

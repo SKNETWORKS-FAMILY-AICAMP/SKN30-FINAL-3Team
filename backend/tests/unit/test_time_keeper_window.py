@@ -18,6 +18,8 @@ from domain.time_keeper.models import (
     MAX_WITHIN_DAYS,
     build_window,
     days_until_due,
+    recontact_contact_bounds,
+    revalidation_received_bounds,
     today_in_business_timezone,
 )
 
@@ -93,3 +95,33 @@ def test_today_follows_the_brokerage_timezone_not_utc() -> None:
     assert today_in_business_timezone(datetime(2026, 9, 3, 23, 30, tzinfo=UTC)) == date(2026, 9, 4)
     # 서울 자정 직후는 아직 같은 날이다. UTC 로 읽으면 하루 전이 된다.
     assert today_in_business_timezone(datetime(2026, 9, 4, 0, 30, tzinfo=KST)) == date(2026, 9, 4)
+
+
+def test_recontact_bounds_move_the_period_onto_the_constant_side() -> None:
+    """컬럼에 연산이 붙으면 인덱스를 타지 못하므로 주기를 경계 쪽으로 옮긴다."""
+    window = build_window(date(2026, 9, 3), 90, 7, recontact_days=30)
+
+    lower, upper = recontact_contact_bounds(window)
+
+    # 창의 시작(8/27)에 기한이 걸리려면 30일 전인 7/28에 접촉했어야 한다.
+    assert lower == datetime(2026, 7, 28, 0, 0, tzinfo=KST)
+    # 창의 끝(12/2)에 걸리는 마지막 날은 11/2이며, 그날 하루를 통째로 담도록 끝을 연다.
+    assert upper == datetime(2026, 11, 3, 0, 0, tzinfo=KST)
+
+
+def test_recontact_bounds_are_half_open_so_the_last_day_is_whole() -> None:
+    window = build_window(date(2026, 9, 3), 90, 7, recontact_days=30)
+    _lower, upper = recontact_contact_bounds(window)
+
+    # 마지막 날 23:59 는 들어오고 다음 날 00:00 은 빠진다.
+    assert datetime(2026, 11, 2, 23, 59, tzinfo=KST) < upper
+    assert datetime(2026, 11, 3, 0, 0, tzinfo=KST) >= upper
+
+
+def test_revalidation_bounds_shift_the_received_date_range() -> None:
+    window = build_window(date(2026, 9, 3), 90, 7, revalidation_days=30)
+
+    earliest, latest = revalidation_received_bounds(window)
+
+    assert earliest == date(2026, 7, 28)
+    assert latest == date(2026, 11, 2)
