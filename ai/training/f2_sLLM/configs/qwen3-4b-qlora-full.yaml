@@ -1,6 +1,6 @@
 model:
   id: Qwen/Qwen3-4B
-  revision: main
+  revision: 1cfa9a7208912126459214e8b04321603b3df60c
   max_length: 2048
 
 quantization:
