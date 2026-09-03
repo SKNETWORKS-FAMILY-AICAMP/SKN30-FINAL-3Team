@@ -2,6 +2,7 @@ set dotenv-load
 
 account_id := env_var("TARGET_ACCOUNT_ID")
 aws_profile := env_var_or_default("AWS_PROFILE", "skn30-session")
+export AWS_PROFILE := aws_profile
 
 # 사용 가능한 Infra 명령을 표시한다.
 default:
@@ -123,41 +124,58 @@ secret-status:
 secret-rotate target:
     uv run --script scripts/manage_runpod_control.py secret-rotate {{ quote(target) }}
 
-# 전달받은 SLLM release bundle의 manifest, adapter, 평가 checksum을 로컬에서 검증한다.
+# 전달받은 LoRA·base SLLM release bundle의 manifest, 선택적 adapter와 평가 checksum을 검증한다.
 sllm-artifact-inspect bundle:
     uv run --script scripts/manage_sllm_artifact.py inspect {{ quote(bundle) }}
 
-# 검증된 SLLM release bundle을 private S3에 불변 경로로 게시한다.
-[confirm("검증된 SLLM release bundle을 private S3에 게시합니까? 같은 release ID는 덮어쓸 수 없습니다.")]
+# 검사된 SLLM release bundle을 private S3에 불변 경로로 게시한다.
+[confirm("검사된 SLLM release bundle을 private S3에 게시합니까? 같은 release ID는 덮어쓸 수 없습니다.")]
 sllm-artifact-publish bundle:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_sllm_artifact.py publish {{ quote(bundle) }} --apply
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_sllm_artifact.py publish {{ quote(bundle) }} --apply
 
 # 공유 F2 RunPod Pod 상태와 active/offline endpoint를 읽기 전용으로 확인한다.
 runpod-status:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-status
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-status
 
 # 배포된 Backend의 합성 음성 fixture로 인증된 F2 전체 경로를 검증한다.
 runpod-smoke:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-smoke
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-smoke
+
+# Pod 삭제 뒤 Backend가 F2 요청을 의도적으로 503 처리하는지 합성 fixture로 검증한다.
+runpod-offline-smoke:
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-smoke-offline
 
 # endpoint, 공유 Pod와 인증 health를 비교해 수동 조정 명령만 제시한다.
 runpod-reconcile:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-reconcile
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-reconcile
 
 # Pod가 사라진 active endpoint만 명시적 확인 후 offline으로 전환하고 API·Worker를 갱신한다.
 [confirm("active endpoint의 Pod가 없음을 확인했으며 endpoint를 offline으로 전환합니까?")]
 runpod-reconcile-apply:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-reconcile --apply --endpoint-offline-confirmed
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-reconcile --apply --endpoint-offline-confirmed
+
+# 비용 없이 S3 release, 공유 Pod 부재와 Backend refresh 대상을 확인한다.
+runpod-create-plan release_id gpu_id:
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-create --release-id {{ quote(release_id) }} --gpu-id {{ quote(gpu_id) }}
+
+# 비용 없이 미평가 dev release와 공유 Pod 부재, Backend refresh 대상을 확인한다.
+runpod-create-dev-plan release_id gpu_id:
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-create --release-id {{ quote(release_id) }} --gpu-id {{ quote(gpu_id) }} --allow-dev-release
 
 # private S3 release로 Secure Cloud Pod를 새로 만들고 검증 후 dev endpoint를 활성화한다.
 [confirm("새 공유 F2 RunPod Pod를 생성하고 GPU 비용을 발생시킵니까?")]
 runpod-create release_id gpu_id:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-create --release-id {{ quote(release_id) }} --gpu-id {{ quote(gpu_id) }} --apply
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-create --release-id {{ quote(release_id) }} --gpu-id {{ quote(gpu_id) }} --apply
+
+# 미평가 dev release로 공유 Pod를 만들고 health·F2 smoke 후 dev endpoint를 활성화한다.
+[confirm("미평가 dev 모델을 공유 F2 endpoint에 연결하고 GPU 비용을 발생시킵니까?")]
+runpod-create-dev release_id gpu_id:
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-create --release-id {{ quote(release_id) }} --gpu-id {{ quote(gpu_id) }} --allow-dev-release --apply
 
 # dev endpoint를 offline으로 전환한 뒤 정확히 일치하는 공유 Pod를 영구 삭제한다.
 [confirm("활성 F2 테스트와 요청이 모두 끝났으며 지정한 RunPod Pod를 영구 삭제합니까?")]
 runpod-delete pod_id:
-    SLLM_MODEL_BUCKET="$$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-delete --pod-id {{ quote(pod_id) }} --workloads-stopped-confirmed --apply
+    SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw sllm_model_bucket_name)" uv run --script scripts/manage_runpod.py pod-delete --pod-id {{ quote(pod_id) }} --workloads-stopped-confirmed --apply
 
 # ASG·RDS 정지 후 ALB를 제거하고 CloudFront를 비활성화하는 saved plan을 생성한다.
 dev-deep-stop-plan:

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Infra 결정 인덱스
@@ -23,5 +23,5 @@ updated: 2026-09-02
 | [ADR-0014](ADR-0014-dev-deep-power-lifecycle.md) | 승인됨 | ALB 삭제·CloudFront 비활성화를 포함한 검토 가능한 dev deep 전원 운영 |
 | [ADR-0015](ADR-0015-cloudwatch-alarm-discord-delivery.md) | 부분 대체됨·코드 구현, 미적용 | CloudWatch Alarm을 전용 SNS·Lambda와 새 Discord webhook Secret으로 분리 전달 |
 | [ADR-0016](ADR-0016-runpod-shared-f2-serving.md) | 대체됨 | 영속 Volume과 stop/start 기반 RunPod 공유 F2 서빙 운영 |
-| [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md) | 부분 대체됨·코드 구현, 외부 자원 미적용 | private S3 SLLM release와 RunPod create/delete, active/offline endpoint로 공유 dev 서빙 |
+| [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | private S3 SLLM release와 RunPod create/delete, active/offline endpoint로 공유 dev 서빙; release v2와 미평가 dev 경로는 프로젝트 ADR-0022·0023 적용 |
 | [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, AWS 값 정본·회전, 읽기 전용 감시와 수동 reconcile |

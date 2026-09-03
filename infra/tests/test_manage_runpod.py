@@ -7,6 +7,7 @@ import unittest
 import urllib.error
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "infra/scripts"
@@ -99,6 +100,7 @@ class TemplateTests(unittest.TestCase):
                 "pod-create",
                 "pod-status",
                 "pod-smoke",
+                "pod-smoke-offline",
                 "pod-delete",
                 "pod-reconcile",
             },
@@ -161,10 +163,27 @@ class RunpodApiTests(unittest.TestCase):
         self.assertNotIn("private-signature", str(raised.exception))
         self.assertNotIn("runpod-private", str(raised.exception))
 
+    def test_model_health_requires_expected_served_model_id(self) -> None:
+        response = mock.MagicMock(status=200)
+        response.read.return_value = json.dumps(
+            {"data": [{"id": "unexpected-model"}]}
+        ).encode()
+        response.__enter__.return_value = response
+        opener = mock.MagicMock()
+        opener.open.return_value = response
+        with mock.patch.object(
+            MODULE.urllib.request, "build_opener", return_value=opener
+        ):
+            result = MODULE.request_models(
+                "https://pod-8001.proxy.runpod.net/v1", SLLM_KEY, "sllm"
+            )
+        self.assertFalse(result["ok"])
+
 
 class FakeRunpod:
-    def __init__(self, *, present: bool = False):
+    def __init__(self, *, present: bool = False, fail_delete: bool = False):
         self.present = present
+        self.fail_delete = fail_delete
         self.deleted: list[str] = []
         self.created = False
 
@@ -184,6 +203,8 @@ class FakeRunpod:
 
     def delete(self, pod_id):
         self.deleted.append(pod_id)
+        if self.fail_delete:
+            raise MODULE.ToolError("delete fixture failure")
         self.present = False
 
 
@@ -203,16 +224,29 @@ class FakeAws:
         self.writes: list[dict] = []
         self.refreshes = 0
         self.smokes = 0
+        self.presigns = 0
+        self.fail_smoke = False
+        self.preflights = 0
+        self.fail_refresh_calls: set[int] = set()
+        self.release_stage = "verified"
 
     def release(self, release_id):
         return (
             {
                 "release_id": release_id,
+                "release_stage": self.release_stage,
                 "base_model": {"id": "Qwen/Qwen3-4B", "revision": "a" * 40},
             },
             "b" * 64,
-            "https://private.s3.example/signed?X-Amz-Signature=secret",
         )
+
+    def presign(self, _release_id):
+        self.presigns += 1
+        return "https://private.s3.example/signed?X-Amz-Signature=secret"
+
+    def preflight_backend(self):
+        self.preflights += 1
+        return "i-development"
 
     def current_endpoint(self):
         return dict(self.endpoint)
@@ -223,13 +257,124 @@ class FakeAws:
 
     def refresh(self):
         self.refreshes += 1
+        if self.refreshes in self.fail_refresh_calls:
+            raise MODULE.ToolError("refresh fixture failure")
 
     def smoke(self):
         self.smokes += 1
+        if self.fail_smoke:
+            raise MODULE.ToolError("smoke fixture failure")
 
 
-def healthy(_url, _key):
+def healthy(_url, _key, _expected_model):
     return {"ok": True, "status": 200, "latency_ms": 1}
+
+
+def published_manifest(schema_version: int) -> dict[str, object]:
+    value: dict[str, object] = {
+        "schema_version": schema_version,
+        "release_id": "consultation-v1",
+        "capability": MODULE.artifact.CAPABILITY,
+        "served_model_name": MODULE.artifact.SERVED_MODEL_NAME,
+        "created_at": "2026-09-01T00:00:00+00:00",
+        "base_model": {"id": "Qwen/Qwen3-4B", "revision": "a" * 40},
+        "adapter": {
+            "format": "peft-lora",
+            "path": "adapter",
+            "sha256": "b" * 64,
+            "size_bytes": 10,
+            "file_count": 2,
+        },
+        "training": {
+            "code_revision": "c" * 40,
+            "dataset_release": "f2-v1",
+            "train_sha256": "d" * 64,
+            "validation_sha256": "e" * 64,
+        },
+        "evaluation": {
+            "task": "full",
+            "summary_path": "evaluation-summary.json",
+            "summary_sha256": "f" * 64,
+            "promotion_status": "approved",
+            "selected_model": "candidate",
+            "approval_path": "promotion-approval.json",
+            "approval_sha256": "1" * 64,
+        },
+    }
+    if schema_version == 2:
+        value["release_mode"] = "lora"
+        value["training"] = {
+            "code_revision": "c" * 40,
+            "train_sha256": "d" * 64,
+            "validation_sha256": "e" * 64,
+        }
+        assert isinstance(value["evaluation"], dict)
+        value["evaluation"].update(
+            {
+                "dataset_release": "f2-v2",
+                "dataset_sha256": "2" * 64,
+                "source_summary_sha256": "4" * 64,
+            }
+        )
+    return value
+
+
+class FakeArtifactClient:
+    def __init__(self, manifest: dict[str, object], *, cross_hashes: bool):
+        self.manifest_bytes = json.dumps(manifest).encode()
+        manifest_sha = MODULE.hashlib.sha256(self.manifest_bytes).hexdigest()
+        bundle_sha = "3" * 64
+        self.heads = {
+            "release.json": {
+                "Metadata": {
+                    "sha256": manifest_sha,
+                    **({"bundle-sha256": bundle_sha} if cross_hashes else {}),
+                }
+            },
+            "bundle.tar.gz": {
+                "Metadata": {
+                    "sha256": bundle_sha,
+                    **(
+                        {"release-manifest-sha256": manifest_sha}
+                        if cross_hashes
+                        else {}
+                    ),
+                }
+            },
+        }
+
+    def run(self, *arguments):
+        if arguments[:2] == ("s3api", "get-object"):
+            Path(arguments[-1]).write_bytes(self.manifest_bytes)
+            return ""
+        raise AssertionError(arguments)
+
+    def object_head(self, *, bucket, key):
+        del bucket
+        return self.heads[key.rsplit("/", 1)[-1]]
+
+
+class PublishedReleaseTests(unittest.TestCase):
+    def operations(self, client):
+        return MODULE.AwsOperations(
+            client,
+            bucket="private",
+            parameter_name="/endpoint",
+            project="project",
+        )
+
+    def test_legacy_v1_checksum_metadata_remains_readable(self) -> None:
+        manifest, bundle_sha = self.operations(
+            FakeArtifactClient(published_manifest(1), cross_hashes=False)
+        ).release("consultation-v1")
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(bundle_sha, "3" * 64)
+
+    def test_v2_requires_bidirectional_cross_hashes(self) -> None:
+        with self.assertRaisesRegex(MODULE.ToolError, "cross-hashes"):
+            self.operations(
+                FakeArtifactClient(published_manifest(2), cross_hashes=False)
+            ).release("consultation-v1")
 
 
 class ControllerTests(unittest.TestCase):
@@ -245,9 +390,10 @@ class ControllerTests(unittest.TestCase):
 
     def test_create_dry_run_does_not_create_pod(self) -> None:
         runpod = FakeRunpod()
+        aws = FakeAws()
         output = io.StringIO()
         with redirect_stdout(output):
-            self.controller(runpod, FakeAws()).create(
+            self.controller(runpod, aws).create(
                 release_id="consultation-v1",
                 gpu_id="NVIDIA RTX 4090",
                 terminate_after=None,
@@ -255,7 +401,57 @@ class ControllerTests(unittest.TestCase):
                 keys=(SLLM_KEY, STT_KEY),
             )
         self.assertFalse(runpod.created)
+        self.assertEqual(aws.presigns, 0)
+        self.assertEqual(aws.preflights, 1)
         self.assertNotIn("Signature=secret", output.getvalue())
+
+    def test_standard_create_rejects_dev_release_before_cost(self) -> None:
+        runpod = FakeRunpod()
+        aws = FakeAws()
+        aws.release_stage = "dev"
+        with self.assertRaisesRegex(MODULE.ToolError, "runpod-create-dev"):
+            self.controller(runpod, aws).create(
+                release_id="dev-consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=False,
+                keys=(SLLM_KEY, STT_KEY),
+            )
+        self.assertFalse(runpod.created)
+        self.assertEqual(aws.preflights, 0)
+        self.assertEqual(aws.presigns, 0)
+
+    def test_dev_create_plan_accepts_only_dev_release(self) -> None:
+        runpod = FakeRunpod()
+        aws = FakeAws()
+        aws.release_stage = "dev"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.controller(runpod, aws).create(
+                release_id="dev-consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=False,
+                keys=(SLLM_KEY, STT_KEY),
+                allow_dev_release=True,
+            )
+        self.assertFalse(runpod.created)
+        self.assertEqual(aws.preflights, 1)
+        self.assertIn('"release_stage": "dev"', output.getvalue())
+        self.assertIn('"evaluation_status": "not-evaluated"', output.getvalue())
+
+    def test_dev_create_path_rejects_verified_release(self) -> None:
+        runpod = FakeRunpod()
+        aws = FakeAws()
+        with self.assertRaisesRegex(MODULE.ToolError, "only accepts a dev release"):
+            self.controller(runpod, aws).create(
+                release_id="consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=False,
+                keys=(SLLM_KEY, STT_KEY),
+                allow_dev_release=True,
+            )
 
     def test_create_activates_endpoint_after_health(self) -> None:
         runpod = FakeRunpod()
@@ -274,6 +470,60 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(aws.refreshes, 1)
         self.assertEqual(aws.smokes, 1)
 
+    def test_create_smoke_failure_restores_endpoint_and_deletes_pod(self) -> None:
+        runpod = FakeRunpod()
+        aws = FakeAws()
+        previous = dict(aws.endpoint)
+        aws.fail_smoke = True
+        with self.assertRaisesRegex(MODULE.ToolError, "smoke fixture failure"):
+            self.controller(runpod, aws).create(
+                release_id="consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=True,
+                keys=(SLLM_KEY, STT_KEY),
+            )
+        self.assertEqual(aws.endpoint, previous)
+        self.assertEqual(aws.refreshes, 2)
+        self.assertEqual(runpod.deleted, [POD_ID])
+
+    def test_create_health_failure_deletes_pod_before_endpoint_change(self) -> None:
+        runpod = FakeRunpod()
+        aws = FakeAws()
+        controller = self.controller(runpod, aws)
+        controller.timeout_seconds = 0
+        with self.assertRaisesRegex(MODULE.ToolError, "did not become ready"):
+            controller.create(
+                release_id="consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=True,
+                keys=(SLLM_KEY, STT_KEY),
+            )
+        self.assertEqual(aws.writes, [])
+        self.assertEqual(runpod.deleted, [POD_ID])
+
+    def test_failed_rollback_refresh_reports_reconcile_guidance(self) -> None:
+        runpod = FakeRunpod()
+        aws = FakeAws()
+        aws.fail_smoke = True
+        aws.fail_refresh_calls = {2}
+        output = io.StringIO()
+        with (
+            redirect_stdout(output),
+            self.assertRaisesRegex(MODULE.ToolError, "reconciliation is incomplete"),
+        ):
+            self.controller(runpod, aws).create(
+                release_id="consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=True,
+                keys=(SLLM_KEY, STT_KEY),
+            )
+        self.assertIn("runpod-reconcile-required", output.getvalue())
+        self.assertNotIn("pod-create-complete", output.getvalue())
+        self.assertEqual(runpod.deleted, [POD_ID])
+
     def test_delete_requires_exact_id_and_sets_offline_first(self) -> None:
         runpod = FakeRunpod(present=True)
         aws = FakeAws()
@@ -290,6 +540,23 @@ class ControllerTests(unittest.TestCase):
             controller.delete(pod_id=POD_ID, confirmed=True, apply=True)
         self.assertEqual(aws.endpoint["status"], "offline")
         self.assertEqual(runpod.deleted, [POD_ID])
+
+    def test_delete_failure_restores_previous_endpoint(self) -> None:
+        runpod = FakeRunpod(present=True, fail_delete=True)
+        aws = FakeAws()
+        aws.endpoint = MODULE.endpoint_value(
+            previous=aws.endpoint,
+            status="active",
+            pod_id=POD_ID,
+            release_id="consultation-v1",
+        )
+        previous = dict(aws.endpoint)
+        with self.assertRaisesRegex(MODULE.ToolError, "delete fixture failure"):
+            self.controller(runpod, aws).delete(
+                pod_id=POD_ID, confirmed=True, apply=True
+            )
+        self.assertEqual(aws.endpoint, previous)
+        self.assertEqual(aws.refreshes, 2)
 
     def test_reconcile_active_missing_pod_is_dry_run_by_default(self) -> None:
         runpod = FakeRunpod()

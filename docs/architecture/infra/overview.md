@@ -1,7 +1,7 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용·RunPod 공유 F2 운영 코드 구현 및 외부 자원 미적용
-updated: 2026-09-01
+implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용·S3 dev release 게시 완료·RunPod/Terraform 미적용
+updated: 2026-09-03
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -12,13 +12,13 @@ updated: 2026-09-01
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
 - **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0020](../../../.agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·기존 관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. Alarm 전용 전달과 애플리케이션 alarm은 코드 구현 후 apply 전이며 deep lifecycle, Verify/Build 분리도 apply 승인 전이다. RunPod image·Template·운영 CLI와 endpoint cutover는 코드 구현 후 외부 자원 적용 전이다.
+- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·기존 관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. S3에는 현재 dev release가 게시됐다. Alarm 전용 전달과 애플리케이션 alarm은 코드 구현 후 apply 전이며 deep lifecycle, Verify/Build 분리도 apply 승인 전이다. RunPod image·Template·Pod와 endpoint cutover 및 이번 Terraform 변경은 적용 전이다.
 
 ## 결정 요약
 
 1차 런타임은 `EC2 Backend + 설치형 brokerage-ai + RunPod Pod 추론`이다. EC2 한 대에서 API와 Worker를 별도 프로세스로 실행하되 같은 배포 이미지와 호스트를 사용한다. Backend는 `brokerage-ai`를 Python 라이브러리로 설치해 프레임워크 중립 DTO와 실행 facade를 호출한다.
 
-SLLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 공유 F2 dev 서빙은 GPU 한 개의 단일 Pod에서 `sllm`·`stt` vLLM 두 프로세스를 실행한다. 실제 기반 모델은 S3 release와 Template이 소유한다. Embedding과 학습·개인 실험은 이 운영 범위에 포함하지 않는다. OpenAI와 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
+SLLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 공유 F2 dev 서빙은 GPU 한 개의 단일 Pod에서 `sllm`·`stt` vLLM 두 프로세스를 실행한다. 실제 SLLM 기반 모델 ID·불변 commit과 선택적 LoRA adapter는 private S3 release v2가, STT 모델은 Template이 소유한다. base-only도 adapter 없는 metadata bundle을 사용하고 기반 가중치는 공개 Hugging Face에서 받는다. Embedding과 학습·개인 실험은 이 운영 범위에 포함하지 않는다. OpenAI와 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
 
 AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용한다. 이 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없어 해당 자원을 만들지 않으며 자동 알림·차단도 전제하지 않는다. RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 분리한다.
 
@@ -52,8 +52,8 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
 | 비동기 작업 | SQS, DLQ | 조건부 | 미확정 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |
 | AI 분리 | ECS Fargate, Cloud Map | 조건부 | 미확정 | 경합·지연·독립 배포·장애 격리 필요성이 측정될 때 |
-| RunPod | shared F2 Pod, private Team Template | 결정 | 코드 구현·외부 자원 미적용 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
-| RunPod | private GHCR image, private S3 SLLM release | 결정 | 코드 구현·image 미게시 | 고정 digest·lock, presigned bundle, `sllm`·`stt` 자동 감독 |
+| RunPod | shared F2 Pod, private Team Template | 결정 | 코드 구현·RunPod/Terraform 미적용 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
+| RunPod | private GHCR image, private S3 SLLM release | 결정 | S3 dev release 게시 완료·image 미게시 | 고정 digest·lock, presigned bundle, `verified|dev` stage, `sllm`·`stt` 자동 감독 |
 | RunPod | bootstrap control, read-only monitor | 결정 | 코드 구현·외부 자원 미적용 | digest plan/apply, Secrets Manager 값 정본, SSM generation/ID, 30분 감시와 수동 reconcile |
 | 1차 제외 | GitHub Actions OIDC | 제외 | 제외 | AWS Developer Tools 전달 경로를 사용 |
 | 1차 제외 | NAT Gateway, Multi-AZ RDS | 제외 | 제외 | 공유 개발·시연 예산 우선 |

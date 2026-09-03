@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # 결정 인덱스
@@ -26,8 +26,10 @@ updated: 2026-09-02
 | [ADR-0017](ADR-0017-shared-dev-development-session.md) | 승인됨 | 공유 AWS를 애플리케이션 dev로 분류하고 합성 고정 계정의 개발 세션만 허용 |
 | [ADR-0018](ADR-0018-f3-save-trigger-anchor-card-scope.md) | 승인됨 | F1 저장 트리거를 앵커 포지션 카드까지로 한정하고 후보 조회·판정은 사용자 요청이 같은 실행을 이어받아 수행 |
 | [ADR-0019](ADR-0019-minimal-error-observability.md) | 승인됨 | Backend 미처리 500과 AI 최종 실패만 기존 AWS 경로로 알리고 공개 오류·Frontend 복구 경계를 정규화 |
-| [ADR-0020](ADR-0020-sllm-release-handoff.md) | 승인됨·코드 구현, 외부 자원 미적용 | 학습자의 bundle 전달, Infra의 private S3 승격, RunPod create/delete와 F2 offline 계약 사용 |
+| [ADR-0020](ADR-0020-sllm-release-handoff.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | 학습자의 bundle 전달, Infra의 private S3 승격, RunPod create/delete와 F2 offline 계약 사용; release 계약은 ADR-0022 적용 |
 | [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, Secrets Manager 값 정본, 읽기 전용 감시와 수동 reconcile 사용 |
+| [ADR-0022](ADR-0022-sllm-release-v2-base-only.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | 평가 provenance를 결속한 LoRA·base release v2, S3 cross-hash와 비용 전 preflight 사용; dev 예외는 ADR-0023 적용 |
+| [ADR-0023](ADR-0023-sllm-dev-unevaluated-release.md) | 승인됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | `dev-*` 미평가 metadata bundle과 명시적 RunPod dev create 경로 사용 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

@@ -102,10 +102,15 @@ VRAM 부족 시 설정 파일에서 `per_device_train_batch_size`를 4→2→1 �
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
   --dataset data/f2_llm/releases/<version>/test.jsonl \
   --task full \
+  --dataset-release f2-<version> \
   --models Qwen/Qwen3-4B \
+  --model-revision <40자리-Hugging-Face-commit> \
   --quantization 4bit \
   --adapter-path /workspace/models/f2-qwen3-4b-qlora-v1/adapter
 ```
+
+`--model-revision`에는 학습 `run_metadata.json`의 `resolved_model_revision`을 전달한다. `main`을
+다시 해석해 다른 기반 가중치로 평가하지 않도록 단일 모델 평가는 항상 불변 commit에 고정한다.
 
 같은 test split에서 base 4B와 adapter의 JSON 파싱, 상담 유형, 장부 불일치,
 필드 키·값, evidence 근거와 금지된 필드 제안을 비교한다. validation loss만으로
@@ -117,13 +122,15 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 체크포인트가 아니라 아래 명령이 만든 `tar.gz` 파일 하나만 전달한다.
 
 현재 정량 승격 임계값은 고정하지 않는다. 파인튜닝 담당자는 `full` 평가 지표를 검토하고 공유 dev에
-올릴 모델 하나를 선택한 뒤 다음 형식의 승인 파일을 만든다. `evaluation_run_id`는 평가 요약의
-`run_id`, `selected_model`은 같은 요약의 `models[].label` 중 하나여야 한다.
+올릴 모델 하나를 선택한 뒤 다음 `promotion-approval:v2` 승인 파일을 만든다. `evaluation_run_id`는
+평가 요약의 `run_id`, `selected_model`은 같은 요약의 `models[].label`, `release_mode`는 평가 실행의
+`lora|base`와 같아야 한다.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "status": "approved",
+  "release_mode": "lora",
   "evaluation_run_id": "20260902T010203Z",
   "selected_model": "qwen3-4b",
   "decision_owner": "fine-tuning-owner",
@@ -135,19 +142,58 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 
 ```bash
 uv run --locked --project ai python ai/training/f2_sLLM/package_release.py \
-  --release-id consultation-v1 \
-  --training-output /local/models/f2-consultation-v1 \
+  --release-id consultation-v2 \
+  --release-mode lora \
+  --training-output /local/models/f2-consultation-v2 \
   --evaluation-summary ai/eval/f2_sLLM/results/<run-id>/summary.json \
-  --promotion-approval /local/approvals/consultation-v1.json \
+  --promotion-approval /local/approvals/consultation-v2.json \
   --dataset-release f2-1.0.0 \
-  --output /local/handoff/consultation-v1.tar.gz
+  --output /local/handoff/consultation-v2.tar.gz
+```
+
+공개 Hugging Face 기반 모델을 adapter 없이 승격할 때도 tar를 없애지 않는다. 같은 검증 metadata
+bundle을 만들되 `--training-output`을 전달하지 않는다. 기반 모델 ID와 40자리 commit은 승인된 평가
+결과에서 파생된다.
+
+```bash
+uv run --locked --project ai python ai/training/f2_sLLM/package_release.py \
+  --release-id consultation-base-v2 \
+  --release-mode base \
+  --evaluation-summary ai/eval/f2_sLLM/results/<run-id>/summary.json \
+  --promotion-approval /local/approvals/consultation-base-v2.json \
+  --dataset-release f2-1.0.0 \
+  --output /local/handoff/consultation-base-v2.tar.gz
 ```
 
 공유 dev의 `sllm`은 전체 상담분석 capability이므로 `--task full` 평가 결과만 포장된다.
 현재 classification-only adapter는 학습 실험에는 사용할 수 있지만 이 전달 절차로 승격할 수 없다.
 package 단계는 metric 임계값을 판정하지 않고 승인 상태·평가 실행·선택 모델 연결을 검증한다.
-bundle에는 PEFT adapter, 로컬 경로를 제거한 평가 요약과 승인, 기반 모델의 불변 revision과 데이터
-checksum만 포함된다. 원본 데이터·전사·예측 JSONL·checkpoint·비밀값은 포함되지 않는다.
+LoRA에서는 선택 모델의 ID·실제 commit·adapter tree checksum을 학습 metadata, adapter config와 실제
+파일에 대조한다. bundle에는 mode에 따른 PEFT adapter, aggregate allowlist로 다시 만든 평가 요약과
+승인, 기반 모델의 불변 revision과 데이터 checksum만 포함된다. 원본 데이터·전사·예측 JSONL·로컬
+경로·checkpoint·비밀값은 포함되지 않는다. `training_args.bin`은 정상 Trainer 산출물이지만 서빙에
+필요하지 않은 pickle이므로 checksum과 bundle에서 제외하고, 알려진 PEFT·tokenizer 파일 외의 adapter
+파일은 패키징을 거부한다.
 
 학습 담당자의 책임은 bundle 생성과 checksum 전달까지다. S3 게시, RunPod 생성, dev endpoint
 변경은 Infra 담당자가 수행한다.
+
+### 평가 전 dev bundle
+
+공유 개발 환경에서 기동과 API 연결만 먼저 확인해야 할 때는 `dev` stage를 명시해 평가·승인 파일
+없이 bundle을 만들 수 있다. 이 경로는 품질 검증이나 정식 승격을 대체하지 않는다. release ID는
+반드시 `dev-`로 시작하며 기반 모델 commit, 학습 metadata와 실제 adapter checksum 검사는 그대로 수행된다.
+
+```bash
+uv run --locked --project ai python ai/training/f2_sLLM/package_release.py \
+  --release-id dev-f2-handwritten-v05-qwen3-4b-full-v1 \
+  --release-stage dev \
+  --release-mode lora \
+  --training-output /local/models/f2-handwritten-v05-qwen3-4b-full-v1 \
+  --dataset-release f2-handwritten-v0.5 \
+  --output /local/handoff/dev-f2-handwritten-v05-qwen3-4b-full-v1.tar.gz
+```
+
+`dev` bundle에는 `evaluation-summary.json`과 `promotion-approval.json`이 없고 manifest에
+`evaluation.status=not-evaluated`가 남는다. Infra의 일반 create는 이를 거부하므로 반드시 전용 dev
+plan/create 절차를 사용한다.

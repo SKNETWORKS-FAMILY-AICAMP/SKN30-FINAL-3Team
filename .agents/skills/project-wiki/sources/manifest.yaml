@@ -1,7 +1,68 @@
 version: 1
-updated: "2026-08-31"
+updated: "2026-09-03"
 
 sources:
+  - id: "sllm-dev-unevaluated-release-2026-09-03"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-09-03)"
+    received: "2026-09-03"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-09-03"
+    partially_supersedes: "ADR-0022의 모든 신규 release에 대한 평가·승인 필수 조건"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0023-sllm-dev-unevaluated-release.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md"
+      - ".agents/skills/project-wiki/references/decisions/index.md"
+      - ".agents/skills/project-wiki/references/architecture/runtime.md"
+      - ".agents/skills/ai/references/training.md"
+      - ".agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md"
+      - ".agents/skills/infra/references/resource-inventory.md"
+      - "ai/training/f2_sLLM/package_release.py"
+      - "infra/scripts/manage_sllm_artifact.py"
+      - "infra/scripts/manage_runpod.py"
+      - "infra/runpod/scripts/artifact_bootstrap.py"
+      - "infra/runpod/README.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - "docs/architecture/infra/overview.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      평가 전 공유 개발 기동을 위해 release_stage=dev, dev- ID, not-evaluated metadata bundle과
+      runpod-create-dev 전용 명령을 추가. 평가·승인 파일만 생략하며 모델 commit·adapter checksum,
+      private S3 불변 게시, health·rollback·삭제 계약은 유지하고 일반 create는 dev bundle을 거부
+
+  - id: "sllm-release-v2-base-only-2026-09-02"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-09-02)"
+    received: "2026-09-02"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-09-02"
+    supersedes: "ADR-0020의 LoRA 전용 release.json:v1 및 promotion-approval:v1 검증 계약"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md"
+      - ".agents/skills/project-wiki/references/decisions/index.md"
+      - ".agents/skills/ai/references/training.md"
+      - ".agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md"
+      - "ai/eval/f2_sLLM/evaluate.py"
+      - "ai/training/f2_sLLM/package_release.py"
+      - "infra/scripts/manage_sllm_artifact.py"
+      - "infra/scripts/manage_runpod.py"
+      - "infra/scripts/manage_runpod_control.py"
+      - "infra/runpod/scripts/artifact_bootstrap.py"
+      - "infra/runpod/scripts/supervisor.py"
+      - "infra/runpod/README.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      release.json:v2에 lora|base mode와 평가 dataset/model commit/adapter checksum provenance를
+      결속하고 base-only는 adapter 없는 metadata bundle로 지원. v2 S3 객체 cross-hash, 동일 checksum
+      부분 게시 재개, 모델 ID health, HF token 차단, 비용 전 create plan, image generation guard,
+      rollback reconcile과 삭제 후 offline smoke를 추가. v1 LoRA bundle과 기존 S3 객체는 마이그레이션
+      없이 읽기 호환하며 Backend HTTP·F2 응답 계약은 유지
+
   - id: "f3-save-trigger-scope-and-run-buttons-2026-08-31"
     type: "user-provided-direction"
     location: "Claude Code task prompt (2026-08-31)"
