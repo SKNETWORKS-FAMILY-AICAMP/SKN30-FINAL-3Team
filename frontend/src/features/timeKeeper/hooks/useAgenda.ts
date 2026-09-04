@@ -20,6 +20,8 @@ export interface AgendaState {
   /** 서버가 D-day를 계산한 기준일(ISO 날짜). */
   asOf: string | null;
   withinDays: number | null;
+  /** 서버가 실제로 적용한 되돌아보는 기간. 재연락·재확인 묶음을 가르는 기준으로도 쓴다. */
+  overdueDays: number | null;
   status: "loading" | "ready" | "error";
   error: ApiError | null;
   /** 성공·실패로 끝난 조회 횟수. 브리핑이 자신이 요청한 재조회의 결과만 기다릴 때 쓴다. */
@@ -37,6 +39,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
   const [total, setTotal] = useState(0);
   const [asOf, setAsOf] = useState<string | null>(null);
   const [windowDays, setWindowDays] = useState<number | null>(null);
+  const [overdueWindowDays, setOverdueWindowDays] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<ApiError | null>(null);
   const [settlementCount, setSettlementCount] = useState(0);
@@ -67,6 +70,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
         setTotal(page.total);
         setAsOf(page.as_of);
         setWindowDays(page.within_days);
+        setOverdueWindowDays(page.overdue_days);
         setStatus("ready");
         setError(null);
         setSettlementCount((current) => current + 1);
@@ -105,6 +109,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
       total,
       asOf,
       withinDays: windowDays,
+      overdueDays: overdueWindowDays,
       status,
       error,
       settlementCount,
@@ -116,6 +121,7 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
       total,
       asOf,
       windowDays,
+      overdueWindowDays,
       status,
       error,
       settlementCount,

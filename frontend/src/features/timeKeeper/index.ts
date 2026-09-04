@@ -13,6 +13,9 @@ export { AgendaList } from "./AgendaList.tsx";
 export { useAgenda } from "./hooks/useAgenda.ts";
 export type { AgendaState } from "./hooks/useAgenda.ts";
 
+export { useDismissedNeglected } from "./hooks/useDismissedNeglected.ts";
+export type { DismissedNeglectedControl } from "./hooks/useDismissedNeglected.ts";
+
 export { BRIEFING_HOUR } from "./model/briefing.ts";
 export { BRIEFING_LIMIT, KNOWN_AGENDA_CATEGORIES } from "./model/dto.ts";
 export type { AgendaCategory, AgendaItemDto, AgendaPageDto } from "./model/dto.ts";

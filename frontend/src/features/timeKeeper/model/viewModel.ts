@@ -118,6 +118,53 @@ export function agendaItemKey(item: AgendaItemDto): string {
   return [item.category, item.unit_id, item.listing_id, item.requirement_id].join("-");
 }
 
+/**
+ * 주기로 만드는 재연락·재확인 종류.
+ *
+ * 서버가 이 종류에는 아래쪽 경계를 두지 않는다 (F4-TK-04·F4-TK-07). "다가오는 일정"과 나란히
+ * 두면 1년 전 접촉한 손님이 오늘 만기와 같은 줄에 서므로, 되돌아보는 기간을 넘긴 것만 따로
+ * 뗀다.
+ */
+const NEGLECTABLE_CATEGORIES: ReadonlySet<string> = new Set([
+  "LISTING_RECONTACT",
+  "CLIENT_RECONTACT",
+  "LISTING_REVALIDATION",
+]);
+
+/** 되돌아보는 기간을 넘겨 밀린 재연락·재확인인지. 저장된 날짜 종류는 항상 아니다. */
+export function isNeglected(item: AgendaItemDto, overdueDays: number): boolean {
+  return NEGLECTABLE_CATEGORIES.has(item.category) && item.days_until_due < -overdueDays;
+}
+
+/**
+ * "확인" 상태를 저장할 때 쓰는 키. 기한(``due_date``)까지 포함한다.
+ *
+ * 손님에게 다시 연락하면 서버의 ``last_contact_at``이 바뀌어 기한도 새로 생긴다. 키에 기한을
+ * 넣어 두면 그 새 기한은 다른 키가 되어 다시 보이고, 확인 기록은 지금 감춘 그 기한에만 남는다.
+ */
+export function neglectedDismissKey(item: AgendaItemDto): string {
+  return `${agendaItemKey(item)}-${item.due_date}`;
+}
+
+/**
+ * 배지·브리핑에 쓰는 눈에 보이는 건수.
+ *
+ * 서버의 ``total``은 창 전체의 참값이라 사용자가 "다시 보지 않기"로 감춘 항목도 그대로
+ * 세어져 있다. 지금 받아 온 행 중 감춘 만큼만 덜어 낸다 — 상한에 걸려 애초에 받지 못한 행은
+ * 셀 방법이 없어 그대로 둔다.
+ */
+export function visibleAgendaTotal(
+  items: readonly AgendaItemDto[],
+  overdueDays: number,
+  total: number,
+  isDismissed: (key: string) => boolean,
+): number {
+  const dismissedAmongFetched = items.filter(
+    (item) => isNeglected(item, overdueDays) && isDismissed(neglectedDismissKey(item)),
+  ).length;
+  return Math.max(0, total - dismissedAmongFetched);
+}
+
 /** 한 종류로 묶인 일정. 창 전체 건수와 실제로 실린 행을 함께 갖는다. */
 export interface AgendaGroup {
   category: AgendaCategory;

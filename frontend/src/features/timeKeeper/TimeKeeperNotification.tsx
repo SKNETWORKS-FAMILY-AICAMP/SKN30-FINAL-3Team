@@ -18,8 +18,10 @@ import { OutlinedCalendarAltIcon } from "@patternfly/react-icons";
 import { AgendaList } from "./AgendaList.tsx";
 import { useAgenda } from "./hooks/useAgenda.ts";
 import { useDailyBriefing } from "./hooks/useDailyBriefing.ts";
+import { useDismissedNeglected } from "./hooks/useDismissedNeglected.ts";
 import { BRIEFING_HOUR } from "./model/briefing.ts";
 import { BRIEFING_LIMIT } from "./model/dto.ts";
+import { visibleAgendaTotal } from "./model/viewModel.ts";
 import "./TimeKeeper.css";
 
 export interface TimeKeeperNotificationProps {
@@ -47,7 +49,11 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
   const [briefingAttempt, setBriefingAttempt] = useState<BriefingAttempt | null>(null);
 
   const agenda = useAgenda({ limit: BRIEFING_LIMIT }, { enabled });
-  const { status, total, settlementCount, reload, withinDays } = agenda;
+  const { items, status, total, overdueDays, settlementCount, reload, withinDays } = agenda;
+  const dismissed = useDismissedNeglected();
+  // 서버의 total은 창 전체 참값이라 "다시 보지 않기"로 감춘 밀린 재연락·재확인도 세어져 있다.
+  // 배지와 브리핑은 실제로 사용자에게 보이는 건수를 따라야 한다.
+  const visibleTotal = visibleAgendaTotal(items, overdueDays ?? 7, total, dismissed.isDismissed);
 
   const { complete: completeBriefing, fail: failBriefing } = useDailyBriefing({
     enabled,
@@ -64,12 +70,12 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
     if (status === "ready") {
       // 조회가 성공하고 표시 대상 유무까지 확인한 뒤에만 오늘 브리핑을 소진한다. 빈 날도
       // 성공한 확인이므로 기록하되 창은 열지 않는다.
-      if (total > 0) setOpen(true);
+      if (visibleTotal > 0) setOpen(true);
       completeBriefing(briefingAttempt.businessDateKey);
       return;
     }
     if (status === "error") failBriefing(briefingAttempt.businessDateKey);
-  }, [briefingAttempt, completeBriefing, failBriefing, settlementCount, status, total]);
+  }, [briefingAttempt, completeBriefing, failBriefing, settlementCount, status, visibleTotal]);
 
   /** 달력 버튼으로 여는 경로. 열 때마다 다시 읽어 기준일이 하루 밀린 목록을 보여주지 않는다. */
   const openAgenda = useCallback(() => {
@@ -77,13 +83,13 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
     setOpen(true);
   }, [reload]);
 
-  const hasCount = status === "ready" && total > 0;
+  const hasCount = status === "ready" && visibleTotal > 0;
 
   return (
     <>
       <Button
         variant="plain"
-        aria-label={hasCount ? `다가오는 일정 ${total}건` : "다가오는 일정을 엽니다"}
+        aria-label={hasCount ? `다가오는 일정 ${visibleTotal}건` : "다가오는 일정을 엽니다"}
         aria-haspopup="dialog"
         onClick={openAgenda}
         icon={
@@ -91,7 +97,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
             <OutlinedCalendarAltIcon />
             {hasCount && (
               <Badge className="time-keeper__badge" isRead={false}>
-                {badgeLabel(total)}
+                {badgeLabel(visibleTotal)}
               </Badge>
             )}
           </span>
@@ -118,7 +124,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
             data-screen-id="F4-MOD-010"
             data-requirement-ids="F4-TK-08, F4-TK-12~21, F1-AL-01, F1-AL-03, F1-AL-04"
           >
-            <AgendaList agenda={agenda} />
+            <AgendaList agenda={agenda} dismissed={dismissed} />
             {agenda.asOf != null && <p className="time-keeper__asof">기준일 {agenda.asOf}</p>}
           </div>
         </ModalBody>

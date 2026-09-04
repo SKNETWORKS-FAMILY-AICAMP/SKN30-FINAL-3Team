@@ -18,9 +18,12 @@ import {
   agendaTargetLabel,
   dDayLabel,
   hasPrivacyConsent,
+  isNeglected,
   isUrgent,
+  neglectedDismissKey,
   primaryPhone,
   roleLabel,
+  visibleAgendaTotal,
 } from "../src/features/timeKeeper/model/viewModel.ts";
 import { KNOWN_AGENDA_CATEGORIES } from "../src/features/timeKeeper/model/dto.ts";
 import type { AgendaContactDto, AgendaItemDto } from "../src/features/timeKeeper/model/dto.ts";
@@ -255,6 +258,55 @@ test("수신이 막힌 번호는 연락처로 고르지 않는다", () => {
   });
 
   assert.equal(primaryPhone(blocked), "010-9999-8888");
+});
+
+test("저장된 날짜 종류는 아무리 지나도 밀린 묶음으로 가지 않는다", () => {
+  // TENANCY_EXPIRY 같은 종류는 서버가 이미 되돌아보는 창으로 걸러 보낸다. 여기서 다시
+  // 밀린 것으로 취급하면 정상 만기가 "밀린" 묶음에 잘못 섞인다.
+  assert.equal(isNeglected(unitItem({ category: "TENANCY_EXPIRY", days_until_due: -400 }), 7), false);
+});
+
+test("재연락·재확인은 되돌아보는 기간을 넘겨야만 밀린 것으로 본다", () => {
+  const atBoundary = unitItem({ category: "CLIENT_RECONTACT", days_until_due: -7 });
+  const pastBoundary = unitItem({ category: "CLIENT_RECONTACT", days_until_due: -8 });
+  const wayPast = unitItem({ category: "LISTING_RECONTACT", days_until_due: -370 });
+
+  // 경계값(overdueDays)까지는 "다가오는 일정" 쪽에 남는다. 저장된 날짜 종류의 되돌아보는
+  // 창이 양끝을 포함하는 것과 같은 기준이다.
+  assert.equal(isNeglected(atBoundary, 7), false);
+  assert.equal(isNeglected(pastBoundary, 7), true);
+  assert.equal(isNeglected(wayPast, 7), true);
+});
+
+test("확인 키는 기한이 바뀌면 함께 바뀐다", () => {
+  const first = unitItem({ category: "CLIENT_RECONTACT", due_date: "2026-01-01" });
+  const renewed = unitItem({ category: "CLIENT_RECONTACT", due_date: "2026-03-01" });
+
+  // 손님에게 다시 연락하면 서버가 새 기한을 만든다. 예전 확인 기록이 새 기한까지 감추면 안 된다.
+  assert.notEqual(neglectedDismissKey(first), neglectedDismissKey(renewed));
+});
+
+test("배지 건수는 받아 온 행 중 확인한 만큼만 덜어 낸다", () => {
+  const stale = unitItem({ category: "LISTING_RECONTACT", unit_id: 9, days_until_due: -400 });
+  const items = [unitItem(), stale];
+
+  assert.equal(
+    visibleAgendaTotal(items, 7, 5, () => false),
+    5,
+    "아무것도 확인하지 않았으면 서버 총계를 그대로 쓴다",
+  );
+  assert.equal(
+    visibleAgendaTotal(items, 7, 5, (key) => key === neglectedDismissKey(stale)),
+    4,
+    "밀린 한 건을 확인하면 배지에서 그만큼 빠진다",
+  );
+});
+
+test("배지 건수는 음수로 내려가지 않는다", () => {
+  // 조회 사이에 총계가 뒤처지는 경우와 같은 방어다 (총계가 실린 건수보다 작아도 음수를 만들지 않는다).
+  const stale = unitItem({ category: "LISTING_RECONTACT", days_until_due: -400 });
+
+  assert.equal(visibleAgendaTotal([stale], 7, 0, () => true), 0);
 });
 
 test("번호가 없거나 동의가 없는 인물을 화면이 구분할 수 있다", () => {
