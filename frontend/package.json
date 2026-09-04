@@ -16,6 +16,7 @@
     "test:root-error": "node --test tests/root-error-boundary.test.mjs",
     "test:f3": "node --test tests/f3-decode.test.ts tests/f3-mock.test.ts tests/f3-candidate-label.test.ts tests/f3-feedback-error.test.ts",
     "test:time-keeper": "node --test tests/time-keeper.test.ts tests/time-keeper-briefing.test.ts tests/time-keeper-dismissed.test.ts",
+    "test:calendar": "node --test tests/calendar.test.ts",
     "test:browser": "node --test tests/f3-panel.browser.test.mjs",
     "test:env": "node --test tests/env-cli.test.mjs tests/env-schema.test.ts tests/vite-config.test.mjs",
     "typecheck": "tsc --noEmit",

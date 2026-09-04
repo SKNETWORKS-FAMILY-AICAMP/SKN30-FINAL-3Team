@@ -63,6 +63,8 @@
 
 .time-keeper__meta { display: flex; flex-wrap: wrap; gap: 8px; color: #64748b; font-size: 12px; }
 .time-keeper__date { font-variant-numeric: tabular-nums; }
+/* 캘린더 일정의 장소. 장부 행에는 없는 값이라 있을 때만 그린다. */
+.time-keeper__location::before { content: "· "; }
 
 .time-keeper__contacts { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
 .time-keeper__contact { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }

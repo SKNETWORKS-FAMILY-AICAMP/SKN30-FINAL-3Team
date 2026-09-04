@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # API 계약 규칙
@@ -563,7 +563,7 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 ### 종류 어휘
 
 `category`는 **고정 열거형이 아니다.** 계약과 일정 테이블이 생기면 값이 늘어나므로 클라이언트는
-모르는 값을 오류로 다루지 않고 코드를 그대로 표시한다. 현재 서버가 내보내는 값은 다음 일곱 가지다.
+모르는 값을 오류로 다루지 않고 코드를 그대로 표시한다. 장부에서 계산하는 갈래는 다음 일곱 가지다.
 
 | category | 원천 | 성격 |
 |---|---|---|
@@ -580,10 +580,15 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 기한 이른 순 정렬이라 가장 오래 방치된 쪽이 위에 온다. 분량은 `per_category_limit` 이 잡고, 밀린
 전체 건수는 `categories` 의 총계가 알린다.
 
-계약 체결일, 계약금·중도금·잔금 지급일, 임장·매물 방문일, 신고·서류 제출 기한과 명도일은
-**대응 데이터가 없어 이 계약에 없다.** 앞의 넷은 계약·일정 테이블(F1-CT-01~03, F1-SC-01~05)이
-미구현이기 때문이고, 명도일은 `handover_condition`이 "만기후" 같은 자유 문구이지 날짜가 아니기
-때문이다. 해당 테이블이 생기면 이 표에 종류를 더한다.
+계약 체결일, 계약금·중도금·잔금 지급일, 신고·서류 제출 기한과 명도일은 **대응 데이터가 없어 이
+계약에 없다.** 앞의 셋은 계약 테이블(F1-CT-01~03)이 미구현이기 때문이고, 명도일은
+`handover_condition`이 "만기후" 같은 자유 문구이지 날짜가 아니기 때문이다. 해당 테이블이 생기면
+이 표에 종류를 더한다.
+
+**여덟 번째 갈래는 캘린더 일정이다.** 사용자가 `/calendar/events`(아래 「F4 캘린더 일정 계약」
+절)로 직접 만든 일정도 이 응답에 함께 실린다. 이 갈래는 위 표의 고정 값이 아니라 사용자가 고른 임의
+문자열(기본 제안: `임장`·`계약`·`잔금`·`이사`·`기타`)을 그대로 낸다. 창 규칙(`within_days`·
+`overdue_days`)은 저장된 날짜 종류와 같은 양끝 포함 규칙을 그대로 적용한다.
 
 종료된 구입 의뢰(`status <> 'ACTIVE'`)와 내려간 매물(`status <> 'RECEIVED'`)은 제외한다. F1이 상태
 값 목록을 확정하지 않았으므로 서버가 신규 저장에 쓰는 기본값만 진행 중으로 본다. F3 후보 추출과
@@ -631,11 +636,37 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
             ]
           }
         }
-      ]
+      ],
+      "event_id": null,
+      "title": null,
+      "location": null
+    },
+    {
+      "category": "임장",
+      "due_date": "2026-09-04",
+      "days_until_due": 0,
+      "unit_id": null,
+      "listing_id": null,
+      "complex_name": null,
+      "building_number": null,
+      "unit_number": null,
+      "tenancy_status": null,
+      "requirement_id": null,
+      "demand_type": null,
+      "requirement_status": null,
+      "assigned_user_id": null,
+      "last_contact_at": null,
+      "contacts": [],
+      "event_id": 12,
+      "title": "행복아파트 임장",
+      "location": "행복아파트 101동"
     }
   ],
-  "categories": [{ "category": "TENANCY_EXPIRY", "total": 2 }],
-  "total": 2,
+  "categories": [
+    { "category": "TENANCY_EXPIRY", "total": 2 },
+    { "category": "임장", "total": 1 }
+  ],
+  "total": 3,
   "limit": 50,
   "offset": 0,
   "as_of": "2026-09-03",
@@ -649,8 +680,11 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 해당되는 것만 그린다. `total`과 `categories[].total`은 `per_category_limit`을 적용하기 **전** 건수라
 `items`에 실린 수보다 클 수 있고, 그 차이가 곧 화면의 "외 N건"이다.
 
-세대에서 온 행은 구입장 필드가, 구입장에서 온 행은 세대 필드가 null이다. 어느 쪽인지는 `category`가
-정한다. 표시 문자열은 서버가 만들지 않고 장부 목록과 같이 원본 값을 싣는다.
+세대에서 온 행은 구입장 필드가, 구입장에서 온 행은 세대 필드가 null이다. 캘린더에서 온 행은 세대·
+구입장 필드가 모두 null이고 `event_id`·`title`·`location`만 채워진다. 어느 갈래인지는 `category`가
+아니라 이 세 갈래 중 어느 id(`unit_id`·`requirement_id`·`event_id`)가 채워졌는지로 정한다. 표시
+문자열은 서버가 만들지 않고 장부·캘린더의 원본 값을 싣는다. 캘린더에서 온 행은 연결된 장부 대상이
+없으므로 `contacts`가 항상 빈 배열이다.
 
 인물 요약은 구입장 목록과 같은 범위다. 목록에서 곧바로 연락으로 넘어가는 화면이 인물마다 상세를
 다시 부르지 않게 하려는 것이며, 개인정보 노출 범위는 세션과 중개사무소 경계로 지킨다. 세대 행은
@@ -665,3 +699,55 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 
 정렬은 `due_date` 오름차순이며 같은 날짜에서는 `category`와 식별자로 안정화한다. 정렬이 흔들리면
 페이지를 넘길 때 같은 행이 다시 나오거나 건너뛴다.
+
+## F4 캘린더 일정 계약 (제안)
+
+이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 기능 범위와 요구사항 ID의 정본은
+[F4 캘린더 요구사항](../../../../../docs/requirements/f4/calendar.md)이고 여기서는 경로와 의미만
+고정한다. 사용자가 캘린더 화면에서 직접 만드는 일정의 CRUD다. 저장은 F4가 소유한
+`calendar_event` 테이블이며 F1 장부 테이블과 별개다([ADR-0024](../decisions/ADR-0024-calendar-storage-ownership.md)).
+장부와의 연결 컬럼은 없다.
+
+| Method | Path | 인증 | 동작 |
+|---|---|---|---|
+| GET | /api/v1/calendar/events | 세션 | `from_date`~`to_date`(양끝 포함)의 일정 조회 |
+| POST | /api/v1/calendar/events | 세션 + CSRF | 일정 생성, 201 |
+| PATCH | /api/v1/calendar/events/{event_id} | 세션 + CSRF | 부분 수정. `row_version` 필수 |
+| DELETE | /api/v1/calendar/events/{event_id} | 세션 + CSRF | 소프트 삭제, 204. `row_version` 쿼리 파라미터 필수 |
+
+`row_version`이 일치하지 않으면 409 `ROW_VERSION_CONFLICT`다(장부와 같은 낙관적 잠금 계약).
+`GET`의 조회 범위는 최대 366일이며 초과하거나 `to_date`가 `from_date`보다 앞이면 422다.
+
+### 응답
+
+```json
+{
+  "items": [
+    {
+      "id": 12,
+      "title": "행복아파트 임장",
+      "category": "임장",
+      "event_date": "2026-09-04",
+      "start_time": "14:00:00",
+      "end_time": "15:00:00",
+      "location": "행복아파트 101동",
+      "memo": null,
+      "created_by": 3,
+      "row_version": 1
+    }
+  ],
+  "from_date": "2026-09-01",
+  "to_date": "2026-09-30"
+}
+```
+
+`category`는 Time Keeper와 같은 이유로 고정 열거형이 아니다. 서버 기본값은 `ETC`이며 화면은 이
+값을 직접 보내지 않고 임장·계약·잔금·이사·기타 중에서 고르거나 사용자가 정한 문자열을 그대로
+보낸다.
+
+### Time Keeper와의 관계
+
+이 테이블의 일정은 `/time-keeper/agenda`(위 「F4 Time Keeper 일정 계약」 절) 응답에도 여덟 번째
+갈래로 함께 실린다. 캘린더 화면은 자기 일정을 CRUD 상세(메모·시작/종료 시각 포함)까지 필요하므로
+`/calendar/events`로 직접 읽고, Time Keeper 응답 중 캘린더 갈래(`event_id`가 있는 행)는 이미
+같은 데이터이므로 겹쳐 그리지 않는다.
