@@ -86,6 +86,9 @@ export function decodeAgendaItem(value: unknown, path = "item"): AgendaItemDto {
     contacts: asArray(row["contacts"], `${path}.contacts`).map((entry, index) =>
       decodeContact(entry, `${path}.contacts[${index}]`),
     ),
+    event_id: asNullableNumber(row["event_id"], `${path}.event_id`),
+    title: asNullableString(row["title"], `${path}.title`),
+    location: asNullableString(row["location"], `${path}.location`),
   };
 }
 

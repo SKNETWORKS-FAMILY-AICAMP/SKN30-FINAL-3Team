@@ -51,6 +51,9 @@ function base(category: string, daysUntilDue: number, parties: MockParty[]): Age
     requirement_status: null,
     assigned_user_id: null,
     last_contact_at: null,
+    event_id: null,
+    title: null,
+    location: null,
     contacts: parties.map((party, index) => ({
       role: party.role,
       is_primary: index === 0,
@@ -98,6 +101,17 @@ function clientItem(
   };
 }
 
+/** 사용자가 캘린더에서 직접 만든 일정. 세대·구입장 id가 모두 없고 제목·장소만 있다. */
+function calendarItem(
+  eventId: number,
+  category: string,
+  daysUntilDue: number,
+  title: string,
+  location: string | null,
+): AgendaItemDto {
+  return { ...base(category, daysUntilDue, []), event_id: eventId, title, location };
+}
+
 /** 주기 규칙으로 만드는 종류. 서버와 같이 되돌아보는 창을 적용하지 않는다. */
 const RULE_CATEGORIES = new Set([
   "LISTING_RECONTACT",
@@ -125,6 +139,8 @@ const ITEMS: readonly AgendaItemDto[] = [
   ]),
   clientItem("CLIENT_TENANCY_EXPIRY", 31, 58, "최손님", "010-5678-9012"),
   clientItem("REQUEST_EXPIRY", 62, 58, "최손님", "010-5678-9012"),
+  calendarItem(9001, "임장", 3, "행복아파트 임장", "행복아파트 101동"),
+  calendarItem(9002, "기타", 9, "사무소 회의", null),
 ];
 
 export const mockTransport: TimeKeeperTransport = {

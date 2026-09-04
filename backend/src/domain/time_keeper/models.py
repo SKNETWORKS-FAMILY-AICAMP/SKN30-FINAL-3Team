@@ -51,21 +51,26 @@ MAX_PER_CATEGORY_LIMIT = 100
 
 
 class AgendaCategory(StrEnum):
-    """일정 한 건의 종류.
+    """장부에서 계산해 만드는 일정의 고정 종류.
 
     값은 어휘이지 화면 문구가 아니다. 표시 문자열은 Frontend가 소유하며, 모르는 값을 만나면
     코드를 그대로 보여주고 넘어간다. 아래 목록은 앞으로 늘어난다.
+
+    이 열거형은 **장부에서 계산하는 갈래만** 담는다. 사용자가 캘린더 화면에서 직접 만드는 일정
+    (``calendar_event``)은 종류가 고정되지 않으므로 여기에 없다. ``AgendaEntry.category``는 그래서
+    이 열거형이 아니라 문자열이다 — 장부 갈래는 이 열거형의 값을, 캘린더 갈래는 사용자가 고른
+    문자열을 그대로 나른다.
 
     아직 만들 수 없는 항목과 이유:
 
     - 계약 체결일, 계약금·중도금·잔금 지급일, 신고·서류 제출 기한
       → 계약 테이블이 없다. F1-CT-01~03이 미구현이라 계약 건 자체가 저장되지 않는다.
         거래신고 기한은 계약일에서 세는 값이므로 계약일이 생겨야 계산할 수 있다.
-    - 임장·매물 방문일
-      → 일정 테이블이 없다. F1-SC-01~05가 미구현이다. F3-IF-04의 "승인된 일정 제안만 F1에
-        등록한다"도 같은 이유로 아직 쓸 곳이 없다.
     - 명도일
       → `property_listing.handover_condition`은 "만기후" 같은 자유 문구이지 날짜가 아니다.
+
+    임장·매물 방문일처럼 날짜가 있는 일반 일정은 이제 사용자가 캘린더에서 직접 만들면 이 목록에도
+    함께 뜬다. 장부 컬럼에서 자동으로 계산해 주지는 않는다는 차이가 있을 뿐이다.
     """
 
     #: 세대의 현 임대차 만기 (`property_unit.tenancy_expiry_date`)
@@ -98,13 +103,20 @@ class AgendaWindow:
 
 @dataclass(frozen=True)
 class AgendaRow:
-    """union 결과 한 줄. 상세와 인물은 페이지를 자른 뒤에 채운다."""
+    """union 결과 한 줄. 상세와 인물은 페이지를 자른 뒤에 채운다.
 
-    category: AgendaCategory
+    ``event_id``가 있으면 캘린더 갈래다. 그 갈래는 조인 없이도 표시에 필요한 ``title``·
+    ``location``을 이미 들고 있으므로 세대·구입장처럼 페이지 이후 별도 조회가 필요 없다.
+    """
+
+    category: str
     due_date: date
     unit_id: int | None
     listing_id: int | None
     requirement_id: int | None
+    event_id: int | None
+    title: str | None
+    location: str | None
 
 
 @dataclass(frozen=True)
@@ -148,9 +160,14 @@ class AgendaContact:
 
 @dataclass(frozen=True)
 class AgendaEntry:
-    """일정 목록 한 행. 세대에서 왔으면 구입장 필드가, 반대면 세대 필드가 비어 있다."""
+    """일정 목록 한 행.
 
-    category: AgendaCategory
+    세대에서 왔으면 구입장 필드가, 구입장에서 왔으면 세대 필드가 비어 있다. 캘린더에서 왔으면
+    셋 다 비고 ``event_id``·``title``·``location``만 채워진다 — 연결된 장부 대상이 없으므로
+    ``contacts``도 항상 빈 튜플이다.
+    """
+
+    category: str
     due_date: date
     days_until_due: int
     unit_id: int | None
@@ -165,6 +182,9 @@ class AgendaEntry:
     assigned_user_id: int | None
     last_contact_at: datetime | None
     contacts: tuple[AgendaContact, ...]
+    event_id: int | None
+    title: str | None
+    location: str | None
 
 
 @dataclass(frozen=True)
@@ -175,7 +195,7 @@ class AgendaCategoryCount:
     종류별 상한 때문에 잘린 건수를 정직하게 알리는 값이기도 하다.
     """
 
-    category: AgendaCategory
+    category: str
     total: int
 
 

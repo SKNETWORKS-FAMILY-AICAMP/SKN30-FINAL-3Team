@@ -70,6 +70,12 @@ export interface AgendaItemDto {
   assigned_user_id: number | null;
   last_contact_at: string | null;
   contacts: AgendaContactDto[];
+  /** 캘린더에서 온 행에만 있다. 사용자가 직접 만든 일정의 식별자. */
+  event_id: number | null;
+  /** 캘린더에서 온 행에만 있다. */
+  title: string | null;
+  /** 캘린더에서 온 행에만 있다. */
+  location: string | null;
 }
 
 /** 창 안에 실제로 존재하는 종류와 건수. 0건인 종류는 서버가 아예 싣지 않는다. */

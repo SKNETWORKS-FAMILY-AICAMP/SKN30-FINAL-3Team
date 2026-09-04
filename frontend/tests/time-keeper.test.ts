@@ -70,7 +70,29 @@ function unitItem(overrides: Partial<AgendaItemDto> = {}): AgendaItemDto {
     assigned_user_id: null,
     last_contact_at: null,
     contacts: [contact()],
+    event_id: null,
+    title: null,
+    location: null,
     ...overrides,
+  };
+}
+
+/** 사용자가 캘린더에서 직접 만든 일정. 세대·구입장 id가 모두 없다. */
+function calendarEventItem(overrides: Partial<AgendaItemDto> = {}): AgendaItemDto {
+  return {
+    ...unitItem(),
+    unit_id: null,
+    listing_id: null,
+    complex_name: null,
+    building_number: null,
+    unit_number: null,
+    tenancy_status: null,
+    contacts: [],
+    ...overrides,
+    category: overrides.category ?? "임장",
+    event_id: overrides.event_id === undefined ? 501 : overrides.event_id,
+    title: overrides.title === undefined ? "행복아파트 임장" : overrides.title,
+    location: overrides.location === undefined ? "행복아파트 101동" : overrides.location,
   };
 }
 
@@ -101,6 +123,17 @@ test("계약을 지킨 응답은 필드를 잃지 않고 통과한다", () => {
   assert.equal(page.items[0]?.unit_number, "1503");
   assert.equal(page.items[0]?.contacts[0]?.party.name, "김임대");
   assert.deepEqual(page.categories, [{ category: "TENANCY_EXPIRY", total: 1 }]);
+});
+
+test("캘린더 갈래의 응답도 계약을 지키면 필드를 잃지 않고 통과한다", () => {
+  const item = decodeAgendaItem(calendarEventItem());
+
+  assert.equal(item.event_id, 501);
+  assert.equal(item.title, "행복아파트 임장");
+  assert.equal(item.location, "행복아파트 101동");
+  assert.equal(item.unit_id, null);
+  assert.equal(item.requirement_id, null);
+  assert.deepEqual(item.contacts, []);
 });
 
 test("해당되는 내용이 없는 종류는 묶음 자체가 생기지 않는다", () => {
@@ -201,6 +234,24 @@ test("세대는 부동산으로, 손님은 이름으로 세운다", () => {
 
 test("동 정보가 없는 세대도 있는 값만으로 이름을 만든다", () => {
   assert.equal(agendaTargetLabel(unitItem({ building_number: null })), "헬리오시티 1503호");
+});
+
+test("캘린더에서 온 일정은 제목을 대상 이름으로 세운다", () => {
+  assert.equal(agendaTargetLabel(calendarEventItem()), "행복아파트 임장");
+  assert.equal(agendaTargetLabel(calendarEventItem({ title: null })), "일정");
+  assert.equal(agendaTargetLabel(calendarEventItem({ title: "" })), "일정");
+});
+
+test("캘린더 일정의 종류는 사용자가 고른 문자열을 그대로 쓴다", () => {
+  assert.equal(agendaCategoryLabel("임장"), "임장");
+  assert.equal(agendaCategoryLabel("ETC"), "기타");
+});
+
+test("같은 종류의 캘린더 일정끼리도 키가 겹치지 않는다", () => {
+  const first = calendarEventItem({ event_id: 501 });
+  const second = calendarEventItem({ event_id: 502 });
+
+  assert.notEqual(agendaItemKey(first), agendaItemKey(second));
 });
 
 test("같은 대상이 여러 종류로 걸려도 키가 겹치지 않는다", () => {

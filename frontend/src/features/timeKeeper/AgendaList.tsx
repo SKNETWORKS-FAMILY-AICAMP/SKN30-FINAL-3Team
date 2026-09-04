@@ -103,10 +103,16 @@ function AgendaGroupSection({
               <span className="time-keeper__target">{agendaTargetLabel(item)}</span>
               <span className="time-keeper__meta">
                 <span className="time-keeper__date">{item.due_date}</span>
+                {item.location != null && item.location !== "" && (
+                  <span className="time-keeper__location">{item.location}</span>
+                )}
               </span>
-              <span className="time-keeper__contacts">
-                <ContactLine item={item} />
-              </span>
+              {/* 캘린더 일정은 연결된 장부 대상이 없다. "연락처 없음"은 장부 행에서만 의미가 있다. */}
+              {item.event_id == null && (
+                <span className="time-keeper__contacts">
+                  <ContactLine item={item} />
+                </span>
+              )}
             </span>
           </li>
         ))}

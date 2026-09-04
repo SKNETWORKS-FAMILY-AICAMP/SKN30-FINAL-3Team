@@ -55,6 +55,7 @@ export default defineConfig(() => {
     VITE_LEDGER_SOURCE: appEnv.ledgerSource,
     // 지정하지 않으면 `parseAppEnv`가 장부 출처로 채운 값이 들어온다.
     VITE_F3_SOURCE: appEnv.f3Source,
+    VITE_CALENDAR_SOURCE: appEnv.calendarSource,
     VITE_API_BASE_URL: appEnv.apiBaseUrl,
     VITE_MOCK_ROW_COUNT: String(appEnv.mockRowCount),
     VITE_MOCK_LATENCY_MS: String(appEnv.mockLatencyMs),
