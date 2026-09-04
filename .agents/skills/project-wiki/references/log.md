@@ -1,10 +1,12 @@
 ---
 status: 구현됨
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # 위키 변경 로그
 
+- 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
+- 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
 - 2026-09-03: 사용자 지시로 F4 기능 번호가 확정되어 이미 종료된 OQ-012가 미해결 목록에 남아 있던 불일치를 제거함.
 - 2026-09-03: 사용자 지시로 F4를 독립 기능으로 등록하고 Time Keeper를 그 안의 서비스로 정의해 `docs/requirements/f4/`와 `F4-CM`·`F4-TK` ID 체계를 신설함(OQ-012 종료). Time Keeper 일정 조회를 API 계약에 `제안`으로 등록하고, F1 장부의 날짜 컬럼에서 임대차 만기·구입 의뢰 만기·희망 입주일과 재연락·매물 조건 재확인을 종류별로 모으는 읽기 전용 조회와 상단바 알림·아침 브리핑 화면을 구현함. 계약·일정 테이블이 없어 계약 체결일, 지급일, 임장일, 신고 기한과 명도일은 제외하고 기준값·기능 번호·장기 미접촉 노출을 OQ-011~013으로 등록함.
 - 2026-09-03: `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle과 release manifest의 S3 불변 게시 및 양방향 cross-hash를 확인해 RunPod 문서 상태를 “S3 dev release 게시 완료·RunPod/Terraform 미적용”으로 갱신했다. AI suite 종료 지연과 Terraform provider handshake 실패는 제한된 sandbox의 thread·provider IPC 제약으로 확인했으며 정상 실행 환경에서 AI 212개 테스트와 두 Terraform root validate가 통과했다.

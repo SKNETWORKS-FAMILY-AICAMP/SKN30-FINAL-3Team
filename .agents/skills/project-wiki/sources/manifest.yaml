@@ -1,7 +1,58 @@
 version: 1
-updated: "2026-09-03"
+updated: "2026-09-04"
 
 sources:
+  - id: "pr-review-policy-routing-2026-09-04"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-09-04)"
+    received: "2026-09-04"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-09-04"
+    partially_supersedes: "ADR-0010의 모듈 정책 디렉터리 재귀 포함과 chunk 수에만 따른 최종 통합 규칙"
+    reflected_in:
+      - ".github/pr-review-policy.json"
+      - ".github/scripts/pr-policy-review.mjs"
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".github/scripts/tests/pr-review.test.mjs"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0024-pr-review-policy-routing-and-arbitration.md"
+      - ".agents/skills/project-wiki/references/decisions/index.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      문서별 상시 전문 에이전트를 추가하지 않고 결정적 정책 pack·Markdown 절 router로 leaf 입력을 줄이며,
+      Luna 변경 모듈 리뷰와 조건부 Terra 정책 중재를 분리한다. 표준 service tier, 실제 token category 기반
+      예상 비용과 272K token 장기 컨텍스트 관측을 추가한다.
+
+  - id: "openai-gpt-5-6-luna-pricing-2026-09-04"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/models/gpt-5.6-luna"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".github/pr-review-policy.json"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0024-pr-review-policy-routing-and-arbitration.md"
+    scope: "Luna 표준 input·cached input·output, cache write와 272K token 초과 장기 컨텍스트 요금 기준"
+
+  - id: "openai-gpt-5-6-terra-pricing-2026-09-04"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/models/gpt-5.6-terra"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".github/pr-review-policy.json"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0024-pr-review-policy-routing-and-arbitration.md"
+    scope: "Terra 표준 input·cached input·output, cache write와 272K token 초과 장기 컨텍스트 요금 기준"
+
+  - id: "openai-responses-service-tier-cache-2026-09-04"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/reference/cli/resources/responses/methods/create"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".github/scripts/pr-review-lib.mjs"
+      - ".github/PR_REVIEW_BOT.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0024-pr-review-policy-routing-and-arbitration.md"
+    scope: "Responses API의 service_tier=default와 GPT-5.6 explicit prompt cache breakpoint·30분 TTL"
+
   - id: "sllm-dev-unevaluated-release-2026-09-03"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-09-03)"
