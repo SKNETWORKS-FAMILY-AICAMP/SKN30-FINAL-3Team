@@ -152,16 +152,17 @@ try {
   }
   const reviewableFiles = files.filter((file) => !shouldIgnoreFile(file.filename, policyFile));
   const limits = effectiveLimits(policyFile.limits ?? {});
+  const serviceTier = policyFile.cost?.serviceTier ?? "default";
   const configurationHash = stableObjectHash({
     stateVersion: 1,
     policy: policyFile,
     limits,
-    leaf: { model, reasoningEffort, reviewVerbosity, serviceTier: "default" },
+    leaf: { model, reasoningEffort, reviewVerbosity, serviceTier },
     merge: {
       model: mergeModel,
       reasoningEffort: mergeReasoningEffort,
       verbosity: mergeVerbosity,
-      serviceTier: "default"
+      serviceTier
     },
     schema: REVIEW_SCHEMA,
     mergeSchema: MERGED_REVIEW_SCHEMA,
@@ -354,7 +355,8 @@ try {
                 : `이번 요청은 ${chunk.id} chunk만 검토합니다. 다른 chunk의 변경을 추측하지 않습니다.`,
             schemaName: leafSchemaName,
             requestMaxOutputTokens: limits.leafMaxOutputTokens,
-            requestVerbosity: reviewVerbosity
+            requestVerbosity: reviewVerbosity,
+            requestServiceTier: serviceTier
           });
           assertCompletedResponse(response);
           return {
@@ -512,6 +514,7 @@ try {
               requestReasoningEffort: mergeReasoningEffort,
               requestMaxOutputTokens: limits.mergeMaxOutputTokens,
               requestVerbosity: mergeVerbosity,
+              requestServiceTier: serviceTier,
               schemaName: "pr_policy_merged_review",
               schema: MERGED_REVIEW_SCHEMA
             });
@@ -715,6 +718,7 @@ async function callOpenAI({
   requestReasoningEffort = reasoningEffort,
   requestMaxOutputTokens = limits.leafMaxOutputTokens,
   requestVerbosity = reviewVerbosity,
+  requestServiceTier = "default",
   schemaName = "pr_policy_review",
   schema = REVIEW_SCHEMA
 }) {
@@ -730,7 +734,7 @@ async function callOpenAI({
     schemaName,
     schema,
     maxOutputTokens: requestMaxOutputTokens,
-    serviceTier: policyFile.cost?.serviceTier ?? "default",
+    serviceTier: requestServiceTier,
     safetyIdentifier: stableSafetyIdentifier(repository, pr.user?.login ?? "unknown")
   });
   const response = await fetchWithRetry(
