@@ -40,10 +40,20 @@ const STATES = {
 };
 const STEPS = ["음성 업로드", "텍스트 변환", "장부 정보 분석", "분석 완료"];
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+/*
+ * 분석 API는 STT와 장부 정보 분석을 한 번의 요청·응답으로 처리하므로, 프론트엔드는 두 단계의
+ * 경계를 실시간으로 알 수 없다. 응답을 받은 시점엔 두 단계 모두 끝난 것이 확실하므로, 완료 표시로
+ * 바로 건너뛰지 않고 "장부 정보 분석" 단계를 화면에 실제로 보여준 뒤 완료로 넘어간다.
+ */
+const STAGE_DISPLAY_MS = 450;
 
 function formatSize(bytes) {
   if (!bytes) return "크기 확인 불가";
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /*
@@ -146,6 +156,9 @@ export default function VoiceMemoModal({ isOpen, draft, initialDraft, ledgerType
       const result = isIntake
         ? await analyzeNewIntake({ audio: file, signal: controller.signal })
         : await analyzeVoiceMemo({ audio: file, ledgerType, draft, signal: controller.signal });
+      if (requestRef.current !== controller) return;
+      setStep(2);
+      await wait(STAGE_DISPLAY_MS);
       if (requestRef.current !== controller) return;
       setStep(STEPS.length - 1);
       setAnalysis(result);
