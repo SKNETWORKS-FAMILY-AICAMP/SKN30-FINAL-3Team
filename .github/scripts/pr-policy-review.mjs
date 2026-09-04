@@ -14,13 +14,14 @@ import {
   buildMergeContext,
   buildMergeInstructions,
   buildOpenAIRequest,
-  buildReviewContext,
   collectHeadFileEvidence,
   discordPayload,
+  estimateOpenAICost,
   extractResponseText,
   fetchWithRetry,
   findCheckRun,
   findReviewComment,
+  fitReviewChunksToContext,
   hasProjectWideChange,
   incompleteReview,
   isReusableReviewState,
@@ -31,6 +32,7 @@ import {
   normalizeMergedReview,
   normalizeReview,
   parseReviewState,
+  planPolicyArbitration,
   planForEvent,
   planReviewChunks,
   reconcileMergedReview,
@@ -42,7 +44,8 @@ import {
   stableObjectHash,
   stableSafetyIdentifier,
   stripReviewState,
-  sumUsage
+  sumUsage,
+  validatePolicyConfig
 } from "./pr-review-lib.mjs";
 
 const rootDir = process.env.GITHUB_WORKSPACE || process.cwd();
@@ -74,6 +77,10 @@ try {
     readJson(eventPath),
     readJson(path.join(rootDir, ".github/pr-review-policy.json"))
   ]);
+  const policyValidation = validatePolicyConfig(policyFile);
+  if (!policyValidation.valid) {
+    throw new Error(`PR review policy is invalid: ${policyValidation.reasons.join("; ")}`);
+  }
   const prNumber = Number(
     eventName === "workflow_dispatch"
       ? process.env.PR_REVIEW_PR_NUMBER || event.inputs?.pr_number
@@ -149,8 +156,13 @@ try {
     stateVersion: 1,
     policy: policyFile,
     limits,
-    leaf: { model, reasoningEffort, reviewVerbosity },
-    merge: { model: mergeModel, reasoningEffort: mergeReasoningEffort, verbosity: mergeVerbosity },
+    leaf: { model, reasoningEffort, reviewVerbosity, serviceTier: "default" },
+    merge: {
+      model: mergeModel,
+      reasoningEffort: mergeReasoningEffort,
+      verbosity: mergeVerbosity,
+      serviceTier: "default"
+    },
     schema: REVIEW_SCHEMA,
     mergeSchema: MERGED_REVIEW_SCHEMA,
     leafInstructions: buildInstructions(limits.chunkMaxFindings),
@@ -158,7 +170,7 @@ try {
     mergeInstructions: buildMergeInstructions(limits.maxFindings)
   });
   const sizeCheck = applyLimits(reviewableFiles, limits);
-  const chunkPlan = sizeCheck.accepted
+  let chunkPlan = sizeCheck.accepted
     ? planReviewChunks(reviewableFiles, policyFile, limits)
     : { accepted: false, chunks: [], reasons: [] };
   let context = {
@@ -173,10 +185,14 @@ try {
     chunkCount: chunkPlan.chunks.length,
     reusedChunkCount: 0,
     reviewedChunkCount: chunkPlan.chunks.length,
-    finalReviewReused: false
+    finalReviewReused: false,
+    arbiterRequired: false,
+    arbiterCompleted: false,
+    arbiterReused: false
   };
   let review;
   let usage = sumUsage([]);
+  const usageCalls = [];
   let effectiveModel = model;
   let reviewState = null;
   let headEvidence = {
@@ -211,18 +227,20 @@ try {
           `/repos/${repository}/contents/${encodeRepositoryPath(file.filename)}?ref=${encodeURIComponent(pr.head.sha)}`
         )
     });
-    const chunkContexts = await Promise.all(
-      chunkPlan.chunks.map((chunk) =>
-        buildReviewContext({
-          rootDir,
-          pr,
-          files: chunk.files,
-          policy: policyFile,
-          limits,
-          headEvidence
-        })
-      )
-    );
+    const fittedPlan = await fitReviewChunksToContext({
+      rootDir,
+      pr,
+      chunks: chunkPlan.chunks,
+      policy: policyFile,
+      limits,
+      headEvidence
+    });
+    chunkPlan = {
+      accepted: fittedPlan.accepted,
+      chunks: fittedPlan.chunks,
+      reasons: fittedPlan.reasons
+    };
+    const chunkContexts = fittedPlan.contexts;
     context = combineChunkContexts(chunkPlan, chunkContexts);
     context.headEvidenceCandidateCount = headEvidence.candidateCount;
     context.headEvidenceFileCount = headEvidence.files.length;
@@ -232,14 +250,16 @@ try {
     );
     context.redactionCount += headEvidence.redactionCount;
     context.headEvidenceRedactionCount = headEvidence.redactionCount;
-    const rejectedChunks = chunkContexts.flatMap((chunkContext, index) =>
-      chunkContext.accepted
-        ? []
-        : chunkContext.reasons.map((reason) => `${chunkPlan.chunks[index].id}: ${reason}`)
+    const arbitration = planPolicyArbitration(
+      reviewableFiles.map((file) => file.filename),
+      policyFile,
+      chunkPlan.chunks.length
     );
-
-    if (rejectedChunks.length > 0) {
-      review = incompleteReview(rejectedChunks);
+    context.arbiterRequired = arbitration.required;
+    context.arbiterReasons = arbitration.reasons;
+    context.arbiterPolicyPackIds = arbitration.policyPackIds;
+    if (!chunkPlan.accepted) {
+      review = incompleteReview(chunkPlan.reasons);
     } else if (dryRun && !invokeOpenAI) {
       review = incompleteReview([
         `Dry-run에서 OpenAI 호출 없이 ${chunkPlan.chunks.length}개 리뷰 chunk 구성까지만 검증했습니다.`
@@ -399,6 +419,11 @@ try {
       await runIndices([...firstByCachePrefix.values()]);
       await runIndices(followerIndices);
       usage = sumUsage(chunkRuns.map((run) => run.usage));
+      usageCalls.push(
+        ...chunkRuns
+          .filter((run) => !run.reused)
+          .map((run) => ({ model: run.model, usage: run.usage }))
+      );
       effectiveModel = [...new Set(chunkRuns.map((run) => run.model))].join(", ") || model;
       const leafReviews = chunkRuns.map((run) => run.review);
       let finalReviewComplete = false;
@@ -409,8 +434,10 @@ try {
         review = mergeReviewsFallback(leafReviews, limits.maxFindings, {
           forceIncomplete: true
         });
-      } else if (chunkRuns.length === 1) {
-        review = leafReviews[0];
+      } else if (!context.arbiterRequired) {
+        review = chunkRuns.length === 1
+          ? leafReviews[0]
+          : mergeReviewsFallback(leafReviews, limits.maxFindings);
         finalReviewComplete = true;
         finalModelUsed = chunkRuns[0].model;
       } else if (
@@ -425,6 +452,7 @@ try {
             limits.maxFindings
           );
           context.finalReviewReused = true;
+          context.arbiterReused = true;
           finalReviewComplete = true;
           finalModelUsed = previousReviewState.finalModel || mergeModel;
           if (!effectiveModel.split(" + ").includes(finalModelUsed)) {
@@ -435,11 +463,12 @@ try {
         }
       }
 
-      if (!review && chunkRuns.every((run) => run.ok)) {
+      if (!review && context.arbiterRequired && chunkRuns.every((run) => run.ok)) {
         const mergeInput = chunkRuns.map((run, index) => ({
           chunk_id: run.chunk.id,
           group: run.chunk.group,
           files: run.chunk.filenames,
+          policy_packs: run.context.policyPackIds,
           review: leafReviews[index]
         }));
         const mergeContext = await buildMergeContext({
@@ -449,9 +478,20 @@ try {
           policy: policyFile,
           limits,
           chunkResults: mergeInput,
-          headEvidence
+          headEvidence,
+          leafPolicyDocuments: chunkContexts.flatMap(
+            (chunkContext) => chunkContext.policyDocuments ?? []
+          )
         });
         context.mergeContextChars = mergeContext.contextChars;
+        context.mergePolicySourceChars = mergeContext.policySourceChars;
+        context.mergePolicyPaths = mergeContext.policyPaths;
+        context.mergePolicyPackIds = mergeContext.policyPackIds;
+        context.citedMergePolicyPaths = mergeContext.citedPolicyPaths;
+        context.missingPolicyPaths = [...new Set([
+          ...(context.missingPolicyPaths ?? []),
+          ...(mergeContext.missingPolicyPaths ?? [])
+        ])];
         if (!mergeContext.accepted) {
           review = mergeReviewsFallback(leafReviews, limits.maxFindings, {
             forceIncomplete: true
@@ -467,7 +507,7 @@ try {
               context: mergeContext,
               limits,
               instructions: buildMergeInstructions(limits.maxFindings),
-              taskInstruction: "모든 chunk 결과를 현재 PR 전체 관점에서 통합합니다.",
+              taskInstruction: "선택된 leaf 결과를 현재 PR의 교차 정책 관점에서 중재합니다.",
               requestModel: mergeModel,
               requestReasoningEffort: mergeReasoningEffort,
               requestMaxOutputTokens: limits.mergeMaxOutputTokens,
@@ -475,9 +515,10 @@ try {
               schemaName: "pr_policy_merged_review",
               schema: MERGED_REVIEW_SCHEMA
             });
-            assertCompletedResponse(response);
-            usage = sumUsage([usage, response.usage]);
             const responseModel = response.model || mergeModel;
+            usage = sumUsage([usage, response.usage]);
+            usageCalls.push({ model: responseModel, usage: response.usage || {} });
+            assertCompletedResponse(response);
             finalModelUsed = responseModel;
             effectiveModel = responseModel === model ? model : `${effectiveModel} + ${responseModel}`;
             review = reconcileMergedReview(
@@ -489,6 +530,7 @@ try {
               limits.maxFindings
             );
             finalReviewComplete = true;
+            context.arbiterCompleted = true;
           } catch (error) {
             openAiFailure = true;
             review = mergeReviewsFallback(leafReviews, limits.maxFindings, {
@@ -533,12 +575,15 @@ try {
 
   review = withContextEvidence(review, context);
   review = addRedactionFinding(review, context.redactedFiles ?? []);
+  const costEstimate = estimateOpenAICost(usageCalls, policyFile.cost);
+  context.longContextCallCount = costEstimate.longContextCalls;
   const durationMs = Date.now() - startedAt;
   const renderedComment = renderGitHubComment({
     pr,
     review,
     model: effectiveModel,
     usage,
+    costEstimate,
     durationMs,
     context
   });
@@ -561,9 +606,11 @@ try {
     review,
     model: effectiveModel,
     usage,
+    costEstimate,
     durationMs,
     modules: context.modules ?? [],
     reviewMode: context.reviewMode,
+    arbiterRequired: context.arbiterRequired,
     chunkCount: context.chunkCount,
     reusedChunkCount: context.reusedChunkCount,
     reviewedChunkCount: context.reviewedChunkCount,
@@ -580,14 +627,20 @@ try {
 - 모델: \`${effectiveModel}\`
 - 영향 모듈: ${(context.modules ?? []).join(", ") || "없음"}
 - 리뷰 방식: ${reviewModeLabel(context)}
-- 증분 리뷰: 신규 ${context.reviewedChunkCount ?? context.chunkCount ?? 0}개 / 재사용 ${context.reusedChunkCount ?? 0}개 / 최종 통합 재사용 ${context.finalReviewReused ? "예" : "아니오"}
+- 정책 pack: ${(context.policyPackIds ?? []).join(", ") || "common-core"}
+- 정책 중재 trigger: ${(context.arbiterReasons ?? []).join(", ") || "없음"}
+- 중재 pack: ${(context.mergePolicyPackIds ?? []).join(", ") || "없음"}
+- 증분 리뷰: 신규 ${context.reviewedChunkCount ?? context.chunkCount ?? 0}개 / 재사용 ${context.reusedChunkCount ?? 0}개 / 정책 중재 재사용 ${context.arbiterReused ? "예" : "아니오"}
 - 파일: ${reviewableFiles.length} reviewable / ${files.length} total, 변경 줄: ${sizeCheck.changedLines}
-- 부분 컨텍스트 합: ${context.contextChars ?? 0}자, 통합 컨텍스트: ${context.mergeContextChars ?? 0}자
+- 부분 정책 원문 합: ${context.policySourceChars ?? 0}자, 부분 컨텍스트 합: ${context.contextChars ?? 0}자
+- 중재 정책 원문: ${context.mergePolicySourceChars ?? 0}자, 중재 컨텍스트: ${context.mergeContextChars ?? 0}자
 - PR head 전체 파일 근거: ${context.headEvidenceFileCount ?? 0}/${context.headEvidenceCandidateCount ?? 0}개, ${context.headEvidenceChars ?? 0}자
 - 비밀 의심 redaction: ${context.redactionCount ?? 0}
 - Finding: ${review.findings.length}
 - 교차 검증 제외: ${(review.dismissed_findings ?? []).length}
 - Token cache: read ${usage.input_tokens_details?.cached_tokens ?? 0} / write ${usage.input_tokens_details?.cache_write_tokens ?? 0}
+- 예상 API 비용: ${costEstimate.complete ? `${costEstimate.currency} ${costEstimate.estimatedCost.toFixed(6)}` : `산정 불완전 (${costEstimate.unpricedModels.join(", ")})`}
+- 272K token 초과 호출: ${costEstimate.longContextCalls}
 - 증분 상태 저장: ${context.reviewStatePersisted ? "예" : "아니오"}
 - Discord 실패: ${discordFailures}
 - Dry-run: ${dryRun}
@@ -604,6 +657,12 @@ function combineChunkContexts(chunkPlan, chunkContexts) {
   return {
     modules: unique(chunkContexts.flatMap((item) => item.modules ?? [])),
     policyPaths: unique(chunkContexts.flatMap((item) => item.policyPaths ?? [])),
+    policyDocuments: chunkContexts.flatMap((item) => item.policyDocuments ?? []),
+    policyPackIds: unique(chunkContexts.flatMap((item) => item.policyPackIds ?? [])),
+    policySourceChars: chunkContexts.reduce(
+      (total, item) => total + Number(item.policySourceChars ?? 0),
+      0
+    ),
     missingPolicyPaths: unique(chunkContexts.flatMap((item) => item.missingPolicyPaths ?? [])),
     missingPatches: unique(chunkContexts.flatMap((item) => item.missingPatches ?? [])),
     redactionCount: chunkContexts.reduce((total, item) => total + Number(item.redactionCount ?? 0), 0),
@@ -638,11 +697,12 @@ function assertCompletedResponse(response) {
 
 function reviewModeLabel(context) {
   const mode = context.reviewMode === "multi"
-    ? `분할 ${context.chunkCount ?? 0}개 + 최종 통합`
+    ? `분할 ${context.chunkCount ?? 0}개`
     : "단일 리뷰";
+  const withArbiter = context.arbiterRequired ? `${mode} + 정책 중재` : mode;
   return context.reusedChunkCount > 0
-    ? `${mode} (신규 ${context.reviewedChunkCount ?? 0}, 재사용 ${context.reusedChunkCount})`
-    : mode;
+    ? `${withArbiter} (신규 ${context.reviewedChunkCount ?? 0}, 재사용 ${context.reusedChunkCount})`
+    : withArbiter;
 }
 
 async function callOpenAI({
@@ -670,6 +730,7 @@ async function callOpenAI({
     schemaName,
     schema,
     maxOutputTokens: requestMaxOutputTokens,
+    serviceTier: policyFile.cost?.serviceTier ?? "default",
     safetyIdentifier: stableSafetyIdentifier(repository, pr.user?.login ?? "unknown")
   });
   const response = await fetchWithRetry(

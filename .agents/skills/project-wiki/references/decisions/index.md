@@ -16,7 +16,7 @@ updated: 2026-09-03
 | [ADR-0007](ADR-0007-terraform-iac.md) | 부분 대체됨 | Terraform IaC 정본과 초기 IAM 접근 사용 |
 | [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md) | 부분 대체됨 | EC2 Backend·설치형 AI·RunPod 상위 구조 유지; 전달은 ADR-0011, RunPod 운영은 ADR-0020 적용 |
 | [ADR-0009](ADR-0009-dev-demo-operating-constraints.md) | 부분 대체됨 | 2026-09-23 종료, CloudFront 동일 origin, Billing 미사용과 pgvector migration 경계 |
-| [ADR-0010](ADR-0010-pr-policy-ai-review-discord.md) | 부분 대체됨 | GitHub Actions 기반 결정적 분할·통합 PR AI 리뷰와 Discord 결과 전달 |
+| [ADR-0010](ADR-0010-pr-policy-ai-review-discord.md) | 부분 대체됨 | GitHub Actions 기반 결정적 분할 PR AI 리뷰와 Discord 결과 전달; 정책 선택·중재는 ADR-0024 적용 |
 | [ADR-0011](ADR-0011-dev-cicd-pipeline-modes.md) | 부분 대체됨 | dev 자동 통합과 Backend·Frontend 수동 독립 CodePipeline 운영 |
 | [ADR-0012](ADR-0012-retain-iam-access.md) | 승인됨 | Identity Center 전환을 폐기하고 기존 개인 IAM·MFA·역할 접근 유지 |
 | [ADR-0013](ADR-0013-dev-integration-pr-flow.md) | 승인됨 | `dev` 개발 통합, `main` 릴리스 PR과 Hong1008 기본 승인 책임 사용 |
@@ -30,6 +30,7 @@ updated: 2026-09-03
 | [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, Secrets Manager 값 정본, 읽기 전용 감시와 수동 reconcile 사용 |
 | [ADR-0022](ADR-0022-sllm-release-v2-base-only.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | 평가 provenance를 결속한 LoRA·base release v2, S3 cross-hash와 비용 전 preflight 사용; dev 예외는 ADR-0023 적용 |
 | [ADR-0023](ADR-0023-sllm-dev-unevaluated-release.md) | 승인됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | `dev-*` 미평가 metadata bundle과 명시적 RunPod dev create 경로 사용 |
+| [ADR-0024](ADR-0024-pr-review-policy-routing-and-arbitration.md) | 승인됨·코드 구현 | 결정적 정책 pack·Markdown 절 라우팅, Luna 모듈 leaf와 조건부 Terra 정책 중재, 예상 비용 기록 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 
