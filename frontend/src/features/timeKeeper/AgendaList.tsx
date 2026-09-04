@@ -11,6 +11,8 @@
  * 문구를 써야 하기 때문이다. 창마다 다시 쓰면 두 곳의 문구가 조용히 갈라진다.
  */
 
+import { Button } from "@patternfly/react-core";
+import type { DismissedNeglectedControl } from "./hooks/useDismissedNeglected.ts";
 import type { AgendaState } from "./hooks/useAgenda.ts";
 import type { AgendaItemDto } from "./model/dto.ts";
 import {
@@ -22,7 +24,9 @@ import {
   groupAgenda,
   hasPrivacyConsent,
   hiddenCount,
+  isNeglected,
   isUrgent,
+  neglectedDismissKey,
   primaryPhone,
   roleLabel,
 } from "./model/viewModel.ts";
@@ -59,7 +63,20 @@ function ContactLine({ item }: { item: AgendaItemDto }) {
   );
 }
 
-function AgendaGroupSection({ group }: { group: AgendaGroup }) {
+/**
+ * 종류 하나의 묶음.
+ *
+ * ``renderItems``만 그리고 ``hidden``은 ``group``(창 전체 참값 기준)으로 그대로 잰다. 밀린
+ * 재연락·재확인이 아래 별도 묶음으로 빠져도 "상한에 걸려 아예 못 받은 건수"라는 뜻은 바뀌지
+ * 않는다.
+ */
+function AgendaGroupSection({
+  group,
+  renderItems,
+}: {
+  group: AgendaGroup;
+  renderItems: AgendaItemDto[];
+}) {
   const action = agendaActionLabel(group.category);
   const hidden = hiddenCount(group);
 
@@ -71,7 +88,7 @@ function AgendaGroupSection({ group }: { group: AgendaGroup }) {
         {action != null && <span className="time-keeper__action">{action}</span>}
       </h3>
       <ul className="time-keeper__list">
-        {group.items.map((item) => (
+        {renderItems.map((item) => (
           <li className="time-keeper__row" key={agendaItemKey(item)}>
             <span
               className={
@@ -99,8 +116,83 @@ function AgendaGroupSection({ group }: { group: AgendaGroup }) {
   );
 }
 
-export function AgendaList({ agenda }: { agenda: AgendaState }) {
-  const { items, categories, status } = agenda;
+/**
+ * 되돌아보는 기간을 넘겨 밀린 재연락·재확인 한 줄.
+ *
+ * 여러 종류가 한 묶음에 섞이므로 행마다 종류 이름을 함께 세운다. "다시 보지 않기"는 이
+ * 브라우저에서만 감추고, 다시 연락해 기한이 새로 생기면 감춘 기록과 무관하게 다시 보인다.
+ */
+function NeglectedRow({
+  item,
+  onDismiss,
+}: {
+  item: AgendaItemDto;
+  onDismiss: (item: AgendaItemDto) => void;
+}) {
+  return (
+    <li className="time-keeper__row">
+      <span className="time-keeper__dday time-keeper__dday--urgent">
+        {dDayLabel(item.days_until_due)}
+      </span>
+      <span className="time-keeper__body">
+        <span className="time-keeper__target">
+          {agendaCategoryLabel(item.category)} · {agendaTargetLabel(item)}
+        </span>
+        <span className="time-keeper__meta">
+          <span className="time-keeper__date">{item.due_date}</span>
+        </span>
+        <span className="time-keeper__contacts">
+          <ContactLine item={item} />
+        </span>
+      </span>
+      <Button
+        className="time-keeper__dismiss"
+        variant="secondary"
+        size="sm"
+        onClick={() => onDismiss(item)}
+      >
+        다시 보지 않기
+      </Button>
+    </li>
+  );
+}
+
+function NeglectedSection({
+  items,
+  onDismiss,
+}: {
+  items: AgendaItemDto[];
+  onDismiss: (item: AgendaItemDto) => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <section className="time-keeper__group time-keeper__group--neglected" aria-label="밀린 재연락·재확인">
+      <h3 className="time-keeper__group-heading">
+        <span className="time-keeper__group-name">밀린 재연락·재확인</span>
+        <span className="time-keeper__group-count">{items.length}건</span>
+      </h3>
+      <p className="time-keeper__group-note">
+        오래 방치된 대상입니다. 확인한 건은 「다시 보지 않기」로 감출 수 있고, 다시 연락하면 새
+        기한으로 돌아옵니다.
+      </p>
+      <ul className="time-keeper__list">
+        {items.map((item) => (
+          <NeglectedRow item={item} key={agendaItemKey(item)} onDismiss={onDismiss} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function AgendaList({
+  agenda,
+  dismissed,
+}: {
+  agenda: AgendaState;
+  dismissed: DismissedNeglectedControl;
+}) {
+  const { items, categories, status, overdueDays } = agenda;
 
   if (status === "loading") {
     return (
@@ -121,16 +213,36 @@ export function AgendaList({ agenda }: { agenda: AgendaState }) {
     );
   }
 
+  // 서버가 실제로 적용한 되돌아보는 기간을 우선한다. 첫 응답이 오기 전 짧은 순간에는 items가
+  // 비어 있어 어느 값을 써도 화면에 드러나지 않으므로 문서화된 기본값(7일)으로 충분하다.
+  const effectiveOverdueDays = overdueDays ?? 7;
   const groups = groupAgenda(items, categories);
-  if (groups.length === 0) {
+  // 감춘 건은 완전히 빠진다. 밀린 재연락·재확인이 "다가오는 일정" 쪽으로 되돌아가지 않는다.
+  const neglected = items.filter(
+    (item) =>
+      isNeglected(item, effectiveOverdueDays) && !dismissed.isDismissed(neglectedDismissKey(item)),
+  );
+  const visibleGroups = groups
+    .map((group) => ({
+      group,
+      // hidden 계산은 group(창 전체 참값) 기준으로 그대로 두고, 그릴 행만 종류에서 뗀다.
+      renderItems: group.items.filter((item) => !isNeglected(item, effectiveOverdueDays)),
+    }))
+    .filter(({ renderItems }) => renderItems.length > 0);
+
+  if (visibleGroups.length === 0 && neglected.length === 0) {
     return <p className="time-keeper__state">예정된 일정이 없습니다.</p>;
   }
 
   return (
     <div className="time-keeper__groups">
-      {groups.map((group) => (
-        <AgendaGroupSection group={group} key={group.category} />
+      {visibleGroups.map(({ group, renderItems }) => (
+        <AgendaGroupSection group={group} key={group.category} renderItems={renderItems} />
       ))}
+      <NeglectedSection
+        items={neglected}
+        onDismiss={(item) => dismissed.dismiss(neglectedDismissKey(item))}
+      />
     </div>
   );
 }

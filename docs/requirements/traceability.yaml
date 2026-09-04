@@ -104,3 +104,15 @@ requirements:
     summary: 알릴 것이 없는 날은 브리핑을 열지 않는다
     implementation:
       - frontend/src/features/timeKeeper/TimeKeeperNotification.tsx
+  - id: F4-TK-22
+    summary: 되돌아보는 기간을 넘긴 재연락·재확인을 별도 묶음으로 보여주고 "다시 보지 않기"로 감춘다
+    implementation:
+      - frontend/src/features/timeKeeper/AgendaList.tsx
+      - frontend/src/features/timeKeeper/model/viewModel.ts
+      - frontend/src/features/timeKeeper/model/dismissed.ts
+      - frontend/src/features/timeKeeper/hooks/useDismissedNeglected.ts
+      - frontend/src/features/timeKeeper/hooks/useAgenda.ts
+      - frontend/src/features/timeKeeper/TimeKeeperNotification.tsx
+    tests:
+      - frontend/tests/time-keeper.test.ts
+      - frontend/tests/time-keeper-dismissed.test.ts

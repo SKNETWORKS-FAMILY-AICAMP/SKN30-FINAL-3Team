@@ -106,3 +106,19 @@
 }
 
 .time-keeper__more { margin: 6px 0 0; color: #64748b; font-size: 12px; }
+
+/* 되돌아보는 기간을 넘겨 밀린 재연락·재확인 묶음. 다른 묶음과 옅게 구분한다. */
+.time-keeper__group--neglected {
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.time-keeper__group-note { margin: 0 0 4px; color: #64748b; font-size: 12px; line-height: 1.5; }
+.time-keeper__group--neglected .time-keeper__row:first-child { border-top: 0; }
+
+.time-keeper__dismiss { flex: 0 0 auto; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .time-keeper__dismiss { align-self: flex-start; }
+}
