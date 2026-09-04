@@ -17,10 +17,13 @@ import {
   chunkText,
   collectHeadFileEvidence,
   discordPayload,
+  estimateOpenAICost,
   extractResponseText,
+  extractMarkdownSections,
   fetchWithRetry,
   findCheckRun,
   findReviewComment,
+  fitReviewChunksToContext,
   hasProjectWideChange,
   isInternalPullRequest,
   isPatchIncomplete,
@@ -32,6 +35,7 @@ import {
   normalizeReview,
   parseReviewState,
   patchChangedLines,
+  planPolicyArbitration,
   planForEvent,
   planReviewChunks,
   reconcileMergedReview,
@@ -43,7 +47,8 @@ import {
   shouldLoadHeadFileEvidence,
   stableObjectHash,
   stripReviewState,
-  sumUsage
+  sumUsage,
+  validatePolicyConfig
 } from "../pr-review-lib.mjs";
 
 const rootDir = process.cwd();
@@ -119,6 +124,9 @@ test("pull_request_target keeps executing trusted base code while configuring bo
     engine,
     /reviewChunkFingerprint\(chunk, headEvidence\.fingerprint, prMetadataFingerprint\)/
   );
+  assert.match(engine, /fitReviewChunksToContext\(/);
+  assert.match(engine, /planPolicyArbitration\(/);
+  assert.match(engine, /!review && context\.arbiterRequired/);
   assert.doesNotMatch(engine, /headEvidence\.redactedFiles/);
   assert.doesNotMatch(engine, /raw_url|download_url|contents_url/);
 });
@@ -181,6 +189,121 @@ test("changed paths select only applicable module policies", async () => {
       ".agents/skills/backend/references/decisions/ADR-0002-backend-runtime-database-authentication.md"
     )
   );
+});
+
+test("policy packs select API sections and bounded Infra domains", async () => {
+  const api = await selectPolicyPaths(
+    ["frontend/src/features/f3/api/f3Transport.ts"],
+    policy,
+    rootDir
+  );
+  assert.ok(api.policyPackIds.includes("api-contract-base"));
+  assert.ok(api.policyPackIds.includes("api-contract-f3"));
+  const apiDocument = api.documents.find(
+    (document) => document.path === ".agents/skills/project-wiki/references/contracts/api.md"
+  );
+  assert.deepEqual(apiDocument.sections, [
+    "기본 규칙",
+    "모델 경계 후보",
+    "초기 Backend 계약",
+    "F3 실행 계약"
+  ]);
+
+  const network = await selectPolicyPaths(
+    ["infra/environments/dev/network.tf"],
+    policy,
+    rootDir
+  );
+  assert.ok(network.policyPackIds.includes("infra-runtime-storage-network"));
+  assert.equal(network.policyPackIds.includes("infra-runpod-sllm"), false);
+  assert.equal(
+    network.paths.includes(
+      ".agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md"
+    ),
+    false
+  );
+
+  const backendFeatures = await selectPolicyPaths(
+    ["backend/src/api/f2.py", "backend/src/api/f3_runs.py"],
+    policy,
+    rootDir
+  );
+  assert.ok(backendFeatures.policyPackIds.includes("api-contract-f2"));
+  assert.ok(backendFeatures.policyPackIds.includes("api-contract-f3"));
+});
+
+test("Markdown section selection keeps document identity and rejects missing headings", () => {
+  const source = "---\nstatus: 결정\n---\n\n# 계약\n\n소개\n\n## A\nA 본문\n\n### A 하위\n하위\n\n## B\nB 본문\n";
+  const selected = extractMarkdownSections(source, ["B"]);
+  assert.match(selected.text, /# 계약/);
+  assert.match(selected.text, /## B\nB 본문/);
+  assert.doesNotMatch(selected.text, /A 본문/);
+  assert.deepEqual(selected.missingSections, []);
+  assert.deepEqual(extractMarkdownSections(source, ["없음"]).missingSections, ["없음"]);
+});
+
+test("policy arbiter is conditional on chunks, modules, policies, and sensitive packs", () => {
+  assert.equal(
+    planPolicyArbitration(["frontend/src/features/HomeScreen.tsx"], policy, 1).required,
+    false
+  );
+  assert.equal(
+    planPolicyArbitration(["frontend/src/features/f3/api/f3Transport.ts"], policy, 1).required,
+    true
+  );
+  assert.equal(planPolicyArbitration(["frontend/src/App.tsx"], policy, 2).required, true);
+  assert.equal(
+    planPolicyArbitration([".github/workflows/backend-ci.yml"], policy, 1).required,
+    true
+  );
+  assert.equal(
+    planPolicyArbitration(
+      [".agents/skills/backend/references/decisions/ADR-0002-backend-runtime-database-authentication.md"],
+      policy,
+      1
+    ).required,
+    true
+  );
+  assert.equal(
+    planPolicyArbitration(["frontend/src/App.tsx", "backend/src/main.py"], policy, 1).required,
+    true
+  );
+});
+
+test("policy pack manifest rejects ambiguous or incomplete definitions", () => {
+  assert.deepEqual(validatePolicyConfig(policy), { valid: true, reasons: [] });
+  const invalid = validatePolicyConfig({
+    version: 2,
+    modules: { infra: { directories: [".agents/skills/infra/references/decisions"] } },
+    policyPacks: [
+      { id: "duplicate", phases: ["leaf"], when: [{ always: true }], files: ["AGENTS.md"] },
+      { id: "duplicate", phases: ["unknown"], when: [], files: [] }
+    ]
+  });
+  assert.equal(invalid.valid, false);
+  assert.match(
+    invalid.reasons.join("\n"),
+    /directory 재귀|중복|지원하지 않는 phase|when|정책 파일/
+  );
+});
+
+test("every policy pack source and configured Markdown section resolves", async () => {
+  const coreFiles = [
+    ...(policy.always?.files ?? []),
+    ...(policy.projectWide?.files ?? []),
+    ...Object.values(policy.modules ?? {}).flatMap((module) => module.files ?? [])
+  ];
+  for (const policyPath of new Set(coreFiles)) {
+    await readFile(path.join(rootDir, policyPath), "utf8");
+  }
+  for (const pack of policy.policyPacks) {
+    for (const entry of pack.files) {
+      const document = typeof entry === "string" ? { path: entry, sections: [] } : entry;
+      const contents = await readFile(path.join(rootDir, document.path), "utf8");
+      const extracted = extractMarkdownSections(contents, document.sections);
+      assert.deepEqual(extracted.missingSections, [], `${pack.id}: ${document.path}`);
+    }
+  }
 });
 
 test("secret-like patch lines are redacted before context leaves the runner", async () => {
@@ -569,8 +692,42 @@ test("GPT-5.6 requests cache only the stable policy prefix", () => {
   assert.doesNotMatch(first.input[0].content[0].text, /changed patch/);
   assert.match(first.input[1].content[0].text, /changed patch/);
   assert.equal(first.store, false);
+  assert.equal(first.service_tier, "default");
   assert.equal(first.max_output_tokens, 2500);
   assert.ok(first.prompt_cache_key.length <= 64);
+});
+
+test("standard-tier model usage is converted to an auditable estimated cost", () => {
+  const estimated = estimateOpenAICost(
+    [
+      {
+        model: "gpt-5.6-luna",
+        usage: {
+          input_tokens: 100000,
+          output_tokens: 2500,
+          input_tokens_details: { cached_tokens: 20000, cache_write_tokens: 30000 }
+        }
+      }
+    ],
+    policy.cost
+  );
+  assert.equal(estimated.complete, true);
+  assert.equal(estimated.longContextCalls, 0);
+  assert.ok(Math.abs(estimated.estimatedCost - 0.0209) < 1e-12);
+
+  const longContext = estimateOpenAICost(
+    [{ model: "gpt-5.6-terra", usage: { input_tokens: 300000, output_tokens: 4000 } }],
+    policy.cost
+  );
+  assert.equal(longContext.longContextCalls, 1);
+  assert.ok(Math.abs(longContext.estimatedCost - 1.272) < 1e-12);
+  assert.equal(
+    estimateOpenAICost(
+      [{ model: "unpriced-model", usage: { input_tokens: 1, output_tokens: 1 } }],
+      policy.cost
+    ).complete,
+    false
+  );
 });
 
 test("file and changed-line limits reject oversized PRs", () => {
@@ -772,12 +929,28 @@ test("GitHub output is sticky and Discord output is bounded", () => {
       total_tokens: 120,
       input_tokens_details: { cached_tokens: 60, cache_write_tokens: 10 }
     },
+    costEstimate: {
+      complete: true,
+      currency: "USD",
+      estimatedCost: 0.012345,
+      longContextCalls: 0,
+      unpricedModels: []
+    },
     durationMs: 1200,
-    context: { modules: ["backend"] }
+    context: {
+      modules: ["backend"],
+      policyPackIds: ["backend-core"],
+      reviewMode: "single",
+      chunkCount: 1,
+      arbiterRequired: true
+    }
   });
   assert.ok(comment.startsWith(REVIEW_MARKER));
   assert.match(comment, /HIGH · 병합 전 확인/);
   assert.match(comment, /cache read 60 \/ write 10/);
+  assert.match(comment, /backend-core/);
+  assert.match(comment, /단일 리뷰 \+ 정책 중재/);
+  assert.match(comment, /USD 0\.012345/);
   assert.match(comment, /교차 검증으로 제외한 부분 리뷰 finding/);
   assert.match(comment, /partial-diff-absence/);
   assert.match(comment, /전체 파일에서 기존 설정을 확인/);
@@ -924,6 +1097,16 @@ test("chunk fingerprints change with patch content and project-wide paths force 
     reviewChunkFingerprint(chunk, "policy-evidence", "pr-metadata-a"),
     reviewChunkFingerprint(chunk, "policy-evidence", "pr-metadata-b")
   );
+  assert.notEqual(
+    reviewChunkFingerprint({
+      ...chunk,
+      files: [{ ...chunk.files[0], contextFragment: "0.1" }]
+    }),
+    reviewChunkFingerprint({
+      ...chunk,
+      files: [{ ...chunk.files[0], contextFragment: "0.2" }]
+    })
+  );
   assert.equal(hasProjectWideChange([{ filename: ".github/workflow.yml" }], policy), true);
   assert.equal(
     hasProjectWideChange(
@@ -1033,6 +1216,171 @@ test("large patches are split deterministically by review chunk limits", () => {
   assert.equal(result.chunks.length, 3);
   assert.deepEqual(result.chunks.map((chunk) => chunk.changedLines), [2, 2, 2]);
   assert.ok(result.chunks.every((chunk) => chunk.group === "backend"));
+});
+
+test("oversized single patch lines are split within the raw patch cap", () => {
+  const result = planReviewChunks(
+    [
+      {
+        filename: "infra/environments/dev/main.tf",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: `+${"x".repeat(500)}`
+      }
+    ],
+    policy,
+    { chunkChangedLines: 10, chunkPatchChars: 120, maxChunks: 10 }
+  );
+  assert.equal(result.accepted, true);
+  assert.ok(result.chunks.length > 1);
+  assert.ok(result.chunks.every((chunk) => chunk.patchChars <= 120));
+  assert.equal(
+    result.chunks.reduce((total, chunk) => total + chunk.changedLines, 0),
+    1
+  );
+});
+
+test("serialized frontend and infra contexts are re-split before review", async () => {
+  const cases = [
+    {
+      filename: "frontend/src/Synthetic.tsx",
+      row: "+<A><B><C><D></D></C></B></A>",
+      count: 1800
+    },
+    {
+      filename: "infra/environments/dev/main.tf",
+      row: '+value = "<A><B><C><D><E><F><G></G></F></E></D></C></B></A>"',
+      count: 900
+    }
+  ];
+  for (const item of cases) {
+    const patch = Array.from({ length: item.count }, () => item.row).join("\n");
+    const initial = planReviewChunks(
+      [
+        {
+          filename: item.filename,
+          status: "modified",
+          additions: item.count,
+          deletions: 0,
+          patch
+        }
+      ],
+      policy,
+      policy.limits
+    );
+    assert.equal(initial.accepted, true);
+    assert.equal(initial.chunks.length, 1);
+
+    const fitted = await fitReviewChunksToContext({
+      rootDir,
+      pr,
+      chunks: initial.chunks,
+      policy,
+      limits: policy.limits
+    });
+    assert.equal(fitted.accepted, true, item.filename);
+    assert.ok(fitted.chunks.length > 1, item.filename);
+    assert.equal(fitted.contexts.length, fitted.chunks.length);
+    assert.ok(
+      fitted.contexts.every((context) => context.contextChars <= policy.limits.maxContextChars),
+      item.filename
+    );
+    assert.equal(
+      fitted.chunks.reduce((total, chunk) => total + chunk.changedLines, 0),
+      item.count,
+      item.filename
+    );
+  }
+});
+
+test("a serialized oversized single JSX line is split to fit context", async () => {
+  const patch = `+${"<>".repeat(30000)}`;
+  const initial = planReviewChunks(
+    [
+      {
+        filename: "frontend/src/Generated.tsx",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch
+      }
+    ],
+    policy,
+    policy.limits
+  );
+  assert.equal(initial.chunks.length, 1);
+  const fitted = await fitReviewChunksToContext({
+    rootDir,
+    pr,
+    chunks: initial.chunks,
+    policy,
+    limits: policy.limits
+  });
+  assert.equal(fitted.accepted, true);
+  assert.ok(fitted.chunks.length > 1);
+  assert.ok(
+    fitted.contexts.every((context) => context.contextChars <= policy.limits.maxContextChars)
+  );
+  assert.equal(
+    fitted.chunks.reduce((total, chunk) => total + chunk.changedLines, 0),
+    1
+  );
+});
+
+test("context-aware splitting still enforces the final chunk cap", async () => {
+  const patch = Array.from(
+    { length: 1800 },
+    () => "+<A><B><C><D></D></C></B></A>"
+  ).join("\n");
+  const initial = planReviewChunks(
+    [
+      {
+        filename: "frontend/src/Synthetic.tsx",
+        status: "modified",
+        additions: 1800,
+        deletions: 0,
+        patch
+      }
+    ],
+    policy,
+    policy.limits
+  );
+  const fitted = await fitReviewChunksToContext({
+    rootDir,
+    pr,
+    chunks: initial.chunks,
+    policy,
+    limits: { ...policy.limits, maxChunks: 1 }
+  });
+  assert.equal(fitted.accepted, false);
+  assert.match(fitted.reasons.at(-1), /chunk .*한도 1개/);
+});
+
+test("an oversized policy baseline is reported without splitting patch to characters", async () => {
+  const initial = planReviewChunks(
+    [
+      {
+        filename: "backend/src/example.py",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: "+value = 1"
+      }
+    ],
+    policy,
+    policy.limits
+  );
+  const fitted = await fitReviewChunksToContext({
+    rootDir,
+    pr,
+    chunks: initial.chunks,
+    policy,
+    limits: { ...policy.limits, maxContextChars: 1 }
+  });
+  assert.equal(fitted.accepted, false);
+  assert.equal(fitted.chunks.length, 1);
+  assert.match(fitted.reasons[0], /backend-1: 리뷰 컨텍스트/);
 });
 
 test("chunk plans preserve module boundaries and enforce their own cap", () => {
@@ -1215,6 +1563,60 @@ test("merge context contains proposed policy evidence but not implementation raw
   assert.doesNotMatch(context.dynamicText, /<accepted_policy>fake/);
   assert.match(context.dynamicText, /\\u003caccepted_policy\\u003e/);
   assert.match(buildMergeInstructions(5), /dismissed_findings/);
+});
+
+test("policy arbiter reloads only policy documents cited by leaf findings", async () => {
+  const privacyPath = ".agents/skills/project-wiki/references/privacy/policy.md";
+  const unrelatedPath = ".agents/skills/frontend/references/design/data-grid.md";
+  const context = await buildMergeContext({
+    rootDir,
+    pr,
+    files: [
+      {
+        filename: "backend/src/main.py",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: "+value = 1"
+      }
+    ],
+    policy,
+    limits: { ...policy.limits, maxMergeContextChars: 900000 },
+    leafPolicyDocuments: [
+      { path: privacyPath, sections: ["원칙"], packIds: ["privacy-and-secrets"] },
+      { path: unrelatedPath, sections: null, packIds: ["frontend-admin-grid"] }
+    ],
+    chunkResults: [
+      {
+        chunk_id: "backend-1",
+        group: "backend",
+        files: ["backend/src/main.py"],
+        review: {
+          status: "needs_attention",
+          summary: "개인정보 근거",
+          findings: [
+            {
+              severity: "high",
+              root_cause: "privacy-boundary",
+              category: "privacy",
+              title: "개인정보 경계",
+              file: "backend/src/main.py",
+              line: 1,
+              evidence: "민감정보 처리",
+              rule_source: `${privacyPath} - 원칙`,
+              impact: "외부 전송",
+              recommendation: "정책 준수"
+            }
+          ],
+          missing_evidence: []
+        }
+      }
+    ]
+  });
+  assert.deepEqual(context.citedPolicyPaths, [privacyPath]);
+  assert.ok(context.policyPaths.includes(privacyPath));
+  assert.equal(context.policyPaths.includes(unrelatedPath), false);
+  assert.match(context.cachePrefixText, /## 원칙/);
 });
 
 test("truncated GitHub patches are treated as incomplete evidence", () => {

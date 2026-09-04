@@ -1,16 +1,16 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·Alarm 전용 전달과 RunPod 공유 F2 운영 코드 구현 및 외부 자원 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-09-01
+implementation: 기존 delivery 적용됨·Alarm 전용 전달 코드 구현 및 AWS 미적용·S3 dev release 게시 완료·RunPod/Terraform 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-09-03
 ---
 
 # 배포 및 운영 구조
 
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
-- **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
+- **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐고 S3 dev release는 게시됐다. RunPod Pod와 이번 Terraform 변경은 미적용이다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
 
 ## Pipeline 구성
 
@@ -110,14 +110,21 @@ Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. �
 
 ## RunPod 공유 F2 서빙과 endpoint 전환
 
-학습 담당자는 Infra 권한 없이 검증된 SLLM bundle 하나만 전달한다. Infra는 이를 private S3
+학습 담당자는 Infra 권한 없이 SLLM v2 metadata bundle 하나만 전달한다. LoRA mode에는 adapter가 있고
+base mode에는 없으며, `verified` stage의 두 mode는 모두 tar bundle과 full 평가·승인을 사용한다. 평가
+dataset checksum, 실제 기반 모델 commit과 adapter checksum을 선택 모델에 결속하고 외부 전달용
+요약은 aggregate allowlist로 다시 만든다. Infra는 이를 private S3
 `releases/sllm/<release-id>/`에 불변 게시하고, private GHCR image가 한 GPU에서 `sllm`·`stt`를
 자동 기동한다. 현재 vLLM 버전의 외부 인증 완화를 위해 서비스별 key와 허용 경로를 검사하는 proxy를
 둔다. Team Template은 image·port·Secret·STT와 자원 기본값만 소유하며 SLLM 모델은 release manifest가
 소유한다.
 
-Pod는 필요할 때 Secure Cloud에 생성하고 작업 종료 시 삭제한다. Volume·SSH는 사용하지 않으며
-Pod에는 1시간 presigned S3 URL만 전달한다. 생성 health 성공 후 SSM `AI_VLLM_ENDPOINT_SET`을
+v2 S3 객체는 자기 checksum과 상대 객체 checksum을 metadata로 양방향 결속한다. 동일 내용의 부분
+게시만 재개하며 기존 v1 LoRA 객체는 과거 자기 checksum 형식으로 계속 읽는다. Pod는 필요할 때
+Secure Cloud에 생성하고 작업 종료 시 삭제한다. Volume·SSH는 사용하지 않으며 Pod에는 1시간
+presigned S3 URL만 전달한다. 기반 모델은 공개 Hugging Face의 불변 commit에서 받고 HF token 계열은
+Template과 자식 프로세스에서 제거한다. `/v1/models`가 각각 `sllm`, `stt`를 실제 반환한 뒤 SSM
+`AI_VLLM_ENDPOINT_SET`을
 `active`로, 삭제 전에는 `offline`으로 바꾸고 같은 Backend image의 API·Worker만 재생성한다.
 refresh 실패 시 이전 JSON을 복원한다.
 
@@ -125,7 +132,12 @@ F2 smoke는 배포 bundle의 합성 음성만 사용해 개발 세션·CSRF를 �
 `POST /api/v1/f2/analyses`를 호출한다. 응답 body, 전사와 인증값은 운영 도구 출력에 복사하지 않는다.
 
 최초 구축은 성공한 image digest의 `runpod-bootstrap-plan → 확인 → runpod-bootstrap` 한 경로를
-사용한다. SSM 제어 문서가 registry·Template ID, digest와 AI Secret 동기화 version을 소유하며
+사용한다. 새 digest generation은 endpoint offline과 공유 Pod 부재에서만 만든다. Pod 생성 전
+`runpod-create-plan`이 S3 release·control ready·공유 Pod 부재와 Backend API·Worker health를 확인한다.
+평가 전 개발 기동은 `dev-*` ID와 `not-evaluated` marker를 가진 `dev` stage로만 허용하며 일반 create가
+아닌 `runpod-create-dev-plan → runpod-create-dev`를 사용한다. 이 예외도 기반 commit·adapter checksum과
+동일한 health·rollback·삭제 계약을 유지하며 정식 품질 승격으로 간주하지 않는다.
+SSM 제어 문서가 registry·Template ID, digest와 AI Secret 동기화 version을 소유하며
 개인 `.env`나 영구 `runpodctl` 설정을 요구하지 않는다. 기본 30분 읽기 전용 감시와 8시간 경고는
 기존 Alarm SNS·Discord로 전달한다. 실행·회전·수동 reconcile과 비용 절차는
 [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다. 자동 중지는 없고 생성 작업자가 종료 시

@@ -70,8 +70,7 @@ def _request(
         with LOOPBACK_OPENER.open(request, timeout=timeout) as response:
             return response.status, response.headers, response.read(1024 * 1024)
     except urllib.error.HTTPError as error:
-        error.read(1024 * 1024)
-        return error.code, error.headers, b""
+        return error.code, error.headers, error.read(1024 * 1024)
     except urllib.error.URLError as error:
         raise SmokeFailure(
             f"Backend request failed: {type(error.reason).__name__}"
@@ -142,7 +141,7 @@ def _load_audio(path: Path) -> bytes:
     return audio
 
 
-def run(base_url: str, audio_path: Path) -> None:
+def run(base_url: str, audio_path: Path, expected_provider_status: str = "active") -> None:
     base_url = base_url.rstrip("/")
     try:
         parsed_base_url = urllib.parse.urlsplit(base_url)
@@ -187,6 +186,13 @@ def run(base_url: str, audio_path: Path) -> None:
         },
         body=body,
     )
+    if expected_provider_status == "offline":
+        if status != 503:
+            raise SmokeFailure(f"offline F2 analysis returned HTTP {status}")
+        result = _json_object(raw, "offline F2 analysis")
+        if result.get("code") != "F2_UNAVAILABLE":
+            raise SmokeFailure("offline F2 analysis did not return F2_UNAVAILABLE")
+        return
     if status != 200:
         raise SmokeFailure(f"F2 analysis failed with HTTP {status}")
     result = _json_object(raw, "F2 analysis")
@@ -216,17 +222,22 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--audio", required=True, type=Path)
+    parser.add_argument(
+        "--expected-provider-status",
+        choices=("active", "offline"),
+        default="active",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     arguments = parse_args()
     try:
-        run(arguments.base_url, arguments.audio)
+        run(arguments.base_url, arguments.audio, arguments.expected_provider_status)
     except SmokeFailure as error:
         print(f"F2 end-to-end smoke failed: {error}", file=sys.stderr)
         return 1
-    print("F2 end-to-end smoke succeeded")
+    print(f"F2 {arguments.expected_provider_status} smoke succeeded")
     return 0
 
 

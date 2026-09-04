@@ -32,9 +32,20 @@ STT_KEY = "s" * 43
 def release(adapter_path: str = "/opt/f2-models/release-v1/adapter"):
     return bootstrap.Release(
         release_id="release-v1",
+        release_mode="lora",
         base_model_id="Qwen/Qwen3-4B",
         base_model_revision="a" * 40,
         adapter_path=adapter_path,
+    )
+
+
+def base_release():
+    return bootstrap.Release(
+        release_id="release-base-v2",
+        release_mode="base",
+        base_model_id="Qwen/Qwen3-4B",
+        base_model_revision="a" * 40,
+        adapter_path=None,
     )
 
 
@@ -91,6 +102,13 @@ class SupervisorTests(unittest.TestCase):
         self.assertNotIn("--enable-lora", stt)
         self.assertNotIn(SLLM_KEY, sllm + stt)
 
+    def test_base_command_uses_sllm_name_without_lora_options(self) -> None:
+        config = supervisor.load_config(base_release(), valid_environment())
+        sllm = supervisor.build_commands(config, "vllm")["sllm"]
+        self.assertEqual(sllm[sllm.index("--served-model-name") + 1], "sllm")
+        self.assertNotIn("--enable-lora", sllm)
+        self.assertNotIn("--lora-modules", sllm)
+
     def test_control_plane_values_are_removed_from_children(self) -> None:
         environment = valid_environment() | {
             "F2_SLLM_BUNDLE_URL": "https://signed.example/private",
@@ -101,6 +119,7 @@ class SupervisorTests(unittest.TestCase):
         proxy = supervisor._proxy_environment(environment, SLLM_KEY)
         self.assertNotIn("F2_SLLM_BUNDLE_URL", model)
         self.assertNotIn("AWS_SECRET_ACCESS_KEY", model)
+        self.assertNotIn("HF_TOKEN", model)
         self.assertNotIn("HF_TOKEN", proxy)
 
 
@@ -110,6 +129,13 @@ class BootstrapTests(unittest.TestCase):
         adapter.mkdir()
         (adapter / "adapter_config.json").write_text("{}", encoding="utf-8")
         (adapter / "adapter_model.safetensors").write_bytes(b"adapter")
+        adapter_files = sorted(path for path in adapter.rglob("*") if path.is_file())
+        adapter_digest = hashlib.sha256()
+        for path in adapter_files:
+            relative = path.relative_to(adapter).as_posix().encode()
+            adapter_digest.update(len(relative).to_bytes(4, "big"))
+            adapter_digest.update(relative)
+            adapter_digest.update(hashlib.sha256(path.read_bytes()).digest())
         summary = {
             "run_id": "evaluation-full-001",
             "task": "full",
@@ -123,8 +149,12 @@ class BootstrapTests(unittest.TestCase):
             "decision_owner": "fine-tuning-owner",
             "rationale": "Full evaluation was reviewed for shared dev promotion.",
         }
-        summary_bytes = (json.dumps(summary, ensure_ascii=False, indent=2) + "\n").encode()
-        approval_bytes = (json.dumps(approval, ensure_ascii=False, indent=2) + "\n").encode()
+        summary_bytes = (
+            json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
+        ).encode()
+        approval_bytes = (
+            json.dumps(approval, ensure_ascii=False, indent=2) + "\n"
+        ).encode()
         (destination / "evaluation-summary.json").write_bytes(summary_bytes)
         (destination / "promotion-approval.json").write_bytes(approval_bytes)
         return {
@@ -133,6 +163,19 @@ class BootstrapTests(unittest.TestCase):
             "capability": "f2-consultation-analysis",
             "served_model_name": "sllm",
             "base_model": {"id": "Qwen/Qwen3-4B", "revision": "a" * 40},
+            "adapter": {
+                "format": "peft-lora",
+                "path": "adapter",
+                "sha256": adapter_digest.hexdigest(),
+                "size_bytes": sum(path.stat().st_size for path in adapter_files),
+                "file_count": len(adapter_files),
+            },
+            "training": {
+                "code_revision": "b" * 40,
+                "dataset_release": "f2-v1",
+                "train_sha256": "c" * 64,
+                "validation_sha256": "d" * 64,
+            },
             "evaluation": {
                 "task": "full",
                 "summary_path": "evaluation-summary.json",
@@ -155,6 +198,111 @@ class BootstrapTests(unittest.TestCase):
                     manifest | {"served_model_name": "qwen"}, "release-v1", destination
                 )
 
+    def test_v2_base_manifest_has_no_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            summary = {
+                "run_id": "evaluation-full-002",
+                "task": "full",
+                "release_mode": "base",
+                "dataset_release": "f2-2.0.0",
+                "dataset_sha256": "e" * 64,
+                "models": [
+                    {
+                        "label": "base-candidate",
+                        "model_id": "Qwen/Qwen3-4B",
+                        "resolved_model_revision": "a" * 40,
+                        "adapter_sha256": None,
+                    }
+                ],
+            }
+            approval = {
+                "schema_version": 2,
+                "release_mode": "base",
+                "status": "approved",
+                "evaluation_run_id": "evaluation-full-002",
+                "selected_model": "base-candidate",
+                "decision_owner": "fine-tuning-owner",
+                "rationale": "Full base evaluation was reviewed.",
+            }
+            summary_bytes = (json.dumps(summary) + "\n").encode()
+            approval_bytes = (json.dumps(approval) + "\n").encode()
+            (destination / "evaluation-summary.json").write_bytes(summary_bytes)
+            (destination / "promotion-approval.json").write_bytes(approval_bytes)
+            manifest = {
+                "schema_version": 2,
+                "release_id": "release-base-v2",
+                "release_mode": "base",
+                "capability": "f2-consultation-analysis",
+                "served_model_name": "sllm",
+                "base_model": {"id": "Qwen/Qwen3-4B", "revision": "a" * 40},
+                "adapter": None,
+                "training": None,
+                "evaluation": {
+                    "task": "full",
+                    "dataset_release": "f2-2.0.0",
+                    "dataset_sha256": "e" * 64,
+                    "source_summary_sha256": "f" * 64,
+                    "summary_path": "evaluation-summary.json",
+                    "summary_sha256": hashlib.sha256(summary_bytes).hexdigest(),
+                    "promotion_status": "approved",
+                    "selected_model": "base-candidate",
+                    "approval_path": "promotion-approval.json",
+                    "approval_sha256": hashlib.sha256(approval_bytes).hexdigest(),
+                },
+            }
+            result = bootstrap._validate(manifest, "release-base-v2", destination)
+        self.assertEqual(result.release_mode, "base")
+        self.assertIsNone(result.adapter_path)
+
+    def test_dev_lora_manifest_is_accepted_without_evaluation_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            manifest = self._release_manifest(destination)
+            (destination / "evaluation-summary.json").unlink()
+            (destination / "promotion-approval.json").unlink()
+            manifest.update(
+                {
+                    "schema_version": 2,
+                    "release_id": "dev-release-v2",
+                    "release_stage": "dev",
+                    "release_mode": "lora",
+                    "evaluation": {
+                        "status": "not-evaluated",
+                        "dataset_release": "f2-dev",
+                    },
+                }
+            )
+            training = manifest["training"]
+            assert isinstance(training, dict)
+            training.pop("dataset_release")
+            result = bootstrap._validate(manifest, "dev-release-v2", destination)
+        self.assertEqual(result.release_stage, "dev")
+        self.assertEqual(result.release_mode, "lora")
+
+    def test_dev_manifest_requires_dev_release_id(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            manifest = self._release_manifest(destination)
+            manifest.update(
+                {
+                    "schema_version": 2,
+                    "release_stage": "dev",
+                    "release_mode": "lora",
+                    "evaluation": {
+                        "status": "not-evaluated",
+                        "dataset_release": "f2-dev",
+                    },
+                }
+            )
+            training = manifest["training"]
+            assert isinstance(training, dict)
+            training.pop("dataset_release")
+            with self.assertRaisesRegex(
+                bootstrap.BootstrapError, "must start with dev-"
+            ):
+                bootstrap._validate(manifest, "release-v1", destination)
+
     def test_manifest_requires_matching_approved_promotion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory)
@@ -162,7 +310,9 @@ class BootstrapTests(unittest.TestCase):
             approval_path = destination / "promotion-approval.json"
             approval = json.loads(approval_path.read_text(encoding="utf-8"))
             approval["selected_model"] = "different-model"
-            approval_bytes = (json.dumps(approval, ensure_ascii=False, indent=2) + "\n").encode()
+            approval_bytes = (
+                json.dumps(approval, ensure_ascii=False, indent=2) + "\n"
+            ).encode()
             approval_path.write_bytes(approval_bytes)
             evaluation = manifest["evaluation"]
             assert isinstance(evaluation, dict)

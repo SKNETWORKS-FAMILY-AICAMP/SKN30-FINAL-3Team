@@ -14,13 +14,13 @@ def test_candidate_selection_implementation_and_project_wiki_stay_aligned() -> N
         / "references"
         / "contracts"
         / "api.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     online_runtime = (
         REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     log = (
         REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references" / "log.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     implemented_row = "| `CANDIDATES_READY` | 업무 처리 | 결정적 SQL 후보 스냅샷 완료 | 구현됨 |"
     assert implemented_row in api_contract

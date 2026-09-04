@@ -14,7 +14,7 @@ def test_candidate_card_implementation_and_project_wiki_stay_aligned() -> None:
         / "references"
         / "contracts"
         / "api.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     ai_contract = (
         REPOSITORY_ROOT
         / ".agents"
@@ -23,13 +23,13 @@ def test_candidate_card_implementation_and_project_wiki_stay_aligned() -> None:
         / "references"
         / "contracts"
         / "f3-ai.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     online_runtime = (
         REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     log = (
         REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references" / "log.md"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     assert (
         "| `CANDIDATE_CARDS_READY` | 업무 처리 | 후보 카드 생성·재사용 완료 | 구현됨 |"

@@ -1,11 +1,11 @@
 ---
 status: 결정
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # 인프라 자원 인벤토리
 
-선택 정본은 [Infra ADR-0002](decisions/ADR-0002-dev-demo-aws-runpod-architecture.md), [Infra ADR-0003](decisions/ADR-0003-dev-storage-database-and-configuration.md), [Infra ADR-0004](decisions/ADR-0004-dev-runtime-and-observability-baseline.md), [Infra ADR-0005](decisions/ADR-0005-dev-frontend-origin-and-api-routing.md), [Infra ADR-0015](decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md), [Infra ADR-0017](decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)과 [Infra ADR-0018](decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)이다. Terraform 코드 구현과 실제 생성 여부를 구분한다. dev workload, DB migration과 기존 delivery 자원은 적용됐고 Alarm 전용 전달, Verify/Build 분리와 RunPod 새 운영 자산은 실환경 적용 전이다.
+선택 정본은 [Infra ADR-0002](decisions/ADR-0002-dev-demo-aws-runpod-architecture.md), [Infra ADR-0003](decisions/ADR-0003-dev-storage-database-and-configuration.md), [Infra ADR-0004](decisions/ADR-0004-dev-runtime-and-observability-baseline.md), [Infra ADR-0005](decisions/ADR-0005-dev-frontend-origin-and-api-routing.md), [Infra ADR-0015](decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md), [Infra ADR-0017](decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)과 [Infra ADR-0018](decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)이다. Terraform 코드 구현과 실제 생성 여부를 구분한다. dev workload, DB migration과 기존 delivery 자원은 적용됐고 S3 dev release는 게시됐다. Alarm 전용 전달, Verify/Build 분리, RunPod와 이번 Terraform 변경은 실환경 적용 전이다.
 
 | 영역 | 자원 | 선택 상태 | 구현 상태 | 도입 조건·제약 |
 |---|---|---|---|---|
@@ -26,9 +26,9 @@ updated: 2026-09-01
 | 관측성 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | 기존 6개 alarm 적용·전용 전달, 2개 app alarm과 RunPod 감시 코드 구현, AWS 미적용 | RunPod 30분 read-only heartbeat·API·Pod·endpoint·health·runtime·cost metric과 8개 alarm도 기존 전용 SNS/Lambda 사용 |
 | 전달 | CodeConnections, CodePipeline V2, CodeBuild, CodeDeploy | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, 모두 QUEUED |
 | 전달 저장소 | Pipeline artifact S3 | 결정 | 적용됨 | non-versioned, 객체 14일 만료; 업무용 S3·Terraform state와 분리 |
-| 모델 실행 | RunPod shared F2 Pod, private Team Template | 결정 | 코드 구현·외부 자원 미적용 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
-| 모델 image | private GHCR custom image | 결정 | 코드 구현·image 미게시 | 고정 base digest와 dependency lock, SLLM·STT supervisor, weight·token·adapter 미포함 |
-| 모델 artifact | private data-model S3 `releases/sllm/` | 결정 | Terraform 코드 구현·미적용 | 검증 bundle 불변 게시, Pod에는 presigned URL만 전달 |
+| 모델 실행 | RunPod shared F2 Pod, private Team Template | 결정 | 코드 구현·RunPod/Terraform 미적용 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
+| 모델 image | private GHCR custom image | 결정 | 코드 구현·image 미게시 | 고정 base digest와 dependency lock, LoRA·base SLLM 및 STT supervisor, weight·token·adapter 미포함 |
+| 모델 artifact | private data-model S3 `releases/sllm/` | 결정 | S3 dev release 게시 완료·이번 Terraform 미적용 | `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle 불변 게시, Pod에는 presigned URL만 전달 |
 | 모델 설정 | RunPod Secret, AWS Secrets Manager, SSM endpoint/control set | 결정 | 코드 구현·AWS/RunPod 미적용 | 별도 SLLM·STT key, active/offline 두 URL, bootstrap generation·immutable resource ID·Secret version sync 관리 |
 | 공개 TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 환경에는 도메인이 없고 실제 개인정보 사용 금지; 운영 승격 시 별도 결정 |
 | 큐 | SQS, DLQ | 조건부 | 미확정 | RDS polling이 독립 재시도·확장을 충족하지 못할 때 |
@@ -45,6 +45,7 @@ updated: 2026-09-01
 - ALB 삭제·CloudFront 비활성화 deep lifecycle은 코드와 운영 명령을 구현했으나 AWS saved plan 검토·apply 전이다.
 - 세 Pipeline, 기존 CodeBuild/CodeDeploy, Discord 알림과 기존 IAM 운영자 policy attachment는 적용됐다. Verify/Build 분리 변경은 검증됐지만 승인 전에는 apply하지 않는다.
 - RunPod는 Terraform provider 대신 Git Template 명세와 기본 dry-run bootstrap/reconcile,
-  create/status/delete lifecycle 도구를 사용한다. custom image·Template·Pod·Secret, SSM endpoint/control,
-  EventBridge monitor와 alarm 자산은 코드만 구현했고 GHCR, RunPod와 AWS에는 아직 적용하지 않았다.
+  create/status/delete lifecycle 도구를 사용한다. S3에는 dev release bundle과 cross-hash manifest를
+  게시했다. custom image·Template·Pod·Secret, SSM endpoint/control, EventBridge monitor와 alarm 자산 및
+  이번 Terraform 변경은 아직 적용하지 않았다.
 - Terraform state bucket은 애플리케이션 파일 저장소가 아니며 다른 용도로 재사용하지 않는다.

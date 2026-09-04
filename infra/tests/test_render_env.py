@@ -51,6 +51,25 @@ class RenderEnvironmentTests(unittest.TestCase):
         self.assertEqual(result["backend"], {"NEW_BACKEND_FEATURE": "enabled"})
         self.assertEqual(result["ai"], {"AI_REQUEST_TIMEOUT_SECONDS": "45"})
 
+    def test_public_parameters_ignores_runpod_control_document(self) -> None:
+        payload = {
+            "Parameters": [
+                {
+                    "Name": "/project-dev/backend/APP_ENV",
+                    "Value": "dev",
+                },
+                {
+                    "Name": "/project-dev/runpod/RUNPOD_CONTROL_SET",
+                    "Value": '{"status":"ready"}',
+                },
+            ]
+        }
+
+        result = render_env.parse_public_parameters(payload, "/project-dev")
+
+        self.assertEqual(result["backend"], {"APP_ENV": "dev"})
+        self.assertEqual(result["ai"], {})
+
     def test_public_parameters_reject_invalid_reserved_and_duplicate_names(
         self,
     ) -> None:

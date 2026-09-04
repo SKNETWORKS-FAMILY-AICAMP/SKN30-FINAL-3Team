@@ -16,6 +16,7 @@ import re
 import secrets
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ DEFAULT_PROJECT = "skn30-final-3team"
 DEFAULT_TEMPLATE = Path(__file__).resolve().parents[1] / "runpod" / "template.json"
 RUNPOD_REST_URL = "https://rest.runpod.io/v1"
 RUNPOD_GRAPHQL_URL = "https://api.runpod.io/graphql"
+RUNPOD_GRAPHQL_USER_AGENT = "Mozilla/5.0 (compatible; SKN30-RunPod-Bootstrap/1.0)"
 SHARED_POD_NAME = "skn30-f2-serving-dev"
 F2_SECRET_NAMES = (
     "AI_VLLM_SLLM_API_KEY",
@@ -302,13 +304,13 @@ class RunpodClient:
 
     def graphql(self, query: str, variables: Mapping[str, Any] | None = None) -> Any:
         request = urllib.request.Request(
-            RUNPOD_GRAPHQL_URL,
+            f"{RUNPOD_GRAPHQL_URL}?{urllib.parse.urlencode({'api_key': self._api_key})}",
             data=json.dumps({"query": query, "variables": variables or {}}).encode(),
             method="POST",
             headers={
-                "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
+                "User-Agent": RUNPOD_GRAPHQL_USER_AGENT,
             },
         )
         try:
@@ -488,6 +490,16 @@ def template_payload(
     }
     if any(env.get(key) != value for key, value in required_refs.items()):
         raise ToolError("RunPod template F2 Secret references do not match the contract")
+    if {
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN",
+        "HUGGINGFACE_HUB_TOKEN",
+        "HUGGINGFACE_TOKEN",
+        "HUGGING_FACE_TOKEN",
+        "HF_ACCESS_TOKEN",
+        "HF_API_TOKEN",
+    } & env.keys():
+        raise ToolError("public-model Template must not inject a Hugging Face token")
     command = source.get("docker_start_cmd", "")
     docker_start = [item for item in str(command).split(",") if item]
     return {
@@ -529,6 +541,15 @@ def one_named(items: Sequence[Mapping[str, Any]], name: str, label: str) -> dict
 
 
 def validate_template(actual: Mapping[str, Any], expected: Mapping[str, Any]) -> None:
+    normalized = dict(actual)
+    for field, default in (
+        ("dockerEntrypoint", []),
+        ("isPublic", False),
+        ("isServerless", False),
+        ("volumeInGb", 0),
+    ):
+        if normalized.get(field) is None:
+            normalized[field] = default
     fields = (
         "imageName",
         "name",
@@ -542,15 +563,26 @@ def validate_template(actual: Mapping[str, Any], expected: Mapping[str, Any]) ->
         "ports",
         "volumeInGb",
     )
-    mismatches = [field for field in fields if actual.get(field) != expected.get(field)]
+    mismatches = [field for field in fields if normalized.get(field) != expected.get(field)]
     if mismatches:
         raise ToolError(
             "existing RunPod template differs in: " + ", ".join(sorted(mismatches))
         )
-    if actual.get("volumeInGb") not in (0, None) or any(
-        str(port).startswith("22/") for port in actual.get("ports", [])
+    if normalized["volumeInGb"] != 0 or any(
+        str(port).startswith("22/") for port in normalized.get("ports", [])
     ):
         raise ToolError("existing RunPod template has a volume or SSH port")
+
+
+def is_resumable_template(
+    control: Mapping[str, Any], image: str, template: Mapping[str, Any]
+) -> bool:
+    return (
+        control.get("status") == "provisioning"
+        and control.get("image") == image
+        and control.get("template_id") is None
+        and isinstance(template.get("id"), str)
+    )
 
 
 class Bootstrapper:
@@ -590,6 +622,11 @@ class Bootstrapper:
             operator, _ = self.aws.secret_value(self.aws.settings.secrets["operator"])
             client = RunpodClient(operator)
             client.pods()
+            if not (
+                control.get("status") in {"ready", "provisioning"}
+                and control.get("image") == image
+            ):
+                ensure_offline_without_pod(self.aws, client)
             generation = self._generation(control, image)
             registry_name = f"{self.aws.settings.prefix}-ghcr-g{generation}"
             template_name = f"{self.aws.settings.prefix}-f2-template-g{generation}"
@@ -603,22 +640,23 @@ class Bootstrapper:
             if registry is None:
                 actions.append(f"create-registry:{registry_name}")
             template = one_named(client.templates(), template_name, "template")
-            if template is not None and control.get("template_id") != template.get("id"):
-                raise ToolError(
-                    "existing template name is not owned by the control document"
-                )
             if template is None:
                 actions.append(f"create-template:{template_name}")
             elif registry is not None:
-                validate_template(
-                    template,
-                    template_payload(
-                        self.template,
-                        image,
-                        resource_id(registry, "RunPod registry"),
-                        template_name,
-                    ),
+                expected = template_payload(
+                    self.template,
+                    image,
+                    resource_id(registry, "RunPod registry"),
+                    template_name,
                 )
+                recorded_template = control.get("template_id")
+                if recorded_template != template.get("id") and not is_resumable_template(
+                    control, image, template
+                ):
+                    raise ToolError(
+                        "existing template name is not owned by the control document"
+                    )
+                validate_template(template, expected)
             runpod_names = client.secret_names()
             actions.extend(
                 f"create-runpod-secret:{name}"
@@ -658,6 +696,11 @@ class Bootstrapper:
         client.pods()
         RunpodClient(monitor).pods()
         control = self.aws.control()
+        if not (
+            control.get("status") in {"ready", "provisioning"}
+            and control.get("image") == image
+        ):
+            ensure_offline_without_pod(self.aws, client)
         generation = self._generation(control, image)
         registry_name = f"{self.aws.settings.prefix}-ghcr-g{generation}"
         template_name = f"{self.aws.settings.prefix}-f2-template-g{generation}"
@@ -699,10 +742,12 @@ class Bootstrapper:
         expected = template_payload(self.template, image, registry_id, template_name)
         template = one_named(client.templates(), template_name, "template")
         recorded_template = control.get("template_id")
-        if template is not None and recorded_template != template.get("id"):
-            raise ToolError("existing template name is not owned by the control document")
         if template is None:
             template = client.create_template(expected)
+        elif recorded_template != template.get("id") and not is_resumable_template(
+            control, image, template
+        ):
+            raise ToolError("existing template name is not owned by the control document")
         validate_template(template, expected)
         template_id = resource_id(template, "RunPod template")
         ready = {
@@ -728,10 +773,10 @@ class Bootstrapper:
 
 def ensure_offline_without_pod(aws: AwsStore, client: RunpodClient) -> None:
     if aws.endpoint().get("status") != "offline":
-        raise ToolError("rotation requires the endpoint to be offline")
+        raise ToolError("operation requires the endpoint to be offline")
     pods = [pod for pod in client.pods() if pod.get("name") == SHARED_POD_NAME]
     if pods:
-        raise ToolError("rotation requires no shared RunPod Pod")
+        raise ToolError("operation requires no shared RunPod Pod")
 
 
 def rotate_secret(aws: AwsStore, target: str, template: Path) -> None:

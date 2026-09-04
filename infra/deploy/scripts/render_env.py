@@ -16,6 +16,7 @@ from typing import Any
 MIGRATION_USER = "app_migrator"
 ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 PUBLIC_NAMESPACES = frozenset({"backend", "ai"})
+IGNORED_OPERATIONAL_PARAMETER_PATHS = frozenset({"runpod/RUNPOD_CONTROL_SET"})
 INJECTED_NAMES = frozenset({"DB_URL", "DB_MIGRATION_URL"})
 SENSITIVE_SUFFIXES = ("_API_KEY", "_PASSWORD", "_PRIVATE_KEY", "_SECRET", "_TOKEN")
 REQUIRED_AI_PROVIDER_KEYS = frozenset(
@@ -254,6 +255,8 @@ def parse_public_parameters(
         if not full_name.startswith(expected_prefix):
             raise SystemExit("SSM returned a parameter outside APP_PARAMETER_PREFIX")
         parts = full_name.removeprefix(expected_prefix).split("/")
+        if "/".join(parts) in IGNORED_OPERATIONAL_PARAMETER_PATHS:
+            continue
         if len(parts) != 2 or parts[0] not in PUBLIC_NAMESPACES:
             raise SystemExit(f"Unsupported public parameter path: {full_name}")
         namespace, name = parts

@@ -119,6 +119,7 @@ def test_local_environment_merges_team_personal_and_process_values(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    team_ready_file = tmp_path / "team-worker-ready"
     (tmp_path / ".env.local").write_text(
         "\n".join(
             (
@@ -127,7 +128,7 @@ def test_local_environment_merges_team_personal_and_process_values(
                 "DB_URL=postgresql+psycopg://app:team@localhost:5432/brokerage",
                 "DB_POOL_SIZE=3",
                 "WORKER_ENABLED=false",
-                "WORKER_READY_FILE=/tmp/team-worker-ready",
+                f"WORKER_READY_FILE={team_ready_file}",
                 "",
             )
         ),
@@ -161,7 +162,7 @@ def test_local_environment_merges_team_personal_and_process_values(
     )
     assert config.db.pool.size == 11
     assert config.worker.enabled is True
-    assert config.worker.ready_file == Path("/tmp/team-worker-ready")
+    assert config.worker.ready_file == team_ready_file
 
 
 def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment(
@@ -241,17 +242,18 @@ def test_invalid_app_env_is_rejected_before_binding() -> None:
         load_config(environ=config_values(APP_ENV="preview"))
 
 
-def test_worker_settings_use_the_same_validated_mapping() -> None:
+def test_worker_settings_use_the_same_validated_mapping(tmp_path: Path) -> None:
+    ready_file = tmp_path / "nondefault-worker-ready"
     config = bind_config(
         config_values(
             WORKER_ENABLED="true",
-            WORKER_READY_FILE="/tmp/nondefault-worker-ready",
+            WORKER_READY_FILE=str(ready_file),
             WORKER_ID="configured-worker",
         )
     )
 
     assert config.worker.enabled is True
-    assert config.worker.ready_file == Path("/tmp/nondefault-worker-ready")
+    assert config.worker.ready_file == ready_file
     assert config.worker.worker_id == "configured-worker"
 
 

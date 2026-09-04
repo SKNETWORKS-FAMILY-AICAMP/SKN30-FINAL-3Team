@@ -20,6 +20,7 @@ IMAGE = (
     "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:"
     + "a" * 64
 )
+NEW_IMAGE = IMAGE.rsplit(":", 1)[0] + ":" + "b" * 64
 
 
 class FakeAws:
@@ -123,6 +124,21 @@ class FakeRunpod:
 
 
 class BootstrapTests(unittest.TestCase):
+    @staticmethod
+    def ready_aws() -> FakeAws:
+        aws = FakeAws()
+        aws.control_value.update(
+            {
+                "status": "ready",
+                "generation": 1,
+                "image": IMAGE,
+                "registry_auth_id": "registry-1",
+                "template_id": "template-1",
+                "ai_provider_secret_version_id": "version-ai",
+            }
+        )
+        return aws
+
     def test_plan_is_read_only(self):
         aws = FakeAws()
         runpod = FakeRunpod()
@@ -141,6 +157,38 @@ class BootstrapTests(unittest.TestCase):
             MODULE.Bootstrapper(FakeAws()).plan(
                 "ghcr.io/example/f2-serving@sha256:" + "a" * 64
             )
+
+    def test_new_image_plan_rejects_active_endpoint(self):
+        aws = self.ready_aws()
+        aws.endpoint_value = {"status": "active", "pod_id": "pod-1"}
+        with patch.object(
+            MODULE, "RunpodClient", return_value=FakeRunpod()
+        ), self.assertRaisesRegex(MODULE.ToolError, "endpoint to be offline"):
+            MODULE.Bootstrapper(aws).plan(NEW_IMAGE)
+        self.assertEqual(aws.controls, [])
+
+    def test_new_image_apply_rejects_shared_pod(self):
+        aws = self.ready_aws()
+        runpod = FakeRunpod()
+        runpod.pod_values = [{"id": "pod-1", "name": MODULE.SHARED_POD_NAME}]
+        with patch.object(
+            MODULE, "RunpodClient", return_value=runpod
+        ), self.assertRaisesRegex(MODULE.ToolError, "no shared RunPod Pod"):
+            MODULE.Bootstrapper(aws).apply(NEW_IMAGE)
+        self.assertEqual(aws.controls, [])
+
+    def test_new_image_plan_creates_generation_only_when_offline_and_empty(self):
+        aws = self.ready_aws()
+        runpod = FakeRunpod()
+        runpod.secret_values = set(MODULE.F2_SECRET_NAMES)
+        with patch.object(
+            MODULE, "RunpodClient", return_value=runpod
+        ), redirect_stdout(io.StringIO()):
+            result = MODULE.Bootstrapper(aws).plan(NEW_IMAGE)
+        self.assertIn(
+            "create-template:skn30-final-3team-dev-f2-template-g2",
+            result["actions"],
+        )
 
     def test_apply_is_idempotent(self):
         aws = FakeAws()
@@ -192,6 +240,39 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(runpod.template_creates, 1)
         self.assertEqual(aws.control_value["status"], "ready")
 
+    def test_apply_resumes_matching_template_created_before_control_record(self):
+        aws = FakeAws()
+        aws.control_value.update(
+            {
+                "status": "provisioning",
+                "generation": 1,
+                "image": IMAGE,
+                "registry_auth_id": "registry-1",
+                "ai_provider_secret_version_id": "version-ai",
+            }
+        )
+        runpod = FakeRunpod()
+        runpod.secret_values = set(MODULE.F2_SECRET_NAMES)
+        runpod.registry_values = [
+            {"id": "registry-1", "name": "skn30-final-3team-dev-ghcr-g1"}
+        ]
+        template = MODULE.template_payload(
+            MODULE.DEFAULT_TEMPLATE,
+            IMAGE,
+            "registry-1",
+            "skn30-final-3team-dev-f2-template-g1",
+        )
+        runpod.template_values = [{**template, "id": "template-1"}]
+
+        with patch.object(
+            MODULE, "RunpodClient", return_value=runpod
+        ), redirect_stdout(io.StringIO()):
+            result = MODULE.Bootstrapper(aws).apply(IMAGE)
+
+        self.assertEqual(result["template_id"], "template-1")
+        self.assertEqual(runpod.template_creates, 0)
+        self.assertEqual(aws.control_value["status"], "ready")
+
     def test_duplicate_registry_name_is_rejected(self):
         aws = FakeAws()
         runpod = FakeRunpod()
@@ -203,6 +284,19 @@ class BootstrapTests(unittest.TestCase):
             MODULE, "RunpodClient", return_value=runpod
         ), self.assertRaises(MODULE.ToolError):
             MODULE.Bootstrapper(aws).apply(IMAGE)
+
+    def test_template_validation_accepts_omitted_default_fields(self):
+        expected = MODULE.template_payload(
+            MODULE.DEFAULT_TEMPLATE,
+            IMAGE,
+            "registry-1",
+            "skn30-final-3team-dev-f2-template-g1",
+        )
+        actual = dict(expected)
+        for field in ("dockerEntrypoint", "isPublic", "isServerless", "volumeInGb"):
+            actual.pop(field)
+
+        MODULE.validate_template(actual, expected)
 
     def test_http_failure_does_not_expose_key_or_response_body(self):
         secret = "runpod-private-key"
@@ -220,6 +314,23 @@ class BootstrapTests(unittest.TestCase):
         with self.assertRaises(MODULE.ToolError) as raised:
             client.pods()
         self.assertNotIn(secret, str(raised.exception))
+
+    def test_graphql_uses_api_key_query_parameter_without_bearer_header(self):
+        captured = {}
+
+        def success(request, _timeout):
+            captured["url"] = request.full_url
+            captured["authorization"] = request.get_header("Authorization")
+            captured["user_agent"] = request.get_header("User-agent")
+            return b'{"data":{"myself":{"secrets":[]}}}'
+
+        client = MODULE.RunpodClient("test-api-key", requester=success)
+        self.assertEqual(client.secret_names(), set())
+        self.assertEqual(
+            captured["url"], f"{MODULE.RUNPOD_GRAPHQL_URL}?api_key=test-api-key"
+        )
+        self.assertIsNone(captured["authorization"])
+        self.assertEqual(captured["user_agent"], MODULE.RUNPOD_GRAPHQL_USER_AGENT)
 
     def test_f2_and_ghcr_rotation_reject_active_endpoint_before_secret_write(self):
         for target in ("f2", "ghcr"):

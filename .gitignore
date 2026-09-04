@@ -75,6 +75,9 @@ dist/
 .eggs/
 *.egg
 
+# Offline AI model artifacts are handed off through private storage, not Git.
+ai/training/*.tar.gz
+
 # Testing & Linting
 .pytest_cache/
 .hypothesis/

@@ -1,10 +1,18 @@
 ---
 status: 구현됨
-updated: 2026-09-02
+updated: 2026-09-04
 ---
 
 # 위키 변경 로그
 
+- 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
+- 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
+- 2026-09-03: 사용자 지시로 F4 기능 번호가 확정되어 이미 종료된 OQ-012가 미해결 목록에 남아 있던 불일치를 제거함.
+- 2026-09-03: 사용자 지시로 F4를 독립 기능으로 등록하고 Time Keeper를 그 안의 서비스로 정의해 `docs/requirements/f4/`와 `F4-CM`·`F4-TK` ID 체계를 신설함(OQ-012 종료). Time Keeper 일정 조회를 API 계약에 `제안`으로 등록하고, F1 장부의 날짜 컬럼에서 임대차 만기·구입 의뢰 만기·희망 입주일과 재연락·매물 조건 재확인을 종류별로 모으는 읽기 전용 조회와 상단바 알림·아침 브리핑 화면을 구현함. 계약·일정 테이블이 없어 계약 체결일, 지급일, 임장일, 신고 기한과 명도일은 제외하고 기준값·기능 번호·장기 미접촉 노출을 OQ-011~013으로 등록함.
+- 2026-09-03: `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle과 release manifest의 S3 불변 게시 및 양방향 cross-hash를 확인해 RunPod 문서 상태를 “S3 dev release 게시 완료·RunPod/Terraform 미적용”으로 갱신했다. AI suite 종료 지연과 Terraform provider handshake 실패는 제한된 sandbox의 thread·provider IPC 제약으로 확인했으며 정상 실행 환경에서 AI 212개 테스트와 두 Terraform root validate가 통과했다.
+- 2026-09-03: 평가 전 adapter의 공유 개발 기동을 위해 ADR-0023을 승인하고 `release_stage=dev`, `dev-*` ID, `evaluation.status=not-evaluated`인 metadata bundle과 `runpod-create-dev(-plan)` 전용 경로를 추가했다. 평가·승인 파일만 생략하며 기반 commit·adapter checksum, 불변 게시, health·rollback·삭제 계약은 유지하고 일반 create는 dev bundle을 거부한다.
+
+- 2026-09-02: SLLM `release.json:v2`와 `promotion-approval:v2`를 승인해 LoRA·base-only를 같은 metadata bundle로 전달하고 평가 dataset·실제 Hugging Face commit·adapter checksum을 결속했다. v2 S3 객체 양방향 cross-hash와 동일 checksum 부분 게시 재개, 모델명 health, 공개 HF 전용 token 차단, 비용 전 create plan, image generation guard, rollback reconcile과 삭제 후 offline 503 smoke를 구현했다. v1 LoRA bundle과 기존 S3 객체는 마이그레이션 없이 계속 읽으며 Backend HTTP·F2 응답 계약은 유지한다.
 - 2026-09-02: RunPod 감시 로그의 endpoint 상태를 `active`·`offline` allowlist로 제한하고 그 밖의 SSM 값을 고정 `invalid`로 일반화했다. 배포·운영 문서의 대체된 Infra ADR-0016 참조는 현재 정본인 ADR-0017·0018로 교체했다.
 - 2026-09-02: RunPod 제어면 API 장애를 Provider 정상으로 오인하지 않도록 감시 계약을 명확히 했다. 장애 주기에는 heartbeat와 API 도달 실패만 기록하고, 확인할 수 없는 endpoint 일치·Provider health·orphan·runtime·비용 metric은 발행하지 않는다.
 - 2026-09-02: ADR-0008의 EC2 Backend·설치형 AI·RunPod 추론 상위 구조는 유지하고, ADR-0020이 Infra ADR-0002의 개발자별 Pod·시연 기간 Pod 유지·조건부 Network Volume 조항만 부분 대체함을 양쪽 ADR과 인덱스에 명시했다. 런타임 인덱스의 GPU runtime 정본 링크도 ADR-0020으로 정규화했다.

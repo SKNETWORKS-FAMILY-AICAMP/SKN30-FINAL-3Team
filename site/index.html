@@ -1,0 +1,280 @@
+<!DOCTYPE html><html class="light" lang="ko" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Propeller AI - 부동산 AI 비서</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline-variant": "#c6c6cd",
+                        "on-background": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#002113",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#6ffbbe",
+                        "inverse-primary": "#bec6e0",
+                        "on-secondary-container": "#fefcff",
+                        "primary-fixed": "#dae2fd",
+                        "surface-container": "#e5eeff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#cbdbf5",
+                        "secondary": "#0051d5",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "on-primary-fixed": "#131b2e",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#213145",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "secondary-container": "#316bf3",
+                        "background": "#f8f9ff",
+                        "surface-tint": "#565e74",
+                        "primary": "#000000",
+                        "error": "#ba1a1a",
+                        "tertiary": "#000000",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "surface": "#f8f9ff",
+                        "primary-container": "#131b2e",
+                        "on-tertiary-container": "#009668",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-container": "#7c839b",
+                        "on-secondary-fixed": "#00174b",
+                        "outline": "#76777d",
+                        "on-surface-variant": "#45464d",
+                        "surface-variant": "#d3e4fe",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-fixed": "#dbe1ff",
+                        "tertiary-container": "#002113",
+                        "surface-container-low": "#eff4ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "base": "4px",
+                        "xl": "48px",
+                        "sm": "16px",
+                        "gutter": "24px",
+                        "xs": "8px",
+                        "margin-mobile": "16px",
+                        "md": "24px",
+                        "margin-desktop": "40px",
+                        "lg": "32px"
+                    },
+                    fontFamily: {
+                        "label-md": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "display": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    fontSize: {
+                        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "display": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "label-sm": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+                        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .bento-card {
+            box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.08);
+            transition: all 0.3s ease;
+        }
+        .bento-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0px 20px 25px -5px rgba(15, 23, 42, 0.1);
+        }
+        .ai-glow {
+            box-shadow: inset 0 0 20px rgba(111, 251, 190, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col" data-mode="connect">
+<!-- TopNavBar -->
+<nav class="bg-background/80 dark:bg-background/80 backdrop-blur-md fixed top-0 w-full z-50 border-b border-outline-variant/30 dark:border-outline/20">
+<div class="flex justify-between items-center h-20 px-margin-desktop max-w-7xl mx-auto">
+<div class="font-display text-headline-md text-on-background dark:text-inverse-on-surface tracking-tight"><img src="assets/logo-header.png" alt="집크크 로고" class="h-14 w-auto object-contain"></div>
+<div class="hidden md:flex gap-gutter items-center">
+<a class="font-label-md text-label-md text-secondary dark:text-secondary-fixed font-bold border-b-2 border-secondary hover:opacity-90 hover:scale-[0.98] transition-all" href="#">Features</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">How it works</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">Pricing</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">Contact Us</a>
+</div>
+<button class="hidden md:block bg-secondary text-on-secondary px-sm py-xs rounded-lg font-label-md hover:bg-secondary-container transition-colors">Start Free</button>
+<button class="md:hidden text-on-surface">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</nav>
+<main class="flex-grow pt-24 pb-xl">
+<!-- Hero Section -->
+<section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-24 text-center">
+<h1 class="font-display text-display text-on-background mb-sm">통화가 끝나면, 장부 정리가 시작됩니다</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl mx-auto mb-lg">공인중개사를 위한 가장 똑똑한 AI 상담 비서, 프로펠러 AI. 통화 기록부터 장부 저장까지 한 번에.</p>
+<div class="flex flex-col md:flex-row justify-center items-center gap-xs md:gap-gutter mt-xl">
+<!-- Process Indicators -->
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
+<span class="material-symbols-outlined text-secondary">mic</span>
+<span class="font-label-md text-label-md text-on-surface">STT 전사</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant hidden md:block">arrow_forward</span>
+<span class="material-symbols-outlined text-outline-variant md:hidden">arrow_downward</span>
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card ai-glow">
+<span class="material-symbols-outlined text-tertiary-fixed-dim">psychology</span>
+<span class="font-label-md text-label-md text-on-surface">정보 추출</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant hidden md:block">arrow_forward</span>
+<span class="material-symbols-outlined text-outline-variant md:hidden">arrow_downward</span>
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
+<span class="material-symbols-outlined text-secondary">fact_check</span>
+<span class="font-label-md text-label-md text-on-surface">사용자 검토</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant hidden md:block">arrow_forward</span>
+<span class="material-symbols-outlined text-outline-variant md:hidden">arrow_downward</span>
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
+<span class="material-symbols-outlined text-secondary">save</span>
+<span class="font-label-md text-label-md text-on-surface">장부 저장</span>
+</div>
+</div>
+<div class="mt-lg">
+<button class="bg-gradient-to-r from-secondary to-tertiary-fixed-dim text-on-secondary px-lg py-sm rounded-lg font-label-md hover:opacity-90 transition-opacity">무료로 시작하기</button>
+</div>
+</section>
+<!-- Feature Bento Grid -->
+<section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl bg-surface-container-low rounded-xl">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-center mb-xl">주요 기능</h2>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md">
+<!-- Card 1 -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card overflow-hidden relative">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Recording</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">상담 내용을 장부에 자동 기록</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">통화 내용을 텍스트로 변환하고 핵심 정보를 구조화하여, 각 항목에 맞는 내용을 장부에 자동으로 입력합니다.</p>
+<div class="bg-surface-dim h-48 rounded-lg relative overflow-hidden">
+<img class="object-cover w-full h-full opacity-80 mix-blend-multiply" data-alt="A modern software interface showing a real-time audio waveform being transcribed into text on a clean, light-mode background with navy blue and bright mint green accents. The design is sleek, professional, and corporate, emphasizing information density." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1oF9DAkf5HY9ygY8ZVSVXp0EBLxA_gHLVzkcneW25N-kvUwV2nPdzvkNSXszmb-5EB5ExTI1uqBM6zwxLJ7JZNu7H5VveUOUSeHVEuJjup7O2hVuG6EaOWl-vP1_h5VPvfc2jmWBsIljQf3vZtU17HtEvr8ujIOlHE4POroYbzgRImcMzEeNH0sAOcTCNhvAU0g9S1C2sJ9T7EFj2dc65GqhmsagtwJzkFbtziyyDJOLlpbpLOp9mFQ">
+</div>
+</div>
+<!-- Card 2 -->
+<div class="md:col-span-4 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card ai-glow">
+<span class="font-label-sm text-label-sm text-tertiary-fixed-dim uppercase tracking-widest mb-xs block">DATABASE MANAGEMENT</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">매물장·구입장 통합 관리</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">매도·임대 정보는 매물장에, 매수·임차 조건은 구입장에 구분하여 저장하고 필요한 정보를 쉽고 체계적으로 관리합니다.</p>
+<div class="flex flex-col gap-xs">
+<div class="bg-surface-container p-xs rounded border border-outline-variant/30 flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">매물장</span>
+<span class="font-label-md text-label-md text-on-background">등록 매물 128건</span>
+</div>
+<div class="bg-surface-container p-xs rounded border border-outline-variant/30 flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">구입장</span>
+<span class="font-label-md text-label-md text-on-background">등록 고객 84명</span>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="md:col-span-4 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">Mobile Sync</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">어디서나 접근</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">모바일과 데스크톱이 실시간으로 동기화되어 외부 현장에서도 기록을 확인할 수 있습니다.</p>
+<div class="mt-md text-center">
+<span class="material-symbols-outlined text-display text-outline-variant">devices</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Smart MATCHING</span><h3 class="font-headline-md text-headline-md text-on-background mb-sm">매물과 고객을 서로 맞춤 추천</h3><p class="font-body-md text-body-md text-on-surface-variant mb-md">매도 고객의 매물에는 적합한 매수 고객을, 매수 고객에게는 조건에 맞는 매물을 찾아 연결합니다.</p><div class="bg-surface-dim h-32 rounded-lg relative overflow-hidden flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-secondary mx-xs">sync_alt</span></div></div>
+</div>
+</section>
+<!-- Multi-Agent Architecture -->
+<section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-center mb-xl">다중 에이전트 아키텍처</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="bg-surface-container-lowest p-md border border-outline-variant/30 rounded-lg text-center">
+<div class="h-20 w-20 mx-auto mb-sm flex items-center justify-center"><img src="assets/icon-property-agent.png" alt="Property Agent 아이콘" class="h-full w-full object-contain"></div>
+<h4 class="font-headline-md text-headline-md mb-xs">Property Agent</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">매물의 가격·평형·거래 조건 분석</p>
+</div>
+<div class="bg-surface-container-lowest p-md border border-outline-variant/30 rounded-lg text-center ai-glow">
+<div class="h-20 w-20 mx-auto mb-sm flex items-center justify-center"><img src="assets/icon-customer-agent.png" alt="Customer Agent 아이콘" class="h-full w-full object-contain"></div>
+<h4 class="font-headline-md text-headline-md mb-xs">Customer Agent</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">고객의 예산·희망 조건 분석</p>
+</div>
+<div class="bg-surface-container-lowest p-md border border-outline-variant/30 rounded-lg text-center">
+<div class="h-20 w-20 mx-auto mb-sm flex items-center justify-center"><img src="assets/icon-matching-agent.png" alt="Matching Agent 아이콘" class="h-full w-full object-contain"></div>
+<h4 class="font-headline-md text-headline-md mb-xs">Matching Agent</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">매물과 고객의 적합도 및 추천 근거 판정</p>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-on-primary-fixed dark:bg-surface-container-lowest w-full py-xl mt-xl border-t border-outline-variant/20">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-desktop max-w-7xl mx-auto">
+<div class="col-span-1 md:col-span-2">
+<div class="font-display text-headline-md text-primary-fixed-dim dark:text-primary mb-sm"><img src="assets/logo-footer.png" alt="집크크 로고" class="h-12 w-auto object-contain mb-sm"></div>
+<p class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant mb-md">
+                    © 2026 ZIPKEKE. All rights reserved.
+                </p>
+</div>
+<div class="col-span-1">
+<h4 class="font-label-sm text-label-sm text-on-primary dark:text-on-surface mb-sm">Legal</h4>
+<ul class="flex flex-col gap-xs">
+<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">Privacy Policy</a></li>
+<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">Terms of Service</a></li>
+</ul>
+</div>
+<div class="col-span-1">
+<h4 class="font-label-sm text-label-sm text-on-primary dark:text-on-surface mb-sm">Connect</h4>
+<ul class="flex flex-col gap-xs">
+<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">Security</a></li>
+<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">LinkedIn</a></li>
+</ul>
+</div>
+</div>
+</footer>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>
