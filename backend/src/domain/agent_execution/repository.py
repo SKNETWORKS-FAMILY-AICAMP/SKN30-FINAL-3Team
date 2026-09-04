@@ -816,7 +816,14 @@ def mark_run_anchor_ready(
 
 
 # model snapshot 에 담아도 되는 값. endpoint 전체 URL, API key, token 은 목록에 없다.
-MODEL_SNAPSHOT_FIELDS = ("provider", "model_name", "model_version", "config_key", "config_version")
+MODEL_SNAPSHOT_FIELDS = (
+    "provider",
+    "model_name",
+    "model_version",
+    "endpoint_alias",
+    "config_key",
+    "config_version",
+)
 
 
 def find_model_config(

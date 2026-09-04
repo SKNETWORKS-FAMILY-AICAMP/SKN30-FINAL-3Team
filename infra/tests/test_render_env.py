@@ -4,6 +4,7 @@ import stat
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPOSITORY_ROOT / "infra/deploy/scripts/render_env.py"
@@ -206,9 +207,10 @@ class RenderEnvironmentTests(unittest.TestCase):
                 }
             )
 
-    def test_ai_provider_keys_require_api_and_worker_keys(self) -> None:
+    def test_ai_provider_keys_allow_bedrock_only_without_static_key(self) -> None:
+        self.assertEqual(render_env.parse_ai_provider_keys("{}"), {})
+
         provider_keys = {
-            "AI_OPENAI_API_KEY": "openai-test",
             "AI_VLLM_SLLM_API_KEY": self.LLM_KEY,
             "AI_VLLM_STT_API_KEY": self.STT_KEY,
         }
@@ -216,17 +218,12 @@ class RenderEnvironmentTests(unittest.TestCase):
         keys = render_env.parse_ai_provider_keys(json.dumps(provider_keys))
 
         self.assertEqual(set(keys), set(provider_keys))
-        for missing_name in provider_keys:
-            incomplete = {
-                name: value
-                for name, value in provider_keys.items()
-                if name != missing_name
-            }
-            with (
-                self.subTest(missing_name=missing_name),
-                self.assertRaisesRegex(SystemExit, missing_name),
-            ):
-                render_env.parse_ai_provider_keys(json.dumps(incomplete))
+        self.assertEqual(
+            render_env.parse_ai_provider_keys(
+                json.dumps({"AI_OPENAI_API_KEY": "openai-test"})
+            ),
+            {"AI_OPENAI_API_KEY": "openai-test"},
+        )
 
     def test_ai_provider_keys_reject_weak_or_shared_vllm_keys(self) -> None:
         invalid_pairs = (
@@ -299,6 +296,107 @@ class RenderEnvironmentTests(unittest.TestCase):
         self.assertEqual(
             migration, {"DB_MIGRATION_URL": "postgresql+psycopg://migration"}
         )
+
+    def test_offline_f2_and_bedrock_endpoint_need_no_provider_secret(self) -> None:
+        offline_endpoint_set = self.endpoint_set(
+            revision=4,
+            status="offline",
+            pod_id=None,
+            sllm_release_id=None,
+            sllm_base_url=None,
+            stt_base_url=None,
+        )
+
+        api, worker, _ = render_env.build_process_environments(
+            public={
+                "backend": {"APP_ENV": "dev"},
+                "ai": {
+                    "AI_LLM_ENDPOINTS": json.dumps(
+                        [
+                            {
+                                "alias": "general-dev-bedrock",
+                                "provider": "bedrock",
+                                "aws_region": "ap-northeast-2",
+                            }
+                        ]
+                    ),
+                    "AI_VLLM_ENDPOINT_SET": offline_endpoint_set,
+                },
+            },
+            runtime_url="postgresql+psycopg://runtime",
+            migration_url="postgresql+psycopg://migration",
+            ai_provider_keys={},
+        )
+
+        self.assertIn("AI_LLM_ENDPOINTS", worker)
+        self.assertNotIn("AI_OPENAI_API_KEY", worker)
+        self.assertFalse(set(render_env.F2_AI_PROVIDER_KEYS) & api.keys())
+        self.assertFalse(set(render_env.F2_AI_PROVIDER_KEYS) & worker.keys())
+
+    def test_active_f2_requires_both_runtime_keys(self) -> None:
+        public = {
+            "backend": {"APP_ENV": "dev"},
+            "ai": {"AI_VLLM_ENDPOINT_SET": self.endpoint_set()},
+        }
+
+        for keys, missing in (
+            ({}, "AI_VLLM_SLLM_API_KEY"),
+            ({"AI_VLLM_SLLM_API_KEY": self.LLM_KEY}, "AI_VLLM_STT_API_KEY"),
+        ):
+            with (
+                self.subTest(keys=keys),
+                self.assertRaisesRegex(SystemExit, missing),
+            ):
+                render_env.build_process_environments(
+                    public=public,
+                    runtime_url="postgresql+psycopg://runtime",
+                    migration_url="postgresql+psycopg://migration",
+                    ai_provider_keys=keys,
+                )
+
+    def test_provider_secret_current_version_detection_is_metadata_only(self) -> None:
+        with patch.object(
+            render_env,
+            "aws",
+            return_value=json.dumps(
+                {
+                    "version-1": ["AWSPREVIOUS"],
+                    "version-2": ["AWSCURRENT"],
+                }
+            ),
+        ) as aws:
+            self.assertTrue(
+                render_env.secret_has_current_version(
+                    "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:test",
+                    "ap-northeast-2",
+                )
+            )
+        self.assertNotIn("get-secret-value", aws.call_args.args)
+
+    def test_provider_secret_without_a_version_is_treated_as_empty(self) -> None:
+        for response in ("null", "{}"):
+            with (
+                self.subTest(response=response),
+                patch.object(render_env, "aws", return_value=response),
+            ):
+                self.assertFalse(
+                    render_env.secret_has_current_version(
+                        "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:test",
+                        "ap-northeast-2",
+                    )
+                )
+
+    def test_provider_secret_version_metadata_rejects_invalid_json_shape(self) -> None:
+        for response in ("not-json", "[]"):
+            with (
+                self.subTest(response=response),
+                patch.object(render_env, "aws", return_value=response),
+                self.assertRaisesRegex(SystemExit, "JSON object or null"),
+            ):
+                render_env.secret_has_current_version(
+                    "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:test",
+                    "ap-northeast-2",
+                )
 
     def test_write_env_is_atomic_and_owner_only(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as directory:

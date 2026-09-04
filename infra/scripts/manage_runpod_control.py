@@ -409,9 +409,7 @@ def initialise_missing_secrets(aws: AwsStore) -> None:
     if not missing:
         return
     if "ai" in missing:
-        openai = prompt_secret("OpenAI API key", nonblank)
         payload = {
-            "AI_OPENAI_API_KEY": openai,
             "AI_VLLM_SLLM_API_KEY": generated_f2_key(),
             "AI_VLLM_STT_API_KEY": generated_f2_key(),
         }
@@ -445,9 +443,9 @@ def load_ai_secret(aws: AwsStore) -> tuple[dict[str, str], str]:
     except json.JSONDecodeError as error:
         raise ToolError("AI provider secret is not valid JSON") from error
     value = as_object(value, "AI provider secret")
-    required = {name: value.get(name) for name in ("AI_OPENAI_API_KEY", *F2_SECRET_NAMES)}
+    required = {name: value.get(name) for name in F2_SECRET_NAMES}
     if not all(isinstance(item, str) and nonblank(item) for item in required.values()):
-        raise ToolError("AI provider secret is missing a required flat AI_*_API_KEY")
+        raise ToolError("AI provider secret is missing a required F2 API key")
     if not all(F2_KEY_PATTERN.fullmatch(str(required[name])) for name in F2_SECRET_NAMES):
         raise ToolError("AI provider F2 keys failed validation")
     if required[F2_SECRET_NAMES[0]] == required[F2_SECRET_NAMES[1]]:

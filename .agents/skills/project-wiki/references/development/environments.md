@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-04
 ---
 
 # 개발환경 원칙
@@ -22,6 +22,12 @@ updated: 2026-08-31
 공유 dev의 애플리케이션 환경·개발 세션 경계는
 [ADR-0017](../decisions/ADR-0017-shared-dev-development-session.md)을 따른다. 별도 staging 환경은
 필요성과 비용이 확인되기 전에는 추가하지 않는다.
+
+범용 구조화 생성의 환경별 기본 경로는 [ADR-0027](../decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)를
+따른다. local은 개발자 개인 OpenAI key로 `gpt-5.6-luna`를 호출하고, 공유 dev는 EC2 Instance
+Role SigV4로 Bedrock `global.openai.gpt-5.6-luna`를 호출한다. 공유 dev 전환은 doctor 통과 뒤
+명시적 Bedrock seed를 적용하고 합성 smoke로 검증한다. 실패 시 OpenAI key·runtime이
+준비된 환경에서만 OpenAI seed를 명시 재적용하며 prod Provider는 아직 확정하지 않는다.
 
 ## 설정과 비밀값
 

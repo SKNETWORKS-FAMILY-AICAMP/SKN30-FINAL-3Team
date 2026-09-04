@@ -63,6 +63,13 @@ locals {
       F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
     }, local.development_auth_identity_environment)
     ai = {
+      AI_LLM_ENDPOINTS = jsonencode([
+        {
+          alias      = "general-dev-bedrock"
+          provider   = "bedrock"
+          aws_region = var.aws_region
+        },
+      ])
       AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
       AI_REQUEST_TIMEOUT_SECONDS = "60"
     }

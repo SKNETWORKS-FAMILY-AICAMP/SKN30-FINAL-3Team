@@ -7,7 +7,8 @@ updated: 2026-08-24
 
 - 상태: 부분 대체됨
 - 결정일: 2026-08-17
-- 대체 범위: 환경 profile 파일과 dotenv 우선순위는 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)가 대체
+- 대체 범위: 환경 profile 파일과 dotenv 우선순위는 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)가,
+  `ModelRoute`의 endpoint alias와 복수 LLM 등록은 [ADR-0004](ADR-0004-aliased-llm-endpoint-routing.md)가 대체
 
 ## 맥락
 

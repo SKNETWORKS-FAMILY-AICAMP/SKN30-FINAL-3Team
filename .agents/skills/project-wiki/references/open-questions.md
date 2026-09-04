@@ -1,6 +1,6 @@
 ---
 status: 미확정
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # 미해결 질문
@@ -11,5 +11,6 @@ updated: 2026-09-03
 | OQ-009 | RDS 작업 polling에서 SQS·DLQ로 전환할 측정 조건과 소비·재시도 계약은 무엇인가? | 1차는 RDS polling이며 독립 재시도·지연 격리·Worker 확장이 어려워질 때만 SQS·DLQ 도입 | backend-ai 계약, 멱등성, DLQ, 배포 | 백엔드·에이전트·인프라 담당·팀 |
 | OQ-010 | 장부를 정하지 않은 신규 음성메모 접수를 한 번의 분석으로 끝낼 수 있는가? | `POST /api/v1/f2/analyses`는 `ledger_type`을 받아 그 장부의 제안만 만든다. Frontend는 매물장으로 먼저 분석하고 매수문의로 판정되면 같은 음성을 구입장 기준으로 한 번 더 보낸다([ADR-006](../../frontend/references/decisions/ADR-006-home-voice-intake.md)). 후보는 `ledger_type` 생략 허용, 판정 장부 기준 제안 반환, 전사 재사용 | F2 계약, RunPod 비용, 접수 지연, 임시 음성 보존 | 백엔드·에이전트 담당·팀 |
 | OQ-011 | F4 Time Keeper 일정 조회의 기준값을 사무소별 설정으로 둘 것인가? | 현재는 코드 기본값이다. 브리핑 시각 09:00, `within_days` 90, `overdue_days` 7, `recontact_days`·`revalidation_days` 30, `per_category_limit` 3. F1-AL-01은 만기 기준을 사무소가 정한다고 하고 F1-AL-05는 알림 규칙을 담당자별로 설정한다고 한다. `brokerage.settings` JSONB가 후보다 | API 계약, 화면 문구, 알림 빈도 | 기획·팀 |
+| OQ-014 | 범용 생성 모델의 prod 승격 평가 기준과 Provider는 무엇인가? | dev는 Bedrock GPT-5.6 Luna 합성 POC를 수행하고 Qwen llama.cpp·vLLM 경로는 비교 후보로 보존한다. 품질·지연·오류·비용 임계값과 Global cross-Region 개인정보 허용 여부는 아직 승인하지 않았다 | prod 모델, 인프라, 비용, 개인정보 처리 위치 | AI·Backend·Infra 담당·기획·팀 |
 
 질문이 해결되면 관련 정본 문서 또는 ADR에 결과를 반영하고 이 표에서 제거한다. Git 이력은 토론의 과거 상태를 보존한다.

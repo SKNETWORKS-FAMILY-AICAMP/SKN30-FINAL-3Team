@@ -7,7 +7,7 @@ updated: 2026-09-04
 
 사용자가 캘린더 화면에서 직접 일정을 추가·수정·삭제한다. Time Keeper(F4-TK)가 장부에서 계산해
 읽는 일정과 저장은 분리하지만, "다가오는 일정"과 캘린더가 같은 목록을 두 형태로 보여준다는
-원칙에 따라 조회는 하나로 합친다([ADR-0024](../../../.agents/skills/project-wiki/references/decisions/ADR-0024-calendar-storage-ownership.md)).
+원칙에 따라 조회는 하나로 합친다([ADR-0025](../../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md)).
 
 > **[제안]** 아래 요구사항은 **코드로 구현되고 검증됐지만 팀 승인 전이다.** Time Keeper 문서와
 > 같은 이유로 상태가 `제안`이다. F2 음성 인식 기반 자동 일정 추가는 이 문서의 범위가 아니다 —
@@ -55,7 +55,7 @@ updated: 2026-09-04
 
 - HTTP 계약의 정본은 [API 계약](../../../.agents/skills/project-wiki/references/contracts/api.md).
 - 화면 구조는 [Screen Matrix](../../screen/SCREEN_MATRIX_F1_F2_F3.md)의 `F4-MOD-011`.
-- 저장 소유권 결정의 배경은 [ADR-0024](../../../.agents/skills/project-wiki/references/decisions/ADR-0024-calendar-storage-ownership.md).
+- 저장 소유권 결정의 배경은 [ADR-0025](../../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md).
 - 월간 그리드 구현 선택은 [Frontend ADR-008](../../../.agents/skills/frontend/references/decisions/ADR-008-calendar-month-grid.md).
 
 ## 6. 미해결 사항

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-04
 ---
 
 # F3 포지션 카드·중개 판정 Backend–AI 계약
@@ -144,8 +144,10 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
   이미 저장된 카드는 유효한 캐시로 남지만 상태는 `CANDIDATES_READY`를 유지한다.
 - 후보가 0건이면 모델을 호출하지 않고 빈 카드 목록을 기록한 뒤 상태를 전이한다.
 
-이 단계도 ADR-0014의 `SYNTHETIC_PROTOTYPE` 입력만 허용한다. 실사용 F1 마스킹이나 외부
-Provider 전송을 새로 승인하지 않는다.
+이 단계도 ADR-0014의 `SYNTHETIC_PROTOTYPE` 입력만 허용한다. 실사용 F1 마스킹은
+아직 승인하지 않았으며, 합성 입력의 Provider 범위는
+[ADR-0026](../decisions/ADR-0026-general-ai-provider-and-model-profiles.md)와
+[ADR-0027](../decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)를 따른다.
 
 ## 요청 계약
 
@@ -329,8 +331,11 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 `usage`(input/output/total token)만 담는다.
 
 - Backend는 Provider와 모델을 직접 고르지 않는다.
-- 실제 모델 ID와 운영 Provider는 이번 작업에서 확정하지 않았다. AI-OQ-001, AI-OQ-002,
-  AI-OQ-003은 그대로 미해결이다.
+- local·dev 합성 프로필은 [ADR-0027](../decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)가
+  정한다. runtime은 OpenAI와 기존 F2 vLLM을 alias 없이, 범용 Bedrock·vLLM·llama.cpp를
+  provider·`endpoint_alias` exact match로 routing한다.
+  등록되지 않은 조합은 다른 endpoint로 fallback하지 않는다.
+- prod 최종 모델·통과 기준은 평가 전까지 미확정이다.
 - SDK 자동 재시도 정책은 바꾸지 않는다 (AI ADR-0001).
 - 프롬프트 원문과 전체 모델 응답은 diagnostics에 넣지 않는다.
 - Secret, token, 인증 헤더는 넣지 않는다.
@@ -355,10 +360,23 @@ context는 서로의 필드를 갖지 않고 `extra="forbid"`이므로 반대편
 
 ### 외부 Provider 전송
 
-이번 작업은 외부 Provider 전송을 승인하지 않는다. 실제 Provider, 리전과 저장 여부는
-AI-OQ-001~003과 별도 운영 결정 전까지 미확정이다. 합성 프로토타입 예외도 외부 Provider 선택을
-승인하지 않는다. 실제 개인정보가 포함될 수 있는 입력에 외부 Provider를 쓰게 되면 Backend가
-개인정보를 제거한 `MASKED` 입력만 전달한다는 조건을 적용한다 (F3-SE-02).
+합성·비식별 local·dev에서는 ADR-0026·0027의 allowlist 프로필을 사용할 수 있다.
+local은 직접 OpenAI `gpt-5.6-luna`를 사용하고, 공유 dev는 Bedrock doctor 통과 뒤
+`dev-bedrock-gpt56-luna`를 명시 적용하고 합성 smoke로 검증한다. 실패 시 OpenAI key와
+runtime이 배포된 환경에서만 `local-openai`를 명시 재적용하고, 그렇지 않으면 Worker를
+정지한다. Qwen 프로필은 GPU endpoint 배포 전에 활성하지
+않는다. 요청·응답 원문을 로깅하지 않는 기존 제약은 유지한다.
+
+Bedrock dev는 서울 `bedrock-runtime`에 SigV4로 요청하지만 모델은
+`global.openai.gpt-5.6-luna` Global cross-Region inference profile이다. 실제 처리 위치를 서울로
+한정할 수 없으므로 합성·비식별 입력만 허용한다. Structured Outputs를 지원하지 않는 Provider
+출력은 AI가 JSON 지시 후 Pydantic으로 재검증하며 계약 위반은 제한된 repair 뒤 fail closed한다.
+
+실제 개인정보는 서울 리전 자체 호스팅 vLLM이나 Bedrock이라도 즉시 허용되지 않는다. prod
+인증·접근 통제, 종단 간 TLS, 전송·저장 암호화, 원문 비로깅, 보존·삭제 정책이
+모두 승인되어야 한다. Global cross-Region Provider를 쓰는 경우에는 목적지 리전과 계정 수준
+보존 모드도 승인해야 한다. 외부 Provider를 쓰는 경우에는 이 조건에 더해 Backend가
+개인정보를 제거한 `MASKED` 입력만 전달한다 (F3-SE-02).
 
 ### 원문 보관 요구와의 충돌
 
@@ -506,12 +524,12 @@ checkpoint 저장 계약은 AI-OQ-004로 계속 미확정이다.
 ### 아직 구현하지 않음 (`계획됨`)
 
 - 실제 F1 사용자 데이터를 위한 상담 로그 마스킹과 `MASKED` 모드 전환
-- 배포 환경의 `WORKER_ENABLED=true` 전환과 운영 Provider 선택. 실행 코드는 지원하지만 현재 Infra
-  기본값은 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`다
+- Bedrock runtime·endpoint·IAM Terraform 코드의 실제 AWS apply와 합성 smoke. 적용 전에는
+  공유 dev DB의 활성 모델을 Bedrock 프로필로 전환하지 않는다
 - F3 전체 production LangGraph와 checkpoint. 포지션 카드 1회 구조화 호출에는 이름뿐인 graph를
   덧씌우지 않는다
 
 ### 미확정
 
-- 실제 모델 ID와 운영 Provider (AI-OQ-001, AI-OQ-002, AI-OQ-003)
+- prod 모델 평가 통과 기준과 최종 승격 모델
 - LangGraph checkpoint 저장 계약 (AI-OQ-004)

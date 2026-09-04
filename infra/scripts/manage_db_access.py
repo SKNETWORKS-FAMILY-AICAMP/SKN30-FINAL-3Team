@@ -52,7 +52,29 @@ F3_SEED_DIRECTORY = REPO_ROOT / "docs" / "db" / "seed"
 F3_SEED_RESET = F3_SEED_DIRECTORY / "001_F3_SYNTHETIC_RESET.sql"
 F3_SEED_DATA = F3_SEED_DIRECTORY / "002_F3_SYNTHETIC_SEED.sql"
 F3_SEED_VERIFY = F3_SEED_DIRECTORY / "003_F3_SYNTHETIC_VERIFY.sql"
-F3_SEED_VERIFY_CHECK_COUNT = 29
+F3_MODEL_PROFILE_DIRECTORY = F3_SEED_DIRECTORY / "model-profiles"
+F3_MODEL_PROFILE_FILES = {
+    "local-openai": F3_MODEL_PROFILE_DIRECTORY / "local-openai.sql",
+    "dev-bedrock-gpt56-luna": (
+        F3_MODEL_PROFILE_DIRECTORY / "dev-bedrock-gpt56-luna.sql"
+    ),
+    "dev-qwen38-vllm-bnb": F3_MODEL_PROFILE_DIRECTORY / "dev-qwen38-vllm-bnb.sql",
+    "dev-qwen38-llamacpp-gguf": (
+        F3_MODEL_PROFILE_DIRECTORY / "dev-qwen38-llamacpp-gguf.sql"
+    ),
+}
+F3_MODEL_PROFILES = tuple(F3_MODEL_PROFILE_FILES)
+F3_SEED_VERIFY_CHECK_COUNT = 30
+F3_SELECTED_PROFILE_QUERY = """
+SELECT 'selected-profile|' || c.config_key
+FROM ai_model_config c
+JOIN brokerage b ON b.id = c.brokerage_id
+WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
+  AND c.is_active
+  AND c.capability IN ('POSITION_CARD', 'BROKERAGE_JUDGMENT')
+GROUP BY c.config_key
+ORDER BY c.config_key
+"""
 
 
 class ToolError(RuntimeError):
@@ -908,7 +930,7 @@ def psql_environment(
     return environment
 
 
-def verify_f3_seed_output(output: str) -> None:
+def verify_f3_seed_output(output: str, model_profile: str) -> None:
     check_lines = [
         line for line in output.splitlines() if line.endswith(("|PASS", "|FAIL"))
     ]
@@ -919,12 +941,27 @@ def verify_f3_seed_output(output: str) -> None:
         raise ToolError(
             "F3 synthetic seed verification returned an unexpected check count"
         )
+    selected_profiles = [
+        line.removeprefix("selected-profile|")
+        for line in output.splitlines()
+        if line.startswith("selected-profile|")
+    ]
+    if selected_profiles != [model_profile]:
+        raise ToolError(
+            "F3 synthetic seed selected model profile verification failed"
+        )
 
 
-def seed_f3(settings: Settings, apply: bool) -> None:
+def seed_f3(settings: Settings, apply: bool, model_profile: str) -> None:
     require_apply(apply, "seed-f3")
     if shutil.which("psql") is None:
         raise ToolError("psql is required to apply the F3 synthetic seed")
+    try:
+        model_profile_file = F3_MODEL_PROFILE_FILES[model_profile]
+    except KeyError as error:
+        raise ToolError(
+            f"unsupported F3 synthetic model profile: {model_profile}"
+        ) from error
 
     direct = base_session(settings)
     identity = direct.client("sts").get_caller_identity()
@@ -952,6 +989,7 @@ def seed_f3(settings: Settings, apply: bool) -> None:
         database=target.identifier,
         username=username,
         reset_scope="F3_SYNTHETIC 합성중개사무소",
+        model_profile=model_profile,
     )
     with PortForward(direct, instance_id, target, settings.local_port):
         apply_result = subprocess.run(
@@ -964,6 +1002,8 @@ def seed_f3(settings: Settings, apply: bool) -> None:
                 str(F3_SEED_RESET),
                 "-f",
                 str(F3_SEED_DATA),
+                "-f",
+                str(model_profile_file),
             ],
             env=environment,
             check=False,
@@ -981,6 +1021,8 @@ def seed_f3(settings: Settings, apply: bool) -> None:
                 "ON_ERROR_STOP=1",
                 "-f",
                 str(F3_SEED_VERIFY),
+                "-c",
+                F3_SELECTED_PROFILE_QUERY,
             ],
             env=environment,
             check=False,
@@ -990,13 +1032,14 @@ def seed_f3(settings: Settings, apply: bool) -> None:
         if verify_result.returncode != 0:
             raise ToolError("F3 synthetic seed verification query failed")
         print(verify_result.stdout, end="")
-        verify_f3_seed_output(verify_result.stdout)
+        verify_f3_seed_output(verify_result.stdout, model_profile)
 
     emit(
         "f3-seed-complete",
         database=target.identifier,
         username=username,
         checks=F3_SEED_VERIFY_CHECK_COUNT,
+        model_profile=model_profile,
     )
 
 
@@ -1141,9 +1184,15 @@ def parser() -> argparse.ArgumentParser:
     command_parser.add_argument("--operator-role", default="TerraformOperatorRole")
 
     commands = command_parser.add_subparsers(dest="command", required=True)
-    for command in ("bootstrap", "sync-team", "migrate", "seed-f3"):
+    for command in ("bootstrap", "sync-team", "migrate"):
         subcommand = commands.add_parser(command)
         subcommand.add_argument("--apply", action="store_true")
+
+    seed_f3_command = commands.add_parser("seed-f3")
+    seed_f3_command.add_argument(
+        "--model-profile", choices=F3_MODEL_PROFILES, required=True
+    )
+    seed_f3_command.add_argument("--apply", action="store_true")
 
     create_account = commands.add_parser("create-session-account")
     create_account.add_argument("--brokerage-name", required=True)
@@ -1195,7 +1244,7 @@ def main() -> None:
     elif arguments.command == "migrate":
         migrate(settings, arguments.apply)
     elif arguments.command == "seed-f3":
-        seed_f3(settings, arguments.apply)
+        seed_f3(settings, arguments.apply, arguments.model_profile)
     elif arguments.command == "create-session-account":
         create_session_account(
             settings,
