@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-09-04
 ---
 
 # 개인정보 정책
@@ -77,13 +77,33 @@ PR에 개인정보나 비밀이 포함되어서는 안 된다. redaction은 우�
 | 허용 데이터 | 실제 인물과 연결되지 않는 합성 장부·상담 로그 |
 | 금지 데이터 | 운영 DB 상담 원문, 실사용자 성명·로그인 ID·연락처·생년월일, 인증·세션 정보와 Secret |
 | 실행 통제 | 요청의 `SYNTHETIC_PROTOTYPE` 표시와 생성기 조립 지점의 명시적 opt-in을 모두 요구 |
-| 외부 전송 | 이 예외만으로 승인하지 않음. Provider·리전·저장 여부는 별도 결정 대상 |
+| 외부 전송 | 합성·비식별 입력만 [ADR-0026](../decisions/ADR-0026-general-ai-provider-and-model-profiles.md)·[ADR-0027](../decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)의 local·dev Provider allowlist 범위에서 허용 |
 | 로그·저장 | 전체 프롬프트·모델 원문 응답·상담 본문을 로그에 남기지 않음. 별도 원문 사본을 만들지 않음 |
 | 재생성 요청 | 계약 검증 실패를 되먹여 다시 생성할 때 Provider로 나가는 것은 **필드 경로, 계약에 적힌 고정 규칙 문구와 내부 식별자뿐**이다. 모델이 만든 값과 상담 본문은 되돌려 보내지 않는다 (AI [ADR-0003](../../../ai/references/decisions/ADR-0003-structured-output-repair.md)) |
 | 종료 조건 | 실제 F1 사용자 데이터를 F3 Worker에 연결하기 전에 Backend 마스킹을 구현하고 `MASKED` 모드로 전환 |
 
 이 예외는 실제 개인정보를 무마스킹으로 처리하자는 결정이 아니다. 합성 여부는 문자열 validator가
 증명할 수 없으므로 케이스 데이터 검토 책임은 유지한다.
+
+### 범용 AI prod 실제 데이터 gate
+
+공유 dev Bedrock은 서울 endpoint에서 `global.openai.gpt-5.6-luna`를 호출하므로 요청이 다른
+상용 AWS 리전에서 처리될 수 있다. Responses 요청은 `store=false`를 강제하지만 이것만으로
+계정 수준 zero data retention이나 처리 리전 제한을 보장한다고 간주하지 않는다. 따라서
+Bedrock dev에는 실제 인물과 연결되지 않는 합성·비식별 입력만 허용한다.
+
+prod의 자체 호스팅 서울 vLLM 또는 Bedrock 중 어느 후보도 선택만으로 실제 개인정보 처리가
+승인되지 않는다. 다음이 모두 승인되기 전에는 dev·prod 모두 합성·비식별 입력만 사용한다.
+
+- 실제 사용자 인증·접근 통제와 종단 간 TLS
+- 전송·저장 암호화와 최소 권한
+- 상담 원문, 전체 prompt와 모델 원문 응답 비로깅
+- DB·백업·로그·임시 자료의 보존 및 삭제 기간
+- 외부 Provider의 처리 목적지 리전과 계정 수준 데이터 보존 모드
+- 실제 데이터가 있는 환경의 종료·`prod-destroy` 승인 절차
+
+보존·삭제 기간은 OQ-007의 차단 항목이다. 보존 의무가 없다는 승인 전에는
+실제 데이터가 있는 prod에서 snapshot 없는 `prod-destroy`를 실행하지 않는다.
 
 ### `agent_run.requested_by`
 

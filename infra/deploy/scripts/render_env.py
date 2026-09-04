@@ -19,12 +19,9 @@ PUBLIC_NAMESPACES = frozenset({"backend", "ai"})
 IGNORED_OPERATIONAL_PARAMETER_PATHS = frozenset({"runpod/RUNPOD_CONTROL_SET"})
 INJECTED_NAMES = frozenset({"DB_URL", "DB_MIGRATION_URL"})
 SENSITIVE_SUFFIXES = ("_API_KEY", "_PASSWORD", "_PRIVATE_KEY", "_SECRET", "_TOKEN")
-REQUIRED_AI_PROVIDER_KEYS = frozenset(
-    {
-        "AI_OPENAI_API_KEY",
-        "AI_VLLM_SLLM_API_KEY",
-        "AI_VLLM_STT_API_KEY",
-    }
+F2_AI_PROVIDER_KEYS = (
+    "AI_VLLM_SLLM_API_KEY",
+    "AI_VLLM_STT_API_KEY",
 )
 F2_API_KEY = re.compile(r"^[A-Za-z0-9_-]{43,128}$")
 AI_VLLM_ENDPOINT_SET_NAME = "AI_VLLM_ENDPOINT_SET"
@@ -286,19 +283,47 @@ def parse_ai_provider_keys(raw: str) -> dict[str, str]:
         if not isinstance(value, str) or not value.strip():
             raise SystemExit(f"AI provider secret value is empty: {name}")
         result[name] = value
-    missing = REQUIRED_AI_PROVIDER_KEYS - result.keys()
-    if missing:
-        raise SystemExit(
-            "AI provider secret is missing required keys: " + ", ".join(sorted(missing))
-        )
-    for name in ("AI_VLLM_SLLM_API_KEY", "AI_VLLM_STT_API_KEY"):
-        if F2_API_KEY.fullmatch(result[name]) is None:
+    for name in F2_AI_PROVIDER_KEYS:
+        if name in result and F2_API_KEY.fullmatch(result[name]) is None:
             raise SystemExit(
                 f"{name} must be 43 to 128 URL-safe letters, digits, underscores, or hyphens"
             )
-    if result["AI_VLLM_SLLM_API_KEY"] == result["AI_VLLM_STT_API_KEY"]:
+    if all(name in result for name in F2_AI_PROVIDER_KEYS) and (
+        result[F2_AI_PROVIDER_KEYS[0]] == result[F2_AI_PROVIDER_KEYS[1]]
+    ):
         raise SystemExit("AI vLLM SLLM and STT API keys must be different")
     return result
+
+
+def secret_has_current_version(secret_id: str, region: str) -> bool:
+    raw = aws(
+        "secretsmanager",
+        "describe-secret",
+        "--secret-id",
+        secret_id,
+        "--query",
+        "VersionIdsToStages",
+        "--output",
+        "json",
+        "--region",
+        region,
+    )
+    try:
+        versions = json.loads(raw)
+    except json.JSONDecodeError:
+        raise SystemExit(
+            "AI provider secret versions must contain a JSON object or null"
+        ) from None
+    if versions is None:
+        return False
+    if not isinstance(versions, dict):
+        raise SystemExit(
+            "AI provider secret versions must contain a JSON object or null"
+        )
+    return any(
+        isinstance(stages, list) and "AWSCURRENT" in stages
+        for stages in versions.values()
+    )
 
 
 def runtime_database_url(
@@ -346,13 +371,17 @@ def build_process_environments(
             + ", ".join(sorted(collisions))
         )
 
-    api = {
-        **backend,
-        **ai,
-        "AI_VLLM_SLLM_API_KEY": ai_provider_keys["AI_VLLM_SLLM_API_KEY"],
-        "AI_VLLM_STT_API_KEY": ai_provider_keys["AI_VLLM_STT_API_KEY"],
-        "DB_URL": runtime_url,
-    }
+    f2_keys: dict[str, str] = {}
+    if ai.get("AI_F2_PROVIDER_STATUS") == "active":
+        missing = [name for name in F2_AI_PROVIDER_KEYS if name not in ai_provider_keys]
+        if missing:
+            raise SystemExit(
+                "AI provider secret is missing keys required by active F2: "
+                + ", ".join(missing)
+            )
+        f2_keys = {name: ai_provider_keys[name] for name in F2_AI_PROVIDER_KEYS}
+
+    api = {**backend, **ai, **f2_keys, "DB_URL": runtime_url}
     worker = {**backend, **ai, "DB_URL": runtime_url, **ai_provider_keys}
     migration = {"DB_MIGRATION_URL": migration_url}
     return api, worker, migration
@@ -432,20 +461,22 @@ def main() -> None:
         ),
         parameter_prefix,
     )
-    ai_provider_keys = parse_ai_provider_keys(
-        aws(
-            "secretsmanager",
-            "get-secret-value",
-            "--secret-id",
-            ai_secret_id,
-            "--query",
-            "SecretString",
-            "--output",
-            "text",
-            "--region",
-            region,
+    ai_provider_keys: dict[str, str] = {}
+    if secret_has_current_version(ai_secret_id, region):
+        ai_provider_keys = parse_ai_provider_keys(
+            aws(
+                "secretsmanager",
+                "get-secret-value",
+                "--secret-id",
+                ai_secret_id,
+                "--query",
+                "SecretString",
+                "--output",
+                "text",
+                "--region",
+                region,
+            )
         )
-    )
 
     token = aws(
         "rds",

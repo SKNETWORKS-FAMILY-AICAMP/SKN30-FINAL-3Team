@@ -14,7 +14,7 @@ updated: 2026-09-04
 > 아래 구성 표의 서비스 중 **Time Keeper와 캘린더가 구현됐고 나머지는 미착수**다. 미착수 서비스의
 > 상세 동작은 승인된 요구사항이 아니므로 이 문서에서 확정 사실로 쓰지 않는다. 캘린더가 F4-CM-06
 > (F4는 F1 장부를 직접 고치지 않는다)의 예외 없이 성립하는 이유는
-> [ADR-0024](../../../.agents/skills/project-wiki/references/decisions/ADR-0024-calendar-storage-ownership.md)에
+> [ADR-0025](../../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md)에
 > 있다 — 캘린더가 쓰는 `calendar_event`는 F1 장부 테이블이 아니라 F4가 소유한 새 테이블이다.
 
 ## 1. 개요

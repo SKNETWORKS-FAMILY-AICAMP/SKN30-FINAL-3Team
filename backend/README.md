@@ -136,12 +136,14 @@ F3 파이프라인 전체를 확인하려면 migration 적용 후 `backend/`에�
 적재한다는 명시적 확인입니다. API와 Worker를 먼저 중지한 뒤 실행합니다.
 
 ```bash
-uv run python src/manage.py seed-f3-synthetic --confirm-reset
+uv run python src/manage.py seed-f3-synthetic --confirm-reset \
+  --model-profile local-openai
 ```
 
 명령은 `backend/.env`의 `DB_URL`을 사용하며 `APP_ENV=local`과 loopback DB 호스트에서만
-동작합니다. 저장소의 고정된 세 SQL을 reset → seed → verify 순서로 실행하고, 29개 검사가 모두
-`PASS`여야 성공합니다. 성공 JSON의 `brokerage_id`를 `backend/.env`에 설정합니다. 자동 증가 ID는
+동작합니다. 저장소의 고정된 reset → data → allowlisted model profile → verify 순서로 실행하고,
+모두 30개 검사가 `PASS`여야 성공합니다. 성공 JSON의 `brokerage_id`를
+`backend/.env`에 설정합니다. 자동 증가 ID는
 환경마다 다르므로 문서의 예시 숫자를 고정해서 사용하지 않습니다.
 
 ```dotenv
@@ -154,7 +156,11 @@ F3 seed의 reset 범위, 케이스와 공유 dev 적용법은
 [F3 합성 seed 안내](../docs/db/seed/README.md)를 따릅니다. 이 seed는 실행 결과를 미리 만들지
 않으며, `agent_run`과 판정 결과는 활성 Worker가 직접 생성해야 합니다.
 
-기본 F3 모델 설정은 OpenAI `gpt-4o-mini`이므로 OpenAI를 사용할 때는 AI 개인 설정도 준비합니다.
+`local-openai` F3 모델 설정은 OpenAI `gpt-5.6-luna`이므로 AI 개인 설정도 준비합니다.
+`dev-bedrock-gpt56-luna`는 공유 dev POC용이며 Infra Bedrock doctor 통과 뒤 명시적으로
+활성하고 합성 smoke로 검증합니다. 실패 시 OpenAI key·runtime이 배포된 환경에서만
+`local-openai`를 명시 재적용합니다.
+두 Qwen dev 프로필은 GPU runtime 배포 전까지 비활성 비교 경로로 보존합니다.
 
 ```bash
 cp ../ai/.env.example ../ai/.env
@@ -164,8 +170,8 @@ cp ../ai/.env.example ../ai/.env
 AI_OPENAI_API_KEY=<private-api-key>
 ```
 
-다른 Provider나 모델을 사용할 때는 [F3 합성 seed 안내](../docs/db/seed/README.md)의 AI 모델 설정과
-[`ai/.env.example`](../ai/.env.example)을 함께 확인합니다.
+다른 Provider나 모델은 [F3 합성 seed 안내](../docs/db/seed/README.md)의 allowlist
+프로필과 [`ai/.env.example`](../ai/.env.example)을 함께 확인합니다.
 
 ## 6. API와 Worker 실행
 

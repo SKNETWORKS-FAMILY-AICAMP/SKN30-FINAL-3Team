@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-01
+updated: 2026-09-04
 ---
 
 # ADR-0013: 개발환경 설정과 비밀값 materialization
@@ -10,6 +10,7 @@ updated: 2026-09-01
 - 대체 범위: [ADR-0003](ADR-0003-dev-storage-database-and-configuration.md)의 수동 비밀값 소유 방식과 [ADR-0011](ADR-0011-dev-delivery-implementation.md)의 runtime 설정·Discord 값 주입 방식
 - 상위 결정: [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)
 - 대체 범위: `secrets.auto.tfvars`, Terraform Secret version과 version counter 운영은 [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)에서 대체한다.
+- 대체 범위: OpenAI key 필수와 F2 key 주입 조건은 [ADR-0019](ADR-0019-bedrock-luna-dev-poc.md)에서 대체한다.
 
 ## 결정
 

@@ -1,7 +1,7 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·Alarm 전용 전달 코드 구현 및 AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용·S3 dev release 게시 완료·RunPod/Terraform 미적용
-updated: 2026-09-03
+implementation: workload·기존 delivery 적용·Alarm 전용 전달 및 Bedrock POC 코드 구현/AWS 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용·S3 dev release 게시 완료·RunPod 미적용
+updated: 2026-09-04
 ---
 
 # 개발·시연용 인프라 아키텍처
@@ -10,7 +10,7 @@ updated: 2026-09-03
 
 - **이 문서가 답하는 질문:** 공유 개발·시연 환경을 AWS와 RunPod에 어떤 자원과 경계로 배치하는가?
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
-- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0020](../../../.agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)
+- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0020](../../../.agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
 - **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·기존 관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. S3에는 현재 dev release가 게시됐다. Alarm 전용 전달과 애플리케이션 alarm은 코드 구현 후 apply 전이며 deep lifecycle, Verify/Build 분리도 apply 승인 전이다. RunPod image·Template·Pod와 endpoint cutover 및 이번 Terraform 변경은 적용 전이다.
 
@@ -18,7 +18,12 @@ updated: 2026-09-03
 
 1차 런타임은 `EC2 Backend + 설치형 brokerage-ai + RunPod Pod 추론`이다. EC2 한 대에서 API와 Worker를 별도 프로세스로 실행하되 같은 배포 이미지와 호스트를 사용한다. Backend는 `brokerage-ai`를 Python 라이브러리로 설치해 프레임워크 중립 DTO와 실행 facade를 호출한다.
 
-SLLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 공유 F2 dev 서빙은 GPU 한 개의 단일 Pod에서 `sllm`·`stt` vLLM 두 프로세스를 실행한다. 실제 SLLM 기반 모델 ID·불변 commit과 선택적 LoRA adapter는 private S3 release v2가, STT 모델은 Template이 소유한다. base-only도 adapter 없는 metadata bundle을 사용하고 기반 가중치는 공개 Hugging Face에서 받는다. Embedding과 학습·개인 실험은 이 운영 범위에 포함하지 않는다. OpenAI와 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
+SLLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 공유 F2 dev 서빙은 GPU 한 개의 단일 Pod에서 `sllm`·`stt` vLLM 두 프로세스를 실행한다. 실제 SLLM 기반 모델 ID·불변 commit과 선택적 LoRA adapter는 private S3 release v2가, STT 모델은 Template이 소유한다. base-only도 adapter 없는 metadata bundle을 사용하고 기반 가중치는 공개 Hugging Face에서 받는다. Embedding과 학습·개인 실험은 이 운영 범위에 포함하지 않는다. OpenAI, Bedrock과 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
+
+범용 생성 모델의 첫 공유 dev POC는 기존 앱 EC2의 Worker가 서울
+`bedrock-runtime`에서 `global.openai.gpt-5.6-luna`를 호출한다. 정적 Bedrock key 없이
+Instance Role과 SigV4를 사용하며, Global cross-Region 처리 때문에 합성·비식별 데이터만 허용한다.
+GPU EC2 llama.cpp·vLLM 비교 경로는 코드·seed 후보만 남기고 Infra 구축을 보류한다.
 
 AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용한다. 이 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없어 해당 자원을 만들지 않으며 자동 알림·차단도 전제하지 않는다. RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 분리한다.
 
@@ -55,6 +60,8 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 | RunPod | shared F2 Pod, private Team Template | 결정 | 코드 구현·RunPod/Terraform 미적용 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
 | RunPod | private GHCR image, private S3 SLLM release | 결정 | S3 dev release 게시 완료·image 미게시 | 고정 digest·lock, presigned bundle, `verified|dev` stage, `sllm`·`stt` 자동 감독 |
 | RunPod | bootstrap control, read-only monitor | 결정 | 코드 구현·외부 자원 미적용 | digest plan/apply, Secrets Manager 값 정본, SSM generation/ID, 30분 감시와 수동 reconcile |
+| Bedrock | GPT-5.6 Luna Global profile | 결정 | 코드 구현·AWS 미적용 | 공개 alias 설정, 비스트리밍 Responses, Instance Role SigV4, 합성 dev 전용 |
+| GPU EC2 | 범용 모델 전용 host·EBS | 보류 | Terraform·runtime 미구현 | llama.cpp+24GB·vLLM BnB+48GB 비교 후보; Bedrock POC 결과 후 별도 승인 |
 | 1차 제외 | GitHub Actions OIDC | 제외 | 제외 | AWS Developer Tools 전달 경로를 사용 |
 | 1차 제외 | NAT Gateway, Multi-AZ RDS | 제외 | 제외 | 공유 개발·시연 예산 우선 |
 | 1차 제외 | WAF, ElastiCache, AWS Backup | 제외 | 제외 | 부하·보존 요구가 확인되면 별도 결정 |
@@ -85,6 +92,7 @@ flowchart LR
     subgraph external["외부 모델 실행"]
         runpod["RunPod shared F2 Pod\nsllm · stt"]
         openai["OpenAI API"]
+        bedrock["Amazon Bedrock\nGPT-5.6 Luna Global"]
     end
 
     github -->|"dev 자동 또는 수동 SHA"| pipeline
@@ -100,6 +108,7 @@ flowchart LR
     ec2 --> dataS3
     ec2 -->|"HTTPS model request"| runpod
     ec2 -->|"HTTPS model request"| openai
+    ec2 -->|"SigV4 HTTPS · 합성 dev"| bedrock
     secret --> ec2
     ec2 --> obs
     alb --> obs
@@ -170,6 +179,8 @@ flowchart TB
 | EC2 → 임시 음성 S3 | 업로드 음성 | 전용 암호화 bucket | 성공·취소 시 즉시 삭제, 실패 시 1시간 이내 삭제 작업; S3 Lifecycle은 보조 안전망 |
 | EC2 → 데이터·모델 S3 | 비식별 데이터셋, 평가 보고서, 승인된 artifact | 전용 bucket과 prefix·IAM 분리 | 승인된 release artifact는 2026-09-23까지 유효하며 종료 후 만료·삭제 |
 | EC2 → RunPod/OpenAI | 모델 실행에 필요한 최소 입력 | 외부 장기 저장을 전제로 하지 않음 | 원문·개인정보 전송은 별도 승인 전 금지, 요청·응답 원문 로깅 금지 |
+| EC2 → Bedrock Global profile | 합성·비식별 모델 입력 | `store=false`; Global 상용 리전에서 처리 가능 | 실제 개인정보 금지, 원문 요청·응답 로깅 금지 |
+| EC2 → 범용 GPU EC2 | 합성·비식별 모델 입력 | 계획 보류 | private 추론 경로·TLS·인증 설계 전 실제 개인정보 금지 |
 | 서비스 → CloudWatch | 가명 식별자, 지연·오류·비용 메타데이터 | log group별 14일 보존 | 토큰·인증 헤더·음성·전사·전체 프롬프트 금지 |
 | RDS 자동 백업 | DB snapshot/PITR 데이터 | RDS 관리 백업 7일 | deletion protection을 유지하고 종료 시 final snapshot 생성; 최종 폐기는 별도 승인 |
 
@@ -226,5 +237,6 @@ flowchart LR
 - Embedding 모델과 F2 외 workload의 GPU·Pod 배치
 - RDS polling에서 SQS·DLQ로 전환할 측정 임계값
 - 향후 ECS AI 내부 호출의 인증·암호화·재시도 방식
+- prod 범용 모델의 품질·지연·비용 통과 기준과 개인정보 보존·삭제 기간
 
 미확정 항목의 정본은 [프로젝트 미해결 질문](../../../.agents/skills/project-wiki/references/open-questions.md)과 [Infra 미해결 질문](../../../.agents/skills/infra/references/open-questions.md)이다.

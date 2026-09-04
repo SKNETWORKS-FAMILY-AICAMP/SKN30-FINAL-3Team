@@ -152,6 +152,24 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(aws.puts, [])
         self.assertNotIn("private", output.getvalue())
 
+    def test_ai_secret_bootstrap_generates_only_f2_keys(self):
+        aws = FakeAws(missing=("ai",))
+        with patch.object(
+            MODULE,
+            "generated_f2_key",
+            side_effect=("s" * 43, "t" * 43),
+        ), patch.object(MODULE, "prompt_secret") as prompt:
+            MODULE.initialise_missing_secrets(aws)
+
+        prompt.assert_not_called()
+        self.assertEqual(len(aws.puts), 1)
+        payload = json.loads(aws.puts[0][1])
+        self.assertEqual(
+            set(payload),
+            {"AI_VLLM_SLLM_API_KEY", "AI_VLLM_STT_API_KEY"},
+        )
+        self.assertNotIn("AI_OPENAI_API_KEY", payload)
+
     def test_plan_rejects_digest_from_another_repository(self):
         with self.assertRaises(MODULE.ToolError):
             MODULE.Bootstrapper(FakeAws()).plan(

@@ -705,7 +705,7 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 이 절은 `제안`이며 팀 검토 후 승인될 때 표시를 제거한다. 기능 범위와 요구사항 ID의 정본은
 [F4 캘린더 요구사항](../../../../../docs/requirements/f4/calendar.md)이고 여기서는 경로와 의미만
 고정한다. 사용자가 캘린더 화면에서 직접 만드는 일정의 CRUD다. 저장은 F4가 소유한
-`calendar_event` 테이블이며 F1 장부 테이블과 별개다([ADR-0024](../decisions/ADR-0024-calendar-storage-ownership.md)).
+`calendar_event` 테이블이며 F1 장부 테이블과 별개다([ADR-0025](../decisions/ADR-0025-calendar-storage-ownership.md)).
 장부와의 연결 컬럼은 없다.
 
 | Method | Path | 인증 | 동작 |

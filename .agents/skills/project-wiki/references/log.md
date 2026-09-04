@@ -7,6 +7,9 @@ updated: 2026-09-04
 
 - 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
 - 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
+- 2026-09-04: 최신 dev 동시 변경에서 중복된 프로젝트 ADR 번호를 최초 병합 순서대로 정규화했다. PR 리뷰 정책은 ADR-0024를 유지하고 캘린더 저장 소유권은 ADR-0025, 범용 Provider 정책은 ADR-0026, Bedrock Luna dev POC는 ADR-0027로 고유하게 연결한다. 결정 내용은 변경하지 않았다.
+- 2026-09-04: 범용 생성의 첫 공유 dev POC를 GPU EC2에서 Bedrock GPT-5.6 Luna로 전환하는 ADR-0027을 승인했다. local은 직접 OpenAI Luna, dev는 EC2 Instance Role SigV4와 Global cross-Region Luna를 사용한다. Bedrock Structured Outputs 부재는 JSON 지시·Pydantic 검증·기존 repair로 보완하고, IMDSv2 hop limit 2 위험과 Global 처리 위치 때문에 dev를 합성·비식별 입력으로 제한한다. 기존 Qwen llama.cpp·vLLM 코드와 seed는 비활성 비교 경로로 보존하며 prod Provider·평가·개인정보 승격은 OQ-007·014로 남겼다.
+- 2026-09-04: ADR-0026과 범용 Provider·seed 구현을 결정 인덱스와 출처 manifest에 반영하고, ADR-0027이 환경별 활성 Provider·GPU 우선순위·IMDS hop 조항만 부분 대체하도록 과거 결정을 보존했다.
 - 2026-09-03: 사용자 지시로 F4 기능 번호가 확정되어 이미 종료된 OQ-012가 미해결 목록에 남아 있던 불일치를 제거함.
 - 2026-09-03: 사용자 지시로 F4를 독립 기능으로 등록하고 Time Keeper를 그 안의 서비스로 정의해 `docs/requirements/f4/`와 `F4-CM`·`F4-TK` ID 체계를 신설함(OQ-012 종료). Time Keeper 일정 조회를 API 계약에 `제안`으로 등록하고, F1 장부의 날짜 컬럼에서 임대차 만기·구입 의뢰 만기·희망 입주일과 재연락·매물 조건 재확인을 종류별로 모으는 읽기 전용 조회와 상단바 알림·아침 브리핑 화면을 구현함. 계약·일정 테이블이 없어 계약 체결일, 지급일, 임장일, 신고 기한과 명도일은 제외하고 기준값·기능 번호·장기 미접촉 노출을 OQ-011~013으로 등록함.
 - 2026-09-03: `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle과 release manifest의 S3 불변 게시 및 양방향 cross-hash를 확인해 RunPod 문서 상태를 “S3 dev release 게시 완료·RunPod/Terraform 미적용”으로 갱신했다. AI suite 종료 지연과 Terraform provider handshake 실패는 제한된 sandbox의 thread·provider IPC 제약으로 확인했으며 정상 실행 환경에서 AI 212개 테스트와 두 Terraform root validate가 통과했다.

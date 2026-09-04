@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ProviderKind(StrEnum):
     OPENAI = "openai"
     VLLM = "vllm"
+    LLAMA_CPP = "llama_cpp"
+    BEDROCK = "bedrock"
 
 
 class MessageRole(StrEnum):
@@ -21,6 +23,7 @@ class ModelRoute(BaseModel):
 
     provider: ProviderKind
     model: str = Field(min_length=1)
+    endpoint_alias: str | None = Field(default=None, max_length=160)
 
     @field_validator("model")
     @classmethod
@@ -29,6 +32,27 @@ class ModelRoute(BaseModel):
         if not normalized:
             raise ValueError("model must not be blank")
         return normalized
+
+    @field_validator("endpoint_alias")
+    @classmethod
+    def endpoint_alias_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("endpoint_alias must not be blank")
+        return normalized
+
+    @model_validator(mode="after")
+    def endpoint_alias_must_match_provider(self) -> ModelRoute:
+        if self.provider is ProviderKind.OPENAI and self.endpoint_alias is not None:
+            raise ValueError("openai routes must not use endpoint_alias")
+        if (
+            self.provider in {ProviderKind.LLAMA_CPP, ProviderKind.BEDROCK}
+            and self.endpoint_alias is None
+        ):
+            raise ValueError(f"{self.provider.value} routes require endpoint_alias")
+        return self
 
 
 class ChatMessage(BaseModel):

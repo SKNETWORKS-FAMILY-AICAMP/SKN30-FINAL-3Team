@@ -22,7 +22,7 @@ check:
     terraform fmt -check -recursive .
     terraform -chdir=bootstrap validate
     terraform -chdir=environments/dev validate
-    uvx ruff check scripts/manage_db_access.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py delivery/lambda/runpod_monitor.py tests
+    uvx ruff check scripts/manage_bedrock.py scripts/manage_db_access.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py delivery/lambda/runpod_monitor.py tests
     uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
     uv run --python 3.12 --with 'aiohttp==3.14.3' --with 'multidict==6.7.1' python -m unittest discover -s runpod/tests -v
 
@@ -105,6 +105,10 @@ dev-stop:
 # RunPod Team Workspace, Template, registry 인증과 AWS CLI를 읽기 전용으로 점검한다.
 runpod-doctor:
     uv run --script scripts/manage_runpod.py doctor
+
+# dev Worker 컨테이너의 Instance Role과 Bedrock Luna profile 접근을 추론 없이 점검한다.
+bedrock-doctor:
+    uv run --script scripts/manage_bedrock.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}"
 
 # AWS·RunPod 자원을 변경하지 않고 bootstrap 작업과 충돌을 계산한다.
 runpod-bootstrap-plan image:
@@ -242,10 +246,15 @@ db-sync:
 db-migrate:
     uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" migrate --apply
 
-# 개인 IAM 인증과 SSM 터널로 공유 dev DB의 검토된 F3 합성 seed를 재적재하고 검증한다.
-[confirm("공유 dev의 API 요청·Worker 작업이 없음을 확인했으며, F3_SYNTHETIC 합성 사무소 데이터를 삭제 후 다시 적재하고 29개 검증을 실행합니까?")]
+# 개인 IAM 인증과 SSM 터널로 공유 dev DB의 Bedrock F3 합성 seed를 재적재하고 검증한다.
+[confirm("Bedrock doctor가 통과했고 공유 dev의 API 요청·Worker 작업이 없음을 확인했으며, F3_SYNTHETIC 합성 사무소 데이터를 삭제 후 Bedrock profile로 다시 적재하고 30개 검증을 실행합니까?")]
 dev-seed-f3:
-    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" seed-f3 --apply
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" seed-f3 --model-profile dev-bedrock-gpt56-luna --apply
+
+# Bedrock smoke 실패 시 OpenAI key·runtime이 준비된 환경에서만 명시 복구한다.
+[confirm("Bedrock smoke 실패를 확인했고 AI_OPENAI_API_KEY·OpenAI runtime이 배포되었으며 공유 dev의 API 요청·Worker 작업이 없습니까? F3_SYNTHETIC 합성 사무소를 local-openai profile로 다시 적재합니다.")]
+dev-seed-f3-openai:
+    uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" seed-f3 --model-profile local-openai --apply
 
 # 개인 IAM 인증과 SSM 터널로 공유 dev DB에 개발용 세션 계정을 생성한다.
 [confirm("공유 dev DB에 개발용 세션 계정을 생성합니까?")]
