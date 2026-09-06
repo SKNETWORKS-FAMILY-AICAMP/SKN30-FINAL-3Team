@@ -50,7 +50,11 @@ class OpenAIConfig(BaseModel):
 class VllmConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    # `sllm` 과 `stt` 는 Infra 가 F2 용으로 한 쌍으로 제공하며 `AI_F2_PROVIDER_STATUS` 가
+    # 연다 (ADR-0005). `f3` 는 그 쌍에 속하지 않는다. F3 는 자기 Pod 을 직접 띄워 쓰므로
+    # F2 상태와 무관하게 URL 이 있으면 바인딩한다.
     sllm: ProviderEndpointConfig | None = None
+    f3: ProviderEndpointConfig | None = None
     embedding: ProviderEndpointConfig | None = None
     stt: ProviderEndpointConfig | None = None
 
@@ -169,6 +173,11 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
                     )
                     if f2_status is F2ProviderStatus.ACTIVE
                     else None
+                ),
+                f3=_vllm_endpoint(
+                    source,
+                    base_url_name="AI_VLLM_F3_BASE_URL",
+                    api_key_name="AI_VLLM_F3_API_KEY",
                 ),
                 embedding=_vllm_endpoint(
                     source,

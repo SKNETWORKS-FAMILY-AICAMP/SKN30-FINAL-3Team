@@ -209,3 +209,21 @@ def test_secret_string_is_masked() -> None:
     assert config.openai is not None
     assert str(config.openai.api_key) == "**********"
     assert "sensitive-value" not in repr(config)
+
+
+def test_f3_endpoint_binds_without_the_f2_provider_status() -> None:
+    """F3 Pod 은 Infra 가 F2 용으로 제공하는 쌍에 속하지 않는다."""
+    config = bind_ai_config(
+        {"AI_VLLM_F3_BASE_URL": "https://pod-8003.proxy.runpod.net/v1"},
+        AiProfile.DEV,
+    )
+
+    assert config.f2.provider_status is F2ProviderStatus.OFFLINE
+    assert config.vllm.sllm is None
+    assert config.vllm.f3 is not None
+    assert str(config.vllm.f3.base_url) == "https://pod-8003.proxy.runpod.net/v1"
+
+
+def test_f3_api_key_without_a_url_is_a_configuration_error() -> None:
+    with pytest.raises(ConfigurationError, match="AI_VLLM_F3_BASE_URL"):
+        bind_ai_config({"AI_VLLM_F3_API_KEY": "secret"}, AiProfile.DEV)
