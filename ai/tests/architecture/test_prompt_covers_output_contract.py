@@ -34,8 +34,7 @@ from brokerage_ai.f3.contracts import (
     ContactabilityAssessment,
     ContactabilityStatus,
     DateSignals,
-    Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     NegotiationIntent,
@@ -64,20 +63,17 @@ from brokerage_ai.f3.prompts import build_position_card_messages
 # 두 규칙은 `assemble_analysis()` 가 장부 표기 금액과 합칠 때에야 걸리므로 모델 출력 schema 만
 # 훑으면 보이지 않는다.
 POSITION_CARD_COVERAGE = {
-    ("PositionCardModelOutput", "each_price_kind_appears_once"): (
-        "price 에 같은 price_kind 를 두 번 담지 않는다"
-    ),
+    # `PositionCardModelOutput` 쪽 같은 이름의 validator 는 없앴다. price 를 거래 유형별 자리를
+    # 가진 객체로 바꿔 중복이 문법적으로 불가능해졌기 때문이다. 아래 공개 계약 validator 는
+    # 남아 있지만 모델 출력으로는 위반할 수 없고, 프롬프트는 그 자리 구조를 알려 준다.
     ("PositionCardAnalysis", "each_price_kind_appears_once"): (
-        "price 에 같은 price_kind 를 두 번 담지 않는다"
+        "price 는 거래 유형마다 자리가 하나뿐인 객체다"
     ),
     ("TimingAssessment", "a_deadline_requires_at_least_one_constraint"): (
         "hard_deadline 은 반드시 null 이다"
     ),
-    ("Evidence", "evidence_must_carry_what_its_kind_requires"): (
-        "kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고"
-    ),
     ("PriceAssessment", "monthly_amounts_belong_to_monthly_rent_only"): (
-        "estimated_monthly_amount 는 price_kind 가 MONTHLY_RENT 일 때만 쓴다"
+        "보증금과 월 금액을 함께 쓰는 자리는 monthly_rent 뿐이다"
     ),
     ("PriceAssessment", "an_estimate_that_differs_requires_a_basis"): (
         "가격 추정은 장부 표기 금액과 다를 때만 낸다"
@@ -90,9 +86,6 @@ JUDGMENT_COVERAGE = {
     ),
     ("CandidateJudgment", "a_rejection_requires_its_reason"): (
         "REJECTED 에는 rejection_reason 을 반드시 쓴다. REJECTED 가 아니면 쓰지 않는다"
-    ),
-    ("Evidence", "evidence_must_carry_what_its_kind_requires"): (
-        "kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고"
     ),
 }
 
@@ -107,7 +100,12 @@ def _nested_models(annotation: object) -> typing.Iterator[type[BaseModel]]:
 
 
 def model_validators(*roots: type[BaseModel]) -> set[tuple[str, str]]:
-    """루트에서 재귀적으로 도달 가능한 모든 `model_validator`."""
+    """루트에서 재귀적으로 도달 가능한 `model_validator` 중 **출력 계약을 표현하는 것**.
+
+    `mode="before"` 는 넣지 않는다. 그것은 들어온 값을 우리가 다듬는 코드이지 모델이 지켜야 할
+    규칙이 아니다. 예전 형식으로 저장된 카드를 되살리는 호환 장치가 여기 해당한다. 모델에게
+    알려 줄 것이 없는 규칙을 표에 넣으면 진짜 교차 필드 규칙이 묻힌다.
+    """
     found: set[tuple[str, str]] = set()
     seen: set[type[BaseModel]] = set()
 
@@ -115,7 +113,9 @@ def model_validators(*roots: type[BaseModel]) -> set[tuple[str, str]]:
         if model in seen:
             return
         seen.add(model)
-        for name in model.__pydantic_decorators__.model_validators:
+        for name, decorator in model.__pydantic_decorators__.model_validators.items():
+            if decorator.info.mode == "before":
+                continue
             found.add((model.__name__, name))
         for field in model.model_fields.values():
             for nested in _nested_models(field.annotation):
@@ -142,7 +142,7 @@ def position_card_prompt() -> str:
 
 
 def judgment_card(card_id: int, side: NegotiationSide) -> JudgmentCard:
-    inferred = (Evidence(kind=EvidenceKind.INFERENCE, note="장부 값으로 판단"),)
+    inferred = (InferenceEvidence(note="장부 값으로 판단"),)
     return JudgmentCard(
         card_id=card_id,
         negotiation_side=side,

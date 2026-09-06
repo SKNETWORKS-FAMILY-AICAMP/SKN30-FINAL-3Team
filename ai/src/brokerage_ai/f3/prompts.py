@@ -11,9 +11,11 @@ from brokerage_ai.f3.contracts import (
     PositionCardGenerationRequest,
 )
 
-# v2: JSON schema 로 표현할 수 없는 교차 필드 규칙 셋을 본문에 명시했다. cache key 에 들어가므로
-# 이 값을 올리면 v1 프롬프트로 만든 카드가 재사용되지 않는다.
-POSITION_CARD_PROMPT_VERSION = "position-card-prompt:v2"
+# v3: price 를 거래 유형별 자리를 가진 객체로 바꾸면서 "같은 price_kind 를 두 번 담지 않는다"
+# 와 "월 금액은 월세에만 쓴다"를 규칙 문장이 아니라 schema 로 옮겼다. 두 규칙은 JSON schema 에
+# 자리가 없어 모델이 존재를 알 수 없었고, 로컬 모델이 ["SALE","SALE"] 을 결정론적으로 반복해
+# 실행이 종료된 사례가 있다. cache key 에 들어가므로 이 값을 올리면 이전 카드는 재사용되지 않는다.
+POSITION_CARD_PROMPT_VERSION = "position-card-prompt:v5"
 
 _SIDE_SCOPE = {
     NegotiationSide.LISTING: (
@@ -26,7 +28,8 @@ _SIDE_SCOPE = {
     ),
 }
 
-_RULES = """규칙을 모두 지킨다.
+_RULES = (
+    """규칙을 모두 지킨다.
 
 1. 출력 언어는 한국어다. 현업 표기(경신·월환·명도·붙박이)를 그대로 쓴다.
 2. 반대편 당사자의 데이터, 의도, 조건을 추측해서 만들지 않는다.
@@ -45,9 +48,8 @@ _RULES = """규칙을 모두 지킨다.
      아니다. 그 값들로 판단했다면 kind=INFERENCE 로 적는다.
 7. 가격 추정은 장부 표기 금액과 다를 때만 낸다. 다르면 basis 근거가 반드시 있어야 한다.
    근거를 만들 수 없으면 추정하지 않는다. 장부 표기 금액 자체는 네가 정하지 않는다.
-   - price 에 같은 price_kind 를 두 번 담지 않는다. 거래 유형마다 최대 한 번이다.
-   - estimated_monthly_amount 는 price_kind 가 MONTHLY_RENT 일 때만 쓴다. 매매와 전세는
-     금액 축이 하나뿐이라 이 값을 채우지 않는다.
+   - price 는 거래 유형마다 자리가 하나뿐인 객체다. 해당하지 않는 유형은 null 로 둔다.
+   - 보증금과 월 금액을 함께 쓰는 자리는 monthly_rent 뿐이다. 나머지는 금액 축이 하나다.
 8. 날짜 산수를 하지 않는다. 남은 일수는 이미 계산되어 date_signals 로 주어진다.
 9. hard_deadline 은 date_signals 의 hard_deadline_candidate 와 같은 값이거나 null 이다.
    그 밖의 날짜를 만들지 않는다.
@@ -61,10 +63,13 @@ _RULES = """규칙을 모두 지킨다.
 13. 처분 결정권 제약(임차인이라 결정권이 없음, 공동명의라 단독 결정 불가, 의뢰인이 실질
     결정권자가 아님)은 별도 항목이 아니라 inflexible 에 근거와 함께 적는다.
 14. 입력이 길더라도 과거 로그를 조용히 버리지 않는다. 전부 읽고 판단한다.
-15. 근거의 네 필드는 항상 모두 출력하되 해당하지 않는 필드는 null 로 둔다.
-    - kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고 note 는 null 이다.
-    - kind=INFERENCE 이면 note 만 채우고 interaction_id 와 quote_text 는 null 이다.
-    해당하지 않는 필드는 반드시 null 로 출력하고 임의 값을 채우지 않는다."""
+15. 근거는 kind 가 형태를 정한다. 고른 형태에 없는 필드는 아예 존재하지 않는다.
+    - kind=QUOTE 이면 interaction_id 와 quote_text 를 쓴다.
+    - kind=INFERENCE 이면 note 를 쓴다.
+    QUOTE 를 고르기 전에 그 문장이 제시된 본문에 **글자 그대로** 있는지 먼저 확인한다.
+    확인되지 않으면 QUOTE 를 쓰지 말고 INFERENCE 로 적는다. 인용문을 지어내지 않는다."""
+    ""
+)
 
 
 def _log_line(log: ConsultationLogInput) -> str:

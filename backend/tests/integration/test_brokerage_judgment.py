@@ -26,8 +26,7 @@ from brokerage_ai.f3 import (
     ContactabilityAssessment,
     ContactabilityStatus,
     ContactChannel,
-    Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     JudgmentEvidence,
@@ -42,6 +41,7 @@ from brokerage_ai.f3 import (
     PositionCondition,
     PriceAssessment,
     PriceKind,
+    QuoteEvidence,
     RecommendedAction,
     TimingAssessment,
     Urgency,
@@ -140,14 +140,13 @@ def card_analysis(request: PositionCardGenerationRequest) -> PositionCardAnalysi
     if request.consultation_logs:
         first = request.consultation_logs[0]
         evidence = (
-            Evidence(
-                kind=EvidenceKind.QUOTE,
+            QuoteEvidence(
                 interaction_id=first.interaction_id,
                 quote_text=first.masked_content[:8],
             ),
         )
     else:
-        evidence = (Evidence(kind=EvidenceKind.INFERENCE, note="전달된 상담 로그가 없다"),)
+        evidence = (InferenceEvidence(note="전달된 상담 로그가 없다"),)
     prices = []
     for kind in PriceKind:
         stated, monthly = stated_price_for(request.anchor, kind)
@@ -164,12 +163,12 @@ def card_analysis(request: PositionCardGenerationRequest) -> PositionCardAnalysi
         flexible=(
             PositionCondition(
                 description="잔금일 조정",
-                evidence=(Evidence(kind=EvidenceKind.INFERENCE, note="정황"),),
+                evidence=(InferenceEvidence(note="정황"),),
             ),
         ),
         contactability=ContactabilityAssessment(
             status=ContactabilityStatus.GOOD,
-            evidence=(Evidence(kind=EvidenceKind.INFERENCE, note="정황"),),
+            evidence=(InferenceEvidence(note="정황"),),
         ),
     )
 
@@ -226,15 +225,14 @@ def default_judgments(request: BrokerageJudgmentRequest) -> tuple[CandidateJudgm
                         evidence_side=request.anchor.negotiation_side,
                         field_name="price",
                         source=next(
-                            Evidence(
-                                kind=EvidenceKind.QUOTE,
+                            QuoteEvidence(
                                 interaction_id=interaction_id,
                                 quote_text=quote_text,
                             )
                             for interaction_id, quote_text in sorted(request.anchor.quoted())
                         )
                         if request.anchor.quoted()
-                        else Evidence(kind=EvidenceKind.INFERENCE, note="카드 값을 비교했다"),
+                        else InferenceEvidence(note="카드 값을 비교했다"),
                     ),
                 ),
             )
