@@ -3,6 +3,10 @@
 이 절차는 로컬 Frontend·Backend에서 개발자별 RunPod Pod의 Qwen3-4B와 Whisper를 호출하는 1차
 검증용이다. 합성·비식별 음성만 사용하며 API key, Pod 주소와 SSH 개인키는 저장소에 기록하지 않는다.
 
+F3를 RunPod 로컬 모델로 돌리는 절차는 [f3-vllm-runbook.md](f3-vllm-runbook.md)에 따로 있다.
+vLLM 서버 하나는 모델 하나만 서빙하고 vLLM adapter도 하나만 등록되므로, F2용
+`AI_VLLM_SLLM_BASE_URL`과 F3용 `AI_VLLM_F3_BASE_URL`을 동시에 켤 수 없다.
+
 ## Pod 준비
 
 24 GiB 이상 NVIDIA GPU Pod와 영속 `/workspace` volume을 사용한다. Pod Web Terminal에서 다음 환경을
