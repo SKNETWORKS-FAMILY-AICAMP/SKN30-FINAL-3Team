@@ -34,6 +34,7 @@ updated: 2026-09-07
 | [ADR-0025](ADR-0025-calendar-storage-ownership.md) | 승인됨 | 캘린더 일정 저장은 F4가 소유(F1-SC 아님)하고, Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 union 갈래로 통합 |
 | [ADR-0026](ADR-0026-general-ai-provider-and-model-profiles.md) | 부분 대체됨·seed와 Provider runtime 구현, GPU Infra 보류 | 범용 Provider alias routing과 신뢰된 Qwen 양자화 seed 프로필 유지; 활성 Provider는 ADR-0027 적용 |
 | [ADR-0027](ADR-0027-bedrock-gpt56-luna-dev-poc.md) | 승인됨·코드 구현, AWS 미적용 | local OpenAI Luna와 합성 dev Bedrock Luna SigV4 POC 사용, GPU Infra 보류 |
+| [ADR-0028](ADR-0028-f2-single-pass-auto-ledger-routing.md) | 승인됨·코드 구현 | F2 신규 음성을 한 번 분석하고 상담 유형에서 추천 장부와 그 장부 필드를 함께 반환 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

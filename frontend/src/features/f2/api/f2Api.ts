@@ -127,9 +127,18 @@ function decodeAnalysis(
   }
 
   const recommendedLedgerType = decodeLedgerType(body["ledger_type"]);
+  const ledgerMismatch = body["ledger_mismatch"] === true;
+  // 추천 장부를 확정할 수 없거나 현재 장부와 다르면 어느 장부 필드로 해석해야 할지 알 수 없다.
+  // Backend는 이 경우 제안을 비우지만, 계약을 어긴 응답이 와도 다른 장부 draft를 건드리지 않도록
+  // 필드 제안을 여기서도 버린다. 상담 로그 초안은 장부와 무관하므로 유지한다.
+  const suppressFieldProposals =
+    ledgerMismatch ||
+    recommendedLedgerType == null ||
+    (currentLedgerType != null && currentLedgerType !== recommendedLedgerType);
   const proposalLedgerType = currentLedgerType ?? recommendedLedgerType ?? "property";
   const bindings = proposalLedgerType === "buyer" ? BUYER_FIELDS : PROPERTY_FIELDS;
-  const proposals = rawProposals.map((raw, index): VoiceProposal => {
+  const fieldProposals = suppressFieldProposals ? [] : rawProposals;
+  const proposals = fieldProposals.map((raw, index): VoiceProposal => {
     const proposal = asRecord(raw, "F2 제안");
     const fieldName = requiredString(proposal, "field_name");
     const binding = bindings[fieldName];
@@ -164,7 +173,7 @@ function decodeAnalysis(
   return {
     consultationType: requiredString(body, "consultation_type"),
     ledgerType: recommendedLedgerType,
-    ledgerMismatch: body["ledger_mismatch"] === true,
+    ledgerMismatch,
     proposals,
     uncertainties: rawUncertainties.filter((item): item is string => typeof item === "string"),
     privacyConfirmedAt: requiredString(body, "privacy_confirmed_at"),
