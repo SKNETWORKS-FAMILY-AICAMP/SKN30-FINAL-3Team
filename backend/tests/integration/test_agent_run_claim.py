@@ -160,7 +160,9 @@ def test_queued_root_run_is_claimed_with_a_fresh_lease() -> None:
             text("SELECT lease_expires_at - now() AS remaining FROM agent_run WHERE id = :i"),
             {"i": run_id},
         ).scalar_one()
-        assert timedelta(minutes=4, seconds=50) <= remaining <= timedelta(minutes=5)
+        # 상수를 그대로 참조한다. 값을 적어 두면 lease 를 조정할 때마다 테스트가 함께 깨진다.
+        lease = timedelta(seconds=service.LEASE_DURATION_SECONDS)
+        assert lease - timedelta(seconds=10) <= remaining <= lease
 
 
 @requires_database
