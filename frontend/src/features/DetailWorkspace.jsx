@@ -24,32 +24,53 @@ function statusForStorage(value) { return value === "저장 완료" ? "success" 
 /**
  * 단지 선택기.
  *
- * 네이티브 select는 항목 안에 버튼을 넣을 수 없어 직접 목록을 그린다.
+ * 목록에서 고르거나, 직접 단지명을 입력할 수 있는 콤보박스다. 입력한 이름이 목록에
+ * 없으면 `onSelect`가 그대로 받아 새 단지로 다룬다(자동 추가는 호출부 책임).
  * 단지는 세대가 참조하는 마스터라 실수로 지우면 곤란하므로, x를 누르면 바로 지우지 않고
  * 그 자리에서 한 번 더 확인받는다.
  */
 function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || "");
   const [pendingId, setPendingId] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const rootRef = useRef(null);
 
   const normalized = options.map((option) => (typeof option === "string" ? { id: option, name: option } : option));
+  const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+  const filtered = normalizedQuery
+    ? normalized.filter((option) => option.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery))
+    : normalized;
+
+  useEffect(() => { setQuery(value || ""); }, [value]);
+
+  const commitQuery = () => {
+    const trimmed = query.trim();
+    if (trimmed === (value || "")) return;
+    onSelect?.(trimmed);
+  };
 
   useEffect(() => {
     if (!open) return undefined;
-    const handlePointer = (event) => { if (!rootRef.current?.contains(event.target)) setOpen(false); };
-    const handleKey = (event) => { if (event.key === "Escape") setOpen(false); };
+    const handlePointer = (event) => {
+      if (rootRef.current?.contains(event.target)) return;
+      setOpen(false);
+      commitQuery();
+    };
+    const handleKey = (event) => { if (event.key === "Escape") { setQuery(value || ""); setOpen(false); } };
     document.addEventListener("mousedown", handlePointer);
     document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("mousedown", handlePointer);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, query, value]);
 
   useEffect(() => { if (!open) { setPendingId(null); setError(""); } }, [open]);
+
+  const pick = (name) => { setQuery(name); onSelect?.(name); setOpen(false); };
 
   const removeComplex = async (option) => {
     setBusyId(option.id);
@@ -66,23 +87,28 @@ function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
   };
 
   return <div className="complex-picker" ref={rootRef}>
-    <button
-      type="button"
+    <input
       id="detail-complex"
-      className="complex-picker__toggle"
-      aria-haspopup="true"
-      aria-expanded={open}
+      type="text"
+      className="complex-picker__input"
       aria-labelledby={`${labelId} detail-complex`}
-      onClick={() => setOpen((current) => !current)}
-    >
-      <span>{value || "단지를 선택하세요"}</span>
-      <span aria-hidden="true">▾</span>
-    </button>
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      autoComplete="off"
+      value={query}
+      placeholder="단지를 선택하거나 입력하세요"
+      onFocus={() => setOpen(true)}
+      onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") { event.preventDefault(); commitQuery(); setOpen(false); }
+        if (event.key === "Escape") { setQuery(value || ""); setOpen(false); }
+      }}
+    />
     {open && <div className="complex-picker__menu">
-      <ul aria-label="단지 목록">
-        {normalized.length === 0 && <li className="complex-picker__empty">등록된 단지가 없습니다.</li>}
-        {normalized.map((option) => <li key={option.id} className={option.name === value ? "is-selected" : ""}>
-          <button type="button" className="complex-picker__pick" onClick={() => { onSelect?.(option.name); setOpen(false); }}>
+      <ul aria-label="단지 목록" role="listbox">
+        {filtered.length === 0 && <li className="complex-picker__empty">{query.trim() ? `'${query.trim()}'을(를) 새 단지로 추가합니다.` : "등록된 단지가 없습니다."}</li>}
+        {filtered.map((option) => <li key={option.id} className={option.name === value ? "is-selected" : ""}>
+          <button type="button" className="complex-picker__pick" onMouseDown={(event) => event.preventDefault()} onClick={() => pick(option.name)}>
             {option.name}
           </button>
           {pendingId === option.id ? <span className="complex-picker__confirm">
@@ -93,6 +119,7 @@ function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
             type="button"
             className="complex-picker__remove"
             aria-label={`${option.name} 단지 삭제`}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => { setError(""); setPendingId(option.id); }}
           >×</button>}
         </li>)}
@@ -192,11 +219,9 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const [securityConfirmed, setSecurityConfirmed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [complexQuickAddOpen, setComplexQuickAddOpen] = useState(false);
-  const [newComplexName, setNewComplexName] = useState("");
-  const [newComplexAddress, setNewComplexAddress] = useState("");
-  const [complexQuickAddError, setComplexQuickAddError] = useState("");
-  const [complexQuickAddStatus, setComplexQuickAddStatus] = useState("");
+  /* 단지 콤보박스에 없는 이름을 입력하면 자동으로 새 단지를 만드는 중 뜨는 상태. */
+  const [complexCreating, setComplexCreating] = useState(false);
+  const [complexError, setComplexError] = useState("");
   /* 음성 메모 제안이 이미 값이 있는 칸을 덮어쓰려 할 때만 채워지는 확인 대기 상태. */
   const [replaceDecision, setReplaceDecision] = useState(null);
   /* 상담 로그를 큰 창에서 읽고 쓰는 상태. 값은 상세의 작성값 하나만 쓰고 여기서 복사하지 않는다. */
@@ -209,7 +234,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const keepExistingRef = useRef(null);
   const logExpandTriggerRef = useRef(null);
 
-  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setDuplicateBlock(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexQuickAddOpen(false); setComplexQuickAddError(""); setComplexQuickAddStatus(""); setReplaceDecision(null); setLogExpanded(false); }, [focusF2Request, isOpen, row]);
+  useEffect(() => { if (!isOpen) { initializedOpenRef.current = false; return; } if (initializedOpenRef.current) return; initializedOpenRef.current = true; const next = normalizeRow(row); setDraft(next); baselineRef.current = next; setF2Open(Boolean(focusF2Request)); setRelationOpen(false); setCloseDecision(false); setDeleteDecision(false); setIsDeleting(false); setDeleteError(""); setDuplicateBlock(false); setSecurityWarning(""); setSecurityConfirmed(false); setSaveError(""); setComplexCreating(false); setComplexError(""); setReplaceDecision(null); setLogExpanded(false); }, [focusF2Request, isOpen, row]);
   useEffect(() => { if (isOpen && focusF2Request) setF2Open(true); }, [focusF2Request, isOpen]);
   useEffect(() => { if (securityWarning) securityRef.current?.focus(); }, [securityWarning]);
   /* 확인을 받는 쪽이 덮어쓰기이므로, 처음 잡히는 초점은 기존 값을 지키는 버튼에 둔다. */
@@ -285,8 +310,33 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
 
   // 저장에는 이름이 아니라 서버 id가 필요하다. 선택지에 id가 있으면 함께 싣는다.
   const complexIdOf = (name) => complexOptions.find((option) => typeof option !== "string" && option.name === name)?.id ?? null;
-  const selectComplex = (value) => { if (value === "__new_complex__") { setComplexQuickAddOpen(true); return; } stagePatch({ complex: value, complexId: complexIdOf(value), duplicateCheck: value === draft.complex ? draft.duplicateCheck : false }); };
-  const createComplex = async () => { const name = newComplexName.trim(); const address = newComplexAddress.trim(); if (!name) { setComplexQuickAddError("단지명을 입력해 주세요."); return; } const duplicate = complexOptions.find((option) => (typeof option === "string" ? option : option.name)?.toLocaleLowerCase("ko-KR") === name.toLocaleLowerCase("ko-KR")); if (duplicate) { setComplexQuickAddError(`이미 등록된 단지입니다: ${typeof duplicate === "string" ? duplicate : duplicate.name}`); return; } try { const created = await onCreateComplex?.({ name, address }); const selectedName = created?.name || name; stagePatch({ complex: selectedName, complexId: created?.id ?? null, duplicateCheck: false }); setComplexQuickAddOpen(false); setNewComplexName(""); setNewComplexAddress(""); setComplexQuickAddError(""); setComplexQuickAddStatus(`${selectedName} 단지를 추가하고 선택했습니다.`); } catch (error) { setComplexQuickAddError(error?.message || "단지를 추가하지 못했습니다."); } };
+  const findComplexOption = (name) => complexOptions
+    .map((option) => (typeof option === "string" ? { id: option, name: option } : option))
+    .find((option) => option.name.toLocaleLowerCase("ko-KR") === name.toLocaleLowerCase("ko-KR"));
+  /*
+   * 콤보박스에서 고른 이름이 이미 등록된 단지면 그대로 선택하고, 없는 이름이면
+   * 신규 단지로 보고 바로 만들어 선택한다. 목록에 없는 이름을 입력하는 것 자체가
+   * 사용자의 추가 의도이므로 별도 확인 없이 진행한다.
+   */
+  const selectComplex = async (rawValue) => {
+    const name = rawValue.trim();
+    setComplexError("");
+    if (!name) { stagePatch({ complex: "", complexId: null, duplicateCheck: false }); return; }
+    const existing = findComplexOption(name);
+    if (existing) {
+      stagePatch({ complex: existing.name, complexId: complexIdOf(existing.name), duplicateCheck: existing.name === draft.complex ? draft.duplicateCheck : false });
+      return;
+    }
+    setComplexCreating(true);
+    try {
+      const created = await onCreateComplex?.({ name });
+      stagePatch({ complex: created?.name || name, complexId: created?.id ?? null, duplicateCheck: false });
+    } catch (error) {
+      setComplexError(error?.message || "단지를 추가하지 못했습니다.");
+    } finally {
+      setComplexCreating(false);
+    }
+  };
 
   /*
    * 저장 전 중복 검사.
@@ -414,7 +464,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
               options={complexOptions}
               onSelect={selectComplex}
               onDelete={onDeleteComplex}
-            />{String(draft.id).startsWith("DRAFT-") && <Button variant="link" isInline onClick={() => setComplexQuickAddOpen(true)}>새 단지 추가</Button>}{complexQuickAddOpen && <div className="detail-complex-quick-add"><strong>새 단지 빠른 추가</strong><label htmlFor="detail-new-complex-name">단지명</label><TextInput id="detail-new-complex-name" value={newComplexName} validated={complexQuickAddError ? "error" : "default"} onChange={(_event, value) => setNewComplexName(value)} /><label htmlFor="detail-new-complex-address">주소</label><TextInput id="detail-new-complex-address" value={newComplexAddress} onChange={(_event, value) => setNewComplexAddress(value)} />{complexQuickAddError && <span role="alert">{complexQuickAddError}</span>}<div className="f2-actions"><Button size="sm" onClick={createComplex}>추가 후 선택</Button><Button size="sm" variant="link" onClick={() => setComplexQuickAddOpen(false)}>취소</Button></div></div>}{complexQuickAddStatus && <span className="detail-complex-quick-add__status" role="status">{complexQuickAddStatus}</span>}</div><div className="detail-inline-fields"><DetailField id="detail-building" label="동" value={draft.building} onChange={(value) => stageField("building", value)} /><DetailField id="detail-unit" label="호" value={draft.unit} onChange={(value) => stageField("unit", value)} /></div><div className="detail-inline-fields"><DetailField id="detail-area" label="평형" value={draft.area} onChange={(value) => stageField("area", value)} /><DetailField id="detail-direction" label="향" value={draft.direction} onChange={(value) => stageField("direction", value)} /></div><DetailField id="detail-type" label="타입" value={draft.type} onChange={(value) => stageField("type", value)} /></div>
+            />{complexCreating && <span className="detail-field__hint" role="status">단지를 추가하는 중…</span>}{complexError && <span className="detail-field__hint" role="alert">{complexError}</span>}</div><div className="detail-inline-fields"><DetailField id="detail-building" label="동" value={draft.building} onChange={(value) => stageField("building", value)} /><DetailField id="detail-unit" label="호" value={draft.unit} onChange={(value) => stageField("unit", value)} /></div><div className="detail-inline-fields"><DetailField id="detail-area" label="평형" value={draft.area} onChange={(value) => stageField("area", value)} /><DetailField id="detail-direction" label="향" value={draft.direction} onChange={(value) => stageField("direction", value)} /></div><DetailField id="detail-type" label="타입" value={draft.type} onChange={(value) => stageField("type", value)} /></div>
 
             {/* 명도는 세대가 아니라 매물 건(handover_condition)에 저장된다. 매물 조건 옆으로 옮겼다. */}
             <div className="detail-info-column"><h3>현재 임대차</h3><div className="detail-inline-fields"><DetailField id="detail-deposit" label="보증금(현)" value={draft.deposit} onChange={(value) => stageField("deposit", value)} /><DetailField id="detail-rent" label="차임(현)" value={draft.rent} onChange={(value) => stageField("rent", value)} /></div><DetailField id="detail-loan" label="융자" value={draft.loan} onChange={(value) => stageField("loan", value)} /><DetailField id="detail-expiry" label="계약 만기일" type="date" value={draft.expiry} onChange={(value) => stageField("expiry", value)} /></div>

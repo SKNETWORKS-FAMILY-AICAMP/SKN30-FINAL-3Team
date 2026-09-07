@@ -136,8 +136,8 @@ button, input, select, textarea { font: inherit; }
 .message-composer__recipients { display: grid; gap: 8px; max-height: 220px; margin: 0; padding: 12px; overflow: auto; border: 0; border-top: 1px solid #d2d2d2; }
 .message-composer__recipients legend { padding: 0 4px; color: #4f5255; font-size: 12px; font-weight: 700; }
 .complex-picker { position: relative; }
-.complex-picker__toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 10px; color: #151515; text-align: left; background: #fff; border: 1px solid #8a8d90; border-bottom-color: #151515; border-radius: 3px; cursor: pointer; font: inherit; }
-.complex-picker__toggle:focus-visible { outline: 2px solid #0066cc; outline-offset: 1px; }
+.complex-picker__input { display: block; width: 100%; padding: 6px 10px; color: #151515; text-align: left; background: #fff; border: 1px solid #8a8d90; border-bottom-color: #151515; border-radius: 3px; font: inherit; }
+.complex-picker__input:focus-visible { outline: 2px solid #0066cc; outline-offset: 1px; }
 .complex-picker__menu { position: absolute; z-index: 30; top: calc(100% + 2px); left: 0; right: 0; max-height: 280px; overflow: auto; background: #fff; border: 1px solid #d2d2d2; border-radius: 4px; box-shadow: 0 4px 12px rgba(3, 3, 3, 0.16); }
 .complex-picker__menu ul { margin: 0; padding: 4px; list-style: none; }
 .complex-picker__menu li { display: flex; align-items: center; gap: 4px; border-radius: 3px; }
