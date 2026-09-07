@@ -9,7 +9,7 @@ import {
   ExclamationTriangleIcon, FilterIcon, HelpIcon, MicrophoneIcon, OutlinedCommentsIcon, SaveIcon, SearchIcon,
   UserIcon,
 } from "@patternfly/react-icons";
-import { useBuyerLedger, useComplexOptions, usePropertyLedger } from "./features/ledger/index.ts";
+import { useBuyerLedger, useComplexOptions, useComplexQuickAdd, usePropertyLedger } from "./features/ledger/index.ts";
 import { describeForUser, isEmptyDraft } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
@@ -178,12 +178,6 @@ export function AppShell() {
   const [batchEditField, setBatchEditField] = useState("assignee");
   const [batchEditValue, setBatchEditValue] = useState("김이순");
   const [scheduleSuggestion, setScheduleSuggestion] = useState(null);
-  /** 매물장 단지 필터 옆 새 단지 추가 창. */
-  const [complexAddOpen, setComplexAddOpen] = useState(false);
-  const [newComplexName, setNewComplexName] = useState("");
-  const [newComplexAddress, setNewComplexAddress] = useState("");
-  const [complexAddError, setComplexAddError] = useState("");
-  const [isCreatingComplex, setIsCreatingComplex] = useState(false);
   const addRowButtonRef = useRef(null);
 
   const selectedRowIds = useMemo(() => selectedRows.map((row) => row.id), [selectedRows]);
@@ -480,30 +474,7 @@ export function AppShell() {
     }
   };
 
-  const openComplexAdd = () => {
-    setNewComplexName("");
-    setNewComplexAddress("");
-    setComplexAddError("");
-    setComplexAddOpen(true);
-  };
-  const closeComplexAdd = () => {
-    if (isCreatingComplex) return;
-    setComplexAddOpen(false);
-  };
-  const submitComplexAdd = async () => {
-    const name = newComplexName.trim();
-    if (!name) { setComplexAddError("단지명을 입력해 주세요."); return; }
-    setIsCreatingComplex(true);
-    setComplexAddError("");
-    try {
-      await handleCreateComplex({ name, address: newComplexAddress.trim() });
-      setComplexAddOpen(false);
-    } catch (error) {
-      setComplexAddError(error?.message || "단지를 추가하지 못했습니다.");
-    } finally {
-      setIsCreatingComplex(false);
-    }
-  };
+  const complexQuickAdd = useComplexQuickAdd(handleCreateComplex);
 
   const clearFilters = () => {
     setSearchQuery(""); setComplexFilter("전체"); setSaveFilter("전체");
@@ -732,7 +703,7 @@ export function AppShell() {
           <div className="f1-control-strip__bottom-row">
             <div className="filter-row">
               <label className={`filter-control${complexFilter === "전체" ? "" : " active-filter"}`}><FilterIcon aria-hidden="true" /><span>단지</span><select value={complexFilter} onChange={(event) => setComplexFilter(event.target.value)}>{["전체", ...complexOptions.map((option) => option.name)].map((value) => <option key={value}>{value}</option>)}</select></label>
-              <Button variant="link" isInline icon={<AddCircleOIcon />} onClick={openComplexAdd}>새 단지 추가</Button>
+              <Button variant="link" isInline icon={<AddCircleOIcon />} onClick={complexQuickAdd.open}>새 단지 추가</Button>
               <label className="filter-control"><span>저장 상태</span><select value={saveFilter} onChange={(event) => setSaveFilter(event.target.value)}>{["전체", "임시저장", "저장 완료"].map((value) => <option key={value}>{value}</option>)}</select></label>
               <Button variant="link" onClick={clearFilters} isDisabled={!searchQuery && complexFilter === "전체" && saveFilter === "전체" && viewState !== "filtered-empty"}>모든 필터 해제</Button>
             </div>
@@ -829,16 +800,23 @@ export function AppShell() {
       </div>}</ModalBody>
       <ModalFooter><Button variant={messageCopied ? "secondary" : "primary"} isDisabled={!composerRecipients.length} onClick={async () => { try { if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable"); await navigator.clipboard.writeText(composerRecipients.map((recipient) => recipient.phone).join("\n")); setMessageCopied(true); setToast({ variant: "success", title: "번호 목록을 복사했습니다. 발송은 외부 도구에서 진행합니다." }); } catch { setMessageCopied(false); setToast({ variant: "warning", title: "번호를 복사하지 못했습니다. 번호 목록을 선택해 직접 복사해 주세요." }); } }}>{messageCopied ? "번호 목록 복사됨" : "번호 목록 복사"}</Button><Button variant="link" onClick={closeMessageComposer}>닫기</Button></ModalFooter>
     </Modal>
-    <Modal variant="small" isOpen={complexAddOpen} onClose={closeComplexAdd}>
+    <Modal variant="small" isOpen={complexQuickAdd.isOpen} onClose={complexQuickAdd.close}>
       <ModalHeader title="새 단지 추가" description="단지명은 필수이며 주소는 선택입니다." />
       <ModalBody>
-        <label className="batch-edit-field"><span>단지명</span><TextInput id="new-complex-name" value={newComplexName} validated={complexAddError ? "error" : "default"} onChange={(_event, value) => setNewComplexName(value)} /></label>
-        <label className="batch-edit-field"><span>주소</span><TextInput id="new-complex-address" value={newComplexAddress} onChange={(_event, value) => setNewComplexAddress(value)} /></label>
-        {complexAddError && <Alert className="workspace-alert" variant="danger" isInline isLiveRegion title="단지를 추가하지 못했습니다">{complexAddError}</Alert>}
+        <label className="batch-edit-field"><span>단지명</span><TextInput
+          id="new-complex-name"
+          ref={complexQuickAdd.nameInputRef}
+          value={complexQuickAdd.name}
+          validated={complexQuickAdd.nameError ? "error" : "default"}
+          aria-describedby={complexQuickAdd.nameError ? "new-complex-name-error" : undefined}
+          onChange={(_event, value) => complexQuickAdd.setName(value)}
+        /></label>
+        <label className="batch-edit-field"><span>주소</span><TextInput id="new-complex-address" value={complexQuickAdd.address} onChange={(_event, value) => complexQuickAdd.setAddress(value)} /></label>
+        {complexQuickAdd.nameError && <Alert id="new-complex-name-error" className="workspace-alert" variant="danger" isInline isLiveRegion title="단지를 추가하지 못했습니다">{complexQuickAdd.nameError}</Alert>}
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" onClick={submitComplexAdd} isLoading={isCreatingComplex} isDisabled={isCreatingComplex}>추가</Button>
-        <Button variant="link" onClick={closeComplexAdd} isDisabled={isCreatingComplex}>취소</Button>
+        <Button variant="primary" onClick={complexQuickAdd.submit} isLoading={complexQuickAdd.isSubmitting} isDisabled={complexQuickAdd.isSubmitting}>추가</Button>
+        <Button variant="link" onClick={complexQuickAdd.close} isDisabled={complexQuickAdd.isSubmitting}>취소</Button>
       </ModalFooter>
     </Modal>
     <Modal variant="small" isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
