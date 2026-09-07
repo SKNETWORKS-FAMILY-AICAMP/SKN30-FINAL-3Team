@@ -126,6 +126,16 @@ Frontend는 HTTP `status`, `code`, `request_id`를 보존해 기능별 안전 �
 
 인물의 개인정보 활용 동의가 없으면 구입장 저장을 거절한다. 동의 사실은 인물 단위로 기록하며 동의 문구, 보존 기간과 철회 절차는 아직 확정하지 않았다.
 
+구입장 생성 요청은 `party_id`와 `new_party` 중 하나를 필수로 받는다. 화면에는 기존 인물을 고르는
+검색이 없으므로 새 손님은 대부분 `new_party`(`name` 필수, `phone` 선택)로 인물까지 함께 만든다.
+매물장이 세대 생성 요청의 `parties`로 임대인·임차인을 함께 만드는 것과 같은 구조다. `new_party`를
+쓸 때는 `privacy_consent`가 true여야 하며, 아니면 `PRIVACY_CONSENT_REQUIRED`로 거절하고 인물도
+만들지 않는다. true이면 서버가 그 시각을 인물의 `privacy_consent_at`으로 기록한다. `party_id`를
+보내는 경로는 이미 동의를 받은 기존 인물에 새 구입장을 잇는 용도로 열려 있지만, 인물 검색 화면이
+없어 현재 클라이언트는 쓰지 않는다. 새 인물의 이름이 비어 있거나 두 필드가 모두 없으면
+`VALIDATION_FAILED`다. `PropertyRequirementUpdateRequest`(PATCH)에는 이 필드가 없다. 구입장의
+인물 연결은 생성 시점에 정해지며 이후 바꾸는 경로는 없다.
+
 ### 상담 로그
 
 | Method | Path | 인증 | 동작 |
