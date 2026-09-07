@@ -222,6 +222,11 @@ function StateSummary({ label, value, status }) { return <div className="detail-
 export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onDeleteComplex, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0, complexOptions = [], onCreateComplex, currentUser = null }) {
   const [draft, setDraft] = useState(() => normalizeRow(row));
   const baselineRef = useRef(normalizeRow(row));
+  /* saveDraft가 비동기 단지 생성 뒤에도 최신 draft를 읽도록 상태를 거울처럼 따라간다. */
+  const draftRef = useRef(draft);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  /* 저장·닫기가 진행 중인 단지 생성 요청을 기다리거나 막을 수 있도록 붙잡아 둔다. */
+  const complexCreateRef = useRef(null);
   const [f2Open, setF2Open] = useState(false);
   const [relationOpen, setRelationOpen] = useState(false);
   const [relationTarget, setRelationTarget] = useState(null);
@@ -334,7 +339,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    * 신규 단지로 보고 바로 만들어 선택한다. 목록에 없는 이름을 입력하는 것 자체가
    * 사용자의 추가 의도이므로 별도 확인 없이 진행한다.
    */
-  const selectComplex = async (rawValue) => {
+  const selectComplex = (rawValue) => {
     const name = rawValue.trim();
     setComplexError("");
     if (!name) { stagePatch({ complex: "", complexId: null, duplicateCheck: false }); return; }
@@ -345,15 +350,24 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     }
     if (!onCreateComplex) { setComplexError("단지를 추가할 수 없습니다. 매물장 메인 화면에서 먼저 등록해 주세요."); return; }
     setComplexCreating(true);
-    try {
-      const created = await onCreateComplex({ name });
-      if (!created?.id || !created?.name) throw new Error("단지를 추가하지 못했습니다. 서버 응답이 올바르지 않습니다.");
-      stagePatch({ complex: created.name, complexId: created.id, duplicateCheck: false });
-    } catch (error) {
-      setComplexError(error?.message || "단지를 추가하지 못했습니다.");
-    } finally {
-      setComplexCreating(false);
-    }
+    /*
+     * saveDraft와 requestClose가 이 요청이 끝날 때까지 기다리거나 막을 수 있도록,
+     * 완료 전에 ref에 실어 둔다. saveDraft는 실패해도 진행해야 하므로 여기서
+     * 예외를 삼키고 성공 여부는 complexError로만 알린다.
+     */
+    const createPromise = (async () => {
+      try {
+        const created = await onCreateComplex({ name });
+        if (!created?.id || !created?.name) throw new Error("단지를 추가하지 못했습니다. 서버 응답이 올바르지 않습니다.");
+        stagePatch({ complex: created.name, complexId: created.id, duplicateCheck: false });
+      } catch (error) {
+        setComplexError(error?.message || "단지를 추가하지 못했습니다.");
+      } finally {
+        setComplexCreating(false);
+        if (complexCreateRef.current === createPromise) complexCreateRef.current = null;
+      }
+    })();
+    complexCreateRef.current = createPromise;
   };
 
   /*
@@ -364,7 +378,40 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    * 다만 입력한 내용을 붙들어 두는 임시저장까지 막으면 잃는 쪽이 더 크다.
    * 임시저장인 줄 알고 누르는 경로(확인 팝업의 임시저장, 닫기 확인)는 allowDraft로 통과시킨다.
    */
-  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => { if (!draft.duplicateCheck && !allowDraft) { setDuplicateBlock(true); return; } const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${draft.memo || ""} ${draft.log || ""}`); if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); return; } setSecurityWarning(""); setIsSaving(true); setSaveError(""); const nextDraft = { ...draft, saveState: canComplete ? "저장 완료" : "임시저장" }; try { const persisted = await onSave?.(nextDraft); window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft })); /* 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다. */ const savedDraft = carrySavedIdentity(nextDraft, persisted); setDraft(savedDraft); baselineRef.current = savedDraft; setSecurityConfirmed(false); setCloseDecision(false); if (closeAfter) onClose?.(); } catch (error) { setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요."); } finally { setIsSaving(false); } };
+  const saveDraft = async ({ closeAfter = false, allowSensitive = false, allowDraft = false } = {}) => {
+    /*
+     * 목록에 없는 단지명을 입력하면 단지 생성이 끝나기 전에는 draft.complex/complexId가
+     * 아직 이전 값이다. 그 상태로 저장하면 사용자가 입력한 단지가 아니라 옛 값이 저장되거나
+     * 새로 만든 단지와 세대의 참조가 어긋난다. 생성이 끝날 때까지 저장을 미룬다.
+     */
+    const pendingComplexCreate = complexCreateRef.current;
+    if (pendingComplexCreate) {
+      setIsSaving(true);
+      try { await pendingComplexCreate; } catch { /* 실패 메시지는 단지 생성 쪽에서 이미 보여줬다. */ }
+    }
+    const current = draftRef.current;
+    if (!current.duplicateCheck && !allowDraft) { setDuplicateBlock(true); if (pendingComplexCreate) setIsSaving(false); return; }
+    const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${current.memo || ""} ${current.log || ""}`);
+    if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); if (pendingComplexCreate) setIsSaving(false); return; }
+    setSecurityWarning(""); setIsSaving(true); setSaveError("");
+    const currentCanComplete = Boolean(current.complex?.trim() && current.building?.trim() && current.unit?.trim() && current.duplicateCheck);
+    const nextDraft = { ...current, saveState: currentCanComplete ? "저장 완료" : "임시저장" };
+    try {
+      const persisted = await onSave?.(nextDraft);
+      window.dispatchEvent(new CustomEvent("prototype:f1-row-saved", { detail: nextDraft }));
+      /* 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다. */
+      const savedDraft = carrySavedIdentity(nextDraft, persisted);
+      setDraft(savedDraft);
+      baselineRef.current = savedDraft;
+      setSecurityConfirmed(false);
+      setCloseDecision(false);
+      if (closeAfter) onClose?.();
+    } catch (error) {
+      setSaveError(error?.message || "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
   /* 확인을 닫으면 바로 체크할 수 있도록 초점을 중복 검사 체크박스에 돌려준다. */
   const closeDuplicateBlock = () => {
     setDuplicateBlock(false);
@@ -389,6 +436,8 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   /* Esc와 닫기 버튼이 열린 확인 위로 지나가면 상세가 통째로 닫힌다. 확인 중에는 가장 위의 확인만 닫는다. */
   const requestClose = (event) => {
     if (isDeleting) return;
+    /* 단지 생성이 끝나기 전에 닫으면 방금 입력한 단지가 세대에 전혀 반영되지 못한 채 사라진다. */
+    if (complexCreating) return;
     if (duplicateBlock) { closeDuplicateBlock(); return; }
     if (deleteDecision) { closeDeleteDecision(); return; }
     if (logExpanded) { closeLogExpanded(); return; }
@@ -412,7 +461,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
    */
   const isUnsavedDraftRow = String(draft.id || "").startsWith("DRAFT-");
   const deleteTargetLabel = `${draft.complex || "단지 미입력"} ${draft.building || "-"}동 ${draft.unit || "-"}호`;
-  const requestDelete = () => { setDeleteError(""); setDeleteDecision(true); };
+  const requestDelete = () => { if (complexCreating) return; setDeleteError(""); setDeleteDecision(true); };
   const confirmDelete = async () => {
     if (isDeleting) return;
     setIsDeleting(true);
@@ -527,7 +576,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
           {crossMatchPanel}
         </section>
       </main>
-      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
+      <aside className="detail-workspace__action-rail" aria-label="F1 상세 작업"><div className={`action-rail__dirty ${isDirty ? "is-dirty" : ""}`} aria-live="polite"><span>{isDirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span></div><div className="action-rail__primary"><span className="action-rail__eyebrow">주요 작업</span><div className={`detail-duplicate-check ${draft.duplicateCheck ? "is-complete" : ""}`}><Checkbox id="detail-duplicate-check" label="중복 검사 완료" isChecked={draft.duplicateCheck} onChange={(_event, checked) => stageField("duplicateCheck", checked)} /></div><Button variant="primary" icon={<SaveIcon />} onClick={() => saveDraft()} isLoading={isSaving} isDisabled={isSaving}>저장</Button><Button ref={detailCloseTriggerRef} variant="secondary" icon={<TimesIcon />} onClick={requestClose} isDisabled={complexCreating}>상세 닫기</Button><Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button><Button className="detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button><Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting || complexCreating} aria-haspopup="dialog">삭제</Button></div><Divider /><div className="action-rail__status"><div className="action-rail__status-heading"><strong>저장 완료 조건</strong><Label status={canComplete ? "success" : "warning"} isCompact>{Object.values(completion).filter(Boolean).length}/4</Label></div><ul>{[["complex", "단지"], ["building", "동"], ["unit", "호"], ["duplicate", "중복 검사"]].map(([key, label]) => <li className={completion[key] ? "is-complete" : ""} key={key}>{completion[key] ? <CheckCircleIcon aria-hidden="true" /> : <InfoCircleIcon aria-hidden="true" />}{label}</li>)}</ul>{!canComplete && <p>{completion.duplicate ? "조건 미충족 상태에서도 임시저장할 수 있습니다." : "중복 검사 완료를 체크해야 저장 완료로 남습니다. 임시저장은 그대로 됩니다."}</p>}</div></aside>
     </div>
     {replaceDecision && <div className="detail-workspace__decision-layer" role="presentation"><section className="detail-workspace__decision-card" role="alertdialog" aria-modal="true" aria-labelledby="replace-decision-title" aria-describedby="replace-decision-effect"><div className="decision-card__icon decision-card__icon--warning"><MicrophoneIcon aria-hidden="true" /></div><Title headingLevel="h2" id="replace-decision-title" size="lg">이미 입력된 값을 음성 메모 값으로 바꿀까요?</Title><p id="replace-decision-effect">아래 {replaceDecision.replacements.length}개 칸에는 이미 값이 있습니다. 바꾸면 기존 값은 이 화면에서 되돌릴 수 없습니다. 어느 쪽을 골라도 장부에 저장하지는 않습니다.</p><ul className="decision-card__replacements">{replaceDecision.replacements.map((item) => <li key={item.fieldKey}><strong>{item.field}</strong><span><em>현재</em>{item.current}</span><span><em>음성 메모</em>{item.next}</span></li>)}</ul>{f2KeptFieldCount > 0 && <p className="decision-card__kept">비어 있던 {f2KeptFieldCount}개 칸은 어느 쪽을 골라도 채웁니다.</p>}<div className="decision-card__actions"><Button variant="primary" onClick={replaceWithF2}>음성 메모 값으로 대체</Button><Button ref={keepExistingRef} variant="secondary" onClick={keepExistingOverF2}>기존 값 유지</Button></div></section></div>}
     </ModalBody>
