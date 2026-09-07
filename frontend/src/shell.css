@@ -143,6 +143,7 @@ button, input, select, textarea { font: inherit; }
 .complex-picker__menu li { display: flex; align-items: center; gap: 4px; border-radius: 3px; }
 .complex-picker__menu li:hover, .complex-picker__menu li:focus-within { background: #f0f7ff; }
 .complex-picker__menu li.is-selected { font-weight: 700; }
+.complex-picker__menu li.is-active { background: #f0f7ff; }
 .complex-picker__pick { flex: 1; padding: 8px 10px; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; }
 /*
  * 삭제 버튼은 항상 렌더한다. visibility: hidden으로 감추면 Tab 순서에서 빠져

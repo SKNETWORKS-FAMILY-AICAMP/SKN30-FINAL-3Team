@@ -32,18 +32,22 @@ function statusForStorage(value) { return value === "저장 완료" ? "success" 
 function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value || "");
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [pendingId, setPendingId] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const rootRef = useRef(null);
+  const listboxId = `${labelId}-listbox`;
 
   const normalized = options.map((option) => (typeof option === "string" ? { id: option, name: option } : option));
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const filtered = normalizedQuery
     ? normalized.filter((option) => option.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery))
     : normalized;
+  const activeOption = activeIndex >= 0 ? filtered[activeIndex] : null;
 
   useEffect(() => { setQuery(value || ""); }, [value]);
+  useEffect(() => { setActiveIndex(-1); }, [query, open]);
 
   const commitQuery = () => {
     const trimmed = query.trim();
@@ -90,24 +94,36 @@ function ComplexPicker({ labelId, value, options = [], onSelect, onDelete }) {
     <input
       id="detail-complex"
       type="text"
+      role="combobox"
       className="complex-picker__input"
       aria-labelledby={`${labelId} detail-complex`}
       aria-haspopup="listbox"
       aria-expanded={open}
+      aria-controls={listboxId}
+      aria-autocomplete="list"
+      aria-activedescendant={activeOption ? `${listboxId}-option-${activeIndex}` : undefined}
       autoComplete="off"
       value={query}
       placeholder="단지를 선택하거나 입력하세요"
       onFocus={() => setOpen(true)}
       onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
       onKeyDown={(event) => {
-        if (event.key === "Enter") { event.preventDefault(); commitQuery(); setOpen(false); }
+        if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); setActiveIndex((current) => (filtered.length ? (current + 1) % filtered.length : -1)); return; }
+        if (event.key === "ArrowUp") { event.preventDefault(); setOpen(true); setActiveIndex((current) => (filtered.length ? (current - 1 + filtered.length) % filtered.length : -1)); return; }
+        if (event.key === "Enter") { event.preventDefault(); if (activeOption) pick(activeOption.name); else commitQuery(); setOpen(false); return; }
         if (event.key === "Escape") { setQuery(value || ""); setOpen(false); }
       }}
     />
     {open && <div className="complex-picker__menu">
-      <ul aria-label="단지 목록" role="listbox">
-        {filtered.length === 0 && <li className="complex-picker__empty">{query.trim() ? `'${query.trim()}'을(를) 새 단지로 추가합니다.` : "등록된 단지가 없습니다."}</li>}
-        {filtered.map((option) => <li key={option.id} className={option.name === value ? "is-selected" : ""}>
+      <ul id={listboxId} aria-label="단지 목록" role="listbox">
+        {filtered.length === 0 && <li className="complex-picker__empty" role="presentation">{query.trim() ? `'${query.trim()}'을(를) 새 단지로 추가합니다.` : "등록된 단지가 없습니다."}</li>}
+        {filtered.map((option, index) => <li
+          key={option.id}
+          id={`${listboxId}-option-${index}`}
+          role="option"
+          aria-selected={option.name === value}
+          className={[option.name === value ? "is-selected" : "", index === activeIndex ? "is-active" : ""].filter(Boolean).join(" ")}
+        >
           <button type="button" className="complex-picker__pick" onMouseDown={(event) => event.preventDefault()} onClick={() => pick(option.name)}>
             {option.name}
           </button>
@@ -327,10 +343,12 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
       stagePatch({ complex: existing.name, complexId: complexIdOf(existing.name), duplicateCheck: existing.name === draft.complex ? draft.duplicateCheck : false });
       return;
     }
+    if (!onCreateComplex) { setComplexError("단지를 추가할 수 없습니다. 매물장 메인 화면에서 먼저 등록해 주세요."); return; }
     setComplexCreating(true);
     try {
-      const created = await onCreateComplex?.({ name });
-      stagePatch({ complex: created?.name || name, complexId: created?.id ?? null, duplicateCheck: false });
+      const created = await onCreateComplex({ name });
+      if (!created?.id || !created?.name) throw new Error("단지를 추가하지 못했습니다. 서버 응답이 올바르지 않습니다.");
+      stagePatch({ complex: created.name, complexId: created.id, duplicateCheck: false });
     } catch (error) {
       setComplexError(error?.message || "단지를 추가하지 못했습니다.");
     } finally {
