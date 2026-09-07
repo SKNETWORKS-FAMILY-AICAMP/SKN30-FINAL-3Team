@@ -1,13 +1,13 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-09-04
 ---
 
 # ADR-0017: 공유 AWS dev 환경과 합성 개발 세션
 
 - 상태: 승인됨
 - 결정일: 2026-08-27
-- 수정일: 2026-08-27
+- 수정일: 2026-09-04
 - 대체 범위: [Backend ADR-0002](../../../backend/references/decisions/ADR-0002-backend-runtime-database-authentication.md)의 개발 세션 `local` 전용 조항
 - 관련 결정: [ADR-0009](ADR-0009-dev-demo-operating-constraints.md), [ADR-0015](ADR-0015-environment-configuration-ownership.md)
 
@@ -38,9 +38,11 @@ updated: 2026-08-27
   명백한 합성·비식별 데이터만 사용한다.
 - 계정 생성과 Backend sample seed 명령은 `local` 애플리케이션 경계에서 실행한다. 운영자가 개인 IAM
   인증과 SSM 터널로 공유 development DB를 지정하는 것은 배포 API에 관리 기능을 노출하는 것이 아니다.
-- `docs/db/seed/`의 검토된 F3 합성 reset·seed·verify 세 파일은 공유 dev에도 적용할 수 있다. Infra의
-  `seed-f3 --apply`만 이 예외를 구현하며, 명시적 확인 뒤 파일을 고정 순서로 실행하고 29개 검사가
-  모두 `PASS`일 때만 완료한다. 대상은 현재 Terraform dev RDS와 `F3_SYNTHETIC` 사무소로 제한하고
+- `docs/db/seed/`의 검토된 F3 합성 reset·data·정적 model profile·verify 파일은 공유 dev에도
+  적용할 수 있다. Infra의 `seed-f3 --apply --model-profile <allowlist>`만 이 예외를 구현하며,
+  명시적 확인 뒤 파일을 고정 순서로 실행하고 30개 검사가 모두 `PASS`일 때만 완료한다. 공유 dev
+  기본 profile은 [ADR-0027](ADR-0027-bedrock-gpt56-luna-dev-poc.md)의 Bedrock smoke gate를 따른다.
+  대상은 현재 Terraform dev RDS와 `F3_SYNTHETIC` 사무소로 제한하고
   개인 IAM·SSM 터널·15분 DB token을 사용하며 token·DB URL을 출력하지 않는다. prod와 임의 DB 적용,
   임의 SQL 경로 입력과 migration 자동 편입은 계속 금지한다.
 

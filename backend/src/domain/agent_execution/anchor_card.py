@@ -535,7 +535,7 @@ def _verify_and_insert_card(
         raise GenerationBindingError("the input privacy mode changed during generation")
     if run.brokerage_id != prepared.brokerage_id:
         raise LeaseNotHeldError("the run belongs to a different brokerage")
-    # model_snapshot 도 실행 감사 계약의 일부다. 네 값을 모두 본다.
+    # model_snapshot 도 실행 감사 계약의 일부다. allowlist의 모든 값을 본다.
     expected_snapshot = _expected_model_snapshot(session, run, binding)
     if (
         run.model_config_id != binding.model_config_id

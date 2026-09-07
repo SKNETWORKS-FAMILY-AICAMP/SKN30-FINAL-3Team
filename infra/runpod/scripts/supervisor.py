@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hmac
+import json
 import os
 import re
 import shutil
@@ -15,8 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from artifact_bootstrap import BootstrapError, Release, bootstrap
+from healthcheck import check
 
 SHUTDOWN_GRACE_SECONDS = 30
+STARTUP_TIMEOUT_SECONDS = 1500
 API_KEY_PATTERN = re.compile(r"[A-Za-z0-9_-]{43,128}\Z")
 MODEL_ID_PATTERN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*\Z"
@@ -90,6 +93,12 @@ def load_config(
     source = dict(os.environ if environment is None else environment)
     stt_model = source.get("F2_STT_MODEL_ID", "").strip()
     stt_revision = source.get("F2_STT_MODEL_REVISION", "").strip()
+    sllm_model = release.base_model_id
+    if source.get("F2_LOCAL_MODELS") == "1":
+        for name in ("sllm", "stt"):
+            if not Path("/models", name, "config.json").is_file():
+                raise ConfigurationError("immutable local model snapshot is missing")
+        sllm_model = "/models/sllm"
     if MODEL_ID_PATTERN.fullmatch(stt_model) is None:
         raise ConfigurationError(
             "F2_STT_MODEL_ID must be a Hugging Face owner/model ID"
@@ -114,10 +123,10 @@ def load_config(
         raise ConfigurationError("SLLM and STT API keys must be different")
     return RuntimeConfig(
         release.release_mode,
-        release.base_model_id,
+        sllm_model,
         release.base_model_revision,
         release.adapter_path,
-        stt_model,
+        "/models/stt" if source.get("F2_LOCAL_MODELS") == "1" else stt_model,
         stt_revision,
         max_length,
         sllm_memory,
@@ -133,6 +142,8 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         "127.0.0.1",
         "--disable-log-requests",
         "--disable-uvicorn-access-log",
+        "--max-num-seqs",
+        "1",
     ]
     sllm = [
         executable,
@@ -244,6 +255,27 @@ def _stop(processes: list[subprocess.Popen[bytes]]) -> None:
                 pass
 
 
+def _wait_for_model(
+    serving: dict[str, subprocess.Popen[bytes]],
+    requested: list[int],
+    deadline: float,
+    port: int,
+    key_name: str,
+    model: str,
+) -> None:
+    while time.monotonic() < deadline:
+        if requested:
+            raise RuntimeError("shutdown requested during startup")
+        if any(process.poll() is not None for process in serving.values()):
+            raise RuntimeError("a serving process exited during startup")
+        try:
+            check(port, key_name, model)
+            return
+        except (OSError, RuntimeError, json.JSONDecodeError):
+            time.sleep(2)
+    raise RuntimeError("model startup timed out")
+
+
 def run() -> int:
     try:
         release = bootstrap()
@@ -264,6 +296,7 @@ def run() -> int:
     signal.signal(signal.SIGINT, lambda number, _frame: requested.append(number))
     serving: dict[str, subprocess.Popen[bytes]] = {}
     try:
+        deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
         print(
             f"f2-serving: starting sllm release {release.release_id} and stt",
             flush=True,
@@ -276,6 +309,10 @@ def run() -> int:
             _proxy_command("sllm", 8001, 18001),
             _proxy_environment(environment, config.sllm_api_key),
         )
+        # Avoid overlapping the two engines' GPU memory profiling and warmup.
+        _wait_for_model(
+            serving, requested, deadline, 8001, "AI_VLLM_SLLM_API_KEY", "sllm"
+        )
         serving["stt-vllm"] = _start(
             commands["stt"],
             _model_environment(environment, api_key=config.stt_api_key, stt=True),
@@ -283,6 +320,9 @@ def run() -> int:
         serving["stt-proxy"] = _start(
             _proxy_command("stt", 8002, 18002),
             _proxy_environment(environment, config.stt_api_key),
+        )
+        _wait_for_model(
+            serving, requested, deadline, 8002, "AI_VLLM_STT_API_KEY", "stt"
         )
         while True:
             if requested:
@@ -304,6 +344,9 @@ def run() -> int:
                 )
                 return process.returncode if process.returncode not in (None, 0) else 1
             time.sleep(0.25)
+    except (OSError, RuntimeError):
+        print("f2-serving startup failed; stopping container", file=sys.stderr, flush=True)
+        return 128 + requested[0] if requested else 1
     finally:
         _stop(list(serving.values()))
 

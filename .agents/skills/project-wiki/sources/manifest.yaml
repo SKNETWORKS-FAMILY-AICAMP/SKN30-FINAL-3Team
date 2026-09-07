@@ -2,6 +2,114 @@ version: 1
 updated: "2026-09-04"
 
 sources:
+  - id: "general-ai-provider-model-profiles-2026-09-03"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-09-03)"
+    received: "2026-09-03"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-09-03"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0026-general-ai-provider-and-model-profiles.md"
+      - ".agents/skills/project-wiki/references/decisions/index.md"
+      - ".agents/skills/project-wiki/references/contracts/f3-ai.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+      - ".agents/skills/ai/references/decisions/ADR-0004-aliased-llm-endpoint-routing.md"
+      - "docs/db/seed/model-profiles/local-openai.sql"
+      - "docs/db/seed/model-profiles/dev-qwen38-vllm-bnb.sql"
+      - "docs/db/seed/model-profiles/dev-qwen38-llamacpp-gguf.sql"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      capability별 단일 활성 모델과 자동 fallback 금지, provider·endpoint alias exact routing,
+      합성 seed 정적 프로필과 Qwen Unsloth 양자화 provenance, llama.cpp·vLLM GPU 비교 경로 및
+      prod 개인정보·평가 gate를 승인. 환경별 활성 Provider와 GPU 우선순위는 ADR-0027이 부분 대체
+
+  - id: "bedrock-gpt56-luna-dev-poc-2026-09-04"
+    type: "user-provided-direction"
+    location: "Codex task prompts (2026-09-04)"
+    received: "2026-09-04"
+    decision_status: "approved"
+    decision_by: "project-requester"
+    decision_date: "2026-09-04"
+    partially_supersedes: "ADR-0026의 환경별 활성 Provider, GPU Infra 우선순위와 IMDSv2 hop limit 1 조항"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - ".agents/skills/project-wiki/references/decisions/ADR-0026-general-ai-provider-and-model-profiles.md"
+      - ".agents/skills/project-wiki/references/decisions/index.md"
+      - ".agents/skills/project-wiki/references/contracts/f3-ai.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+      - ".agents/skills/project-wiki/references/development/environments.md"
+      - ".agents/skills/project-wiki/references/architecture/runtime.md"
+      - ".agents/skills/project-wiki/references/open-questions.md"
+      - ".agents/skills/ai/references/decisions/ADR-0005-bedrock-sigv4-structured-generation.md"
+      - ".agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md"
+      - "docs/db/seed/model-profiles/dev-bedrock-gpt56-luna.sql"
+      - "docs/architecture/infra/overview.md"
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      local 범용 생성은 OpenAI gpt-5.6-luna, 공유 dev POC는 Bedrock
+      global.openai.gpt-5.6-luna로 전환. EC2 Instance Role SigV4와 IMDSv2 hop limit 2를
+      합성 dev에 한해 허용하고, Structured Outputs 부재는 로컬 검증·repair로 보완. 기존
+      Qwen llama.cpp·vLLM 경로는 비활성 비교 후보로 보존하며 prod 승격은 평가·개인정보 gate 유지
+
+  - id: "aws-bedrock-gpt56-luna-model-card"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-openai-gpt-56-luna.html"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - ".agents/skills/project-wiki/references/contracts/f3-ai.md"
+      - ".agents/skills/ai/references/decisions/ADR-0005-bedrock-sigv4-structured-generation.md"
+    scope: "GPT-5.6 Luna의 Bedrock Runtime Responses 지원, Global inference profile ID와 Structured Outputs 미지원 계약"
+
+  - id: "aws-bedrock-responses-runtime"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - ".agents/skills/ai/references/decisions/ADR-0005-bedrock-sigv4-structured-generation.md"
+      - ".agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md"
+    scope: "bedrock-runtime OpenAI-compatible Responses URL, 동기 호출, store=false와 IAM project 권한 계약"
+
+  - id: "aws-bedrock-api-key-authentication"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys.html"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - ".agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md"
+    scope: "장기 key는 탐색용이고 운영 경로는 Instance Role SigV4를 사용한다는 인증 선택 근거"
+
+  - id: "aws-bedrock-global-cross-region-inference"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/bedrock/latest/userguide/global-cross-region-inference.html"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+      - ".agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md"
+    scope: "Global profile의 처리 리전과 최소 IAM resource 범위, 합성 dev 개인정보 제한 근거"
+
+  - id: "aws-bedrock-data-retention"
+    type: "official-documentation"
+    url: "https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+    scope: "Responses store=false와 계정 수준 zero data retention을 구분하고 prod 보존 승격을 차단하는 근거"
+
+  - id: "openai-gpt56-luna-model"
+    type: "official-documentation"
+    url: "https://developers.openai.com/api/docs/models/gpt-5.6-luna"
+    accessed: "2026-09-04"
+    reflected_in:
+      - ".agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md"
+      - "docs/db/seed/model-profiles/local-openai.sql"
+    scope: "local 직접 OpenAI 범용 생성 모델 ID와 Structured Outputs 지원 근거"
+
   - id: "pr-review-policy-routing-2026-09-04"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-09-04)"

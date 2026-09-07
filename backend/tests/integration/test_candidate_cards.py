@@ -347,7 +347,7 @@ class Fixture:
                 "m": self.model_config_id,
                 "s": (
                     '{"provider": "vllm", "model_name": "fake-delegate", "model_version": null,'
-                    ' "config_key": "delegate", "config_version": 1}'
+                    ' "endpoint_alias": null, "config_key": "delegate", "config_version": 1}'
                 ),
             },
         )

@@ -18,7 +18,7 @@ from domain.property_ledger.commands import (
     has_sample_ledger,
     seed_sample_ledger,
 )
-from synthetic_seed import SyntheticSeedError, seed_f3_synthetic
+from synthetic_seed import F3_MODEL_PROFILES, SyntheticSeedError, seed_f3_synthetic
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -55,6 +55,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="F3_SYNTHETIC 합성 사무소의 기존 장부와 실행 결과 삭제를 확인한다",
     )
+    f3_seed.add_argument(
+        "--model-profile",
+        choices=F3_MODEL_PROFILES,
+        required=True,
+        help="허용된 Provider·모델·endpoint 설정 프로필",
+    )
     return parser
 
 
@@ -67,6 +73,7 @@ def main() -> None:
             result = seed_f3_synthetic(
                 config,
                 confirm_reset=arguments.confirm_reset,
+                model_profile=arguments.model_profile,
             )
         except SyntheticSeedError as error:
             raise SystemExit(str(error)) from None

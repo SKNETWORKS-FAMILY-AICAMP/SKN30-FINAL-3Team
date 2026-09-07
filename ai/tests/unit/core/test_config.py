@@ -1,16 +1,21 @@
+import json
 import os
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 import brokerage_ai.core.config as config_module
 from brokerage_ai.core.config import (
     AiProfile,
+    BedrockLlmEndpointConfig,
     F2ProviderStatus,
+    SelfHostedLlmEndpointConfig,
     bind_ai_config,
     load_ai_config,
 )
 from brokerage_ai.core.errors import ConfigurationError
+from brokerage_ai.core.types import ProviderKind
 
 
 def test_local_environment_merges_team_personal_and_process_values(
@@ -209,3 +214,202 @@ def test_secret_string_is_masked() -> None:
     assert config.openai is not None
     assert str(config.openai.api_key) == "**********"
     assert "sensitive-value" not in repr(config)
+
+
+def test_self_hosted_llm_endpoint_resolves_secret_reference() -> None:
+    address_book = [
+        {
+            "alias": " general-dev-gpu ",
+            "provider": "llama_cpp",
+            "base_url": "https://gpu.example/v1",
+            "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
+        }
+    ]
+
+    config = bind_ai_config(
+        {
+            "AI_LLM_ENDPOINTS": json.dumps(address_book),
+            "AI_GENERAL_DEV_GPU_API_KEY": "sensitive-value",
+        },
+        AiProfile.DEV,
+    )
+
+    endpoint = config.llm_endpoints[0]
+    assert isinstance(endpoint, SelfHostedLlmEndpointConfig)
+    assert endpoint.alias == "general-dev-gpu"
+    assert endpoint.provider is ProviderKind.LLAMA_CPP
+    assert endpoint.api_key.get_secret_value() == "sensitive-value"
+    assert "sensitive-value" not in repr(config)
+
+
+def test_bedrock_llm_endpoint_derives_official_runtime_url_without_secret() -> None:
+    config = bind_ai_config(
+        {
+            "AI_LLM_ENDPOINTS": json.dumps(
+                [
+                    {
+                        "alias": " general-dev-bedrock ",
+                        "provider": "bedrock",
+                        "aws_region": " ap-northeast-2 ",
+                    }
+                ]
+            )
+        },
+        AiProfile.DEV,
+    )
+
+    endpoint = config.llm_endpoints[0]
+    assert isinstance(endpoint, BedrockLlmEndpointConfig)
+    assert endpoint.alias == "general-dev-bedrock"
+    assert endpoint.provider is ProviderKind.BEDROCK
+    assert endpoint.aws_region == "ap-northeast-2"
+    assert endpoint.base_url == ("https://bedrock-runtime.ap-northeast-2.amazonaws.com/openai/v1")
+
+
+def test_direct_bedrock_endpoint_config_applies_the_same_normalization() -> None:
+    endpoint = BedrockLlmEndpointConfig(
+        alias=" general-dev-bedrock ",
+        provider=ProviderKind.BEDROCK,
+        aws_region=" ap-northeast-2 ",
+    )
+
+    assert endpoint.alias == "general-dev-bedrock"
+    assert endpoint.aws_region == "ap-northeast-2"
+    with pytest.raises(ValidationError, match="valid AWS region"):
+        BedrockLlmEndpointConfig(
+            alias="general-dev-bedrock",
+            provider=ProviderKind.BEDROCK,
+            aws_region="not a region",
+        )
+
+
+@pytest.mark.parametrize("extra_field", ["base_url", "api_key_env", "api_key"])
+def test_bedrock_llm_endpoint_rejects_key_and_url_fields(extra_field: str) -> None:
+    definition = {
+        "alias": "general-dev-bedrock",
+        "provider": "bedrock",
+        "aws_region": "ap-northeast-2",
+        extra_field: "sensitive-value",
+    }
+
+    with pytest.raises(ConfigurationError) as caught:
+        bind_ai_config(
+            {"AI_LLM_ENDPOINTS": json.dumps([definition])},
+            AiProfile.DEV,
+        )
+
+    assert "sensitive-value" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "definition",
+    [
+        {
+            "alias": " ",
+            "provider": "bedrock",
+            "aws_region": "ap-northeast-2",
+        },
+        {
+            "alias": "general-dev-bedrock",
+            "provider": "bedrock",
+            "aws_region": "not a region",
+        },
+        {
+            "alias": "general-dev-bedrock",
+            "provider": "unsupported",
+            "aws_region": "ap-northeast-2",
+        },
+        {
+            "alias": "general-dev-gpu",
+            "provider": "vllm",
+            "base_url": "not-a-url",
+            "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
+        },
+        {
+            "alias": "general-dev-gpu",
+            "provider": "vllm",
+            "base_url": "https://gpu.example/v1",
+            "api_key_env": "UNSAFE_KEY",
+        },
+    ],
+)
+def test_invalid_llm_endpoint_definition_is_rejected(definition: dict[str, str]) -> None:
+    with pytest.raises(ConfigurationError, match="invalid AI_LLM_ENDPOINTS"):
+        bind_ai_config(
+            {
+                "AI_LLM_ENDPOINTS": json.dumps([definition]),
+                "AI_GENERAL_DEV_GPU_API_KEY": "sensitive-value",
+            },
+            AiProfile.DEV,
+        )
+
+
+def test_self_hosted_llm_endpoint_requires_referenced_secret() -> None:
+    definition = {
+        "alias": "general-dev-gpu",
+        "provider": "vllm",
+        "base_url": "https://gpu.example/v1",
+        "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
+    }
+
+    with pytest.raises(ConfigurationError, match="AI_GENERAL_DEV_GPU_API_KEY"):
+        bind_ai_config(
+            {"AI_LLM_ENDPOINTS": json.dumps([definition])},
+            AiProfile.DEV,
+        )
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://user:sensitive-value@gpu.example/v1",
+        "https://gpu.example/v1?token=sensitive-value",
+        "https://gpu.example/v1#sensitive-value",
+    ],
+)
+def test_self_hosted_llm_endpoint_rejects_sensitive_url_components(
+    base_url: str,
+) -> None:
+    definition = {
+        "alias": "general-dev-gpu",
+        "provider": "vllm",
+        "base_url": base_url,
+        "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
+    }
+
+    with pytest.raises(ConfigurationError) as caught:
+        bind_ai_config(
+            {
+                "AI_LLM_ENDPOINTS": json.dumps([definition]),
+                "AI_GENERAL_DEV_GPU_API_KEY": "another-sensitive-value",
+            },
+            AiProfile.DEV,
+        )
+
+    assert "sensitive-value" not in str(caught.value)
+    assert "another-sensitive-value" not in str(caught.value)
+
+
+def test_llm_endpoint_alias_is_unique_across_providers() -> None:
+    address_book = [
+        {
+            "alias": "general-dev",
+            "provider": "bedrock",
+            "aws_region": "ap-northeast-2",
+        },
+        {
+            "alias": " general-dev ",
+            "provider": "vllm",
+            "base_url": "https://gpu.example/v1",
+            "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
+        },
+    ]
+
+    with pytest.raises(ConfigurationError, match="duplicate alias: general-dev"):
+        bind_ai_config(
+            {
+                "AI_LLM_ENDPOINTS": json.dumps(address_book),
+                "AI_GENERAL_DEV_GPU_API_KEY": "sensitive-value",
+            },
+            AiProfile.DEV,
+        )

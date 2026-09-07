@@ -1,11 +1,11 @@
 ---
 status: 결정
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # 인프라 자원 인벤토리
 
-선택 정본은 [Infra ADR-0002](decisions/ADR-0002-dev-demo-aws-runpod-architecture.md), [Infra ADR-0003](decisions/ADR-0003-dev-storage-database-and-configuration.md), [Infra ADR-0004](decisions/ADR-0004-dev-runtime-and-observability-baseline.md), [Infra ADR-0005](decisions/ADR-0005-dev-frontend-origin-and-api-routing.md), [Infra ADR-0015](decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md), [Infra ADR-0017](decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)과 [Infra ADR-0018](decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)이다. Terraform 코드 구현과 실제 생성 여부를 구분한다. dev workload, DB migration과 기존 delivery 자원은 적용됐고 S3 dev release는 게시됐다. Alarm 전용 전달, Verify/Build 분리, RunPod와 이번 Terraform 변경은 실환경 적용 전이다.
+선택 정본은 [Infra ADR-0002](decisions/ADR-0002-dev-demo-aws-runpod-architecture.md), [Infra ADR-0003](decisions/ADR-0003-dev-storage-database-and-configuration.md), [Infra ADR-0004](decisions/ADR-0004-dev-runtime-and-observability-baseline.md), [Infra ADR-0005](decisions/ADR-0005-dev-frontend-origin-and-api-routing.md), [Infra ADR-0015](decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md), [Infra ADR-0017](decisions/ADR-0017-runpod-ephemeral-sllm-serving.md), [Infra ADR-0018](decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md), [Infra ADR-0019](decisions/ADR-0019-bedrock-luna-dev-poc.md)과 [프로젝트 ADR-0027](../../project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)다. Terraform 코드 구현과 실제 생성 여부를 구분한다. dev workload, DB migration과 기존 delivery 자원은 적용됐고 S3 dev release는 게시됐다. Alarm 전용 전달, Verify/Build 분리, RunPod와 Bedrock Terraform 변경은 실환경 적용 전이다.
 
 | 영역 | 자원 | 선택 상태 | 구현 상태 | 도입 조건·제약 |
 |---|---|---|---|---|
@@ -30,6 +30,9 @@ updated: 2026-09-03
 | 모델 image | private GHCR custom image | 결정 | 코드 구현·image 미게시 | 고정 base digest와 dependency lock, LoRA·base SLLM 및 STT supervisor, weight·token·adapter 미포함 |
 | 모델 artifact | private data-model S3 `releases/sllm/` | 결정 | S3 dev release 게시 완료·이번 Terraform 미적용 | `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle 불변 게시, Pod에는 presigned URL만 전달 |
 | 모델 설정 | RunPod Secret, AWS Secrets Manager, SSM endpoint/control set | 결정 | 코드 구현·AWS/RunPod 미적용 | 별도 SLLM·STT key, active/offline 두 URL, bootstrap generation·immutable resource ID·Secret version sync 관리 |
+| 범용 모델 실행 | Bedrock GPT-5.6 Luna Global profile | 결정 | Terraform·runtime 코드 구현·AWS 미적용 | `general-dev-bedrock`, SigV4 Instance Role, 합성 dev 전용, 비스트리밍·`store=false` |
+| 범용 모델 인증 | 앱 EC2 role·IMDSv2 | 결정 | Terraform 코드 구현·AWS 미적용 | Luna profile·foundation model·default project 최소 권한, token 필수·hop limit 2; 정적 Bedrock key 없음 |
+| 범용 GPU 비교 | 전용 dev GPU EC2·암호화 EBS | 보류 | Terraform·runtime 미구현 | llama.cpp+24GB와 vLLM BnB+48GB 코드·seed 후보만 보존; Bedrock POC 후 필요할 때 별도 승인 |
 | 공개 TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 환경에는 도메인이 없고 실제 개인정보 사용 금지; 운영 승격 시 별도 결정 |
 | 큐 | SQS, DLQ | 조건부 | 미확정 | RDS polling이 독립 재시도·확장을 충족하지 못할 때 |
 | AI 분리 | ECS Fargate, Cloud Map | 조건부 | 미확정 | 경합·지연·독립 배포·장애 격리 필요 측정 후 |
@@ -48,4 +51,7 @@ updated: 2026-09-03
   create/status/delete lifecycle 도구를 사용한다. S3에는 dev release bundle과 cross-hash manifest를
   게시했다. custom image·Template·Pod·Secret, SSM endpoint/control, EventBridge monitor와 alarm 자산 및
   이번 Terraform 변경은 아직 적용하지 않았다.
+- Bedrock 공개 endpoint 설정, Luna 최소 권한 IAM, IMDSv2 hop limit 2와 추론 없는 doctor는
+  코드에 구현했으며 saved plan 검토·apply 전이다. 정적 Bedrock key는 만들지 않는다.
+- 범용 dev GPU EC2·EBS와 `dev-start` / `dev-stop` 통합은 보류했고 현재 Terraform에는 없다.
 - Terraform state bucket은 애플리케이션 파일 저장소가 아니며 다른 용도로 재사용하지 않는다.
