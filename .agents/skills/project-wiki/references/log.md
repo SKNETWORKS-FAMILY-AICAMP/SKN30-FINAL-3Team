@@ -1,10 +1,11 @@
 ---
 status: 구현됨
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # 위키 변경 로그
 
+- 2026-09-07: ADR-0026·0027의 부분 대체 범위에 renderer의 OpenAI key 강제 제거와 범용 endpoint 배포 설정 주입을 명시하고, 해당 항목의 현재 구현 상태는 ADR-0027을 따르도록 연결했다.
 - 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
 - 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
 - 2026-09-04: 최신 dev 동시 변경에서 중복된 프로젝트 ADR 번호를 최초 병합 순서대로 정규화했다. PR 리뷰 정책은 ADR-0024를 유지하고 캘린더 저장 소유권은 ADR-0025, 범용 Provider 정책은 ADR-0026, Bedrock Luna dev POC는 ADR-0027로 고유하게 연결한다. 결정 내용은 변경하지 않았다.

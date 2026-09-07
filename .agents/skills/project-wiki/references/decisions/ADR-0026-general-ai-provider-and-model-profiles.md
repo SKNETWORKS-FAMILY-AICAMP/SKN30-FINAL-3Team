@@ -1,13 +1,14 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # ADR-0026: 범용 AI Provider 정책과 합성 Seed 모델 프로필
 
 - 상태: 부분 대체됨·seed와 Provider runtime 구현, GPU Infra 보류
 - 결정일: 2026-09-03
-- 부분 대체됨: 환경별 활성 Provider, GPU Infra 우선순위와 IMDSv2 hop limit 조항은
+- 부분 대체됨: 환경별 활성 Provider, GPU Infra 우선순위, IMDSv2 hop limit 조항과
+  renderer의 OpenAI key 강제 제거·범용 endpoint 배포 설정 주입의 구현 범위는
   [ADR-0027](ADR-0027-bedrock-gpt56-luna-dev-poc.md)가 대체
 - 부분 대체: [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md)의 F3 추론 위치,
   [ADR-0014](ADR-0014-f3-prototype-synthetic-input.md)의 합성 입력 Provider 미승인,
@@ -122,6 +123,10 @@ dev는 계속 합성·비식별 데이터만 사용한다. prod의 실제 개인
 prod 보존 기간과 모델 평가 통과 기준은 차단형 미해결 질문으로 남긴다.
 
 ## 구현 범위
+
+아래는 이 ADR 당시의 구현 범위다. renderer의 OpenAI key 강제 제거와 범용 endpoint
+배포 설정 주입은 이후 [ADR-0027의 구현 범위](ADR-0027-bedrock-gpt56-luna-dev-poc.md#구현-범위)에
+포함되었으며, 해당 항목의 현재 상태는 ADR-0027을 따른다.
 
 반영한다.
 

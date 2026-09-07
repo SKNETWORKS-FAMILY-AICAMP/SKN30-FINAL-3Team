@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # ADR-0027: 범용 생성 모델은 Bedrock GPT-5.6 Luna로 dev POC한다
@@ -8,7 +8,9 @@ updated: 2026-09-04
 - 상태: 승인됨·코드 구현, AWS 미적용
 - 결정일: 2026-09-04
 - 부분 대체: [ADR-0026](ADR-0026-general-ai-provider-and-model-profiles.md)의 환경별 활성
-  Provider, GPU Infra 우선순위와 IMDSv2 hop limit 1 조항
+  Provider, GPU Infra 우선순위, IMDSv2 hop limit 1 조항과 renderer의 OpenAI key 강제
+  제거·범용 endpoint 배포 설정 주입의 구현 범위. Bedrock-only dev 배포를 지원하기 위해
+  ADR-0026에서 제외했던 renderer·endpoint 설정을 이 ADR의 구현 범위에 포함한다.
 - 관련 계약: [F3 AI 계약](../contracts/f3-ai.md),
   [개인정보 정책](../privacy/policy.md)
 
