@@ -22,6 +22,7 @@ test("parses the complete public frontend environment", () => {
     authDevelopmentEnabled: true,
     ledgerSource: "mock",
     f3Source: "mock",
+    calendarSource: "mock",
     mockRowCount: 7200,
     mockLatencyMs: 350,
   });
@@ -118,6 +119,29 @@ test("F3 source can differ from the ledger source", () => {
 
 test("rejects an invalid F3 source instead of falling back", () => {
   assert.throws(() => parseAppEnv(validEnv({ VITE_F3_SOURCE: "fixture" })), /VITE_F3_SOURCE/);
+});
+
+test("calendar source defaults to the ledger source when unset", () => {
+  assert.equal(parseAppEnv(validEnv({ VITE_LEDGER_SOURCE: "api" })).calendarSource, "api");
+  assert.equal(parseAppEnv(validEnv({ VITE_LEDGER_SOURCE: "mock" })).calendarSource, "mock");
+  for (const unset of [undefined, "", "  "]) {
+    assert.equal(parseAppEnv(validEnv({ VITE_CALENDAR_SOURCE: unset })).calendarSource, "mock");
+  }
+});
+
+test("calendar source can differ from the ledger source", () => {
+  const parsed = parseAppEnv(
+    validEnv({ VITE_LEDGER_SOURCE: "api", VITE_CALENDAR_SOURCE: "mock" }),
+  );
+  assert.equal(parsed.ledgerSource, "api");
+  assert.equal(parsed.calendarSource, "mock");
+});
+
+test("rejects an invalid calendar source instead of falling back", () => {
+  assert.throws(
+    () => parseAppEnv(validEnv({ VITE_CALENDAR_SOURCE: "fixture" })),
+    /VITE_CALENDAR_SOURCE/,
+  );
 });
 
 test("rejects invalid mock numeric settings instead of silently falling back", () => {

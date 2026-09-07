@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Infra 결정 인덱스
@@ -25,3 +25,4 @@ updated: 2026-09-03
 | [ADR-0016](ADR-0016-runpod-shared-f2-serving.md) | 대체됨 | 영속 Volume과 stop/start 기반 RunPod 공유 F2 서빙 운영 |
 | [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | private S3 SLLM release와 RunPod create/delete, active/offline endpoint로 공유 dev 서빙; release v2와 미평가 dev 경로는 프로젝트 ADR-0022·0023 적용 |
 | [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, AWS 값 정본·회전, 읽기 전용 감시와 수동 reconcile |
+| [ADR-0019](ADR-0019-bedrock-luna-dev-poc.md) | 승인됨·코드 구현, AWS 미적용 | Bedrock Luna Global POC의 최소 권한 Instance Role, SigV4·IMDSv2 hop 2와 합성 dev gate |

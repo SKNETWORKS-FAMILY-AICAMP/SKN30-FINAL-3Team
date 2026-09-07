@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "limits": {
     "maxFiles": 200,
     "maxChangedLines": 10000,
@@ -17,6 +17,30 @@
     "maxFindings": 5,
     "leafMaxOutputTokens": 2500,
     "mergeMaxOutputTokens": 4000
+  },
+  "cost": {
+    "currency": "USD",
+    "updated": "2026-09-04",
+    "serviceTier": "default",
+    "longContextThresholdTokens": 272000,
+    "models": {
+      "gpt-5.6-luna": {
+        "inputPerMillion": 0.2,
+        "cachedInputPerMillion": 0.02,
+        "cacheWritePerMillion": 0.25,
+        "outputPerMillion": 1.2,
+        "longContextInputMultiplier": 2,
+        "longContextOutputMultiplier": 1.5
+      },
+      "gpt-5.6-terra": {
+        "inputPerMillion": 2,
+        "cachedInputPerMillion": 0.2,
+        "cacheWritePerMillion": 2.5,
+        "outputPerMillion": 12,
+        "longContextInputMultiplier": 2,
+        "longContextOutputMultiplier": 1.5
+      }
+    }
   },
   "ignored": {
     "basenames": [
@@ -85,14 +109,12 @@
       ".agents-rule/git.md",
       ".agents/skills/project-wiki/SKILL.md",
       ".agents/skills/project-wiki/references/index.md",
-      ".agents/skills/project-wiki/references/architecture/overview.md",
-      ".agents/skills/project-wiki/references/architecture/runtime.md",
-      ".agents/skills/project-wiki/references/contracts/api.md",
-      ".agents/skills/project-wiki/references/contracts/events.md",
-      ".agents/skills/project-wiki/references/privacy/policy.md",
-      ".agents/skills/project-wiki/references/decisions/index.md",
-      ".agents/skills/project-wiki/references/open-questions.md"
+      ".agents/skills/project-wiki/references/decisions/index.md"
     ]
+  },
+  "arbiter": {
+    "minChunks": 2,
+    "minModules": 2
   },
   "projectWide": {
     "prefixes": [
@@ -104,12 +126,7 @@
       "AGENTS.md",
       "CLAUDE.md"
     ],
-    "directories": [
-      ".agents/skills/project-wiki/references/decisions"
-    ],
-    "files": [
-      ".agents/skills/project-wiki/references/development/environments.md"
-    ]
+    "files": []
   },
   "modules": {
     "frontend": {
@@ -117,11 +134,8 @@
       "policyPrefixes": [".agents/skills/frontend/"],
       "files": [
         ".agents/skills/frontend/SKILL.md",
-        ".agents/skills/frontend/references/index.md"
-      ],
-      "directories": [
-        ".agents/skills/frontend/references/decisions",
-        ".agents/skills/frontend/references/design"
+        ".agents/skills/frontend/references/index.md",
+        ".agents/skills/frontend/references/decisions/index.md"
       ]
     },
     "backend": {
@@ -132,10 +146,8 @@
         ".agents/skills/backend/references/index.md",
         ".agents/skills/backend/references/architecture.md",
         ".agents/skills/backend/references/testing-and-quality.md",
-        ".agents/skills/backend/references/open-questions.md"
-      ],
-      "directories": [
-        ".agents/skills/backend/references/decisions"
+        ".agents/skills/backend/references/open-questions.md",
+        ".agents/skills/backend/references/decisions/index.md"
       ]
     },
     "ai": {
@@ -144,10 +156,8 @@
       "files": [
         ".agents/skills/ai/SKILL.md",
         ".agents/skills/ai/references/index.md",
-        ".agents/skills/ai/references/open-questions.md"
-      ],
-      "directories": [
-        ".agents/skills/ai/references/decisions"
+        ".agents/skills/ai/references/open-questions.md",
+        ".agents/skills/ai/references/decisions/index.md"
       ]
     },
     "data": {
@@ -158,10 +168,8 @@
         ".agents/skills/data/references/index.md",
         ".agents/skills/data/references/dataset-design.md",
         ".agents/skills/data/references/evaluation-design.md",
-        ".agents/skills/data/references/open-questions.md"
-      ],
-      "directories": [
-        ".agents/skills/data/references/decisions"
+        ".agents/skills/data/references/open-questions.md",
+        ".agents/skills/data/references/decisions/index.md"
       ]
     },
     "infra": {
@@ -172,11 +180,345 @@
         ".agents/skills/infra/references/index.md",
         ".agents/skills/infra/references/resource-inventory.md",
         ".agents/skills/infra/references/terraform-standards.md",
-        ".agents/skills/infra/references/open-questions.md"
-      ],
-      "directories": [
-        ".agents/skills/infra/references/decisions"
+        ".agents/skills/infra/references/open-questions.md",
+        ".agents/skills/infra/references/decisions/index.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0007-terraform-iac.md"
       ]
     }
-  }
+  },
+  "policyPacks": [
+    {
+      "id": "ci-workflow-governance",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [{ "prefixes": [".github/workflows/"] }],
+      "files": [
+        ".agents/skills/project-wiki/references/development/environments.md",
+        {
+          "path": ".agents/skills/project-wiki/references/privacy/policy.md",
+          "sections": ["원칙", "구현 규칙", "변경 검토"]
+        }
+      ]
+    },
+    {
+      "id": "review-agent-governance",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "prefixes": [".github/scripts/pr-", ".github/workflows/pr-policy-review.yml"] },
+        { "files": [".github/pr-review-policy.json"] },
+        { "prefixes": [".agents/skills/project-wiki/references/decisions/ADR-0010-", ".agents/skills/project-wiki/references/decisions/ADR-0016-", ".agents/skills/project-wiki/references/decisions/ADR-0024-"] }
+      ],
+      "files": [
+        ".agents/skills/project-wiki/references/decisions/ADR-0010-pr-policy-ai-review-discord.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0016-pr-review-cross-chunk-evidence.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0024-pr-review-policy-routing-and-arbitration.md",
+        {
+          "path": ".agents/skills/project-wiki/references/privacy/policy.md",
+          "sections": ["원칙", "PR Policy Agent 외부 전송", "변경 검토"]
+        }
+      ]
+    },
+    {
+      "id": "module-boundaries",
+      "phases": ["leaf", "arbiter"],
+      "when": [
+        { "modulesAny": ["backend", "ai"] },
+        { "minModules": 2 },
+        { "prefixes": [".agents/skills/project-wiki/references/architecture/"] }
+      ],
+      "files": [
+        ".agents/skills/project-wiki/references/architecture/overview.md",
+        ".agents/skills/project-wiki/references/architecture/runtime.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md"
+      ]
+    },
+    {
+      "id": "api-contract-base",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "prefixes": ["backend/src/api/", "frontend/src/shared/api/"] },
+        { "contains": ["/api/"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/api.md"] }
+      ],
+      "files": [
+        {
+          "path": ".agents/skills/project-wiki/references/contracts/api.md",
+          "sections": ["기본 규칙", "모델 경계 후보", "초기 Backend 계약"]
+        }
+      ]
+    },
+    {
+      "id": "api-contract-f1",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "contains": ["property_ledger", "features/ledger", "BuyerLedger", "LedgerGrid"] }
+      ],
+      "files": [
+        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F1 장부 계약 (제안)"] }
+      ]
+    },
+    {
+      "id": "api-contract-f2",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "contains": ["/f2/", "features/f2", "f2.py", "f2_", "VoiceMemo", "smoke_f2"] }
+      ],
+      "files": [
+        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F2 음성 분석 계약 (구현됨 · 1차 연동)"] }
+      ]
+    },
+    {
+      "id": "api-contract-f3",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "contains": ["/f3/", "features/f3", "f3_runs", "f3_", "agent_execution", "CrossMatch"] }
+      ],
+      "files": [
+        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F3 실행 계약"] },
+        ".agents/skills/project-wiki/references/contracts/f3-ai.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md"
+      ]
+    },
+    {
+      "id": "api-contract-f4",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "contains": ["time_keeper", "timeKeeper", "TimeKeeper"] }
+      ],
+      "files": [
+        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F4 Time Keeper 일정 계약 (제안)"] }
+      ]
+    },
+    {
+      "id": "event-contract",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "contains": ["worker", "queue", "event", "sqs"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/events.md"] }
+      ],
+      "files": [".agents/skills/project-wiki/references/contracts/events.md"]
+    },
+    {
+      "id": "privacy-and-secrets",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "prefixes": ["data/", "frontend/src/features/auth/", "backend/src/domain/authentication/"] },
+        { "contains": ["privacy", "secret", "credential", "password", "phone", "email", "requested_by", "created_by", ".env"] }
+      ],
+      "files": [".agents/skills/project-wiki/references/privacy/policy.md"]
+    },
+    {
+      "id": "frontend-core",
+      "phases": ["leaf"],
+      "when": [{ "modulesAny": ["frontend"] }],
+      "files": [
+        ".agents/skills/frontend/references/decisions/ADR-002-typescript-standard.md",
+        ".agents/skills/frontend/references/decisions/ADR-004-shared-boundary.md",
+        ".agents/skills/frontend/references/decisions/ADR-005-feature-data-source.md",
+        ".agents/skills/frontend/references/decisions/ADR-007-editable-fields-must-persist.md"
+      ]
+    },
+    {
+      "id": "frontend-interface",
+      "phases": ["leaf"],
+      "when": [
+        { "modulesAny": ["frontend"], "suffixes": [".tsx", ".jsx", ".css"] },
+        { "prefixes": ["docs/screen/"] }
+      ],
+      "files": [
+        ".agents/skills/frontend/references/design/index.md",
+        ".agents/skills/frontend/references/design/review-checklist.md",
+        ".agents/skills/frontend/references/design/accessibility.md",
+        ".agents/skills/frontend/references/design/components-and-content.md",
+        ".agents/skills/frontend/references/design/tokens-and-layout.md"
+      ]
+    },
+    {
+      "id": "frontend-admin-grid",
+      "phases": ["leaf"],
+      "when": [{ "modulesAny": ["frontend"], "contains": ["Grid", "Ledger", "admin"] }],
+      "files": [
+        ".agents/skills/frontend/references/design/admin-safety.md",
+        ".agents/skills/frontend/references/design/data-grid.md",
+        ".agents/skills/frontend/references/decisions/ADR-001-admin-dashboard-design-system.md"
+      ]
+    },
+    {
+      "id": "frontend-home-voice",
+      "phases": ["leaf"],
+      "when": [{ "modulesAny": ["frontend"], "contains": ["HomeScreen", "VoiceMemo"] }],
+      "files": [".agents/skills/frontend/references/decisions/ADR-006-home-voice-intake.md"]
+    },
+    {
+      "id": "frontend-delivery",
+      "phases": ["leaf", "arbiter"],
+      "when": [{ "prefixes": ["frontend/"], "contains": ["build", "deploy", "config/env"] }],
+      "files": [".agents/skills/frontend/references/decisions/ADR-003-static-release-delivery.md"]
+    },
+    {
+      "id": "backend-core",
+      "phases": ["leaf"],
+      "when": [{ "modulesAny": ["backend"] }],
+      "files": [
+        ".agents/skills/backend/references/decisions/ADR-0001-contextual-architecture-defaults.md",
+        ".agents/skills/backend/references/decisions/ADR-0002-backend-runtime-database-authentication.md"
+      ]
+    },
+    {
+      "id": "backend-delivery-runtime",
+      "phases": ["leaf", "arbiter"],
+      "when": [{ "contains": ["backend/src/server", "backend/src/worker", "backend/src/core/config", "infra/deploy/"] }],
+      "files": [
+        ".agents/skills/backend/references/decisions/ADR-0003-dev-deployment-contract.md",
+        ".agents/skills/backend/references/decisions/ADR-0004-always-on-f2-runtime.md",
+        ".agents/skills/backend/references/decisions/ADR-0005-offline-f2-runtime.md"
+      ]
+    },
+    {
+      "id": "ai-core",
+      "phases": ["leaf"],
+      "when": [{ "modulesAny": ["ai"] }],
+      "files": [
+        ".agents/skills/ai/references/decisions/ADR-0001-ai-runtime-foundation.md",
+        ".agents/skills/ai/references/decisions/ADR-0002-langgraph-adoption.md",
+        ".agents/skills/ai/references/decisions/ADR-0003-structured-output-repair.md"
+      ]
+    },
+    {
+      "id": "ai-training-release",
+      "phases": ["leaf", "arbiter"],
+      "when": [{ "prefixes": ["ai/training/", "ai/eval/", "data/f2_llm/"] }],
+      "files": [
+        ".agents/skills/ai/references/training.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0023-sllm-dev-unevaluated-release.md"
+      ]
+    },
+    {
+      "id": "data-lifecycle",
+      "phases": ["leaf"],
+      "when": [{ "modulesAny": ["data"] }],
+      "files": [".agents/skills/data/references/decisions/0001-dataset-lifecycle-layout.md"]
+    },
+    {
+      "id": "infra-bootstrap-state",
+      "phases": ["leaf"],
+      "when": [
+        { "prefixes": ["infra/bootstrap/"] },
+        { "contains": ["backend.tf", "providers.tf", "versions.tf", "state", "account-baseline", "operator-access", "team-readonly", "verify-account"] }
+      ],
+      "files": [
+        ".agents/skills/infra/references/aws-account-bootstrap.md",
+        ".agents/skills/infra/references/decisions/ADR-0001-terraform-layout-and-state.md",
+        ".agents/skills/infra/references/decisions/ADR-0006-team-readonly-iam-group.md",
+        ".agents/skills/infra/references/decisions/ADR-0012-existing-iam-operators.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0007-terraform-iac.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0012-retain-iam-access.md"
+      ]
+    },
+    {
+      "id": "infra-runtime-storage-network",
+      "phases": ["leaf"],
+      "when": [
+        { "prefixes": ["docs/architecture/infra/"] },
+        { "contains": ["network.tf", "database.tf", "runtime.tf", "workload-storage.tf", "frontend.tf", "db-tunnel", "security.tf"] }
+      ],
+      "files": [
+        ".agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md",
+        ".agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md",
+        ".agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md",
+        ".agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md",
+        ".agents/skills/infra/references/decisions/ADR-0007-dev-db-tunnel-access.md",
+        ".agents/skills/infra/references/decisions/ADR-0008-dev-database-access-management.md",
+        ".agents/skills/infra/references/decisions/ADR-0010-dev-ec2-instance-class.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md"
+      ]
+    },
+    {
+      "id": "infra-environment-baseline",
+      "phases": ["leaf"],
+      "when": [{ "prefixes": ["infra/environments/dev/"] }],
+      "files": [
+        ".agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md"
+      ]
+    },
+    {
+      "id": "infra-delivery",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [{ "prefixes": ["infra/delivery/", "infra/deploy/"] }, { "contains": ["delivery.tf", "test_delivery"] }],
+      "files": [
+        ".agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md",
+        ".agents/skills/infra/references/decisions/ADR-0013-dev-environment-materialization.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md"
+      ]
+    },
+    {
+      "id": "infra-lifecycle-cost",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [{ "modulesAny": ["infra"], "contains": ["manage_dev_power", "deep-power", "deep_lifecycle", "power", "budget", "cost"] }],
+      "files": [
+        ".agents/skills/infra/references/decisions/ADR-0009-dev-power-lifecycle.md",
+        ".agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md"
+      ]
+    },
+    {
+      "id": "infra-observability",
+      "phases": ["leaf", "arbiter"],
+      "when": [{ "contains": ["observability", "cloudwatch", "alarm", "monitor", "notifier"] }],
+      "files": [
+        ".agents/skills/project-wiki/references/contracts/observability.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md",
+        ".agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md",
+        ".agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md"
+      ]
+    },
+    {
+      "id": "infra-runpod-sllm",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [{ "prefixes": ["infra/runpod/"] }, { "contains": ["runpod", "sllm", "artifact"] }],
+      "files": [
+        ".agents/skills/infra/references/decisions/ADR-0016-runpod-shared-f2-serving.md",
+        ".agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md",
+        ".agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0021-runpod-operations-and-secret-ownership.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0023-sllm-dev-unevaluated-release.md"
+      ]
+    },
+    {
+      "id": "infra-iam-secrets",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [{ "modulesAny": ["infra"], "contains": ["iam", "secret", "security", "access", "configuration.tf", "render_env", ".env"] }],
+      "files": [
+        ".agents/skills/project-wiki/references/privacy/policy.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0012-retain-iam-access.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0021-runpod-operations-and-secret-ownership.md",
+        ".agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md",
+        ".agents/skills/infra/references/decisions/ADR-0006-team-readonly-iam-group.md",
+        ".agents/skills/infra/references/decisions/ADR-0007-dev-db-tunnel-access.md",
+        ".agents/skills/infra/references/decisions/ADR-0008-dev-database-access-management.md",
+        ".agents/skills/infra/references/decisions/ADR-0012-existing-iam-operators.md",
+        ".agents/skills/infra/references/decisions/ADR-0013-dev-environment-materialization.md"
+      ]
+    }
+  ]
 }

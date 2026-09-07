@@ -15,15 +15,17 @@
 | seed/ | 로컬·공유 dev F3 파이프라인 검증용 합성 장부 | 환경별 명시 적용 · prod 제외 |
 
 seed/의 파일은 migration이 아니다. 실행기가 적용 여부를 관리하지 않고, 번호도 migrate/와 무관하며,
-prod에는 적용하지 않는다. 공유 dev에는 검토된 F3 합성 파일 세 개만 Infra의 명시적 확인 명령으로
-적용할 수 있다. 아래의 파일 이름·불변성·검증 규칙은 migrate/에만 적용된다. 상세는
+prod에는 적용하지 않는다. 공유 dev에는 Infra Bedrock doctor 통과 후 검토된 F3 합성
+reset·data seed·`dev-bedrock-gpt56-luna` model profile·verify를 명시적 확인 명령으로
+적용한 뒤 합성 smoke를 수행한다.
+아래의 파일 이름·불변성·검증 규칙은 migrate/에만 적용된다. 상세는
 [seed/README.md](seed/README.md)에 있다.
 
 archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migration과 신규 DB 객체에는 원장, 상담 자동화, 에이전트 실행, 협상 포지션, 매칭 평가 등 업무 용어를 사용한다.
 
 ## 현재 기준선
 
-현재 기준선은 27개 테이블과 17개 전진 migration이다.
+현재 기준선은 28개 테이블과 18개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -44,6 +46,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 015_ALTER_AGENT_EXECUTION_CANDIDATE_CARD_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 후보 카드 완료 상태 lease 회수용 선점 인덱스 |
 | 016_ALTER_AGENT_EXECUTION_JUDGMENT_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 중개 판정 중 상태 lease 회수용 선점 인덱스 |
 | 017_ALTER_PROPERTY_LEDGER_AGENDA_INDEX.sql | 매물·수요 원장 확장 | 0 | 일정·할 일 조회용 의뢰 만기·희망 입주일·최종 접촉·접수일 부분 인덱스 |
+| 018_CREATE_CALENDAR.sql | 캘린더 | 1 | calendar_event |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 

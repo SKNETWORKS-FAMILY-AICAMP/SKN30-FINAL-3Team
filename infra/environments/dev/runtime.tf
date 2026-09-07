@@ -1,5 +1,9 @@
 locals {
   runtime_metric_namespace = "${var.project_name}/${local.environment}"
+  bedrock_luna_model_id    = "openai.gpt-5.6-luna"
+  bedrock_luna_profile_id  = "global.${local.bedrock_luna_model_id}"
+  bedrock_luna_profile_arn = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${local.bedrock_luna_profile_id}"
+  bedrock_default_project  = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:project/default"
   runtime_tags = {
     Project     = var.project_name
     Environment = local.environment
@@ -135,6 +139,95 @@ data "aws_iam_policy_document" "app_runtime" {
     resources = [
       "arn:aws:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.postgres.resource_id}/app_migrator",
     ]
+  }
+
+  statement {
+    sid       = "ReadBedrockLunaInferenceProfile"
+    effect    = "Allow"
+    actions   = ["bedrock:GetInferenceProfile"]
+    resources = [local.bedrock_luna_profile_arn]
+  }
+
+  statement {
+    sid       = "InvokeBedrockLunaGlobalProfile"
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel"]
+    resources = [local.bedrock_luna_profile_arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = [var.aws_region]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "bedrock:ProjectArn"
+      values   = [local.bedrock_default_project]
+    }
+  }
+
+  statement {
+    sid       = "InvokeBedrockLunaRegionalFoundationModel"
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel"]
+    resources = ["arn:aws:bedrock:${var.aws_region}::foundation-model/${local.bedrock_luna_model_id}"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = [var.aws_region]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "bedrock:InferenceProfileArn"
+      values   = [local.bedrock_luna_profile_arn]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "bedrock:ProjectArn"
+      values   = [local.bedrock_default_project]
+    }
+  }
+
+  statement {
+    sid       = "InvokeBedrockLunaGlobalFoundationModel"
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel"]
+    resources = ["arn:aws:bedrock:::foundation-model/${local.bedrock_luna_model_id}"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = ["unspecified"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "bedrock:InferenceProfileArn"
+      values   = [local.bedrock_luna_profile_arn]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "bedrock:ProjectArn"
+      values   = [local.bedrock_default_project]
+    }
+  }
+
+  statement {
+    sid       = "InvokeBedrockLunaDefaultProject"
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel"]
+    resources = [local.bedrock_default_project]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "bedrock:ModelArn"
+      values   = [local.bedrock_luna_profile_arn]
+    }
   }
 
   statement {
@@ -291,7 +384,7 @@ resource "aws_launch_template" "app" {
   metadata_options {
     http_endpoint               = "enabled"
     http_protocol_ipv6          = "disabled"
-    http_put_response_hop_limit = 1
+    http_put_response_hop_limit = 2
     http_tokens                 = "required"
     instance_metadata_tags      = "disabled"
   }

@@ -21,6 +21,7 @@ import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { HomeScreen } from "./features/HomeScreen.tsx";
 import { TimeKeeperNotification } from "./features/timeKeeper/index.ts";
+import { CalendarView } from "./features/calendar/index.ts";
 import VoiceMemoModal from "./features/VoiceMemoModal.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -618,6 +619,8 @@ export function AppShell() {
           <span id="topbar-intake-help" className="pf-v6-screen-reader">음성을 분석해 매도의뢰는 매물장, 매수문의는 구입장에 신규 행으로 추가합니다.</span>
           {/* 달력 버튼과 아침 일정 브리핑 창을 함께 소유한다. 상단바는 위치만 정한다. */}
           <TimeKeeperNotification enabled={ledgerEnabled} />
+          {/* 월간 캘린더. 자기 일정 CRUD와 장부 읽기 전용 일정을 함께 보여준다(F4-CAL). */}
+          <CalendarView />
           {/* F1 알림 센터(F1-AL-04)의 자리. 아직 동작하지 않는다. */}
           <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
           <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />

@@ -1,8 +1,8 @@
 -- PostgreSQL 15+
 -- F3 합성 장부의 자기 점검. 읽기 전용이며 어떤 행도 바꾸지 않는다.
 --
--- 002_F3_SYNTHETIC_SEED.sql 을 적용한 직후에 실행한다. Worker 를 켜기 전에 데이터가
--- 의도한 모양인지 먼저 확인하기 위한 파일이다.
+-- 002_F3_SYNTHETIC_SEED.sql 과 선택한 model-profiles/*.sql 하나를 적용한 직후에
+-- 실행한다. Worker 를 켜기 전에 데이터와 모델 프로필이 의도한 모양인지 확인한다.
 --
 -- 마지막 열이 전부 PASS 여야 한다. 하나라도 FAIL 이면 파이프라인을 돌리기 전에 seed 를
 -- 다시 적용한다.
@@ -49,6 +49,48 @@ checks(sort_key, "검사", "기대", "실제") AS (
     UNION ALL SELECT 103, '활성 AI 모델 설정 수 (POSITION_CARD + BROKERAGE_JUDGMENT)', 2,
         (SELECT count(*) FROM ai_model_config c JOIN tenant t ON t.brokerage_id = c.brokerage_id
           WHERE c.is_active AND c.capability IN ('POSITION_CARD', 'BROKERAGE_JUDGMENT'))
+    UNION ALL SELECT 110, '활성 AI 모델 설정이 허용된 단일 프로필과 완전 일치', 1, (
+        SELECT count(*) FROM (
+            SELECT c.config_key
+            FROM ai_model_config c
+            JOIN tenant t ON t.brokerage_id = c.brokerage_id
+            JOIN (VALUES
+                ('local-openai', 'openai', 'gpt-5.6-luna', NULL::varchar, NULL::varchar),
+                (
+                    'dev-bedrock-gpt56-luna',
+                    'bedrock',
+                    'global.openai.gpt-5.6-luna',
+                    NULL::varchar,
+                    'general-dev-bedrock'
+                ),
+                (
+                    'dev-qwen38-vllm-bnb',
+                    'vllm',
+                    'unsloth/Qwen3.8-27B-unsloth-bnb-4bit',
+                    '8aa5f05d26b7205477066e1449e0af13f762a299',
+                    'general-dev-gpu'
+                ),
+                (
+                    'dev-qwen38-llamacpp-gguf',
+                    'llama_cpp',
+                    'unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M',
+                    '4ca720788d1e01f1bff70c033e0d0028fd02e502@sha256:322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482',
+                    'general-dev-gpu'
+                )
+            ) AS p(config_key, provider, model_name, model_version, endpoint_alias)
+              ON c.config_key = p.config_key
+             AND c.provider = p.provider
+             AND c.model_name = p.model_name
+             AND c.model_version IS NOT DISTINCT FROM p.model_version
+             AND c.endpoint_alias IS NOT DISTINCT FROM p.endpoint_alias
+            WHERE c.is_active
+              AND c.config_version = 1
+              AND c.parameters = '{}'::jsonb
+              AND c.capability IN ('POSITION_CARD', 'BROKERAGE_JUDGMENT')
+            GROUP BY c.config_key
+            HAVING count(*) = 2 AND count(DISTINCT c.capability) = 2
+        ) valid_profile
+    )
     UNION ALL SELECT 104, '단지 수', 5,
         (SELECT count(*) FROM property_complex x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
     UNION ALL SELECT 105, '세대 수', 36,

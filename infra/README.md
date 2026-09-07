@@ -21,6 +21,7 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
 - `scripts/verify-account-link.sh`: state bucket·원격 state 읽기와 dev init/validate 검증
 - `scripts/manage_db_access.py`: DB 역할, runtime Secret, IAM migration과 검증 관리
+- `scripts/manage_bedrock.py`: dev Worker 컨테이너의 Instance Role·Luna profile 읽기 전용 점검
 - `scripts/manage_dev_power.py`: 지정 Infra 운영자의 dev RDS·ASG start/stop/status 관리
 - `runpod/`: 공유 F2 private image, dependency lock, 불변 Team Template 명세와 운영 runbook
 - `scripts/manage_runpod.py`: AWS 제어 문서를 사용하는 공유 Pod doctor/create/status/delete와 기본 dry-run reconcile 관리
@@ -91,8 +92,10 @@ delivery·Alarm Discord, RunPod 운영·감시 API key와 GHCR credential의 Sec
 
 Terraform 적용 뒤 `just secret-status`로 AWSCURRENT 존재만 확인하고, 최초
 `just runpod-bootstrap <image@digest>`에서 누락값을 TTY 비표시로 입력한다. AI Secret은 기존 renderer 호환 평면
-`AI_*_API_KEY` JSON이고 F2 key 두 개는 도구가 생성한다. 회전은 `just secret-rotate <target>`을
-사용한다. 실제 값, hash와 PAT는 tfvars, 명령 인자, plan/state, 로그나 Discord에 넣지 않는다.
+`AI_*_API_KEY` JSON이고 F2 key 두 개는 도구가 생성한다. OpenAI key는 선택값이며 Bedrock은
+EC2 Instance Role SigV4를 사용하므로 key를 생성·저장하지 않는다. 회전은
+`just secret-rotate <target>`을 사용한다. 실제 값, hash와 PAT는 tfvars, 명령 인자,
+plan/state, 로그나 Discord에 넣지 않는다.
 
 ### Terraform 변경
 
@@ -122,6 +125,29 @@ saved plan에서 기존 Secret version의 `removed`가 값을 삭제하지 않�
 `terraform show -json`이나 state에 나타나면 apply하지 않는다.
 
 `just fmt`는 Terraform 파일을 수정하므로 포맷이 필요할 때만 실행한다. `just verify-account`는 state와 AWS 계정 연결을 읽기 전용으로 검증한다.
+
+### Bedrock 범용 모델 POC
+
+Bedrock Terraform 변경은 `AI_LLM_ENDPOINTS` 공개 설정, Luna Global CRIS 최소 권한과 앱 EC2
+Launch Template의 IMDSv2 hop limit 2를 포함한다. saved plan에서 profile·foundation model·
+`project/default` 외 Bedrock 권한, streaming 권한, 정적 credential 또는 Secret version이 없는지
+검토한다. ASG에는 자동 instance refresh가 없으므로 apply만으로 실행 중인 EC2의 metadata 설정은
+바뀌지 않는다. 공유 dev 중단 시간을 확보하고 활성 작업을 모두 종료한 뒤 `just dev-stop`과
+`just dev-start`를 순서대로 실행해 최신 Launch Template의 EC2로 교체한다. 두 명령은 RDS도
+정지·재시작하므로 공유 dev 전체가 중단된다. 새 EC2의 `InService`, SSM `Online`, IMDSv2 token
+필수·hop limit 2를 확인하고 Backend revision을 배포한 다음 아래 명령을 실행한다. 이 명령은
+일회성 Worker 컨테이너에서 Instance Role과 profile 조회만 확인하며 추론하지 않는다.
+
+```bash
+just bedrock-doctor
+```
+
+doctor가 성공하면 `just dev-seed-f3`로 Bedrock profile을 명시 활성화한 뒤 합성 F3 smoke를
+수행한다. smoke가 실패하면 OpenAI key·runtime이 배포된 경우에만
+`just dev-seed-f3-openai`로 `local-openai`를 명시 복구한다. Bedrock-only 환경은 Worker를
+정지하고 설정을 복구한다. 자동 fallback은 사용하지 않는다. 서울의 Luna는 Global
+cross-Region profile이므로 공유 dev에서는
+합성·비식별 데이터만 사용한다.
 
 다른 팀원을 추가하려면 기존 운영자가 전체 `operator_user_arns`를 보존한 bootstrap plan을 검토하고 적용해야 한다. IAM 사용자 생성·삭제, 그룹 멤버 추가·제거, console password와 MFA 등록은 Terraform 범위가 아니며 AWS 콘솔에서 개인별로 수행한다. 장기 access key는 만들지 않는다.
 
@@ -222,8 +248,9 @@ just db-migrate
 just dev-seed-f3
 ```
 
-이 명령은 개인 IAM 인증과 SSM 터널을 사용해 `F3_SYNTHETIC 합성중개사무소`만 reset하고,
-커밋된 seed를 적용한 뒤 29개 검사가 모두 `PASS`인지 확인한다. IAM token과 DB URL은 출력하지
+이 명령은 EC2 교체와 `bedrock-doctor` 성공 후에만 사용한다. 개인 IAM 인증과 SSM 터널을 사용해
+`F3_SYNTHETIC 합성중개사무소`만 reset하고,
+커밋된 seed와 `dev-bedrock-gpt56-luna` 프로필을 적용한 뒤 30개 검사가 모두 `PASS`인지 확인한다. IAM token과 DB URL은 출력하지
 않는다. 기존 F3 실행 결과도 reset되므로 공유 dev에서 실행 중인 API 요청과 Worker 작업이 없을 때
 확인 프롬프트를 승인한다. prod 또는 임의 DB를 대상으로 실행할 수 없고 파일 경로도 받지 않는다.
 

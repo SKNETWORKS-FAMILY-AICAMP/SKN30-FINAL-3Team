@@ -8,9 +8,10 @@
 - `.github/workflows/pr-policy-review.yml`의 별도 사용자 변경은 이 delivery 변경과 섞지 않는다.
 - `pipeline_operator_user_names`가 승인된 기존 IAM 사용자만 포함하고 `student` 외 추가 사용자가 없는지 확인한다.
 - `SKN30_FINAL` Connection이 `AVAILABLE`이고 승인된 repository만 접근하는지 확인한다.
-- `just -f infra/justfile secret-status`로 AI provider key, 기존 delivery Discord webhook과 새 Alarm
-  전용 Discord webhook의 AWSCURRENT 존재만 확인한다. 값은 TTY 기반 bootstrap/rotation 명령으로
-  넣으며 Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
+- `just -f infra/justfile secret-status`로 선택적 AI provider key, 기존 delivery Discord webhook과 새 Alarm
+  전용 Discord webhook의 AWSCURRENT 존재만 확인한다. F2 active에는 SLLM·STT key가 필요하지만
+  Bedrock은 Instance Role을 사용해 key가 없다. 값은 TTY 기반 bootstrap/rotation 명령으로 넣으며
+  Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
 - Frontend/Backend 정적 검사, migration, Docker/Compose 검증이 성공했는지 확인한다. Frontend
   Verify에는 env·auth·최상위 오류 복구·F2·F3 계약, `typecheck`과 원장 테스트가 모두 포함된다.
 
@@ -208,18 +209,27 @@ aws iam simulate-principal-policy \
   --region ap-northeast-2
 ```
 
+Bedrock POC Terraform apply는 Launch Template의 새 default version만 만들며 기존 EC2를 자동
+교체하지 않는다. 활성 작업을 종료하고 공유 dev 중단 시간을 공지한 뒤 `just -f infra/justfile
+dev-stop`과 `just -f infra/justfile dev-start`를 순서대로 실행한다. 이는 기존 EC2를 종료하고
+RDS도 정지·재시작한다. 새 EC2가 `InService`, SSM `Online`, IMDSv2 token 필수·hop limit 2인 것을
+확인한 뒤 Backend revision을 배포한다. 이 교체와 배포가 끝나기 전에는 doctor나 Bedrock seed를
+실행하지 않는다.
+
 Pipeline과 CodeDeploy에서는 다음 순서로 확인한다.
 
 1. CodePipeline의 Source revision이 요청한 40자리 SHA인지 확인한다.
 2. Backend Build artifact의 image가 `repository@sha256:...` 형식인지 확인한다.
 3. `backend-image.env`에 image digest와 비민감 parameter prefix·secret ARN·port·health/log 메타데이터만 있는지 확인한다.
-4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 비민감 AI endpoint·timeout은 API·Worker 파일에, AI provider key는 Worker 파일에만 있어야 한다.
+4. CodeDeploy `BeforeInstall`에서 이전 통합 파일 `/opt/brokerage/config/runtime.env`만 제거되고, `AfterInstall`에서 API·Worker·Migration별 `0600` 환경파일 조립과 migration이 성공했는지 확인한다. 세 파일은 pinned Compose `v2.35.1`의 `format: raw`로 읽으며 비민감 `AI_LLM_ENDPOINTS`·timeout은 API·Worker 파일에 있어야 한다. F2 key는 endpoint active일 때만 API에, 선택적 OpenAI·vLLM key는 Worker에 주입하며 Bedrock key는 없어야 한다.
 5. `ApplicationStart`, `ValidateService`가 성공하고 deployment 상태가 `Succeeded`인지 확인한다.
 6. Target Group의 유일한 target이 `healthy`인지 확인한다.
 7. CloudFront `https://<distribution-domain><APP_READINESS_PATH>`가 200을 반환하는지 확인한다.
 8. API·Worker CloudWatch log에 revision 전환 이후 지속적인 error가 없는지 확인한다.
 9. `/opt/brokerage/deploy-record.json`의 revision, image digest와 Pipeline execution ID가
    실행 이력과 같은지 확인한다. 파일에는 비밀값이 없어야 한다.
+10. Bedrock POC revision이면 `just -f infra/justfile bedrock-doctor`가 추론 없이 Worker 컨테이너의
+    IMDSv2·Instance Role·`global.openai.gpt-5.6-luna` profile 조회를 통과하는지 확인한다.
 
 실패한 deployment의 상세 상태는 값을 노출하지 않는 다음 조회로 확인한다.
 

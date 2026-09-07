@@ -37,11 +37,13 @@ class AgendaContactResponse(BaseModel):
 class AgendaItemResponse(BaseModel):
     """일정 목록 한 행.
 
-    세대에서 온 행은 구입장 필드가, 구입장에서 온 행은 세대 필드가 null이다. 어느 쪽인지는
-    ``category``가 정한다. 표시 문자열은 서버가 만들지 않고 장부 목록과 같이 원본 값을 싣는다.
+    세대에서 온 행은 구입장 필드가, 구입장에서 온 행은 세대 필드가 null이다. 캘린더에서 온 행은
+    셋 다 null이고 ``event_id``·``title``·``location``만 채워진다. 어느 쪽인지는 ``category``가
+    정하는 게 아니라 이 세 갈래 중 어느 id가 채워졌는지로 정한다. 표시 문자열은 서버가 만들지
+    않고 장부·캘린더의 원본 값을 싣는다.
 
-    ``category``는 문자열이며 앞으로 늘어난다. 계약과 일정 테이블이 생기면 계약 체결일, 지급일,
-    임장일, 신고 기한이 같은 목록에 붙는다. 클라이언트는 모르는 값을 오류로 다루지 않는다.
+    ``category``는 문자열이며 앞으로 늘어난다. 장부 갈래는 고정된 어휘를 쓰고 캘린더 갈래는
+    사용자가 고른 임의 문자열을 그대로 싣는다. 클라이언트는 모르는 값을 오류로 다루지 않는다.
     """
 
     category: str
@@ -60,11 +62,17 @@ class AgendaItemResponse(BaseModel):
     assigned_user_id: int | None
     last_contact_at: datetime | None
     contacts: list[AgendaContactResponse]
+    #: 캘린더에서 온 행에만 있다. 사용자가 직접 만든 일정의 식별자.
+    event_id: int | None
+    #: 캘린더에서 온 행에만 있다.
+    title: str | None
+    #: 캘린더에서 온 행에만 있다.
+    location: str | None
 
     @classmethod
     def from_domain(cls, entry: AgendaEntry) -> AgendaItemResponse:
         return cls(
-            category=entry.category.value,
+            category=entry.category,
             due_date=entry.due_date,
             days_until_due=entry.days_until_due,
             unit_id=entry.unit_id,
@@ -79,6 +87,9 @@ class AgendaItemResponse(BaseModel):
             assigned_user_id=entry.assigned_user_id,
             last_contact_at=entry.last_contact_at,
             contacts=[AgendaContactResponse.from_domain(item) for item in entry.contacts],
+            event_id=entry.event_id,
+            title=entry.title,
+            location=entry.location,
         )
 
 
@@ -97,7 +108,7 @@ class AgendaCategorySummary(BaseModel):
 
     @classmethod
     def from_domain(cls, count: AgendaCategoryCount) -> AgendaCategorySummary:
-        return cls(category=count.category.value, total=count.total)
+        return cls(category=count.category, total=count.total)
 
 
 class AgendaListResponse(BaseModel):
