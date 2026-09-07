@@ -30,8 +30,10 @@ updated: 2026-09-04
 | [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, Secrets Manager 값 정본, 읽기 전용 감시와 수동 reconcile 사용 |
 | [ADR-0022](ADR-0022-sllm-release-v2-base-only.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | 평가 provenance를 결속한 LoRA·base release v2, S3 cross-hash와 비용 전 preflight 사용; dev 예외는 ADR-0023 적용 |
 | [ADR-0023](ADR-0023-sllm-dev-unevaluated-release.md) | 승인됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | `dev-*` 미평가 metadata bundle과 명시적 RunPod dev create 경로 사용 |
-| [ADR-0024](ADR-0024-calendar-storage-ownership.md) | 승인됨 | 캘린더 일정 저장은 F4가 소유(F1-SC 아님)하고, Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 union 갈래로 통합 |
 | [ADR-0024](ADR-0024-pr-review-policy-routing-and-arbitration.md) | 승인됨·코드 구현 | 결정적 정책 pack·Markdown 절 라우팅, Luna 모듈 leaf와 조건부 Terra 정책 중재, 예상 비용 기록 |
+| [ADR-0025](ADR-0025-calendar-storage-ownership.md) | 승인됨 | 캘린더 일정 저장은 F4가 소유(F1-SC 아님)하고, Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 union 갈래로 통합 |
+| [ADR-0026](ADR-0026-general-ai-provider-and-model-profiles.md) | 부분 대체됨·seed와 Provider runtime 구현, GPU Infra 보류 | 범용 Provider alias routing과 신뢰된 Qwen 양자화 seed 프로필 유지; 활성 Provider는 ADR-0027 적용 |
+| [ADR-0027](ADR-0027-bedrock-gpt56-luna-dev-poc.md) | 승인됨·코드 구현, AWS 미적용 | local OpenAI Luna와 합성 dev Bedrock Luna SigV4 POC 사용, GPU Infra 보류 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

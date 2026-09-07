@@ -7,7 +7,7 @@ updated: 2026-09-04
 
 - 2026-09-04: F4 캘린더(`F4-CAL-01~11`)를 신설하고 구현함. 사용자가 캘린더 화면에서 직접 일정을
   만들고 고치고 지운다. 저장은 F4가 소유한 `calendar_event` 테이블이며, 기존 문서가 "일정 저장은
-  F1(F1-SC)이 소유한다"고 정리했던 것을 이 범위에서 뒤집었다([ADR-0024](../../.agents/skills/project-wiki/references/decisions/ADR-0024-calendar-storage-ownership.md)).
+  F1(F1-SC)이 소유한다"고 정리했던 것을 이 범위에서 뒤집었다([ADR-0025](../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md)).
   `GET /time-keeper/agenda`가 캘린더 일정을 여덟 번째 갈래로 포함하도록 확장되어, 캘린더에서 만든
   일정이 "다가오는 일정"의 배지·목록·아침 브리핑에도 함께 뜬다. F2 음성 인식 기반 자동 일정 추가는
   이번 범위에 없다.

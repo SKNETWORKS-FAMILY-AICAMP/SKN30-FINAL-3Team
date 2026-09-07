@@ -1019,6 +1019,7 @@ def test_the_run_snapshot_carries_no_prompt_or_model_response() -> None:
             "provider",
             "model_name",
             "model_version",
+            "endpoint_alias",
             "config_key",
             "config_version",
         }

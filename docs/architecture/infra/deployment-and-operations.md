@@ -1,14 +1,14 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·Alarm 전용 전달 코드 구현 및 AWS 미적용·S3 dev release 게시 완료·RunPod/Terraform 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-09-03
+implementation: 기존 delivery 적용됨·Alarm 전용 전달 및 Bedrock POC 코드 구현/AWS 미적용·S3 dev release 게시 완료·RunPod 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+updated: 2026-09-04
 ---
 
 # 배포 및 운영 구조
 
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
 - **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐고 S3 dev release는 게시됐다. RunPod Pod와 이번 Terraform 변경은 미적용이다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
 
@@ -82,11 +82,11 @@ Launch Template은 SSM, Docker, pinned Compose plugin, CodeDeploy agent와 Cloud
 | `ApplicationStart` | API와 Worker 시작 |
 | `ValidateService` | container health와 local `/health/ready` 확인 |
 
-runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. API에는 Backend·AI 공개 설정, F2용 vLLM LLM·STT key와 `DB_URL`, Worker에는 Backend·AI 공개 설정, 전체 Provider key와 `DB_URL`, migration에는 `DB_MIGRATION_URL`만 담긴 별도 env 파일을 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
+runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. `AI_LLM_ENDPOINTS`의 Bedrock 항목은 alias·provider·리전만 공개 설정으로 전달한다. API에는 F2 endpoint가 active일 때만 vLLM LLM·STT key를 넣고, Worker에는 존재하는 선택적 Provider key만 넣는다. Bedrock은 key를 주입하지 않고 EC2 Instance Role을 사용한다. API·Worker의 `DB_URL`과 migration 전용 `DB_MIGRATION_URL`은 별도 env 파일에 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
 
 CodeDeploy deployment group은 ASG와 target group을 사용하고 실패 시 마지막 정상 revision으로 자동 rollback한다. rollback은 image와 application revision만 되돌리고 DB down migration을 실행하지 않는다.
 
-Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM cleanup만 수행하며 작업을 claim하지 않는다. F3 handler 코드는 `true`에서 RDS polling을 지원하지만 현재 배포 Parameter는 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`다. 검토된 합성 전용 환경에서 두 값을 모두 `true`로 명시하지 않으면 활성 Worker는 DB·Provider 접근과 claim 전에 기동을 거절한다. 운영 Provider 선택과 실사용 데이터 활성화는 별도 적용하며, 정지 신호를 받으면 현재 application 단계까지 마친 뒤 종료한다.
+Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM cleanup만 수행하며 작업을 claim하지 않는다. 현재 공유 dev Parameter는 `WORKER_ENABLED=true`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`이며 합성·비식별 데이터만 처리한다. Bedrock alias와 Instance Role이 준비되어도 Terraform이나 배포가 DB 활성 모델을 자동 변경하지 않는다. 정지 신호를 받으면 현재 application 단계까지 마친 뒤 종료한다.
 
 ## Frontend build와 배포
 
@@ -143,16 +143,52 @@ SSM 제어 문서가 registry·Template ID, digest와 AI Secret 동기화 versio
 [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다. 자동 중지는 없고 생성 작업자가 종료 시
 정확한 Pod ID로 삭제한다. 모델 정본은 private S3에 남는다.
 
+## Bedrock 범용 모델 POC
+
+공유 dev Worker는 `general-dev-bedrock` alias로 서울 `bedrock-runtime`의
+`global.openai.gpt-5.6-luna`를 호출한다. EC2 role에는 해당 Global CRIS profile, 서울·global
+foundation model, 계정의 `project/default`에 대한 비스트리밍 `InvokeModel`과 profile 조회만
+허용한다. 정적 AWS credential과 Bedrock API key는 만들지 않는다.
+
+Docker bridge에서 Instance Role을 사용하도록 IMDSv2 token 필수 상태에서 hop limit을 2로 올린다.
+따라서 같은 앱 EC2의 다른 컨테이너도 role credential에 접근할 수 있다. 최소 권한 role과
+합성·비식별 dev 제한을 함께 적용하며 이 방식은 prod identity 결정으로 승격하지 않는다.
+
+ASG에는 자동 `instance_refresh`를 두지 않는다. 따라서 Terraform apply가 새 Launch Template을
+만들어도 이미 실행 중인 EC2는 hop limit 1로 남을 수 있다. plan/apply와 전원 전환을 동시에
+실행하지 않고, 공유 dev 중단 시간을 공지하고 실행 중인 배포·migration·API 요청·Worker 작업을
+종료한 뒤 다음 순서로 활성화한다.
+
+1. 승인한 Terraform plan을 apply한다.
+2. `just dev-stop` 뒤 `just dev-start`를 실행해 기존 EC2를 종료하고 최신 Launch Template으로
+   새 EC2를 만든다. 이 과정은 ASG뿐 아니라 RDS도 정지·재시작하므로 공유 dev 전체가 중단된다.
+3. 새 인스턴스가 `InService`, SSM `Online`이고 IMDSv2 token 필수·hop limit 2인지 확인한 뒤 해당
+   인스턴스에 Backend revision을 배포한다.
+4. `just bedrock-doctor`로 일회성 Worker 컨테이너의 IMDSv2와 profile 조회를 검증한다. 이 명령은
+   모델 추론을 수행하지 않는다.
+5. `just dev-seed-f3`로 `dev-bedrock-gpt56-luna`를 명시 적용한다.
+6. 합성 F3 smoke에서 JSON 로컬 검증과 repair를 확인한다.
+
+실패 시 기존 OpenAI key와 runtime이 배포된 환경에서만 `just dev-seed-f3-openai`로 DB를
+`local-openai` profile에 명시 복구한다. OpenAI가 준비되지 않았다면 Worker를 정지하고
+Bedrock 설정을 복구한다. 자동 fallback은 하지 않으며 GPU EC2·EBS 기반 llama.cpp·vLLM 비교
+Infra는 보류한다.
+
+향후 prod 명령은 `prod-apply` 전체 apply, `prod-start` / `prod-stop` 비용 자원
+시작·정지, `prod-destroy` snapshot 없는 전체 destroy로 구성한다. 실제 데이터가 있으면
+보존·삭제 정책 승인 전에 `prod-destroy`를 실행하지 않는다.
+
 ## IAM과 비밀값
 
 - Pipeline service role은 세 개로 나눈다.
 - admission, Backend Verify/image Build, Frontend Verify/release Build와 Frontend deploy CodeBuild role은 기능별로 분리한다.
 - CodeDeploy는 AWS 관리 service role을 사용한다.
-- EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write와 migration DB connect만 둔다.
+- EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write, migration DB connect와 Luna 전용 최소 Bedrock 권한만 둔다.
 - 운영자 policy는 `pipeline_operator_user_names`에 지정한 기존 IAM 사용자에게 직접 연결하고 `team-readonly`에는 쓰기 권한을 추가하지 않는다.
-- OpenAI·vLLM key, delivery·Alarm Discord webhook, RunPod 운영·감시 key와 GHCR credential의 정본은
+- 선택적 OpenAI·vLLM key, delivery·Alarm Discord webhook, RunPod 운영·감시 key와 GHCR credential의 정본은
   AWS Secrets Manager다. Terraform은 컨테이너만 만들고 값은 TTY bootstrap/rotation 명령이
-  AWSCURRENT로 관리한다. Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
+  AWSCURRENT로 관리한다. F2 active 시에는 SLLM·STT key 두 개가 모두 필요하다. Bedrock은
+  Instance Role SigV4를 사용하므로 Secret을 추가하지 않는다. Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
 - RDS runtime 비밀번호와 migration IAM token은 서비스가 자동 생성하는 기존 경계를 유지한다.
 - state, Build log, artifact, release manifest와 Discord 메시지에 DB URL, IAM token, API key 또는 webhook을 기록하지 않는다.
 

@@ -56,7 +56,7 @@ F3 17장이 「시세·실거래 폴링」을 「중개사가 직접 확인하�
 | 항목 | 어디 소속 | 사유 |
 |---|---|---|
 | 양측 포지션 판단·거래 가능성 판정 | F3 | F4는 판단하지 않는다 (`F4-CM-01`) |
-| 세대·매물·손님과 연결된 매물장 전반의 일정(임장·계약·잔금 등 유형 구분, 담당자별 색상) | F1 | F1-SC가 소유한다. 아직 미구현. 사용자가 캘린더에서 직접 만드는 일정은 F4가 소유한다(`calendar.md`, [ADR-0024](../../../.agents/skills/project-wiki/references/decisions/ADR-0024-calendar-storage-ownership.md)) |
+| 세대·매물·손님과 연결된 매물장 전반의 일정(임장·계약·잔금 등 유형 구분, 담당자별 색상) | F1 | F1-SC가 소유한다. 아직 미구현. 사용자가 캘린더에서 직접 만드는 일정은 F4가 소유한다(`calendar.md`, [ADR-0025](../../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md)) |
 | 계약 건 관리 | F1 | F1-CT가 소유한다 |
 | 문자 실발송 | F1 | F1-MS-14의 발송 어댑터를 통한다 |
 | 가격 평가·법률 판단 | 제외 | 책임 소재가 시스템 밖에 있다 |

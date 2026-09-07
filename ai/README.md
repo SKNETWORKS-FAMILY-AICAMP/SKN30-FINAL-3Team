@@ -25,6 +25,33 @@ cp .env.example .env
 사용하므로 공유 AWS 개발 배포에서는 `dev` 설정으로 조립됩니다. 실제 비밀값은 `.env.example`,
 `.env.local` 또는 다른 추적 파일에 기록하지 않습니다.
 
+### 범용 생성 endpoint
+
+F3와 향후 범용 생성 기능은 `AI_LLM_ENDPOINTS`의 공개 주소록으로 실제 endpoint를 찾습니다.
+DB의 provider·model·endpoint alias와 주소록의 `(provider, alias)`가 정확히 일치해야 하며,
+등록되지 않은 route는 OpenAI나 F2 vLLM로 fallback하지 않습니다.
+
+llama.cpp와 vLLM은 별도 API key 환경변수를 참조합니다. JSON에는 key 원문을 넣지 않습니다.
+
+```dotenv
+AI_LLM_ENDPOINTS=[{"alias":"general-dev-gpu","provider":"llama_cpp","base_url":"https://gpu-endpoint/v1","api_key_env":"AI_GENERAL_DEV_GPU_API_KEY"}]
+AI_GENERAL_DEV_GPU_API_KEY=<private-api-key>
+```
+
+Bedrock은 임의 URL과 API key를 받지 않습니다. AWS 리전에서 공식 Bedrock Runtime URL을 만들고
+botocore 기본 credential chain의 Instance Role 임시 자격 증명으로 요청마다 SigV4 서명합니다.
+
+```dotenv
+AI_LLM_ENDPOINTS=[{"alias":"general-dev-bedrock","provider":"bedrock","aws_region":"ap-northeast-2"}]
+```
+
+Bedrock adapter는 OpenAI-compatible Responses API를 비스트리밍으로 호출하고 `store=false`를
+고정합니다. 서버측 Structured Outputs 대신 JSON Schema를 지시한 뒤 Pydantic으로 결과를 다시
+검증합니다. OpenAI와 F2 RunPod 설정은 기존 전용 변수로 유지합니다. 공유 dev는 Infra apply와
+Instance Role 기반 doctor가 성공한 뒤 운영자가 `dev-bedrock-gpt56-luna` seed를 명시
+적용하고 합성 smoke로 검증합니다. 코드 배포만으로 활성 모델이나 fallback이 바뀌지
+않습니다.
+
 ## F2 음성메모 파이프라인
 
 `brokerage_ai.f2`에는 다음 실행 흐름을 연결하는 프레임워크 중립 파이프라인이 있습니다.

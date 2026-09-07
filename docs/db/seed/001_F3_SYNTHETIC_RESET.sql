@@ -5,8 +5,9 @@
 -- 일치하는 사무소가 없으면 어떤 행도 지우지 않는다. 다른 사무소, 다른 개발 계정과
 -- seed-sample-ledger 가 만든 데이터는 건드리지 않는다.
 --
--- 002_F3_SYNTHETIC_SEED.sql 을 다시 적용하기 전에 실행한다. 두 파일을 순서대로 돌리면
--- 몇 번을 반복해도 같은 상태가 된다.
+-- 002_F3_SYNTHETIC_SEED.sql 과 허용된 model-profiles/*.sql 한 개를 다시 적용하기 전에
+-- 실행한다. reset, data seed, model profile 세 파일을 순서대로 돌리면 몇 번을 반복해도
+-- 같은 상태가 된다.
 --
 -- seed 는 migration 실행기가 관리하지 않으므로 transaction 을 이 파일이 직접 연다.
 -- 중간에 실패하면 사무소가 반쯤 지워진 상태로 남지 않는다.

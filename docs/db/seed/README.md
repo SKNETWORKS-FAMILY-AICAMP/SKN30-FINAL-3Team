@@ -11,8 +11,24 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 | 파일 | 성격 | 하는 일 |
 |---|---|---|
 | `001_F3_SYNTHETIC_RESET.sql` | 쓰기 | 합성 사무소 1곳의 데이터만 지운다 |
-| `002_F3_SYNTHETIC_SEED.sql` | 쓰기 | 합성 사무소·사용자·AI 설정·장부·상담 로그를 만든다 |
-| `003_F3_SYNTHETIC_VERIFY.sql` | 읽기 전용 | 데이터가 의도한 모양인지 29가지를 점검한다 |
+| `002_F3_SYNTHETIC_SEED.sql` | 쓰기 | 합성 사무소·사용자·장부·상담 로그를 만든다 |
+| `model-profiles/*.sql` | 쓰기 | 선택한 Provider·모델 설정 두 건을 만든다 |
+| `003_F3_SYNTHETIC_VERIFY.sql` | 읽기 전용 | 데이터와 단일 허용 모델 프로필을 30가지로 점검한다 |
+
+## 모델 프로필
+
+관리 명령은 아래 고정 이름만 허용한다. SQL 경로나 provider·model 문자열은 입력받지 않는다.
+
+| 프로필 | Provider | 모델 | `endpoint_alias` | 사용 상태 |
+|---|---|---|---|---|
+| `local-openai` | `openai` | `gpt-5.6-luna` | `NULL` | 로컬 개발 기본값 |
+| `dev-bedrock-gpt56-luna` | `bedrock` | `global.openai.gpt-5.6-luna` | `general-dev-bedrock` | 공유 dev POC; doctor 후 명시 적용·합성 smoke 검증 |
+| `dev-qwen38-vllm-bnb` | `vllm` | `unsloth/Qwen3.8-27B-unsloth-bnb-4bit` | `general-dev-gpu` | 프로필만 구현; GPU runtime 전환 전 적용 금지 |
+| `dev-qwen38-llamacpp-gguf` | `llama_cpp` | `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M` | `general-dev-gpu` | 프로필만 구현; GPU runtime 전환 전 적용 금지 |
+
+두 Qwen 프로필은 모델 revision을 `model_version`에 고정한다. GGUF 프로필은 파일 SHA-256도
+함께 기록한다. 프로필마다 `POSITION_CARD`와 `BROKERAGE_JUDGMENT`를 하나씩 만들며 자동 fallback이나
+A/B 분배는 하지 않는다.
 
 ## 안전 범위
 
@@ -20,8 +36,11 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
   다른 개발 계정과 `seed-sample-ledger`가 만든 데이터는 건드리지 않는다.
 - 개인 로컬 합성 DB와 `infra/environments/dev`가 소유한 공유 dev에서만 사용한다. prod와 다른
   공유·운영 DB에는 적용하지 않는다.
-- 공유 dev 적용은 커밋된 세 파일을 고정 순서로 실행하고 29개 검사를 확인하는
-  `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
+- 공유 dev 적용은 Bedrock doctor 통과 후 커밋된
+  reset·data·`dev-bedrock-gpt56-luna` profile·verify를 고정 순서로 실행하고
+  30개 검사를 확인하는 `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
+  이후 합성 smoke를 실행하고, 실패하면 OpenAI key·runtime이 배포된 경우에만
+  `dev-seed-f3-openai`로 명시 복구한다. OpenAI가 준비되지 않았다면 Worker를 정지한다.
 - 실존 이름·연락처·주소·상담 원문을 변형해 쓰지 않았다. 전부 새로 지어낸 값이다.
 - 연락처는 프로젝트가 합성 fixture에 사용하는 `010-0000-XXXX` 테스트 형식만 쓴다.
 - API Key, 토큰, 비밀번호를 넣지 않는다. `app_user.password_hash`에 들어가는
@@ -37,12 +56,13 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 
 ```bash
 cd backend
-uv run python src/manage.py seed-f3-synthetic --confirm-reset
+uv run python src/manage.py seed-f3-synthetic --confirm-reset \
+  --model-profile local-openai
 ```
 
 명령은 `APP_ENV=local`이고 `DB_URL` 호스트가 `localhost` 또는 loopback IP일 때만 동작한다.
-임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` seed → `003` verify를 고정 순서로
-실행한다. 29개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
+임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` data → 선택한 model profile →
+`003` verify를 고정 순서로 실행한다. 30개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
 `verification_checks`를 출력한다. 몇 번을 반복해도 합성 사무소 ID와 같은 데이터 상태를 유지한다.
 
 ## 공유 dev 적용
@@ -60,9 +80,10 @@ just dev-seed-f3
 
 - 개인 `aws login` IAM 사용자와 같은 이름의 PostgreSQL 역할을 사용한다.
 - 태그로 제한된 app EC2의 SSM remote-host 터널과 15분 IAM DB 토큰을 프로세스 내부에서만 쓴다.
-- 실행 파일을 `001` reset → `002` seed → `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
+- 실행 파일을 `001` reset → `002` data → `dev-bedrock-gpt56-luna` profile →
+  `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
 - `app_owner` 역할로 실행하며 IAM token과 DB URL을 명령행·로그에 출력하지 않는다.
-- `003`의 29개 결과가 모두 `PASS`일 때만 완료로 보고한다.
+- `003`의 30개 결과가 모두 `PASS`일 때만 완료로 보고한다.
 
 확인 프롬프트는 기존 `F3_SYNTHETIC 합성중개사무소`의 실행 결과와 장부를 reset한 뒤 다시
 적재한다는 사실을 명시한다. 다른 사무소 데이터는 reset 대상이 아니지만, 공유 dev에서 실행 중인
@@ -198,15 +219,13 @@ ORDER BY seed_key;
 
 ## AI 모델 설정
 
-`002`가 `POSITION_CARD`와 `BROKERAGE_JUDGMENT` capability의 활성 설정을 함께 만든다.
-기본값은 `provider = 'openai'`, `model_name = 'gpt-4o-mini'`다.
+`002`는 합성 장부만 만들고 관리 명령이 선택한 정적 프로필 SQL이
+`POSITION_CARD`와 `BROKERAGE_JUDGMENT` 설정을 만든다. 임의 `UPDATE`, provider·model
+문자열, SQL 경로로 모델을 바꾸지 않는다. 새 모델은 provenance를 검토한 후
+allowlist 프로필과 검증 쿼리를 함께 추가한다.
 
-다른 모델을 쓰려면 seed 적용 후 값을 바꾼다. 구조화 출력을 지원하는 모델이어야 한다.
-
-```sql
-UPDATE ai_model_config
-SET provider = 'vllm', model_name = '<로컬 모델명>'
-WHERE brokerage_id = (SELECT id FROM brokerage WHERE name = 'F3_SYNTHETIC 합성중개사무소');
-```
-
-API Key는 SQL에 넣지 않는다. `ai/.env`에 둔다.
+API key나 클라우드 자격 증명은 SQL에 넣지 않는다. Bedrock 활성 환경 정책은
+[ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md),
+Qwen provenance와 비활성 비교 경로는
+[ADR-0026](../../../.agents/skills/project-wiki/references/decisions/ADR-0026-general-ai-provider-and-model-profiles.md)를
+따른다.

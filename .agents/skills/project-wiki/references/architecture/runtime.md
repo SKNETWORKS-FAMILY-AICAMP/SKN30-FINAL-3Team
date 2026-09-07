@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # 런타임 및 기술 후보
@@ -20,8 +20,8 @@ updated: 2026-09-03
 | AI package runtime | 같은 EC2에 설치한 `brokerage-ai` | 결정; AI ADR-0001 |
 | Conditional AI runtime | ECS Fargate·Cloud Map | 조건부 |
 | IaC | Terraform | 결정; [ADR-0007](../decisions/ADR-0007-terraform-iac.md) |
-| Runtime AWS integration | AWS SDK for Python (`boto3`) | 제안 |
-| Model API | OpenAI·OpenAI-compatible vLLM adapter | 구현됨; F2는 작업명 `sllm`·`stt`, active/offline endpoint 사용 |
+| Runtime AWS integration | botocore credential chain·SigV4 | 결정; Bedrock dev adapter에 한정 |
+| Model API | OpenAI·Bedrock·OpenAI-compatible vLLM·llama.cpp adapter | 구현됨; Bedrock AWS 적용 전, F2는 작업명 `sllm`·`stt`, active/offline endpoint 사용 |
 | GPU runtime | private S3 release로 생성·삭제하는 RunPod shared F2 Pod | 결정; S3 dev release 게시 완료·RunPod/Terraform 미적용, [ADR-0020](../decisions/ADR-0020-sllm-release-handoff.md) |
 | Application CI/CD | 통합 자동·Backend 수동·Frontend 수동 CodePipeline V2 | 결정; 기존 main source 적용, dev/Verify·Build 분리 미적용 |
 
@@ -32,6 +32,9 @@ updated: 2026-09-03
 - SQLModel 테이블 모델은 API 및 이벤트 공개 계약으로 직접 사용하지 않는다.
 - Backend는 Yoyo로 순수 SQL 전진 migration을 적용하며 애플리케이션 시작 시 자동 적용하지 않는다.
 - AWS SDK는 실행 중 AWS 서비스를 호출하는 데 사용하고 IaC 대체 수단으로 사용하지 않는다.
+- 공유 dev 범용 생성은 [ADR-0027](../decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)에 따라
+  Instance Role SigV4로 Bedrock Luna를 호출한다. Global cross-Region 특성 때문에 합성·비식별
+  입력만 허용하며 GPU EC2는 비교·탈출 경로로 보류한다.
 - AI 실행부는 CPU·메모리 경합, API 지연, 독립 배포 또는 장애 격리 필요성이 측정될 때만 ECS로 분리한다. 분리 후에도 AI의 DB 직접 접근은 금지한다.
 - 통합 Pipeline은 검증 gate 후 `dev` 변경을 자동 감지하고, Backend·Frontend 독립 Pipeline은 최신 `dev` 또는 지정 `COMMIT_ID`를 수동 배포한다. `main`은 릴리스 PR 기준으로 유지한다. 세 Pipeline은 `QUEUED`이며 Terraform 배포는 범위에서 제외한다.
 
