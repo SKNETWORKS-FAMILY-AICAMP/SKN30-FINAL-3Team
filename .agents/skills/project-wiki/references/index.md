@@ -30,3 +30,5 @@ updated: 2026-08-31
 | [log.md](log.md) | 최근 위키 변경의 요약이 필요할 때 |
 
 외부 및 사람용 원문의 등록 현황은 `../sources/manifest.yaml`에서 확인한다.
+
+이미지 게시 준비와 GPU 배포 경계는 [F2·범용 이미지 게시](../../../../infra/serving/README.md)를 참고한다.

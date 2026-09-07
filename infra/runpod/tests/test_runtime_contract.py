@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 RUNPOD_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = RUNPOD_ROOT / "scripts"
@@ -62,6 +63,83 @@ def valid_environment() -> dict[str, str]:
 
 
 class SupervisorTests(unittest.TestCase):
+    def test_local_models_require_both_snapshots(self):
+        environment = {**valid_environment(), "F2_LOCAL_MODELS": "1"}
+        with patch.object(supervisor.Path, "is_file", return_value=True):
+            config = supervisor.load_config(base_release(), environment)
+            commands = supervisor.build_commands(config, "vllm")
+            self.assertIn("/models/sllm", commands["sllm"])
+            self.assertIn("/models/stt", commands["stt"])
+        with patch.object(supervisor.Path, "is_file", return_value=False):
+            with self.assertRaises(supervisor.ConfigurationError):
+                supervisor.load_config(base_release(), environment)
+
+    def test_both_engines_limit_sequences_to_one(self) -> None:
+        config = supervisor.load_config(base_release(), valid_environment())
+        for command in supervisor.build_commands(config, "vllm").values():
+            self.assertEqual(command[command.index("--max-num-seqs") + 1], "1")
+
+    def test_stt_starts_after_sllm_health_and_process_failure_stops_all(self) -> None:
+        processes = [Mock(returncode=None) for _ in range(4)]
+        for process in processes:
+            process.poll.return_value = None
+        started = []
+
+        def start(command, _environment):
+            process = processes[len(started)]
+            started.append(command)
+            return process
+
+        def ready(port, _key, _model):
+            self.assertEqual(len(started), 2 if port == 8001 else 4)
+            if port == 8002:
+                processes[0].poll.return_value = 7
+                processes[0].returncode = 7
+
+        with (
+            patch.object(supervisor, "bootstrap", return_value=base_release()),
+            patch.dict(supervisor.os.environ, valid_environment()),
+            patch.object(supervisor.shutil, "which", return_value="vllm"),
+            patch.object(supervisor.signal, "signal"),
+            patch.object(supervisor, "_start", side_effect=start),
+            patch.object(supervisor, "check", side_effect=ready),
+            patch.object(supervisor, "_stop") as stop,
+        ):
+            self.assertEqual(supervisor.run(), 7)
+            stop.assert_called_once_with(processes)
+
+    def test_startup_failure_cleans_started_services_without_starting_stt(self) -> None:
+        process = Mock()
+        with (
+            patch.object(supervisor, "bootstrap", return_value=base_release()),
+            patch.dict(supervisor.os.environ, valid_environment()),
+            patch.object(supervisor.shutil, "which", return_value="vllm"),
+            patch.object(supervisor.signal, "signal"),
+            patch.object(supervisor, "_start", return_value=process) as start,
+            patch.object(
+                supervisor, "_wait_for_model", side_effect=RuntimeError("timeout")
+            ),
+            patch.object(supervisor, "_stop") as stop,
+        ):
+            self.assertEqual(supervisor.run(), 1)
+            self.assertEqual(start.call_count, 2)
+            stop.assert_called_once_with([process, process])
+
+    def test_model_wait_handles_exit_shutdown_and_timeout(self) -> None:
+        process = Mock()
+        for requested, exit_code, now in (([], 1, 0), ([15], None, 0), ([], None, 11)):
+            process.poll.return_value = exit_code
+            with (
+                self.subTest(requested=requested, exit_code=exit_code, now=now),
+                patch.object(supervisor.time, "monotonic", return_value=now),
+                patch.object(supervisor, "check") as check,
+                self.assertRaises(RuntimeError),
+            ):
+                supervisor._wait_for_model(
+                    {"sllm": process}, requested, 10, 8001, "key", "sllm"
+                )
+            check.assert_not_called()
+
     def test_release_owns_sllm_model_and_template_owns_stt(self) -> None:
         config = supervisor.load_config(release(), valid_environment())
         self.assertEqual(config.sllm_model_id, "Qwen/Qwen3-4B")
@@ -124,6 +202,35 @@ class SupervisorTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_verified_cache_needs_no_download_url(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            destination = root / "release-v1"
+            destination.mkdir()
+            manifest = self._release_manifest(destination)
+            raw = json.dumps(manifest).encode()
+            (destination / "release.json").write_bytes(raw)
+            (destination / "verified-bundle.json").write_text(
+                json.dumps(
+                    {
+                        "bundle_sha256": "b" * 64,
+                        "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                    }
+                )
+            )
+            with (
+                patch.object(bootstrap, "RELEASE_ROOT", root),
+                patch.object(bootstrap, "_download") as download,
+            ):
+                result = bootstrap.bootstrap(
+                    {
+                        "F2_SLLM_RELEASE_ID": "release-v1",
+                        "F2_SLLM_BUNDLE_SHA256": "b" * 64,
+                    }
+                )
+                self.assertEqual(result.base_model_id, "Qwen/Qwen3-4B")
+                download.assert_not_called()
+
     def _release_manifest(self, destination: Path) -> dict[str, object]:
         adapter = destination / "adapter"
         adapter.mkdir()
@@ -322,6 +429,40 @@ class BootstrapTests(unittest.TestCase):
                 bootstrap.BootstrapError, "promotion approval does not match"
             ):
                 bootstrap._validate(manifest, "release-v1", destination)
+
+    def test_cached_manifest_cannot_change_the_verified_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            destination = root / "release-v1"
+            destination.mkdir()
+            manifest = self._release_manifest(destination)
+            raw = json.dumps(manifest).encode()
+            (destination / "release.json").write_bytes(raw)
+            (destination / "verified-bundle.json").write_text(
+                json.dumps(
+                    {
+                        "bundle_sha256": "b" * 64,
+                        "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                    }
+                )
+            )
+            manifest["base_model"]["revision"] = "c" * 40
+            (destination / "release.json").write_text(json.dumps(manifest))
+            from unittest.mock import patch
+
+            with (
+                patch.object(bootstrap, "RELEASE_ROOT", root),
+                self.assertRaisesRegex(
+                    bootstrap.BootstrapError, "cached release does not match"
+                ),
+            ):
+                bootstrap.bootstrap(
+                    {
+                        "F2_SLLM_RELEASE_ID": "release-v1",
+                        "F2_SLLM_BUNDLE_SHA256": "b" * 64,
+                        "F2_SLLM_BUNDLE_URL": "https://signed.example/bundle",
+                    }
+                )
 
 
 class ImageAndTemplateTests(unittest.TestCase):

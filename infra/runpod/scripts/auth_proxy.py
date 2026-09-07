@@ -8,6 +8,7 @@ import hmac
 import logging
 import os
 import re
+import shutil
 import time
 from collections.abc import AsyncIterator
 
@@ -151,6 +152,14 @@ def create_application(
         middlewares=[authenticate_and_log],
         client_max_size=max_request_bytes,
     )
+
+    async def disk_status(request: web.Request) -> web.Response:
+        usage = shutil.disk_usage(os.environ.get("HF_HOME", "/tmp"))
+        return web.json_response(
+            {"disk_total_bytes": usage.total, "disk_free_bytes": usage.free}
+        )
+
+    application.router.add_get("/ops/status", disk_status)
 
     async def start_session(app: web.Application) -> None:
         timeout = ClientTimeout(total=None, connect=10, sock_connect=10, sock_read=None)
