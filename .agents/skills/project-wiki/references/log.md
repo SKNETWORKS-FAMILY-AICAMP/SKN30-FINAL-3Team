@@ -1,10 +1,11 @@
 ---
 status: 구현됨
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # 위키 변경 로그
 
+- 2026-09-07: ADR-0025를 승인해 F2 신규 음성 접수에서 현재 장부를 생략하고 STT·sLLM 분석 한 번으로 상담 유형과 유형별 필드를 추출한 뒤, pipeline이 매도의뢰→매물장·매수문의→구입장을 추천하도록 변경했다. 기존 상세는 `current_ledger_type`과 추천 장부의 불일치 보호를 유지하며, 응답 `ledger_type`은 추천 대상 장부를 뜻한다. OQ-010과 Frontend 2회 분석 결정을 종료했다.
 - 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
 - 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
 - 2026-09-03: 사용자 지시로 F4 기능 번호가 확정되어 이미 종료된 OQ-012가 미해결 목록에 남아 있던 불일치를 제거함.

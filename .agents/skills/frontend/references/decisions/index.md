@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # 프론트엔드 결정 인덱스
@@ -12,6 +12,6 @@ updated: 2026-09-04
 | [ADR-003](ADR-003-static-release-delivery.md) | 결정 | Vite 정적 artifact와 asset-first/index-last 복구 가능한 전달 |
 | [ADR-004](ADR-004-shared-boundary.md) | 결정 | 여러 기능이 실제로 공유하는 전송·검증·표기 경계를 `src/shared`에 두고, 설정에 의존하는 진입점과 순수한 진입점을 분리한다. 오류는 분류만 공유하고 사용자 문구는 각 기능이 소유한다. |
 | [ADR-005](ADR-005-feature-data-source.md) | 결정 | 데이터 출처를 기능 단위로 고르고, 지정하지 않으면 장부 출처를 따른다. |
-| [ADR-006](ADR-006-home-voice-intake.md) | 결정 | 첫 화면을 진입점 선택으로 두고, 신규 음성메모 접수가 상담 유형으로 장부를 판정한다. |
+| [ADR-006](ADR-006-home-voice-intake.md) | 부분 대체됨 | 첫 화면과 검토 흐름은 유지하고, Frontend 2회 분석·장부 판정 소유는 프로젝트 ADR-0025로 대체한다. |
 | [ADR-007](ADR-007-editable-fields-must-persist.md) | 결정 | 편집 가능하게 보이는 칸은 저장 경로가 있어야 한다. 없으면 편집을 열지 않고 이유를 밝힌다. |
 | [ADR-008](ADR-008-calendar-month-grid.md) | 결정 | 캘린더 월간 뷰는 PatternFly `CalendarMonth`(단일 날짜 선택용)가 아니라 직접 만든 CSS Grid로 구현한다. |

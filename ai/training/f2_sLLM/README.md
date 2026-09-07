@@ -1,9 +1,10 @@
 # F2 분류·full-output QLoRA 학습
 
 `Qwen/Qwen3-4B`를 상담 유형 분류 또는 F2 전체 구조화 출력으로 미세조정하는
-오프라인 도구다. `classification`은 상담 유형만 출력하고, `full`은 현재
-장부 종류와 STT 텍스트를 받아 상담 유형, 장부 불일치, 필드, 원문 근거,
-불확실성과 상담 로그 초안의 6-key JSON을 출력한다. 운영 승격 대상은 검수된
+오프라인 도구다. `classification`은 상담 유형만 출력하고, `full`은 STT 텍스트를 받아
+상담 유형에 맞는 장부 필드, 원문 근거, 불확실성과 상담 로그 초안의 5-key JSON을 출력한다.
+`ledger_type`은 모델 출력에서 없애지 않고 운영 pipeline이 상담 유형에서 결정해 API 응답으로
+반환한다. 운영 승격 대상은 검수된
 full-output 정답으로 학습·평가한 adapter다.
 
 모델 ID와 QLoRA 설정은 실험 기본값일 뿐, 승인된 운영 모델 결정이 아니다.
@@ -23,8 +24,9 @@ ai/training/f2_sLLM/
 ```
 
 데이터 분할은 Data 모듈이 담당한다. 동일 `source_group_id`는 항상 같은 split에
-배치되어야 하며, test는 SFT 변환 단계에서 차단된다. full-output은
-`sample_id`, `ledger_type`, `expected`를 보존한 분할 산출물을 사용한다.
+배치되어야 하며, test는 SFT 변환 단계에서 차단된다. full-output 원천은
+`sample_id`, `ledger_type`, `expected`를 보존한 분할 산출물을 사용한다. 원천의 `ledger_type`은
+기존 데이터 정합성 검증에만 쓰고 모델 prompt에는 넣지 않는다.
 
 ## 1. 데이터 준비
 
@@ -33,7 +35,8 @@ manifest·privacy 문서와 검수를 갖춘 `data/f2_llm/releases/<version>/` �
 분할은 `data/scripts/split_f2_sllm_dataset.py`가 분류 스키마(`scenario_id`)와
 full-output 스키마(`sample_id`, `ledger_type`, `expected`)를 모두 처리한다. Data 모듈에서
 분할한 결과를 받은 뒤 아래 SFT 변환을 실행한다. 분할 보고서의 장부·셀 분포와
-`ledger_mismatch_count`로 특정 split에 쏠림이 없는지 먼저 확인한다.
+`ledger_mismatch_count`로 특정 split에 쏠림이 없는지 먼저 확인한다. 기존 장부와 상담 유형이
+불일치한 행은 필드 정답이 비어 있으므로 단일 입력 자동 장부 추천 학습에서는 제외한다.
 
 학습에는 train과 validation만 변환한다. test는 최종 평가 전까지 열어보거나 변환하지 않는다.
 
@@ -66,6 +69,7 @@ uv pip install \
 
 ```bash
 ai/training/f2_sLLM/.venv/bin/python ai/training/f2_sLLM/train_qlora.py \
+  --task full \
   --train-data /workspace/datasets/f2-<version>/sft-train.jsonl \
   --validation-data /workspace/datasets/f2-<version>/sft-validation.jsonl \
   --output-dir /workspace/models/f2-qwen3-4b-smoke \
@@ -82,6 +86,7 @@ full-output 학습은 별도 설정을 명시한다. 학습기는 Qwen 채팅 �
 
 ```bash
 ai/training/f2_sLLM/.venv/bin/python ai/training/f2_sLLM/train_qlora.py \
+  --task full \
   --train-data /workspace/datasets/f2-<version>/sft-train.jsonl \
   --validation-data /workspace/datasets/f2-<version>/sft-validation.jsonl \
   --config ai/training/f2_sLLM/configs/qwen3-4b-qlora-full.yaml \
@@ -112,8 +117,9 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 `--model-revision`에는 학습 `run_metadata.json`의 `resolved_model_revision`을 전달한다. `main`을
 다시 해석해 다른 기반 가중치로 평가하지 않도록 단일 모델 평가는 항상 불변 commit에 고정한다.
 
-같은 test split에서 base 4B와 adapter의 JSON 파싱, 상담 유형, 장부 불일치,
-필드 키·값, evidence 근거와 금지된 필드 제안을 비교한다. validation loss만으로
+같은 test split에서 base 4B와 adapter의 JSON 파싱, 상담 유형, 유형별 필드 키·값과
+evidence 근거를 비교한다. 장부 추천과 기존 상세의 불일치 보호는 상담 유형에 따른 결정적
+pipeline 테스트로 검증한다. validation loss만으로
 최종 모델을 확정하지 않는다.
 
 ## 4. Infra 전달 bundle 생성

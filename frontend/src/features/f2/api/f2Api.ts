@@ -1,7 +1,6 @@
 import { APP_ENV } from "../../../config/env.ts";
 import { ApiError, apiErrorFromResponse, getCsrfToken } from "../../../shared/api/index.ts";
 import type { LedgerType } from "../model/consultationRouting.ts";
-import { routeConsultation } from "../model/consultationRouting.ts";
 
 interface AnalyzeVoiceMemoInput {
   audio: File;
@@ -23,6 +22,8 @@ export interface VoiceProposal {
 
 export interface VoiceAnalysis {
   consultationType: string;
+  /** 상담 유형에서 결정된 추천 장부. 기타상담은 null이다. */
+  ledgerType: LedgerType | null;
   ledgerMismatch: boolean;
   proposals: VoiceProposal[];
   uncertainties: string[];
@@ -106,7 +107,18 @@ function requiredString(record: Record<string, unknown>, key: string): string {
   return value;
 }
 
-function decodeAnalysis(value: unknown, ledgerType: LedgerType, draft: Record<string, unknown>): VoiceAnalysis {
+function decodeLedgerType(value: unknown): LedgerType | null {
+  if (value === "매물장") return "property";
+  if (value === "구입장") return "buyer";
+  if (value === null) return null;
+  throw new Error("F2 응답의 ledger_type 값이 올바르지 않습니다.");
+}
+
+function decodeAnalysis(
+  value: unknown,
+  currentLedgerType: LedgerType | null,
+  draft: Record<string, unknown>,
+): VoiceAnalysis {
   const body = asRecord(value, "F2");
   const rawProposals = body["proposals"];
   const rawUncertainties = body["uncertainties"];
@@ -114,7 +126,9 @@ function decodeAnalysis(value: unknown, ledgerType: LedgerType, draft: Record<st
     throw new Error("F2 제안 응답 형식이 올바르지 않습니다.");
   }
 
-  const bindings = ledgerType === "buyer" ? BUYER_FIELDS : PROPERTY_FIELDS;
+  const recommendedLedgerType = decodeLedgerType(body["ledger_type"]);
+  const proposalLedgerType = currentLedgerType ?? recommendedLedgerType ?? "property";
+  const bindings = proposalLedgerType === "buyer" ? BUYER_FIELDS : PROPERTY_FIELDS;
   const proposals = rawProposals.map((raw, index): VoiceProposal => {
     const proposal = asRecord(raw, "F2 제안");
     const fieldName = requiredString(proposal, "field_name");
@@ -133,7 +147,7 @@ function decodeAnalysis(value: unknown, ledgerType: LedgerType, draft: Record<st
     };
   });
 
-  const logFieldKey = ledgerType === "buyer" ? "content" : "log";
+  const logFieldKey = proposalLedgerType === "buyer" ? "content" : "log";
   const logCurrent = stringValue(draft[logFieldKey]);
   const logDraft = requiredString(body, "consultation_log_draft");
   proposals.push({
@@ -149,6 +163,7 @@ function decodeAnalysis(value: unknown, ledgerType: LedgerType, draft: Record<st
 
   return {
     consultationType: requiredString(body, "consultation_type"),
+    ledgerType: recommendedLedgerType,
     ledgerMismatch: body["ledger_mismatch"] === true,
     proposals,
     uncertainties: rawUncertainties.filter((item): item is string => typeof item === "string"),
@@ -156,7 +171,12 @@ function decodeAnalysis(value: unknown, ledgerType: LedgerType, draft: Record<st
   };
 }
 
-export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<VoiceAnalysis> {
+async function requestVoiceAnalysis(input: {
+  audio: File;
+  currentLedgerType: LedgerType | null;
+  draft: Record<string, unknown>;
+  signal?: AbortSignal;
+}): Promise<VoiceAnalysis> {
   const csrfToken = getCsrfToken();
   if (csrfToken == null) {
     throw new ApiError({
@@ -168,8 +188,13 @@ export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<Vo
 
   const form = new FormData();
   form.append("audio", input.audio, input.audio.name);
-  form.append("ledger_type", input.ledgerType === "buyer" ? "구입장" : "매물장");
-  form.append("current_fields", JSON.stringify(currentFields(input.ledgerType, input.draft)));
+  if (input.currentLedgerType != null) {
+    form.append(
+      "current_ledger_type",
+      input.currentLedgerType === "buyer" ? "구입장" : "매물장",
+    );
+    form.append("current_fields", JSON.stringify(currentFields(input.currentLedgerType, input.draft)));
+  }
   form.append("privacy_confirmed", "true");
 
   let response: Response;
@@ -203,7 +228,7 @@ export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<Vo
   }
 
   try {
-    return decodeAnalysis(payload, input.ledgerType, input.draft);
+    return decodeAnalysis(payload, input.currentLedgerType, input.draft);
   } catch (cause) {
     throw new ApiError({
       kind: "contract",
@@ -212,6 +237,16 @@ export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<Vo
       cause,
     });
   }
+}
+
+/** 기존 장부 상세에 연결된 음성메모를 분석한다. */
+export async function analyzeVoiceMemo(input: AnalyzeVoiceMemoInput): Promise<VoiceAnalysis> {
+  return requestVoiceAnalysis({
+    audio: input.audio,
+    currentLedgerType: input.ledgerType,
+    draft: input.draft,
+    signal: input.signal,
+  });
 }
 
 export interface IntakeAnalysis extends VoiceAnalysis {
@@ -224,39 +259,24 @@ export interface IntakeAnalysis extends VoiceAnalysis {
   usedFallbackLedger: boolean;
 }
 
-/**
- * 장부를 정하지 않은 신규 접수의 기준 장부.
- *
- * 어떤 장부로 보낼지는 분석 결과를 봐야 알 수 있으므로 한쪽을 먼저 정해 보낸다.
- * 매도의뢰가 매물장 기본 흐름이라 매물장을 기준으로 둔다.
- */
-const PROBE_LEDGER: LedgerType = "property";
+/** 기타상담은 추천 장부가 없으므로 화면에서 사용할 fallback. */
+const FALLBACK_LEDGER: LedgerType = "property";
 
 /**
  * 장부를 정하지 않은 신규 음성메모 접수.
  *
- * 상담 유형으로 장부를 고르고 그 장부의 필드 제안을 돌려준다.
- * 계약상 장부와 상담 유형이 어긋난 분석은 필드 제안을 만들지 않으므로,
- * 기준 장부와 판정이 다르면 판정된 장부로 한 번 더 분석해야 손님·세대 정보를 제안으로 받는다.
- * 매수문의 한 유형에서만 요청이 두 번 나간다.
+ * 현재 장부를 보내지 않고 한 번만 분석한다.
+ * Backend가 상담 유형에서 추천 장부를 결정해 그 장부의 필드 제안과 함께 돌려준다.
  */
 export async function analyzeNewIntake(input: { audio: File; signal?: AbortSignal }): Promise<IntakeAnalysis> {
-  const probe = await analyzeVoiceMemo({
+  const analysis = await requestVoiceAnalysis({
     audio: input.audio,
-    ledgerType: PROBE_LEDGER,
+    currentLedgerType: null,
     draft: {},
     signal: input.signal,
   });
-
-  const routed = routeConsultation(probe.consultationType);
-  if (routed == null) return { ...probe, ledgerType: PROBE_LEDGER, usedFallbackLedger: true };
-  if (routed === PROBE_LEDGER) return { ...probe, ledgerType: routed, usedFallbackLedger: false };
-
-  const matched = await analyzeVoiceMemo({
-    audio: input.audio,
-    ledgerType: routed,
-    draft: {},
-    signal: input.signal,
-  });
-  return { ...matched, ledgerType: routed, usedFallbackLedger: false };
+  if (analysis.ledgerType == null) {
+    return { ...analysis, ledgerType: FALLBACK_LEDGER, usedFallbackLedger: true };
+  }
+  return { ...analysis, ledgerType: analysis.ledgerType, usedFallbackLedger: false };
 }

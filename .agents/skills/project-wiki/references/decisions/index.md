@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # 결정 인덱스
@@ -32,6 +32,7 @@ updated: 2026-09-04
 | [ADR-0023](ADR-0023-sllm-dev-unevaluated-release.md) | 승인됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | `dev-*` 미평가 metadata bundle과 명시적 RunPod dev create 경로 사용 |
 | [ADR-0024](ADR-0024-calendar-storage-ownership.md) | 승인됨 | 캘린더 일정 저장은 F4가 소유(F1-SC 아님)하고, Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 union 갈래로 통합 |
 | [ADR-0024](ADR-0024-pr-review-policy-routing-and-arbitration.md) | 승인됨·코드 구현 | 결정적 정책 pack·Markdown 절 라우팅, Luna 모듈 leaf와 조건부 Terra 정책 중재, 예상 비용 기록 |
+| [ADR-0025](ADR-0025-f2-single-pass-auto-ledger-routing.md) | 승인됨·코드 구현 | F2 신규 음성을 한 번 분석하고 상담 유형에서 추천 장부와 그 장부 필드를 함께 반환 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

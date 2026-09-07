@@ -1,10 +1,14 @@
 ---
-status: 결정
+status: 부분 대체됨
 date: 2026-08-26
 implementation: 구현됨
 ---
 
 # ADR-006: 첫 화면을 진입점 선택으로 두고 신규 음성메모 접수가 장부를 판정한다
+
+> 2026-09-07: 신규 접수의 Frontend 2회 분석과 `routeConsultation` 소유 결정은
+> [프로젝트 ADR-0025](../../../project-wiki/references/decisions/ADR-0025-f2-single-pass-auto-ledger-routing.md)로
+> 대체됐다. 홈 진입점, 저장 전 검토, 기존 상세 음성메모 분리 결정은 유지한다.
 
 ## 맥락
 
