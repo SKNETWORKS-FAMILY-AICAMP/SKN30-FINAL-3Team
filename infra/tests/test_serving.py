@@ -1,0 +1,414 @@
+"""Behavioral regression tests for routing, maintenance, and cloud ownership."""
+
+import asyncio
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [
+    str(ROOT / "scripts"),
+    str(ROOT / "deploy/scripts"),
+    str(ROOT / "serving"),
+]
+import manage_serving as serving
+import render_env
+from connect_serving import local_environment
+from general_middleware import ServingRoutes
+from serving_contract import GENERAL_KEY, aws_base_url, endpoint_urls
+
+
+class Contracts(unittest.TestCase):
+    def test_f2_aws_pair_and_legacy_runpod_roundtrip(self):
+        for deployment in (
+            {
+                "cloud": "aws",
+                "resource_id": "i-1234567890abcdef0",
+                "private_ip": "10.30.0.15",
+            },
+            {"cloud": "runpod", "resource_id": "abc12345"},
+        ):
+            value = serving.f2_record({"revision": 1}, deployment, "dev-example")
+            result = render_env.parse_ai_vllm_endpoint_set(json.dumps(value))
+            self.assertEqual(result["AI_F2_PROVIDER_STATUS"], "active")
+            self.assertNotEqual(
+                result["AI_VLLM_SLLM_BASE_URL"], result["AI_VLLM_STT_BASE_URL"]
+            )
+            self.assertEqual(
+                render_env.parse_ai_vllm_endpoint_set(
+                    json.dumps(serving.f2_record(value, None, None))
+                ),
+                {"AI_F2_PROVIDER_STATUS": "offline"},
+            )
+
+    def test_aws_does_not_accept_other_host_or_port(self):
+        for url in (
+            "http://10.30.0.16:8001/v1",
+            "http://10.30.0.15:8002/v1",
+            "http://10.30.0.15:8001/v1?key=x",
+            "https://example.com/v1",
+        ):
+            with self.assertRaises(ValueError):
+                aws_base_url(
+                    url,
+                    instance_id="i-1234567890abcdef0",
+                    private_ip="10.30.0.15",
+                    port=8001,
+                )
+        with self.assertRaises(ValueError):
+            aws_base_url(
+                "http://169.254.169.254:8001/v1",
+                instance_id="i-1234567890abcdef0",
+                private_ip="169.254.169.254",
+                port=8001,
+            )
+
+    def test_runpod_cannot_overwrite_aws_endpoint(self):
+        with self.assertRaises(serving.f2.ToolError):
+            serving.f2.endpoint_value(
+                previous={"cloud": "aws", "revision": 4}, status="offline"
+            )
+
+    def test_general_alias_survives_cloud_change(self):
+        for url in (
+            "http://127.0.0.1:8000/v1",
+            endpoint_urls("runpod", "abc12345", "general")[0],
+        ):
+            value = local_environment("general", [url], ["a" * 43])
+            entries = json.loads(value["AI_LLM_ENDPOINTS"])
+            self.assertEqual(entries[0]["alias"], "general-dev-gpu")
+            self.assertEqual(entries[0]["api_key_env"], GENERAL_KEY)
+            self.assertNotIn("MODEL_PROFILE", value)
+            self.assertNotIn("AI_OPENAI_API_KEY", value)
+
+    def test_general_registration_contract(self):
+        source = json.loads((ROOT / "serving/general-template.json").read_text())
+        payload = serving.control.template_payload(
+            source, "image", "registry", source["name"]
+        )
+        self.assertEqual(payload["ports"], ["8000/http"])
+        self.assertEqual(payload["volumeInGb"], 0)
+        self.assertIn(GENERAL_KEY, payload["env"])
+
+    def test_secret_not_in_general_endpoint_registry(self):
+        f2_offline = serving.f2_record({"revision": 0}, None, None)
+        public = {
+            "backend": {},
+            "ai": {
+                "AI_VLLM_ENDPOINT_SET": json.dumps(f2_offline),
+                "AI_GENERAL_ENDPOINT_SET": json.dumps(
+                    {
+                        "status": "active",
+                        "cloud": "runpod",
+                        "resource_id": "abc12345",
+                        "base_url": "https://abc12345-8000.proxy.runpod.net/v1",
+                    }
+                ),
+                "AI_LLM_ENDPOINTS": "[]",
+            },
+        }
+        api, worker, _ = render_env.build_process_environments(
+            public=public,
+            runtime_url="db",
+            migration_url="migration",
+            ai_provider_keys={GENERAL_KEY: "g" * 43},
+        )
+        self.assertEqual(api[GENERAL_KEY], "g" * 43)
+        self.assertEqual(worker[GENERAL_KEY], "g" * 43)
+        self.assertNotIn("g" * 43, worker["AI_LLM_ENDPOINTS"])
+
+
+class Cutover(unittest.TestCase):
+    def controller(self):
+        controller = serving.Serving.__new__(serving.Serving)
+        controller.selection = Mock(
+            return_value={
+                "f2": None,
+                "general": {"cloud": "runpod", "gpu_id": "NVIDIA L40S"},
+            }
+        )
+        controller.no_deployment = Mock()
+        controller.endpoint = Mock(return_value={"status": "active"})
+        controller.prepare = Mock(
+            return_value={
+                "cloud": "aws",
+                "resource_id": "i-1234567890abcdef0",
+                "private_ip": "10.30.0.10",
+            }
+        )
+        controller.app = Mock()
+        controller.activate = Mock()
+        controller.application_smoke = Mock()
+        controller.write = Mock()
+        controller.stop_resources = Mock()
+        return controller
+
+    def test_plan_never_prepares_or_writes(self):
+        c = self.controller()
+        c.switch("general", "aws", apply=False)
+        c.prepare.assert_not_called()
+        c.write.assert_not_called()
+
+    def test_prepare_failure_keeps_live_routing(self):
+        c = self.controller()
+        c.prepare.side_effect = serving.ToolError("GPU unavailable")
+        with self.assertRaises(serving.ToolError):
+            c.switch("general", "aws", apply=True)
+        c.app.assert_not_called()
+        c.activate.assert_not_called()
+        c.write.assert_not_called()
+
+    def test_drain_failure_never_changes_routing(self):
+        c = self.controller()
+        c.app.side_effect = serving.ToolError("drain timed out")
+        with self.assertRaises(serving.ToolError):
+            c.switch("general", "aws", apply=True)
+        c.activate.assert_not_called()
+        c.stop_resources.assert_not_called()
+
+    def test_failed_smoke_stays_in_maintenance_and_keeps_selection(self):
+        c = self.controller()
+        c.application_smoke.side_effect = serving.ToolError("bad output")
+        with self.assertRaises(serving.ToolError):
+            c.switch("general", "aws", apply=True)
+        self.assertEqual(c.app.call_args.args, ("stop",))
+        self.assertIsNone(c.activate.call_args.args[2])
+        c.write.assert_not_called()
+        c.stop_resources.assert_not_called()
+
+    def test_old_gpu_is_stopped_only_after_smoke(self):
+        c = self.controller()
+        order = []
+        c.application_smoke.side_effect = lambda _: order.append("smoke")
+        c.write.side_effect = lambda *_: order.append("selection")
+        c.stop_resources.side_effect = lambda *_, **kw: order.append("cleanup")
+        c.switch("general", "aws", apply=True)
+        self.assertEqual(order, ["smoke", "selection", "cleanup"])
+
+    def test_same_cloud_switch_does_not_restart_gpu(self):
+        c = self.controller()
+        c.switch("general", "runpod", apply=True)
+        c.prepare.assert_not_called()
+        c.app.assert_not_called()
+
+
+class LifecycleFailures(unittest.TestCase):
+    def test_deep_capacity_uses_only_selected_aws_but_switch_preserves_instances(self):
+        c = Cutover().controller()
+        c.selection.return_value = {
+            "f2": {"cloud": "aws"},
+            "general": {"cloud": "runpod"},
+        }
+        c.instances = Mock(return_value=[{"InstanceId": "fixture"}])
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(serving, "INFRA", Path(directory)),
+        ):
+            path = Path(directory) / "environments/dev"
+            path.mkdir(parents=True)
+            c.capacity_config()
+            self.assertEqual(
+                json.loads((path / "serving-capacity.auto.tfvars.json").read_text())[
+                    "gpu_provisioned_workloads"
+                ],
+                ["f2"],
+            )
+            c.capacity_config("general")
+            self.assertEqual(
+                json.loads((path / "serving-capacity.auto.tfvars.json").read_text())[
+                    "gpu_provisioned_workloads"
+                ],
+                ["f2", "general"],
+            )
+
+    def test_stop_continues_other_gpus_and_app_shutdown_after_failure(self):
+        c = Cutover().controller()
+        c.power = Mock()
+        c.stop_resources.side_effect = [serving.ToolError("f2 shutdown failed"), None]
+        with self.assertRaises(serving.ToolError):
+            c.stop()
+        self.assertEqual(
+            [call.args[0] for call in c.stop_resources.call_args_list],
+            ["f2", "general"],
+        )
+        c.power.stop.assert_called_once()
+
+    def test_stop_aborts_every_gpu_mutation_on_failed_drain(self):
+        c = Cutover().controller()
+        c.power = Mock()
+        c.app.side_effect = serving.ToolError("busy")
+        with self.assertRaises(serving.ToolError):
+            c.stop()
+        c.activate.assert_not_called()
+        c.stop_resources.assert_not_called()
+        c.power.stop.assert_not_called()
+
+    def test_failed_app_restart_keeps_maintenance(self):
+        c = Cutover().controller()
+        c.app_id = Mock(return_value="app")
+        c.power = Mock()
+        c.restore_application = Mock(side_effect=serving.ToolError("deployment failed"))
+        with self.assertRaises(serving.ToolError):
+            c.start()
+        self.assertEqual(c.app.call_args.args, ("stop",))
+        c.stop_resources.assert_not_called()
+
+    def test_operational_parameters_are_not_application_environment(self):
+        payload = {
+            "Parameters": [
+                {"Name": "/project-dev/" + suffix, "Value": "{}"}
+                for suffix in (
+                    "runpod/RUNPOD_CONTROL_SET",
+                    "runpod/GENERAL_CONTROL_SET",
+                    "serving/SELECTION",
+                )
+            ]
+        }
+        self.assertEqual(
+            render_env.parse_public_parameters(payload, "/project-dev"),
+            {"ai": {}, "backend": {}},
+        )
+
+    def test_general_url_must_match_registered_resource(self):
+        public = {
+            "backend": {},
+            "ai": {
+                "AI_VLLM_ENDPOINT_SET": json.dumps(serving.f2_record({}, None, None)),
+                "AI_GENERAL_ENDPOINT_SET": json.dumps(
+                    {
+                        "status": "active",
+                        "cloud": "runpod",
+                        "resource_id": "abc12345",
+                        "base_url": "https://different-8000.proxy.runpod.net/v1",
+                    }
+                ),
+            },
+        }
+        with self.assertRaises(SystemExit):
+            render_env.expand_ai_vllm_endpoint_set(public)
+
+
+class GeneralHttpSurface(unittest.TestCase):
+    def request(self, method, path, headers):
+        messages = []
+        upstream = Mock()
+
+        async def app(scope, receive, send):
+            upstream()
+
+        async def send(message):
+            messages.append(message)
+
+        with patch.dict("os.environ", {"VLLM_API_KEY": "k" * 43}):
+            middleware = ServingRoutes(app)
+        asyncio.run(
+            middleware(
+                {"type": "http", "method": method, "path": path, "headers": headers},
+                None,
+                send,
+            )
+        )
+        return upstream, messages
+
+    def test_native_admin_paths_are_blocked_even_with_valid_key(self):
+        headers = [(b"authorization", b"Bearer " + b"k" * 43)]
+        for path in ("/load_lora_adapter", "/sleep", "/metrics", "/docs"):
+            upstream, messages = self.request("GET", path, headers)
+            upstream.assert_not_called()
+            self.assertEqual(messages[0]["status"], 404)
+
+    def test_missing_or_duplicate_authorization_is_rejected(self):
+        for headers in ([], [(b"authorization", b"Bearer " + b"k" * 43)] * 2):
+            upstream, messages = self.request("POST", "/v1/chat/completions", headers)
+            upstream.assert_not_called()
+            self.assertEqual(messages[0]["status"], 401)
+
+    def test_inference_is_forwarded_and_status_never_contains_credentials(self):
+        headers = [(b"authorization", b"Bearer " + b"k" * 43)]
+        upstream, messages = self.request("POST", "/v1/chat/completions", headers)
+        upstream.assert_called_once()
+        self.assertEqual(messages, [])
+        with patch.dict("os.environ", {"HF_HOME": "/tmp"}):
+            _, messages = self.request("GET", "/ops/status", headers)
+        self.assertEqual(messages[0]["status"], 200)
+        payload = json.loads(messages[1]["body"])
+        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes"})
+
+
+class PreparationFailures(unittest.TestCase):
+    def test_timeout_deletes_only_new_runpod_candidate(self):
+        c = Cutover().controller()
+        del c.prepare
+        candidate = {"cloud": "runpod", "resource_id": "new12345"}
+
+        def fail(*args):
+            c.started_candidate = candidate
+            raise serving.ToolError("model readiness timed out")
+
+        c._prepare = fail
+        c.runpod = Mock()
+        with self.assertRaises(serving.ToolError):
+            c.prepare("general", {"cloud": "runpod"})
+        c.runpod.return_value.delete.assert_called_once_with("new12345")
+        c.activate.assert_not_called()
+
+    def test_preexisting_candidate_is_not_deleted_on_probe_failure(self):
+        c = Cutover().controller()
+        del c.prepare
+        c._prepare = Mock(side_effect=serving.ToolError("bad inference"))
+        c.runpod = Mock()
+        with self.assertRaises(serving.ToolError):
+            c.prepare("general", {"cloud": "runpod"})
+        c.runpod.assert_not_called()
+
+    def test_failed_selection_commit_stays_in_maintenance(self):
+        c = Cutover().controller()
+        c.write.side_effect = serving.ToolError("SSM unavailable")
+        with self.assertRaises(serving.ToolError):
+            c.switch("general", "aws", apply=True)
+        self.assertEqual(c.app.call_args.args, ("stop",))
+        self.assertIsNone(c.activate.call_args.args[2])
+        c.stop_resources.assert_not_called()
+
+
+class ExternalProbeHeaders(unittest.TestCase):
+    def test_status_and_generation_keep_auth_and_explicit_user_agent(self):
+        import io
+
+        import probe as gpu_probe
+
+        replies = [
+            {"data": [{"id": "test-model"}]},
+            {"disk_free_bytes": 1024},
+            {"data": [{"id": "test-model"}]},
+            {"choices": [{"message": {"content": '{"ok": true}'}}]},
+        ]
+        requests = []
+
+        def open_request(request, timeout):
+            requests.append(request)
+            return io.BytesIO(json.dumps(replies.pop(0)).encode())
+
+        opener = Mock()
+        opener.open.side_effect = open_request
+        with patch.object(
+            gpu_probe.urllib.request, "build_opener", return_value=opener
+        ):
+            self.assertEqual(
+                gpu_probe.read_status(
+                    "https://example.invalid/v1", "synthetic", "test-model"
+                ),
+                {"model_ready": True, "disk_free_bytes": 1024},
+            )
+            gpu_probe.probe("https://example.invalid/v1", "synthetic", "test-model")
+        self.assertEqual(len(requests), 4)
+        for request in requests:
+            self.assertEqual(request.get_header("User-agent"), "skn30-infra/1.0")
+            self.assertEqual(request.get_header("Authorization"), "Bearer synthetic")
+
+
+if __name__ == "__main__":
+    unittest.main()

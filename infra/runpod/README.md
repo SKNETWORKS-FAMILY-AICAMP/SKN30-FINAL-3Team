@@ -1,170 +1,191 @@
 # RunPod F2 dev 서빙
 
-공유 dev 서빙은 `sllm`(상담분석)과 `stt` 두 작업 이름을 사용한다. 기반 모델 ID는 학습자가 만든
-SLLM release manifest와 Template의 STT 설정에서 관리하며 애플리케이션에 노출하지 않는다.
+현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](../serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
 
-## 소유 경계
 
-- 학습 담당자: 로컬에서 자유롭게 학습·평가하고 `package_release.py`로 만든 v2 metadata bundle
-  하나를 전달한다. LoRA bundle에만 adapter가 있으며 base-only도 tar bundle 자체는 사용한다.
-  AWS, RunPod, `infra/` 실행 권한은 필요하지 않다.
-- Infra 담당자: bundle 검증, private S3 불변 게시, RunPod Pod 생성·삭제와 dev endpoint 전환을
-  담당한다.
-- S3 `releases/sllm/<release-id>/`가 전달받은 모델의 정본이다. Pod disk는 cache일 뿐 보존 대상이
-  아니며 Volume Disk와 Network Volume을 사용하지 않는다.
+공유 dev는 GPU 한 대의 Pod에서 `sllm`(상담 분석)과 `stt`(음성 인식)를 제공한다.
+최초 Secret·registry·Template은 Console에서 만들고 도구는 검증·등록만 한다.
+일상 Pod 생성·삭제는 기존 명령으로 자동화한다. 외부 자원은 아직 적용 전이다.
 
-## 최초 1회 준비
+## 소유 경계와 지원 범위
 
-Terraform saved plan을 먼저 적용해 Secret 컨테이너와 SSM 제어 문서를 만든다. 이 plan에는 Secret
-version이나 평문 입력이 없어야 하고 기존 AI·Discord version의 state 분리는 `destroy=false`여야 한다.
+대상은 **사용자 약 10명의 부트캠프 팀 프로젝트·취업 포트폴리오**다. 주니어 한 명이 문서를 보고
+기동·상태 확인·복구·종료할 수 있는 범위로 운영한다.
 
-GHCR workflow는 Ruff와 runtime/proxy 테스트가 성공해야 image를 게시한다. summary의 정확한
-`ghcr.io/...@sha256:...`를 변경 없는 계획에 먼저 전달한 뒤 확인이 붙은 bootstrap을 한 번 실행한다.
-기존 generation과 다른 digest는 endpoint가 offline이고 공유 Pod가 없을 때만 새 immutable Template
-generation을 만들 수 있다.
+| 항목 | 이 프로젝트의 기준 |
+|---|---|
+| 동시 처리 | API 인스턴스 1개·Uvicorn worker 1개, F2 분석 합계 1건. 추가 요청은 429 `F2_BUSY` |
+| 혼잡 처리 | 본문 파싱 전에 거절하고 선택 파일을 유지해 수동 재시도. `Retry-After: 5`는 완료 시간 보장이 아님 |
+| 시연 구성 | 검증한 image digest·release·STT revision·GPU 조합 1개를 기록해 재사용 |
+| GPU | Pod 1개·GPU 1개 유지. SLLM health 성공 후 STT 기동, 각 엔진 `--max-num-seqs 1` |
+| 점검·장애 | 모델 교체 중 짧은 API 중단과 두 모델의 공동 장애 허용. 진행 중 분석 종료 후 점검 |
+| 비용 | 시연·실험 때만 생성하고 만든 사람이 종료 시 삭제·Pod 부재 확인 |
+| 포트폴리오 | 선택 이유, 한계, 실행·복구 기록과 AI 품질 측정을 설명. 실측 없는 처리량·가용성 주장 금지 |
+
+Redis·F2 영속 대기열·GPU 증설·무중단 교체는 현재 범위에 추가하지 않는다. 사용자가 실제로
+대기 후 자동 처리나 더 높은 동시성을 필요로 할 때 재평가한다. 이 F2 제한은 F3 Worker에 적용하지 않는다.
+
+- 학습 담당자는 `package_release.py`의 v2 bundle을 전달한다. Infra 담당자가 검사해 private S3
+  `releases/sllm/<release-id>/`에 불변 게시한다. 학습 담당자에게 AWS·RunPod 권한을 요구하지 않는다.
+- 품질 평가·승인·학습 provenance 검증은 패키징·게시 단계가 소유한다. Pod는 전달받은 bundle
+  checksum, 안전한 압축 해제, 모델 ID·불변 commit과 adapter bytes를 확인하고 실행한다.
+- v1 읽기 호환, v2의 `base|lora`, `verified|dev`를 유지한다. 이미 전달된 artifact 지원을
+  단순화를 이유로 제거하지 않는다. 기반 모델은 공개 Hugging Face에서 받으며 gated 모델은 제외한다.
+- private GHCR runtime의 digest, STT 모델·revision, 포트와 메모리 설정은 `template.json`이 기준이다.
+  SLLM 모델과 adapter는 release가 소유한다. GPU별 기동·동시 요청 성능은 실환경 검증 전이다.
+- Pod는 create/delete 방식이며 Volume·SSH를 사용하지 않는다. S3가 정본이며 Pod disk는 cache다.
+- F2 endpoint·key는 Backend API만 사용한다. Worker는 범용 생성 작업을 처리한다.
+
+## 최초 준비: Console → AWS 비밀 입력 → 검증·등록
+
+현재 운영 방식의 결정은 [ADR-0029](../../.agents/skills/project-wiki/references/decisions/ADR-0029-runpod-manual-observation.md)를 따른다.
+운영자가 관리하는 가변 기록은 등록된 Template·registry·image 정보와 F2 active/offline endpoint다.
+generation·Secret version 동기화·감시 heartbeat 상태는 관리하지 않는다. S3 release는 불변 입력이다.
+남은 자체 코드는 Pod 생성·삭제와 AWS 연결, release 게시 검증, Pod 내부 다운로드·인증·프로세스 실행을
+담당한다. 코드가 모두 작아졌거나 외부 운영 복잡성이 없어졌다고 평가하지 않는다.
+
+Terraform saved plan을 검토·승인·적용해 필요한 AWS Secret 컨테이너와 SSM 문서를 먼저 만든다.
+Secret 값은 Terraform에 넣지 않는다. 이 단계와 GHCR image 게시·GPU 기동은 아직 실행하지 않았다.
+
+1. `runpod-image` workflow의 테스트를 통과한 정확한 `ghcr.io/...@sha256:...`를 준비한다.
+2. RunPod Console에서 운영용 API key를 발급한다.
+3. RunPod Console에서 아래 두 Secret을 만든다. 각각 서로 다른 43~128자 URL-safe 난수
+   (`A-Z`, `a-z`, `0-9`, `_`, `-`)를 비밀번호 관리자 등으로 준비한다. 같은 값을 다음 AWS 입력에
+   사용하며 문서·채팅·로그·명령 인자에 복사하지 않는다.
+4. RunPod Console에서 GHCR username과 package 읽기 권한 PAT를 registry credential로 등록한다.
+   GHCR credential은 RunPod에서만 관리한다. 기존 AWS GHCR Secret 컨테이너는 호환을 위해 남지만
+   도구가 읽거나 값을 요구하지 않는다.
+5. 다음 표와 `template.json`에 맞는 private Pod Template 하나를 생성한다.
+
+| Console 설정 | 값 |
+|---|---|
+| Template 이름 | `skn30-f2-serving-v2` |
+| Image | workflow가 게시한 정확한 GHCR digest |
+| Registry credential | 위에서 만든 GHCR credential 연결 |
+| Container disk / Volume disk | 30 GiB / 0 GiB; Network Volume 없음 |
+| HTTP ports | `8001`, `8002`; TCP·SSH 포트 없음 |
+| Container start command | `python /opt/f2-runtime/scripts/supervisor.py` |
+| Entrypoint override | 비움 |
+| Secret 환경변수 | `AI_VLLM_SLLM_API_KEY`, `AI_VLLM_STT_API_KEY`를 같은 이름의 RunPod Secret에 연결 |
+| 나머지 환경변수 | `template.json`의 STT ID·revision, SLLM context와 메모리 값 그대로 |
+| 공개·Serverless 설정 | 둘 다 비활성 |
+
+AWS 계정·리전은 기존 Infra 환경 설정을 사용한다. 아래 입력은 TTY에서 표시 없이 두 번 받는다.
+`secret-rotate`는 최초 값 입력에도 사용한다. 기존 AI Secret의 OpenAI key는 보존한다.
 
 ```bash
-just -f infra/justfile runpod-bootstrap-plan ghcr.io/.../f2-serving@sha256:<64-hex>
-just -f infra/justfile runpod-bootstrap ghcr.io/.../f2-serving@sha256:<64-hex>
-just -f infra/justfile runpod-doctor
-```
-
-도구는 AWS 계정·리전·컨테이너를 확인하고 누락값만 TTY 비표시로 받는다. F2 key 두 개는 내부
-생성한다. RunPod Secret, GHCR registry auth와 private immutable Template을 만들고 검증한 뒤에만
-SSM 제어 상태를 `ready`로 바꾼다. 실패 시 `provisioning`이 남으므로 같은 digest로 재실행한다.
-중복 이름이나 설정 불일치는 덮어쓰지 않는다. RunPod API key와 GHCR PAT의 최초 발급만 각 Console에서
-수행하며 개인 `.env`, key 명령 인자나 영구 `runpodctl` 설정은 사용하지 않는다.
-
-비밀값 존재와 회전은 다음 명령으로 관리한다. 값·hash는 출력하지 않는다. `f2`, `ghcr`은 endpoint가
-offline이고 공유 Pod가 없을 때만 허용한다.
-
-```bash
-just -f infra/justfile secret-status
-just -f infra/justfile secret-rotate openai
-just -f infra/justfile secret-rotate f2
-just -f infra/justfile secret-rotate ghcr
-just -f infra/justfile secret-rotate delivery-discord
-just -f infra/justfile secret-rotate alarm-discord
 just -f infra/justfile secret-rotate runpod-operator
-just -f infra/justfile secret-rotate runpod-monitor
-```
-
-## 매 릴리스 운영
-
-먼저 Terraform 적용 후 Secret 컨테이너·SSM 문서가 있고 control이 `ready`인지, 공유 Pod가 없는지
-값 노출 없이 확인한다.
-
-```bash
+just -f infra/justfile secret-rotate f2
 just -f infra/justfile secret-status
+just -f infra/justfile runpod-register-plan <image@digest> <template-id> <registry-id>
+just -f infra/justfile runpod-register <image@digest> <template-id> <registry-id>
 just -f infra/justfile runpod-doctor
-just -f infra/justfile runpod-status
 ```
 
-Infra 담당자가 전달받은 파일을 먼저 검사하고 private S3에 게시한다. 새 package는
-`release.json:v2`만 생성하며 `release_mode=lora|base`, 기반 모델 ID·40자리 commit, dataset
-release/checksum, 원본 전체 평가 요약 checksum과 승인 연결을 검증한다. LoRA에는 adapter·training이 필수이고 base에는 둘 다
-`null`이다. 검사기와 Pod runtime은 기존 v1 LoRA bundle도 계속 읽는다.
+등록은 endpoint offline과 공유 Pod 부재를 요구한다. 운영 key와 AWS F2 key의 조회 가능 여부, Template의 Secret 참조,
+Template ID·image·registry 연결·포트·환경·Volume 설정을 확인한 뒤 SSM에 완성된 기록을 한 번 쓴다.
+RunPod 자원 생성·수정·삭제, 자동 generation 증가, `provisioning` 중간 상태는 없다.
+검증 실패 시 기존 등록은 보존되며 Console 설정을 수정하고 같은 명령을 다시 실행한다.
+등록 조회만으로 양쪽 F2 Secret **값**의 일치나 private image pull 성공은 확인할 수 없다.
+이 두 항목은 첫 Pod 기동과 인증 health에서 확인하며 실패하면 active 전환 전에 Pod를 정리한다.
+
+## 일상 운영
+
+게시 단계는 모델·adapter·평가 정보와 checksum을 검증한다. 동일 release ID의 다른 내용은 거부한다.
+기존과 같은 checksum의 부분 게시만 이어서 완료한다.
 
 ```bash
-just -f infra/justfile sllm-artifact-inspect /handoff/consultation-v2.tar.gz
-just -f infra/justfile sllm-artifact-publish /handoff/consultation-v2.tar.gz
-```
-
-v2의 `bundle.tar.gz`와 `release.json`은 자기 SHA-256과 상대 객체 SHA-256 metadata를 양방향으로
-결속한다. 같은 release ID를 재실행하면 기존 객체 checksum이 완전히 같은 경우에만 누락 객체를
-이어 게시하고, 다른 내용이면 불변 충돌로 중단한다. 원본 데이터·전사·예측 원문·checkpoint·로컬
-경로·비밀값은 bundle에 넣지 않는다.
-
-사용 가능한 GPU ID를 확인한 후 먼저 비용 없는 plan을 실행한다. plan은 control ready, 공유 Pod
-부재, S3 두 객체와 cross-hash, 실행 중인 Backend EC2와 API·Worker health를 확인하며 presigned URL과
-Pod를 만들지 않는다.
-
-RunPod Console에서 사용할 정확한 Secure Cloud GPU ID를 확인한 뒤 생성한다.
-
-```bash
-just -f infra/justfile runpod-create-plan consultation-v2 "NVIDIA GeForce RTX 4090"
-just -f infra/justfile runpod-create consultation-v2 "NVIDIA GeForce RTX 4090"
+just -f infra/justfile sllm-artifact-inspect /handoff/release.tar.gz
+just -f infra/justfile sllm-artifact-publish /handoff/release.tar.gz
+just -f infra/justfile runpod-create-plan <release-id> <secure-cloud-gpu-id>
+just -f infra/justfile runpod-create <release-id> <secure-cloud-gpu-id>
 just -f infra/justfile runpod-status
-just -f infra/justfile runpod-reconcile
 just -f infra/justfile runpod-smoke
 ```
 
-평가 전 기동·통합 확인은 `release_stage=dev`이고 ID가 `dev-`로 시작하는 bundle만 허용한다.
-`dev` bundle은 평가·승인 파일 대신 `not-evaluated` 상태를 명시하므로 품질 검증이나 정식 승격으로
-간주하지 않는다. 일반 create는 이를 거부하며 아래 전용 명령만 shared dev endpoint를 변경할 수 있다.
+미평가 `dev-*` bundle에는 일반 create 대신 `runpod-create-dev-plan`과 `runpod-create-dev`를 쓴다.
+팀에 미평가 상태를 알린다. 이는 기동·연결 검증이며 품질 승인이나 정식 승격이 아니다.
+
+plan과 create 모두 현재 Console Template을 등록된 digest·설정과 대조한 뒤 S3 cross-hash,
+공유 Pod 부재와 Backend API·Worker health를 확인한다. plan은 presign·GPU 생성을 하지 않는다.
+create는 1시간 presigned URL을 Pod에 전달한다. 두 `/v1/models`에 각각 `sllm`, `stt`가 확인되면
+SSM endpoint를 active로 바꾸고 **API의 F2 환경변수만 갱신해 API만 재생성**한다. 같은 image를 유지하며
+Worker·migration 환경파일과 다른 API 설정은 변경하지 않는다. 마지막으로 합성 F2 smoke를 실행한다.
 
 ```bash
-just -f infra/justfile sllm-artifact-inspect /handoff/dev-<release>.tar.gz
-just -f infra/justfile sllm-artifact-publish /handoff/dev-<release>.tar.gz
-just -f infra/justfile runpod-create-dev-plan dev-<release> "NVIDIA GeForce RTX 4090"
-just -f infra/justfile runpod-create-dev dev-<release> "NVIDIA GeForce RTX 4090"
-```
-
-팀에 미평가 모델 사용 중임을 알리고 확인이 끝나면 verified release와 동일하게 정확한 Pod ID로
-삭제한 뒤 `runpod-offline-smoke`를 실행한다.
-
-create만 GPU 비용을 발생시킨다. S3 presigned URL은 1시간만 유효하고 출력에 노출되지 않는다. LoRA는
-`--enable-lora --lora-modules sllm=<adapter>`로, base는 LoRA 옵션 없이 기반 모델을 `sllm` 이름으로
-기동한다. 두 `/v1/models` 응답에 각각 정확한 `sllm`, `stt` ID가 확인된 뒤에만 SSM endpoint가
-`active`로 바뀌고 기존 Backend image의 API·Worker만 재생성된다.
-
-기반 가중치는 bundle이나 GHCR image에 넣지 않고 Pod 시작 시 공개 Hugging Face 저장소의 불변
-commit에서 받는다. Template과 자식 프로세스는 HF token 계열 환경변수를 거부·제거하므로
-private/gated 모델은 지원하지 않으며 health 전에 실패해 정리된다. Qwen ID는 명령 형식 예시일 뿐
-승인된 운영 모델이 아니다.
-
-작업 종료 후 출력된 정확한 Pod ID로 삭제한다. 먼저 endpoint를 `offline`으로 갱신해 F2 요청이
-명시적인 503을 반환하게 한 뒤 Pod를 영구 삭제한다.
-
-```bash
-just -f infra/justfile runpod-delete <pod-id>
+just -f infra/justfile runpod-delete <정확한-pod-id>
 just -f infra/justfile runpod-offline-smoke
 ```
 
-삭제해도 private S3 release는 남는다. 다음 실행은 새 Pod를 만들고 기반 모델·STT weight를 다시
-내려받으므로 시작 시간이 발생하지만, 유휴 GPU·Volume 비용은 발생하지 않는다. RunPod 콘솔 로그는
-장애 확인용 보조 경로이며 tmux, SSH, `PYTHONPATH` 복구는 운영 절차가 아니다.
+삭제 전 진행 중인 F2 요청이 끝났는지 확인한다. offline 전환·API 재생성 뒤 Pod를 삭제하며
+이후 F2는 503 `F2_UNAVAILABLE`을 반환한다. 다음 생성 시 기반 모델·STT weight를 다시 받는다.
+자동 중지는 없으므로 생성한 운영자가 작업 종료 시 삭제를 책임진다.
 
-## 실패 처리
+## 이미지 변경과 비밀 회전
 
-- 생성 중 모델 health 또는 AWS refresh가 실패하면 endpoint를 이전 값으로 복원하고 새 Pod를
-  삭제한다.
-- active F2 smoke가 실패해도 같은 rollback을 수행한다.
-- 삭제 전 AWS refresh가 실패하면 이전 active endpoint를 복원하고 Pod는 삭제하지 않는다.
-- rollback refresh 또는 자동 Pod 삭제까지 실패하면 완료 이벤트를 내지 않고
-  `runpod-reconcile-required`와 안전한 상태 확인·수동 조정 순서를 출력한다. 이 경우 출력된
-  `runpod-status`와 `runpod-reconcile`부터 실행하고 SSM endpoint 의도값과 Backend refresh를 확인한다.
-- 동일 이름 Pod가 이미 있거나 2개 이상이면 도구는 추측하지 않고 중단한다.
-- S3 release ID는 덮어쓸 수 없다. checksum이 다른 adapter나 metadata는 새 release ID로 게시한다.
+- **이미지 변경:** Pod 삭제·offline 확인 → Console의 같은 Template image를 새 digest로 변경 →
+  `register-plan → register → doctor` → release create·smoke. 이전 digest로 되돌릴 때도 같은 순서다.
+- **F2 key:** offline·Pod 부재 확인 → Console 두 Secret 값을 교체 → `secret-rotate f2`에 같은 값 입력 →
+  다음 create의 인증 health·smoke. Secret version 동기화 상태를 따로 저장하지 않는다.
+- **GHCR PAT:** offline·Pod 부재 확인 → Console registry credential 교체·Template 연결 확인 →
+  `register-plan → register → doctor`. 새 registry ID이면 그 ID로 등록한다. AWS에 PAT를 복제하지 않는다.
+- **RunPod API key:** 새 key 발급 → 해당 `secret-rotate` → 운영 조회 성공 확인 →
+  Console에서 이전 key 비활성화. 기존 key를 먼저 폐기하지 않는다.
+- **OpenAI key:** `secret-rotate openai`는 전체 환경 refresh(`--all`) 완료를 기다린다.
+  이 경로만 API·Worker를 함께 재생성하므로 실행 중인 Worker 작업 종료 후 수행한다.
+- Discord key는 기존 `secret-rotate delivery-discord|alarm-discord`를 사용한다.
 
-## 관측과 수동 조정
+## 실패 시 복구
 
-EventBridge가 기본 30분마다 읽기 전용 Lambda를 실행한다. RunPod API, 공유 Pod, endpoint 일치,
-인증된 SLLM/STT health, 연속 실행 시간·시간당 비용과 heartbeat를 기존 프로젝트 namespace에 기록한다.
-기본 8시간 실행, offline orphan 60분, API·health 연속 실패와 endpoint 불일치는 기존 Alarm
-SNS·Discord로 전달한다. 감시는 endpoint를 쓰거나 Pod를 생성·삭제하지 않는다.
+| 실패 지점 | 자동 처리 | 운영자 다음 행동 |
+|---|---|---|
+| Console 등록 검증 | SSM 등록 유지, 외부 자원 변경 없음 | 오류 필드 수정 후 register-plan 재실행 |
+| 모델 download·health 또는 F2 smoke | offline 전환·refresh와 새 Pod 삭제 시도 | status로 Pod 부재와 endpoint 확인 후 원인 수정 |
+| offline 전환의 API refresh | offline 유지, Pod 유지 | status·reconcile로 의도값 확인 후 삭제 재시도 |
+| offline 정리 또는 삭제도 실패 | `runpod-reconcile-required`, 완료로 보고하지 않음 | 아래 수동 조정 순서 |
 
-알림을 받으면 `runpod-status → runpod-reconcile → runpod-smoke → Alarm OK` 순서로 확인한다.
-`runpod-reconcile`은 기본 dry-run이다. active endpoint의 Pod가 실제로 없을 때만
-`runpod-reconcile-apply`로 offline 전환과 API·Worker refresh를 확인할 수 있다. endpoint와 다른 Pod,
-복수 Pod, health 실패나 RunPod API 장애는 상태를 바꾸지 않는다. offline orphan은 출력된 정확한
-`runpod-delete <pod-id>` 명령을 별도로 검토한다.
+`runpod-status → runpod-reconcile`로 SSM 의도값과 실제 Pod를 확인한다. reconcile 기본은 읽기 전용이며
+Pod가 없을 때 `runpod-reconcile-apply`로 offline을 적용한다. 이미 offline이어도 API refresh와
+offline smoke를 재실행하여 이전 refresh 실패를 복구한다.
+다른 Pod·복수 Pod·health 실패·RunPod API 장애는 추측해서 변경하지 않는다. offline orphan은 정확한 ID의
+`runpod-delete`로 삭제한다. 마지막으로 해당 active/offline smoke를 확인한다.
 
-## 사용자 실검증 순서
+전용 감시 Lambda·EventBridge·RunPod 경보는 제거했다. 방치 시간·상태 불일치 자동 알림은 없다.
+생성한 운영자가 시작 시 `status → smoke`, 종료 시 `delete → status → offline-smoke`를 수행하고
+Console에서 Pod 부재와 사용액을 확인한다. 한 번에 한 명만 운영 명령을 실행한다.
+기존 Backend·AI 오류 알림은 유지한다. GPU 메모리 부족은 SLLM·STT가 함께 중단될 수 있으므로
+Console에서 프로세스명과 오류를 확인하고 검증한 image·모델 조합으로 재생성한다.
+등록 도구는 Secret 목록을 별도 조회하지 않는다. Console에서 두 이름과 값을 확인하고
+최초 Pod 인증 health가 성공하는지 확인한다. 외부 apply 전 saved plan에서 제거 대상 자원을 검토한다.
 
-현재 `dev-f2-handwritten-v05-qwen3-4b-full-v1`은 private S3에 게시됐고 RunPod Pod와 이번 Terraform
-변경은 미적용이다. 운영자가 비용과 변경 내용을 확인한 뒤 다음 순서로 검증한다. presigned URL·token·
-응답 원문은 어떤 출력에도 복사하지 않는다.
+## 최초 실환경 검증과 기존 코드 전환
 
-1. 필요한 Terraform 변경이 있으면 `plan → show → 승인 → apply`를 먼저 완료한다.
-2. 변경된 runtime의 새 GHCR digest를 build하고 `runpod-bootstrap-plan → runpod-bootstrap`을 실행한다.
-3. API·Worker에 `preflight_runpod_create.sh`와 offline smoke가 포함된 현재 Backend revision을 배포한다.
-4. 새 release는 mode와 stage에 맞춰 package하고 `sllm-artifact-inspect → publish`한다. 현재 dev LoRA
-   release의 이 단계는 완료됐다.
-5. 현재 dev release는 `runpod-create-dev-plan`으로 S3·control·공유 Pod·Backend target을 확인한다.
-6. GPU 비용을 확인한 뒤 `runpod-create-dev`를 실행하고 `runpod-status → runpod-smoke`를 확인한다.
-7. 출력된 정확한 Pod ID로 `runpod-delete`를 실행한다.
-8. `runpod-offline-smoke`가 503 `F2_UNAVAILABLE`을 확인하는지 검증한다.
+시연 합격 조건은 아래 표다. 현재 모의 테스트 결과를 실제 RunPod 성능 검증으로 해석하지 않는다.
 
-제한된 sandbox 밖의 정상 로컬 환경에서 AI 전체 212개 테스트와 두 Terraform root `validate`가
-통과했다. 실제 apply 전에는 저장한 plan의 변경 대상을 별도로 검토한다.
+| 검증 | 합격 조건 | 현재 증거 |
+|---|---|---|
+| 혼잡 | 겹치는 분석 10건 중 1건 실행·9건 429, 그동안 일반 health 응답 | 합성 pipeline API 테스트 |
+| 실패·취소 | 실패 뒤 재시도 가능, 취소된 실행이 끝날 때 파일·슬롯 정리, 혼잡 요청 본문 미소비 | API 회귀 테스트 |
+| 기동·공동 종료 | SLLM health 뒤 STT 기동, timeout·프로세스 종료 시 시작한 서비스 정리 | supervisor 모의 테스트 |
+| 실제 GPU | 두 모델 기동·합성 F2 분석 완료, 지원할 음성 길이에서 OOM 없음 | 미실행 |
+| 실제 복구 | create·smoke·delete·offline-smoke 후 같은 조합으로 재기동 성공 | 미실행 |
+
+실환경 기록에는 실행 날짜, 코드 revision, image digest, release ID, STT commit, GPU 종류·VRAM,
+합성 음성 길이, cold start·분석·복구 소요 시간, 최대 메모리 사용량, 429 건수와 최종 Pod 부재 여부를
+남긴다. 원본 음성·전사·제안·키·presigned URL은 기록하지 않는다. OOM이면 먼저 GPU 메모리와
+모델 조합을 다시 검토하며 비율 변경만으로 해결됐다고 가정하지 않는다. 합격한 한 조합을 시연에 고정한다.
+
+현재 `dev-f2-handwritten-v05-qwen3-4b-full-v1`은 S3 게시 완료이며 RunPod·이번 변경은 외부 미적용이다.
+먼저 새 runtime image 게시와 위 Console 등록을 완료하고, `--f2-only` renderer가 포함된 Backend
+revision을 배포한다. 오래된 Backend revision은 Worker도 재시작하므로 새 운영 명령보다 먼저 교체한다.
+
+최초 검증은 `create-dev-plan → create-dev → status → smoke → delete → offline-smoke`다.
+기동 소요 시간, 선택 GPU, 음성·분석 동시 요청 결과, 메모리 부족 여부를 안전한 메타데이터로 기록한다.
+실제 GPU 검증 전에는 현재 메모리 비율이나 임의 GPU를 검증 완료 조합이라고 표현하지 않는다.
+기존 control v1은 offline 상태에서 register하면 v2 단일 기록으로 교체한다. 기존 RunPod 자원을 도구가
+삭제하지 않으므로 Console에서 기존 Template을 재사용할 때 이름·설정을 위 표에 맞춘다.
+
+공식 참고: [Template 설정](https://docs.runpod.io/pods/templates/manage-templates),
+[vLLM 0.11.0 엔진 설정](https://docs.vllm.ai/en/v0.11.0/cli/serve.html),
+[Secret 관리](https://docs.runpod.io/pods/templates/secrets),
+[Template ID 조회](https://docs.runpod.io/api-reference/templates/GET/templates/templateId).

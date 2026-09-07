@@ -159,7 +159,16 @@ Provider 오류 원문은 반환하지 않는다. 제안 응답만으로 장부�
 이 경로는 RunPod base model 연결을 검증하는 1차 동기 수직 슬라이스다. 영속 작업, Worker 재개,
 SSE 단계 알림, 전사 재사용 재시도와 승인 감사 저장은 아직 구현하지 않았으며
 `docs/architecture/f2/online-runtime.md`의 제안 구조를 대체하지 않는다. Backend와 RunPod 양쪽의 임시
-음성은 각 요청 종료 시 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
+음성은 해당 처리가 실제 종료될 때 삭제하고 애플리케이션 로그에는 음성·전사·제안 원문을 기록하지 않는다.
+클라이언트 취소만으로 이미 실행 중인 STT thread가 종료되지는 않으므로 Backend 임시 파일은
+pipeline 종료까지 유지한 뒤 삭제한다. 취소된 결과를 별도 저장하거나 재조회하는 기능은 없다.
+
+약 10명 시연 기준으로 API 인스턴스 1개·Uvicorn worker 1개에서 F2 분석은 동시에 1건만 허용한다.
+추가 요청은 큐에 쌓지 않고 429 `F2_BUSY`, `Retry-After: 5`와 공통 오류 봉투를 반환한다.
+혼잡 검사는 multipart 본문 파싱·인증 의존성 실행 전에 수행하므로 혼잡 중에는 인증 오류보다
+429가 먼저 올 수 있다. 슬롯을 얻은 요청에는 기존 세션·CSRF·입력 검증을 모두 적용한다.
+Frontend는 선택 파일을 유지하고 잠시 후 수동 재시도를 안내한다. 5초 뒤 성공이나 공정한 순서를
+보장하지 않으며 자동 재시도는 하지 않는다. API 프로세스/인스턴스 증설 전에는 이 제한을 재설계한다.
 
 F2 route는 별도 사용자 기능 플래그 없이 항상 공개한다. Infra endpoint set이 `active`일 때만
 Backend가 `AI_VLLM_SLLM_BASE_URL`과 `AI_VLLM_STT_BASE_URL`로 pipeline을 초기화한다. `offline`이면
@@ -179,6 +188,7 @@ Backend는 정상 기동하고 분석 요청만 503 `F2_UNAVAILABLE`로 종료�
 | VALIDATION_FAILED | 422 | 입력 형식 또는 필수값 위반 |
 | PRIVACY_CONSENT_REQUIRED | 422 | 개인정보 활용 동의 없이 구입장을 저장하려 함 |
 | F2_UNAVAILABLE | 503 | RunPod endpoint가 offline이거나 STT·SLLM Provider 요청·응답을 사용할 수 없음 |
+| F2_BUSY | 429 | 다른 F2 분석이 진행 중이며 재시도 필요; `Retry-After: 5` |
 | F2_PROCESSING_FAILED | 502 | 공개할 수 없는 F2 내부 처리 오류 |
 | INTERNAL_SERVER_ERROR | 500 | 공개할 수 없는 예상 밖 Backend 오류 |
 

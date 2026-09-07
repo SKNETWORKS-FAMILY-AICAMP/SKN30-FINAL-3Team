@@ -1,4 +1,4 @@
-from brokerage_ai.core.config import AiConfig, AiProfile, load_ai_config
+from brokerage_ai.core.config import AiConfig, AiProfile, bind_ai_config, load_ai_config
 from brokerage_ai.core.errors import (
     AiError,
     ConfigurationError,
@@ -54,4 +54,5 @@ __all__ = [
     "TokenUsage",
     "create_ai_runtime",
     "load_ai_config",
+    "bind_ai_config",
 ]

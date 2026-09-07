@@ -17,7 +17,10 @@ class DeliveryPipelineContractTests(unittest.TestCase):
     def test_justfile_exports_selected_aws_profile_to_runpod_tools(self) -> None:
         justfile = read("infra/justfile")
 
-        self.assertIn('aws_profile := env_var_or_default("AWS_PROFILE", "skn30-session")', justfile)
+        self.assertIn(
+            'aws_profile := env_var_or_default("AWS_PROFILE", "skn30-session")',
+            justfile,
+        )
         self.assertIn("export AWS_PROFILE := aws_profile", justfile)
         self.assertNotIn("$$(terraform", justfile)
         self.assertEqual(
@@ -41,7 +44,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertLess(runtime_tests, publish)
         self.assertLess(publish, summary)
         self.assertIn("${IMAGE_NAME}@${IMAGE_DIGEST}", workflow)
-        self.assertIn("runpod-bootstrap-plan and runpod-bootstrap input", workflow)
+        self.assertIn("runpod-register-plan and runpod-register input", workflow)
 
     def test_backend_verify_owns_database_checks_without_artifacts(self) -> None:
         buildspec = read("infra/delivery/buildspec-backend-verify.yml")
@@ -283,7 +286,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         self.assertIn("smoke_f2_offline.sh", verifier)
         self.assertIn('scripts/render_env.py"', refresh)
         self.assertIn(
-            "compose up --detach --no-deps --force-recreate --pull never api worker",
+            'compose up --detach --no-deps --force-recreate --pull never "${services[@]}"',
             refresh,
         )
         self.assertIn('scripts/validate_service.sh"', refresh)
@@ -413,7 +416,9 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             "alarm_discord_webhook_secret_version",
         ):
             self.assertNotIn(f'variable "{name}"', variables)
-        self.assertFalse((REPOSITORY_ROOT / "infra/environments/dev/secrets.example.tfvars").exists())
+        self.assertFalse(
+            (REPOSITORY_ROOT / "infra/environments/dev/secrets.example.tfvars").exists()
+        )
 
     def test_compose_uses_process_specific_environment_files(self) -> None:
         compose = read("infra/deploy/compose.dev.yml")

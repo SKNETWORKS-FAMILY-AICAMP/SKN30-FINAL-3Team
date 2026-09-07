@@ -170,9 +170,6 @@ class ObservabilityContractTests(unittest.TestCase):
         self,
     ) -> None:
         observability = read("infra/environments/dev/observability.tf")
-        runpod_observability = read(
-            "infra/environments/dev/runpod-observability.tf"
-        )
 
         self.assertEqual(
             observability.count(
@@ -185,18 +182,6 @@ class ObservabilityContractTests(unittest.TestCase):
                 "ok_actions    = [aws_sns_topic.cloudwatch_alarms.arn]"
             ),
             8,
-        )
-        self.assertEqual(
-            runpod_observability.count(
-                "alarm_actions = [aws_sns_topic.cloudwatch_alarms.arn]"
-            ),
-            3,
-        )
-        self.assertEqual(
-            runpod_observability.count(
-                "ok_actions    = [aws_sns_topic.cloudwatch_alarms.arn]"
-            ),
-            3,
         )
         for start, end in (
             (
@@ -214,48 +199,6 @@ class ObservabilityContractTests(unittest.TestCase):
             self.assertIn("datapoints_to_alarm = 1", alarm)
             self.assertIn("threshold           = 1", alarm)
             self.assertIn('treat_missing_data  = "notBreaching"', alarm)
-
-    def test_runpod_monitor_is_read_only_and_uses_project_metrics(self) -> None:
-        source = read("infra/environments/dev/runpod-observability.tf")
-        variables = read("infra/environments/dev/variables.tf")
-        policy = section(
-            source,
-            'resource "aws_iam_role_policy" "runpod_monitor"',
-            'resource "aws_lambda_function" "runpod_monitor"',
-        )
-
-        for allowed in (
-            '"secretsmanager:GetSecretValue"',
-            '"ssm:GetParameter"',
-            '"cloudwatch:PutMetricData"',
-            '"logs:CreateLogStream"',
-            '"logs:PutLogEvents"',
-        ):
-            self.assertIn(allowed, policy)
-        for forbidden in (
-            "ssm:PutParameter",
-            "ssm:SendCommand",
-            "ec2:TerminateInstances",
-            "runpod:",
-        ):
-            self.assertNotIn(forbidden, policy)
-        self.assertIn('"cloudwatch:namespace" = local.runtime_metric_namespace', policy)
-        self.assertIn(
-            'schedule_expression = "rate(${var.runpod_monitor_interval_minutes} minutes)"',
-            source,
-        )
-        self.assertIn('variable "runpod_monitor_interval_minutes"', variables)
-        self.assertIn('variable "runpod_runtime_warning_hours"', variables)
-        for metric in (
-            "RunPodMonitorHeartbeat",
-            "RunPodControlPlaneReachable",
-            "RunPodEndpointConsistent",
-            "RunPodSllmHealthy",
-            "RunPodSttHealthy",
-            "RunPodOrphanPodAgeMinutes",
-            "RunPodRuntimeHours",
-        ):
-            self.assertIn(metric, source)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HOME=/workspace/.cache/huggingface \
     HUGGINGFACE_HUB_CACHE=/workspace/.cache/huggingface/hub \
     PYTHONUNBUFFERED=1 \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
     VLLM_NO_USAGE_STATS=1
 
 WORKDIR /opt/f2-runtime
@@ -32,6 +33,7 @@ COPY scripts/ ./scripts/
 
 RUN chmod 0755 scripts/artifact_bootstrap.py scripts/supervisor.py scripts/auth_proxy.py scripts/healthcheck.py \
     && python -c "import sys; sys.path.insert(0, '/opt/f2-runtime/scripts'); import artifact_bootstrap, auth_proxy, healthcheck, supervisor" \
+    && python scripts/validate_cli.py \
     && mkdir -p /workspace/.cache/huggingface \
     && chmod 0700 /workspace/.cache/huggingface
 

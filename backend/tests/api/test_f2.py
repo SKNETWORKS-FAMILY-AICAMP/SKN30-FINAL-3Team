@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 from typing import cast
 
+import httpx
 import pytest
 from brokerage_ai.core.errors import ProviderTimeoutError
 from brokerage_ai.f2 import (
@@ -16,6 +18,7 @@ from brokerage_ai.f2 import (
     LedgerType,
     ProposalStatus,
 )
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import main
@@ -59,7 +62,7 @@ class FakePipeline:
         )
 
 
-def client_with_pipeline(config, pipeline: FakePipeline) -> TestClient:
+def app_with_pipeline(config, pipeline: FakePipeline) -> FastAPI:
     app = create_app(config=config, readiness_probe=lambda request: True)
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(
         id=1,
@@ -70,7 +73,11 @@ def client_with_pipeline(config, pipeline: FakePipeline) -> TestClient:
     )
     app.dependency_overrides[require_csrf] = lambda: None
     app.dependency_overrides[get_f2_pipeline] = lambda: pipeline
-    return TestClient(app)
+    return app
+
+
+def client_with_pipeline(config, pipeline: FakePipeline) -> TestClient:
+    return TestClient(app_with_pipeline(config, pipeline))
 
 
 def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
@@ -212,3 +219,133 @@ def test_empty_transcription_remains_422_without_a_terminal_event(
     assert response.status_code == 422
     assert response.json()["code"] == "VALIDATION_FAILED"
     assert events == []
+
+
+class BlockingPipeline(FakePipeline):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.finish = asyncio.Event()
+        self.calls = 0
+
+    async def run(self, request: F2PipelineRequest) -> F2PipelineResult:
+        self.calls += 1
+        self.temp_path = request.audio_path
+        self.started.set()
+        await self.finish.wait()
+        return await super().run(request)
+
+
+def test_ten_overlapping_analyses_admit_one_and_reject_nine_without_blocking_health(config):
+    async def scenario():
+        pipeline = BlockingPipeline()
+        app = app_with_pipeline(config, pipeline)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+
+            async def submit():
+                return await client.post(
+                    "/api/v1/f2/analyses",
+                    files={"audio": ("memo.wav", b"audio", "audio/wav")},
+                    data={
+                        "ledger_type": "매물장",
+                        "current_fields": "{}",
+                        "privacy_confirmed": "true",
+                    },
+                )
+
+            first = asyncio.create_task(submit())
+            try:
+                await asyncio.wait_for(pipeline.started.wait(), timeout=5)
+                responses = await asyncio.wait_for(
+                    asyncio.gather(*(submit() for _ in range(9))), timeout=5
+                )
+                assert all(response.status_code == 429 for response in responses)
+                assert all(response.json()["code"] == "F2_BUSY" for response in responses)
+                assert all(response.headers["Retry-After"] == "5" for response in responses)
+                assert pipeline.calls == 1
+                assert (await client.get("/health/live")).status_code == 200
+            finally:
+                pipeline.finish.set()
+                response = await first
+            assert response.status_code == 200
+            assert (await submit()).status_code == 200
+            assert pipeline.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_canceled_caller_keeps_file_and_slot_until_analysis_finishes(config):
+    async def scenario():
+        pipeline = BlockingPipeline()
+        app = app_with_pipeline(config, pipeline)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            caller = asyncio.create_task(
+                client.post(
+                    "/api/v1/f2/analyses",
+                    files={"audio": ("memo.wav", b"audio", "audio/wav")},
+                    data={
+                        "ledger_type": "매물장",
+                        "current_fields": "{}",
+                        "privacy_confirmed": "true",
+                    },
+                )
+            )
+            await asyncio.wait_for(pipeline.started.wait(), timeout=5)
+            analysis = app.state.f2_analysis_task
+            try:
+                caller.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await caller
+                assert app.state.f2_analysis_busy
+                assert not analysis.done()
+                assert pipeline.temp_path is not None and pipeline.temp_path.exists()
+            finally:
+                pipeline.finish.set()
+                await analysis
+            assert not app.state.f2_analysis_busy
+            assert app.state.f2_analysis_task is None
+            assert not pipeline.temp_path.exists()
+
+    asyncio.run(scenario())
+
+
+def test_busy_request_is_rejected_before_reading_upload(config):
+    class UnreadBody(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            raise AssertionError("busy requests must not consume the upload body")
+            yield b""  # pragma: no cover
+
+    async def scenario():
+        app = create_app(config=config)
+        app.state.f2_analysis_busy = True
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            response = await client.post("/api/v1/f2/analyses", content=UnreadBody())
+        assert response.status_code == 429
+        assert response.json()["code"] == "F2_BUSY"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("error", [ProviderTimeoutError(), F2PipelineError("private")])
+def test_failed_analysis_releases_capacity_for_retry(config, error):
+    pipeline = FakePipeline(error)
+    with client_with_pipeline(config, pipeline) as client:
+
+        def submit(content=b"audio"):
+            return client.post(
+                "/api/v1/f2/analyses",
+                files={"audio": ("memo.wav", content, "audio/wav")},
+                data={"ledger_type": "매물장", "current_fields": "{}", "privacy_confirmed": "true"},
+            )
+
+        assert submit().status_code in (502, 503)
+        assert pipeline.temp_path is not None and not pipeline.temp_path.exists()
+        pipeline.error = None
+        assert submit(b"").status_code == 422
+        assert submit().status_code == 200

@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from unittest.mock import patch
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPOSITORY_ROOT / "infra/deploy/scripts/render_env.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("render_env", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
 render_env = importlib.util.module_from_spec(SPEC)
@@ -30,6 +32,47 @@ class RenderEnvironmentTests(unittest.TestCase):
         }
         payload.update(overrides)
         return json.dumps(payload)
+
+    def test_f2_refresh_preserves_unrelated_values_and_removes_offline_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "api.env"
+            original = {
+                "DB_URL": "fixture=db-url",
+                "APP_ENV": "dev",
+                "NEW_SETTING": "keep",
+            }
+            render_env.write_env(path, original)
+            keys = {
+                "AI_VLLM_SLLM_API_KEY": self.LLM_KEY,
+                "AI_VLLM_STT_API_KEY": self.STT_KEY,
+            }
+            render_env.refresh_f2_environment(path, self.endpoint_set(), keys)
+            active = dict(line.split("=", 1) for line in path.read_text().splitlines())
+            self.assertEqual(active["AI_F2_PROVIDER_STATUS"], "active")
+            for name, value in original.items():
+                self.assertEqual(active[name], value)
+            offline = self.endpoint_set(
+                status="offline",
+                pod_id=None,
+                sllm_release_id=None,
+                sllm_base_url=None,
+                stt_base_url=None,
+            )
+            render_env.refresh_f2_environment(path, offline, {})
+            result = dict(line.split("=", 1) for line in path.read_text().splitlines())
+            self.assertEqual(result, {**original, "AI_F2_PROVIDER_STATUS": "offline"})
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    def test_f2_refresh_invalid_endpoint_leaves_existing_file_intact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "api.env"
+            path.write_text("DB_URL=existing\nAI_F2_PROVIDER_STATUS=offline\n")
+            previous = path.read_bytes()
+            with self.assertRaises(SystemExit):
+                render_env.refresh_f2_environment(
+                    path, self.endpoint_set(sllm_base_url="http://wrong"), {}
+                )
+            self.assertEqual(path.read_bytes(), previous)
 
     def test_public_parameters_accept_new_valid_names_without_an_allowlist(
         self,
@@ -281,16 +324,10 @@ class RenderEnvironmentTests(unittest.TestCase):
         )
         self.assertNotIn("AI_VLLM_ENDPOINT_SET", api)
         self.assertEqual(worker["AI_OPENAI_API_KEY"], "openai-test")
-        self.assertEqual(worker["AI_VLLM_SLLM_API_KEY"], self.LLM_KEY)
-        self.assertEqual(worker["AI_VLLM_STT_API_KEY"], self.STT_KEY)
         self.assertEqual(worker["DB_URL"], "postgresql+psycopg://runtime")
-        self.assertEqual(
-            worker["AI_VLLM_SLLM_BASE_URL"],
-            "https://abc123def4567-8001.proxy.runpod.net/v1",
-        )
-        self.assertEqual(
-            worker["AI_VLLM_STT_BASE_URL"],
-            "https://abc123def4567-8002.proxy.runpod.net/v1",
+        self.assertEqual(worker["AI_F2_PROVIDER_STATUS"], "offline")
+        self.assertFalse(
+            (render_env.F2_ENV_NAMES - {"AI_F2_PROVIDER_STATUS"}) & worker.keys()
         )
         self.assertNotIn("AI_VLLM_ENDPOINT_SET", worker)
         self.assertEqual(

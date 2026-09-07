@@ -154,11 +154,11 @@ def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> Non
     assert configured.vllm.sllm is not None
 
 
-def test_enabled_worker_merges_ai_local_files_without_mutating_process_environment(
+def test_enabled_worker_merges_backend_local_files_without_mutating_process_environment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import brokerage_ai.core.config as ai_config_module
+    import core.config as ai_config_module
 
     (tmp_path / ".env.local").write_text(
         "AI_REQUEST_TIMEOUT_SECONDS=10\n"
@@ -171,7 +171,7 @@ def test_enabled_worker_merges_ai_local_files_without_mutating_process_environme
         "AI_VLLM_SLLM_API_KEY=personal-secret\nAI_OPENAI_API_KEY=personal-openai-secret\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(ai_config_module, "AI_ROOT", tmp_path)
+    monkeypatch.setattr(ai_config_module, "BACKEND_ROOT", tmp_path)
     monkeypatch.delenv("AI_VLLM_SLLM_API_KEY", raising=False)
 
     config = require_ai_provider(

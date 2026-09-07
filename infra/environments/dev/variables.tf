@@ -124,34 +124,3 @@ variable "app_asg_health_check_type" {
     error_message = "app_asg_health_check_type은 EC2 또는 ELB여야 합니다."
   }
 }
-
-variable "runpod_monitor_interval_minutes" {
-  description = "읽기 전용 RunPod 감시 Lambda 실행 주기(분)"
-  type        = number
-  default     = 30
-
-  validation {
-    condition = (
-      var.runpod_monitor_interval_minutes >= 5 &&
-      var.runpod_monitor_interval_minutes <= 60 &&
-      var.runpod_monitor_interval_minutes == floor(var.runpod_monitor_interval_minutes) &&
-      var.runpod_monitor_interval_minutes % 5 == 0
-    )
-    error_message = "runpod_monitor_interval_minutes는 5~60 사이의 5분 단위 정수여야 합니다."
-  }
-}
-
-variable "runpod_runtime_warning_hours" {
-  description = "공유 RunPod가 연속 실행될 때 경고할 시간"
-  type        = number
-  default     = 8
-
-  validation {
-    condition = (
-      var.runpod_runtime_warning_hours >= 1 &&
-      var.runpod_runtime_warning_hours <= 24 &&
-      var.runpod_runtime_warning_hours == floor(var.runpod_runtime_warning_hours)
-    )
-    error_message = "runpod_runtime_warning_hours는 1~24 사이의 정수여야 합니다."
-  }
-}

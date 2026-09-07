@@ -20,12 +20,13 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 import boto3
+import manage_runpod_control as control
 import manage_sllm_artifact as artifact
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -168,6 +169,7 @@ class RunpodApi:
                 "Authorization": f"Bearer {self._api_key}",
                 "Accept": "application/json",
                 "Content-Type": "application/json",
+                "User-Agent": "skn30-infra/1.0",
             },
         )
         try:
@@ -186,6 +188,9 @@ class RunpodApi:
 
     def registry(self, registry_id: str) -> dict[str, Any]:
         return one_object(self.request("GET", f"/containerregistryauth/{registry_id}"))
+
+    def template(self, template_id: str) -> dict[str, Any]:
+        return one_object(self.request("GET", f"/templates/{template_id}"))
 
     def pods(self) -> list[dict[str, Any]]:
         return object_list(self.request("GET", "/pods"))
@@ -372,7 +377,9 @@ def aws_operational_values(
     if not isinstance(ai, Mapping) or not isinstance(control, Mapping):
         raise ToolError("AWS RunPod operational data has an invalid shape")
     if control.get("status") != "ready":
-        raise ToolError("RunPod control status is not ready; resume bootstrap first")
+        raise ToolError(
+            "RunPod control status is not ready; run runpod-register-plan and runpod-register first"
+        )
     raw_values = (
         operator,
         ai.get("AI_VLLM_SLLM_API_KEY"),
@@ -418,7 +425,8 @@ def verify_pod(
 
 def request_models(base_url: str, api_key: str, expected_model: str) -> dict[str, Any]:
     request = urllib.request.Request(
-        f"{base_url}/models", headers={"Authorization": f"Bearer {api_key}"}
+        f"{base_url}/models",
+        headers={"Authorization": f"Bearer {api_key}", "User-Agent": "skn30-infra/1.0"},
     )
     opener = urllib.request.build_opener(
         urllib.request.ProxyHandler({}), NoRedirectHandler()
@@ -526,6 +534,7 @@ class AwsOperations:
             "--filters",
             f"Name=tag:Project,Values={self.project}",
             "Name=tag:Environment,Values=dev",
+            f"Name=tag:Name,Values={self.project}-dev-app",
             "Name=instance-state-name,Values=running",
             "--query",
             "Reservations[].Instances[].InstanceId",
@@ -646,6 +655,10 @@ def endpoint_value(
     pod_id: str | None = None,
     release_id: str | None = None,
 ) -> dict[str, Any]:
+    if previous.get("cloud", "runpod") != "runpod":
+        raise ToolError(
+            "RunPod commands cannot change an AWS-owned endpoint; use ai-switch"
+        )
     revision = previous.get("revision")
     if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
         raise ToolError("current endpoint revision is invalid")
@@ -679,23 +692,23 @@ class Controller:
 
     @staticmethod
     def emit_reconcile_guidance(
-        pod_id: str, *, rollback_refresh_failed: bool, pod_delete_failed: bool
+        pod_id: str, *, offline_refresh_failed: bool, pod_delete_failed: bool
     ) -> None:
         actions = [
             "just -f infra/justfile runpod-status",
             "just -f infra/justfile runpod-reconcile",
         ]
-        if rollback_refresh_failed:
+        if offline_refresh_failed:
             actions.append(
-                "restore the intended SSM endpoint value, rerun the approved Backend "
-                "endpoint refresh, then run the matching active/offline smoke"
+                "keep F2 offline and rerun reconcile-apply after Pod cleanup; "
+                "then run offline smoke"
             )
         if pod_delete_failed:
             actions.append(f"just -f infra/justfile runpod-delete {pod_id}")
         emit(
             "runpod-reconcile-required",
             pod_id=pod_id,
-            rollback_refresh_failed=rollback_refresh_failed,
+            offline_refresh_failed=offline_refresh_failed,
             pod_delete_failed=pod_delete_failed,
             actions=actions,
         )
@@ -733,6 +746,11 @@ class Controller:
             raise ToolError(
                 f"a Pod named {SHARED_POD_NAME!r} already exists; delete it first"
             )
+        previous = self.aws.current_endpoint()
+        if previous.get("status") != "offline":
+            raise ToolError(
+                "creation requires an offline endpoint; run reconcile first"
+            )
         manifest, bundle_sha = self.aws.release(release_id)
         release_stage = str(manifest.get("release_stage", "verified"))
         if release_stage == "dev" and not allow_dev_release:
@@ -768,34 +786,34 @@ class Controller:
             terminate_after=terminate_after,
         )
         pod_id = resource_id(created)
-        rollback_refresh_failed = False
+        active = None
         try:
             health = self.wait_ready(pod_id, keys)
-            previous = self.aws.current_endpoint()
             active = endpoint_value(
                 previous=previous, status="active", pod_id=pod_id, release_id=release_id
             )
-            try:
-                self.aws.write_endpoint(active)
-                self.aws.refresh()
-                self.aws.smoke()
-            except Exception:
-                try:
-                    self.aws.write_endpoint(previous)
-                    self.aws.refresh()
-                except ToolError:
-                    rollback_refresh_failed = True
-                raise
+            self.aws.write_endpoint(active)
+            self.aws.refresh()
+            self.aws.smoke()
         except Exception as error:
+            offline_refresh_failed = False
+            if active is not None:
+                try:
+                    self.aws.write_endpoint(
+                        endpoint_value(previous=active, status="offline")
+                    )
+                    self.aws.refresh()
+                except (ToolError, artifact.ToolError):
+                    offline_refresh_failed = True
             pod_delete_failed = False
             try:
                 self.runpod.delete(pod_id)
             except ToolError:
                 pod_delete_failed = True
-            if rollback_refresh_failed or pod_delete_failed:
+            if offline_refresh_failed or pod_delete_failed:
                 self.emit_reconcile_guidance(
                     pod_id,
-                    rollback_refresh_failed=rollback_refresh_failed,
+                    offline_refresh_failed=offline_refresh_failed,
                     pod_delete_failed=pod_delete_failed,
                 )
                 raise ToolError(
@@ -807,7 +825,6 @@ class Controller:
             pod_id=pod_id,
             release_id=release_id,
             release_stage=release_stage,
-            proxy_urls=proxy_urls(pod_id),
             health=health,
             delete_command=f"just -f infra/justfile runpod-delete {pod_id}",
         )
@@ -815,7 +832,11 @@ class Controller:
     def status(self, keys: tuple[str, str] | None) -> None:
         matches = shared_pods(self.runpod.pods())
         if not matches:
-            emit("pod-status", status="ABSENT", endpoint=self.aws.current_endpoint())
+            emit(
+                "pod-status",
+                status="ABSENT",
+                endpoint_status=self.aws.current_endpoint().get("status"),
+            )
             return
         if len(matches) != 1:
             raise ToolError(f"expected zero or one shared Pod; found {len(matches)}")
@@ -832,9 +853,8 @@ class Controller:
             "pod-status",
             pod_id=pod_id,
             status=status,
-            proxy_urls=proxy_urls(pod_id),
             health=health,
-            endpoint=self.aws.current_endpoint(),
+            endpoint_status=self.aws.current_endpoint().get("status"),
         )
 
     def reconcile(
@@ -859,7 +879,20 @@ class Controller:
             raise ToolError("multiple shared Pods require an operator decision")
         if status == "offline":
             if not matches:
-                emit("runpod-reconcile-plan", state="offline-clean", actions=[])
+                emit(
+                    "runpod-reconcile-plan",
+                    state="offline-clean",
+                    actions=[],
+                    apply=apply,
+                )
+                if apply:
+                    if not endpoint_offline_confirmed:
+                        raise ToolError(
+                            "reconcile apply requires --endpoint-offline-confirmed"
+                        )
+                    self.aws.refresh()
+                    self.aws.smoke_offline()
+                    emit("runpod-reconcile-complete", endpoint_status="offline")
                 return
             pod_id = resource_id(matches[0])
             emit(
@@ -884,7 +917,7 @@ class Controller:
                     endpoint_pod_id=endpoint_pod_id,
                 )
                 raise ToolError("active endpoint points to a non-shared Pod")
-            actions = ["set endpoint offline", "refresh API and Worker environment"]
+            actions = ["set endpoint offline", "refresh API F2 environment"]
             emit(
                 "runpod-reconcile-plan",
                 state="active-pod-absent",
@@ -897,12 +930,7 @@ class Controller:
                 raise ToolError("reconcile apply requires --endpoint-offline-confirmed")
             offline = endpoint_value(previous=endpoint, status="offline")
             self.aws.write_endpoint(offline)
-            try:
-                self.aws.refresh()
-            except ToolError:
-                self.aws.write_endpoint(endpoint)
-                self.aws.refresh()
-                raise
+            self.aws.refresh()
             emit("runpod-reconcile-complete", endpoint_status="offline")
             return
 
@@ -949,44 +977,21 @@ class Controller:
             return
         previous = self.aws.current_endpoint()
         offline = endpoint_value(previous=previous, status="offline")
+        # Leave F2 offline on any failure; retry deletion with the same exact Pod ID.
+        # A successful delete with a lost response must never restore a dead endpoint.
         try:
             self.aws.write_endpoint(offline)
             self.aws.refresh()
-        except Exception as error:
-            rollback_refresh_failed = False
-            try:
-                self.aws.write_endpoint(previous)
-                self.aws.refresh()
-            except ToolError:
-                rollback_refresh_failed = True
-            if rollback_refresh_failed:
-                self.emit_reconcile_guidance(
-                    pod_id,
-                    rollback_refresh_failed=True,
-                    pod_delete_failed=False,
-                )
-                raise ToolError(
-                    "endpoint offline refresh failed and automatic rollback is incomplete"
-                ) from error
-            raise
-        try:
             self.runpod.delete(pod_id)
-        except Exception as error:
-            rollback_refresh_failed = False
-            try:
-                self.aws.write_endpoint(previous)
-                self.aws.refresh()
-            except ToolError:
-                rollback_refresh_failed = True
-            if rollback_refresh_failed:
-                self.emit_reconcile_guidance(
-                    pod_id,
-                    rollback_refresh_failed=True,
-                    pod_delete_failed=True,
-                )
-                raise ToolError(
-                    "Pod deletion failed and automatic endpoint rollback is incomplete"
-                ) from error
+        except Exception:
+            emit(
+                "pod-delete-incomplete",
+                pod_id=pod_id,
+                actions=[
+                    "just -f infra/justfile runpod-status",
+                    f"retry runpod-delete {pod_id} if present; otherwise runpod-reconcile-apply",
+                ],
+            )
             raise
         emit(
             "pod-delete-complete",
@@ -1010,6 +1015,13 @@ def doctor(
         validate_identifier(value, label)
     client.pods()
     client.registry(registry_id)
+    try:
+        control.validate_template(
+            client.template(template_id),
+            control.template_payload(asdict(spec), spec.image, registry_id, spec.name),
+        )
+    except control.ToolError as error:
+        raise ToolError(str(error)) from error
     emit(
         "doctor-complete",
         api="rest-v1",
@@ -1103,6 +1115,8 @@ def main() -> int:
             return 0
         controller = Controller(runpod, aws, spec, template_id, args.timeout_seconds)
         if args.command == "pod-create":
+            # Console edits are allowed only offline; recheck drift before GPU billing.
+            doctor(runpod, spec, template_id=template_id, registry_id=registry_id)
             controller.create(
                 release_id=args.release_id,
                 gpu_id=args.gpu_id,

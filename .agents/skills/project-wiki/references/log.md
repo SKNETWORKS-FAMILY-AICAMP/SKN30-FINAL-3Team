@@ -5,6 +5,13 @@ updated: 2026-09-07
 
 # 위키 변경 로그
 
+- 2026-09-07: AWS GPU 오류·비용 부담에 대비해 RunPod 배포 경로를 유지하라는 사용자 요구와 정지·삭제 시 잔여 요금의 공식 근거를 배포·운영 문서에 기록했다. 기능별 수동 전환은 제안으로 구분했으며 AWS GPU·F3 RunPod 배포와 전환 도구는 아직 구현하지 않았다.
+
+- 2026-09-07: 사용자가 자체 RunPod 감시 제거·운영자 시작/종료 확인을 선택했다. 전용 Lambda·주기 실행·8개 경보·감시 key와 GraphQL Secret 조회를 제거하고 create/delete 실패를 이전 active 복원 대신 offline 정리·명시적 재시도로 단순화했다. 프로젝트 ADR-0029와 Infra ADR-0021에 기록했으며 외부 apply는 하지 않았다.
+
+- 2026-09-07: 사용자가 약 10명 규모의 부트캠프 팀 프로젝트·취업 포트폴리오라는 운영 기준을 명시했다. ADR-0028에 단일 GPU·API 점검 중단 허용을 반영하고 F2 동시 분석 1건·본문 파싱 전 429·수동 재시도, 취소 시 실제 종료 후 정리, 단일 API worker와 SLLM→STT 순차 기동을 구현했다. 실환경 GPU 검증은 미실행이며 runbook에 시연 합격·기록 기준을 추가했다.
+
+- 2026-09-07: 사용자 선택에 따라 RunPod 최초 구축을 Console 자원 검증·등록으로 단순화했다. ADR-0028에 GHCR Console 소유, 게시 단계 품질 검증, API 전용 F2 refresh와 Worker 설정 분리를 기록했다. 코드 구현·팀 검토 전·외부 미적용 상태다.
 - 2026-09-07: ADR-0026·0027의 부분 대체 범위에 renderer의 OpenAI key 강제 제거와 범용 endpoint 배포 설정 주입을 명시하고, 해당 항목의 현재 구현 상태는 ADR-0027을 따르도록 연결했다.
 - 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
 - 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
@@ -101,3 +108,7 @@ updated: 2026-09-07
 - 2026-08-12: 프로젝트 ADR을 공통·모듈 간 결정으로 한정하고 백엔드 내부 결정 정본을 backend 스킬 references로 이동함.
 
 - 2026-09-07: F2 기존 release를 유지하는 캐시 런타임과 범용 Qwen 별도 이미지 게시 절차를 분리했다. GPU 호환성·배포는 미검증이며 local 기본 모델·dev 활성 모델 변경은 포함하지 않는다. [이미지 운영](../../../../infra/serving/README.md)
+
+- 2026-09-07: ADR-0030으로 local 개인 OpenAI·dev F2/general AWS·RunPod 전환과 모델 설정만 갱신하는 데이터 보존 정책을 반영. 실제 GPU 검증 전.
+
+- 2026-09-07: 사용자 승인으로 GPU 통합 기반 saved plan을 적용(9 생성·7 변경·16 삭제)하고 drift 없음을 확인. 감시 제거·SSM/IAM 반영, 앱/RDS 중지·GPU 0 및 기존 등록/저장소 보존. GPU 실배포는 후속 단계.

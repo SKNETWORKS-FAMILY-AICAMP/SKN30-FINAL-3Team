@@ -174,3 +174,87 @@ def test_f3_synthetic_seed_is_repeatable_on_postgresql(
         assert all(row["config_version"] == 1 for row in rows)
         assert all(row["parameters"] == {} for row in rows)
         assert all(row["is_active"] is True for row in rows)
+
+
+@pytest.mark.skipif(not os.getenv("TEST_DB_URL"), reason="TEST_DB_URL is required")
+def test_general_activation_preserves_ledgers_and_old_profiles(
+    make_config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from brokerage_ai import bind_ai_config
+
+    import general_model
+
+    with _isolated_database(os.environ["TEST_DB_URL"]) as database_url:
+        config = make_config(
+            {"APP_ENV": "local", "DB_TARGET": "development", "DB_URL": database_url}
+        )
+        seed = seed_f3_synthetic(config, confirm_reset=True, model_profile="local-openai")
+        ai_config = bind_ai_config(
+            {
+                "AI_F2_PROVIDER_STATUS": "offline",
+                "AI_GENERAL_API_KEY": "test-only",
+                "AI_LLM_ENDPOINTS": '[{"alias":"general-dev-gpu","provider":"vllm",'
+                '"base_url":"http://127.0.0.1:18000/v1","api_key_env":"AI_GENERAL_API_KEY"}]',
+            },
+            "local",
+        )
+        monkeypatch.setattr(general_model, "load_ai_config", lambda *_: ai_config)
+        engine = create_engine(database_url)
+        try:
+            with engine.connect() as connection:
+                tables = (
+                    connection.execute(
+                        text(
+                            "SELECT tablename FROM pg_tables WHERE schemaname='public' "
+                            "AND tablename <> 'ai_model_config' ORDER BY tablename"
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                # Snapshot every non-model table, including business and execution history.
+                before = {
+                    table: connection.execute(
+                        text(
+                            f'SELECT row_to_json(t)::text FROM "{table}" t '
+                            "ORDER BY row_to_json(t)::text"
+                        )
+                    )
+                    .scalars()
+                    .all()
+                    for table in tables
+                }
+                old_ids = set(connection.execute(text("SELECT id FROM ai_model_config")).scalars())
+            for _ in range(2):
+                general_model.activate_general(
+                    config, seed.brokerage_id, apply=True, shared_dev=False, workloads_stopped=True
+                )
+            with engine.connect() as connection:
+                after = {
+                    table: connection.execute(
+                        text(
+                            f'SELECT row_to_json(t)::text FROM "{table}" t '
+                            "ORDER BY row_to_json(t)::text"
+                        )
+                    )
+                    .scalars()
+                    .all()
+                    for table in tables
+                }
+                rows = (
+                    connection.execute(
+                        text(
+                            "SELECT id, config_key, is_active, endpoint_alias FROM ai_model_config"
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+            assert before == after
+            assert old_ids <= {row["id"] for row in rows}
+            active = [row for row in rows if row["is_active"]]
+            assert len(active) == 2
+            assert all(row["config_key"] == general_model.PROFILE for row in active)
+            assert all(row["endpoint_alias"] == "general-dev-gpu" for row in active)
+        finally:
+            engine.dispose()

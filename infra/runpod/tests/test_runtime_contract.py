@@ -70,9 +70,41 @@ class SupervisorTests(unittest.TestCase):
             commands = supervisor.build_commands(config, "vllm")
             self.assertIn("/models/sllm", commands["sllm"])
             self.assertIn("/models/stt", commands["stt"])
-        with patch.object(supervisor.Path, "is_file", return_value=False):
-            with self.assertRaises(supervisor.ConfigurationError):
-                supervisor.load_config(base_release(), environment)
+        with (
+            patch.object(supervisor.Path, "is_file", return_value=False),
+            self.assertRaises(supervisor.ConfigurationError),
+        ):
+            supervisor.load_config(base_release(), environment)
+
+    def test_pinned_local_template_disables_thinking_with_supported_cli(self) -> None:
+        from dataclasses import replace
+
+        config = replace(
+            supervisor.load_config(base_release(), valid_environment()),
+            sllm_model_id="/models/sllm",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory, "chat.jinja")
+            with (
+                patch.object(supervisor, "SLLM_CHAT_TEMPLATE", output),
+                patch.object(
+                    supervisor.Path,
+                    "read_text",
+                    return_value=json.dumps(
+                        {
+                            "chat_template": "{{ enable_thinking }}{{ messages }}",
+                        }
+                    ),
+                ),
+            ):
+                supervisor.prepare_chat_template(config)
+                command = supervisor.build_commands(config, "vllm")["sllm"]
+            self.assertEqual(
+                output.read_text(),
+                "{% set enable_thinking = false %}{{ enable_thinking }}{{ messages }}",
+            )
+            self.assertEqual(command[command.index("--chat-template") + 1], str(output))
+            self.assertNotIn("--default-chat-template-kwargs", command)
 
     def test_both_engines_limit_sequences_to_one(self) -> None:
         config = supervisor.load_config(base_release(), valid_environment())
@@ -98,6 +130,7 @@ class SupervisorTests(unittest.TestCase):
 
         with (
             patch.object(supervisor, "bootstrap", return_value=base_release()),
+            patch.object(supervisor, "prepare_chat_template"),
             patch.dict(supervisor.os.environ, valid_environment()),
             patch.object(supervisor.shutil, "which", return_value="vllm"),
             patch.object(supervisor.signal, "signal"),
@@ -112,6 +145,7 @@ class SupervisorTests(unittest.TestCase):
         process = Mock()
         with (
             patch.object(supervisor, "bootstrap", return_value=base_release()),
+            patch.object(supervisor, "prepare_chat_template"),
             patch.dict(supervisor.os.environ, valid_environment()),
             patch.object(supervisor.shutil, "which", return_value="vllm"),
             patch.object(supervisor.signal, "signal"),
@@ -410,7 +444,7 @@ class BootstrapTests(unittest.TestCase):
             ):
                 bootstrap._validate(manifest, "release-v1", destination)
 
-    def test_manifest_requires_matching_approved_promotion(self) -> None:
+    def test_runtime_does_not_reinterpret_publisher_evaluation_policy(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory)
             manifest = self._release_manifest(destination)
@@ -425,8 +459,16 @@ class BootstrapTests(unittest.TestCase):
             assert isinstance(evaluation, dict)
             evaluation["approval_sha256"] = hashlib.sha256(approval_bytes).hexdigest()
 
+            result = bootstrap._validate(manifest, "release-v1", destination)
+            self.assertEqual(result.base_model_id, "Qwen/Qwen3-4B")
+
+    def test_changed_adapter_bytes_are_still_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            manifest = self._release_manifest(destination)
+            (destination / "adapter/adapter_model.safetensors").write_bytes(b"changed")
             with self.assertRaisesRegex(
-                bootstrap.BootstrapError, "promotion approval does not match"
+                bootstrap.BootstrapError, "metadata does not match"
             ):
                 bootstrap._validate(manifest, "release-v1", destination)
 

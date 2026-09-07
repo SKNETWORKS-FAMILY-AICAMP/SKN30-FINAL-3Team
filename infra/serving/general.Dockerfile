@@ -4,5 +4,8 @@ FROM ${BASE_IMAGE}
 ENV HF_HOME=/workspace/huggingface VLLM_NO_USAGE_STATS=1 PYTHONUNBUFFERED=1
 COPY general_runtime.py /opt/general/general_runtime.py
 COPY general_middleware.py /opt/general/general_middleware.py
+COPY validate_cli.py /opt/general/validate_cli.py
 ENTRYPOINT []
-CMD ["python", "/opt/general/general_runtime.py"]
+RUN python3 -c "import vllm, bitsandbytes; import py_compile; py_compile.compile('/opt/general/general_runtime.py', doraise=True)"
+RUN python3 /opt/general/validate_cli.py
+CMD ["python3", "/opt/general/general_runtime.py"]

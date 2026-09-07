@@ -17,8 +17,7 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 IMAGE = (
-    "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:"
-    + "a" * 64
+    "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:" + "a" * 64
 )
 NEW_IMAGE = IMAGE.rsplit(":", 1)[0] + ":" + "b" * 64
 
@@ -49,7 +48,9 @@ class FakeAws:
         return "123456789012"
 
     def has_current(self, name):
-        purpose = next(key for key, value in self.settings.secrets.items() if value == name)
+        purpose = next(
+            key for key, value in self.settings.secrets.items() if value == name
+        )
         return purpose not in self.missing
 
     def control(self):
@@ -60,11 +61,12 @@ class FakeAws:
         self.controls.append(dict(value))
 
     def secret_value(self, name):
-        purpose = next(key for key, value in self.settings.secrets.items() if value == name)
+        purpose = next(
+            key for key, value in self.settings.secrets.items() if value == name
+        )
         values = {
             "ai": json.dumps(self.ai),
             "operator": "operator-private",
-            "monitor": "monitor-private",
             "ghcr": json.dumps({"username": "octocat", "password": "pat-private"}),
             "delivery_discord": "https://discord.com/api/webhooks/1/private",
             "alarm_discord": "https://discord.com/api/webhooks/2/private",
@@ -80,228 +82,167 @@ class FakeAws:
 
 
 class FakeRunpod:
+    # Deliberately no create/update/delete methods: registration is read-only.
     def __init__(self):
         self.pod_values = []
-        self.secret_values = set()
-        self.registry_values = []
-        self.template_values = []
-        self.registry_creates = 0
-        self.template_creates = 0
-        self.fail_template_once = False
+        self.registry_value = {"id": "registry-1"}
+        self.template_value = {
+            **MODULE.template_payload(
+                MODULE.DEFAULT_TEMPLATE, IMAGE, "registry-1", "skn30-f2-serving-v2"
+            ),
+            "id": "template-1",
+        }
 
     def pods(self):
         return list(self.pod_values)
 
-    def secret_names(self):
-        return set(self.secret_values)
+    def registry(self, _identifier):
+        return dict(self.registry_value)
 
-    def create_secret(self, name, _value):
-        self.secret_values.add(name)
-
-    def delete_secret(self, name):
-        self.secret_values.remove(name)
-
-    def registries(self):
-        return list(self.registry_values)
-
-    def create_registry(self, name, _username, _password):
-        self.registry_creates += 1
-        value = {"id": "registry-1", "name": name}
-        self.registry_values.append(value)
-        return value
-
-    def templates(self):
-        return list(self.template_values)
-
-    def create_template(self, payload):
-        if self.fail_template_once:
-            self.fail_template_once = False
-            raise MODULE.ToolError("template fixture failure")
-        self.template_creates += 1
-        value = {**payload, "id": "template-1"}
-        self.template_values.append(value)
-        return value
+    def template(self, _identifier):
+        return dict(self.template_value)
 
 
-class BootstrapTests(unittest.TestCase):
-    @staticmethod
-    def ready_aws() -> FakeAws:
-        aws = FakeAws()
-        aws.control_value.update(
-            {
-                "status": "ready",
-                "generation": 1,
-                "image": IMAGE,
-                "registry_auth_id": "registry-1",
-                "template_id": "template-1",
-                "ai_provider_secret_version_id": "version-ai",
-            }
-        )
-        return aws
+class RegistrationTests(unittest.TestCase):
+    def test_rest_client_identifies_itself(self):
+        def requester(request, _timeout):
+            self.assertEqual(request.get_header("User-agent"), "skn30-infra/1.0")
+            return b"[]"
 
-    def test_plan_is_read_only(self):
-        aws = FakeAws()
-        runpod = FakeRunpod()
-        output = io.StringIO()
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), redirect_stdout(output):
-            result = MODULE.Bootstrapper(aws).plan(IMAGE)
-        self.assertFalse(result["mutates"])
-        self.assertEqual(aws.controls, [])
-        self.assertEqual(aws.puts, [])
-        self.assertNotIn("private", output.getvalue())
+        self.assertEqual(MODULE.RunpodClient("synthetic", requester=requester).pods(), [])
 
-    def test_ai_secret_bootstrap_generates_only_f2_keys(self):
-        aws = FakeAws(missing=("ai",))
-        with patch.object(
-            MODULE,
-            "generated_f2_key",
-            side_effect=("s" * 43, "t" * 43),
-        ), patch.object(MODULE, "prompt_secret") as prompt:
-            MODULE.initialise_missing_secrets(aws)
-
-        prompt.assert_not_called()
-        self.assertEqual(len(aws.puts), 1)
-        payload = json.loads(aws.puts[0][1])
-        self.assertEqual(
-            set(payload),
-            {"AI_VLLM_SLLM_API_KEY", "AI_VLLM_STT_API_KEY"},
-        )
-        self.assertNotIn("AI_OPENAI_API_KEY", payload)
-
-    def test_plan_rejects_digest_from_another_repository(self):
-        with self.assertRaises(MODULE.ToolError):
-            MODULE.Bootstrapper(FakeAws()).plan(
-                "ghcr.io/example/f2-serving@sha256:" + "a" * 64
+    def register(self, aws, runpod, *, apply=False, image=IMAGE):
+        with (
+            patch.object(MODULE, "RunpodClient", return_value=runpod),
+            redirect_stdout(io.StringIO()),
+        ):
+            return MODULE.Registrar(aws).register(
+                image, "template-1", "registry-1", apply=apply
             )
 
-    def test_new_image_plan_rejects_active_endpoint(self):
-        aws = self.ready_aws()
-        aws.endpoint_value = {"status": "active", "pod_id": "pod-1"}
-        with patch.object(
-            MODULE, "RunpodClient", return_value=FakeRunpod()
-        ), self.assertRaisesRegex(MODULE.ToolError, "endpoint to be offline"):
-            MODULE.Bootstrapper(aws).plan(NEW_IMAGE)
+    def test_plan_never_writes_secrets_or_registration(self):
+        aws = FakeAws()
+        self.register(aws, FakeRunpod())
         self.assertEqual(aws.controls, [])
+        self.assertEqual(aws.puts, [])
 
-    def test_new_image_apply_rejects_shared_pod(self):
-        aws = self.ready_aws()
-        runpod = FakeRunpod()
-        runpod.pod_values = [{"id": "pod-1", "name": MODULE.SHARED_POD_NAME}]
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), self.assertRaisesRegex(MODULE.ToolError, "no shared RunPod Pod"):
-            MODULE.Bootstrapper(aws).apply(NEW_IMAGE)
-        self.assertEqual(aws.controls, [])
-
-    def test_new_image_plan_creates_generation_only_when_offline_and_empty(self):
-        aws = self.ready_aws()
-        runpod = FakeRunpod()
-        runpod.secret_values = set(MODULE.F2_SECRET_NAMES)
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), redirect_stdout(io.StringIO()):
-            result = MODULE.Bootstrapper(aws).plan(NEW_IMAGE)
-        self.assertIn(
-            "create-template:skn30-final-3team-dev-f2-template-g2",
-            result["actions"],
-        )
-
-    def test_apply_is_idempotent(self):
+    def test_registration_is_one_complete_write_and_idempotent(self):
         aws = FakeAws()
         runpod = FakeRunpod()
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), redirect_stdout(io.StringIO()):
-            first = MODULE.Bootstrapper(aws).apply(IMAGE)
-            second = MODULE.Bootstrapper(aws).apply(IMAGE)
+        first = self.register(aws, runpod, apply=True)
+        second = self.register(aws, runpod, apply=True)
         self.assertEqual(first, second)
-        self.assertEqual(runpod.registry_creates, 1)
-        self.assertEqual(runpod.template_creates, 1)
-        self.assertEqual(runpod.secret_values, set(MODULE.F2_SECRET_NAMES))
+        self.assertEqual(len(aws.controls), 1)
+        self.assertEqual(aws.control_value["status"], "ready")
+        self.assertEqual(aws.control_value["schema_version"], 2)
+        self.assertNotIn("generation", aws.control_value)
+        self.assertNotIn("ai_provider_secret_version_id", aws.control_value)
+        self.assertEqual(aws.puts, [])
+
+    def test_registration_rejects_active_endpoint_even_with_same_image(self):
+        aws = FakeAws()
+        aws.endpoint_value["status"] = "active"
+        with self.assertRaisesRegex(MODULE.ToolError, "offline"):
+            self.register(aws, FakeRunpod(), apply=True)
+        self.assertEqual(aws.controls, [])
+
+    def test_registration_rejects_existing_shared_pod(self):
+        aws, runpod = FakeAws(), FakeRunpod()
+        runpod.pod_values = [{"name": MODULE.SHARED_POD_NAME}]
+        with self.assertRaisesRegex(MODULE.ToolError, "no shared RunPod Pod"):
+            self.register(aws, runpod, apply=True)
+        self.assertEqual(aws.controls, [])
+
+    def test_invalid_console_template_leaves_previous_registration_intact(self):
+        for field, value in (
+            ("imageName", NEW_IMAGE),
+            ("isPublic", True),
+            ("volumeInGb", 10),
+            ("ports", ["22/tcp"]),
+            ("containerRegistryAuthId", "another-registry"),
+        ):
+            with self.subTest(field=field):
+                aws, runpod = FakeAws(), FakeRunpod()
+                previous = dict(aws.control_value)
+                runpod.template_value[field] = value
+                with self.assertRaises(MODULE.ToolError):
+                    self.register(aws, runpod, apply=True)
+                self.assertEqual(aws.control_value, previous)
+                self.assertEqual(aws.controls, [])
+
+    def test_unrelated_repository_rejected_before_aws_write(self):
+        aws = FakeAws()
+        with self.assertRaises(MODULE.ToolError):
+            self.register(
+                aws,
+                FakeRunpod(),
+                apply=True,
+                image="ghcr.io/example/other@sha256:" + "a" * 64,
+            )
+        self.assertEqual(aws.controls, [])
+
+    def test_registration_does_not_require_discord_secrets(self):
+        aws = FakeAws(missing=("delivery_discord", "alarm_discord"))
+        self.register(aws, FakeRunpod(), apply=True)
         self.assertEqual(aws.control_value["status"], "ready")
 
-    def test_apply_never_prints_secret_values(self):
-        aws = FakeAws()
-        runpod = FakeRunpod()
-        output = io.StringIO()
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), redirect_stdout(output):
-            MODULE.Bootstrapper(aws).apply(IMAGE)
+    def test_failure_can_be_retried_without_partial_control_state(self):
+        aws, runpod = FakeAws(), FakeRunpod()
+        with (
+            patch.object(
+                runpod, "template", side_effect=MODULE.ToolError("unavailable")
+            ),
+            self.assertRaises(MODULE.ToolError),
+        ):
+            self.register(aws, runpod, apply=True)
+        self.assertEqual(aws.controls, [])
+        self.register(aws, runpod, apply=True)
+        self.assertEqual(len(aws.controls), 1)
+
+    def test_registration_never_prints_secret_values(self):
+        aws, runpod, output = FakeAws(), FakeRunpod(), io.StringIO()
+        with (
+            patch.object(MODULE, "RunpodClient", return_value=runpod),
+            redirect_stdout(output),
+        ):
+            MODULE.Registrar(aws).register(
+                IMAGE, "template-1", "registry-1", apply=True
+            )
         for secret in (
             "operator-private",
             "monitor-private",
-            "pat-private",
             "openai-private",
             "s" * 43,
             "t" * 43,
         ):
             self.assertNotIn(secret, output.getvalue())
-        self.assertNotIn("subprocess", PATH.read_text(encoding="utf-8"))
 
-    def test_partial_failure_resumes_from_control_document(self):
+    def test_f2_key_import_preserves_general_provider_and_has_no_remote_writes(self):
         aws = FakeAws()
-        runpod = FakeRunpod()
-        runpod.fail_template_once = True
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), self.assertRaises(MODULE.ToolError):
-            MODULE.Bootstrapper(aws).apply(IMAGE)
-        self.assertEqual(aws.control_value["status"], "provisioning")
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), redirect_stdout(io.StringIO()):
-            MODULE.Bootstrapper(aws).apply(IMAGE)
-        self.assertEqual(runpod.registry_creates, 1)
-        self.assertEqual(runpod.template_creates, 1)
-        self.assertEqual(aws.control_value["status"], "ready")
+        with (
+            patch.object(MODULE, "RunpodClient", return_value=FakeRunpod()),
+            patch.object(MODULE, "prompt_secret", side_effect=("a" * 43, "b" * 43)),
+            redirect_stdout(io.StringIO()),
+        ):
+            MODULE.rotate_secret(aws, "f2")
+        self.assertEqual(len(aws.puts), 1)
+        payload = json.loads(aws.puts[0][1])
+        self.assertEqual(payload["AI_OPENAI_API_KEY"], "openai-private")
+        self.assertEqual(payload[MODULE.F2_SECRET_NAMES[0]], "a" * 43)
+        self.assertEqual(aws.controls, [])
 
-    def test_apply_resumes_matching_template_created_before_control_record(self):
-        aws = FakeAws()
-        aws.control_value.update(
-            {
-                "status": "provisioning",
-                "generation": 1,
-                "image": IMAGE,
-                "registry_auth_id": "registry-1",
-                "ai_provider_secret_version_id": "version-ai",
-            }
-        )
-        runpod = FakeRunpod()
-        runpod.secret_values = set(MODULE.F2_SECRET_NAMES)
-        runpod.registry_values = [
-            {"id": "registry-1", "name": "skn30-final-3team-dev-ghcr-g1"}
-        ]
-        template = MODULE.template_payload(
-            MODULE.DEFAULT_TEMPLATE,
-            IMAGE,
-            "registry-1",
-            "skn30-final-3team-dev-f2-template-g1",
-        )
-        runpod.template_values = [{**template, "id": "template-1"}]
-
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), redirect_stdout(io.StringIO()):
-            result = MODULE.Bootstrapper(aws).apply(IMAGE)
-
-        self.assertEqual(result["template_id"], "template-1")
-        self.assertEqual(runpod.template_creates, 0)
-        self.assertEqual(aws.control_value["status"], "ready")
-
-    def test_duplicate_registry_name_is_rejected(self):
-        aws = FakeAws()
-        runpod = FakeRunpod()
-        runpod.registry_values = [
-            {"id": "one", "name": "skn30-final-3team-dev-ghcr-g1"},
-            {"id": "two", "name": "skn30-final-3team-dev-ghcr-g1"},
-        ]
-        with patch.object(
-            MODULE, "RunpodClient", return_value=runpod
-        ), self.assertRaises(MODULE.ToolError):
-            MODULE.Bootstrapper(aws).apply(IMAGE)
+    def test_first_operator_key_does_not_require_existing_operator_secret(self):
+        aws = FakeAws(missing=("operator",))
+        with (
+            patch.object(MODULE, "RunpodClient", return_value=FakeRunpod()),
+            patch.object(MODULE, "prompt_secret", return_value="new-operator-key"),
+            patch.object(
+                aws, "secret_value", side_effect=AssertionError("must not read old key")
+            ),
+            redirect_stdout(io.StringIO()),
+        ):
+            MODULE.rotate_secret(aws, "runpod-operator")
+        self.assertEqual(len(aws.puts), 1)
 
     def test_template_validation_accepts_omitted_default_fields(self):
         expected = MODULE.template_payload(
@@ -333,33 +274,17 @@ class BootstrapTests(unittest.TestCase):
             client.pods()
         self.assertNotIn(secret, str(raised.exception))
 
-    def test_graphql_uses_api_key_query_parameter_without_bearer_header(self):
-        captured = {}
-
-        def success(request, _timeout):
-            captured["url"] = request.full_url
-            captured["authorization"] = request.get_header("Authorization")
-            captured["user_agent"] = request.get_header("User-agent")
-            return b'{"data":{"myself":{"secrets":[]}}}'
-
-        client = MODULE.RunpodClient("test-api-key", requester=success)
-        self.assertEqual(client.secret_names(), set())
-        self.assertEqual(
-            captured["url"], f"{MODULE.RUNPOD_GRAPHQL_URL}?api_key=test-api-key"
-        )
-        self.assertIsNone(captured["authorization"])
-        self.assertEqual(captured["user_agent"], MODULE.RUNPOD_GRAPHQL_USER_AGENT)
-
-    def test_f2_and_ghcr_rotation_reject_active_endpoint_before_secret_write(self):
-        for target in ("f2", "ghcr"):
-            with self.subTest(target=target):
-                aws = FakeAws()
-                aws.endpoint_value = {"status": "active", "pod_id": "pod-1"}
-                with patch.object(
-                    MODULE, "RunpodClient", return_value=FakeRunpod()
-                ), self.assertRaises(MODULE.ToolError):
-                    MODULE.rotate_secret(aws, target, MODULE.DEFAULT_TEMPLATE)
-                self.assertEqual(aws.puts, [])
+    def test_f2_rotation_rejects_active_endpoint_before_prompt_or_secret_write(self):
+        aws = FakeAws()
+        aws.endpoint_value["status"] = "active"
+        with (
+            patch.object(MODULE, "RunpodClient", return_value=FakeRunpod()),
+            patch.object(MODULE, "prompt_secret") as prompt,
+            self.assertRaises(MODULE.ToolError),
+        ):
+            MODULE.rotate_secret(aws, "f2")
+        prompt.assert_not_called()
+        self.assertEqual(aws.puts, [])
 
 
 if __name__ == "__main__":
