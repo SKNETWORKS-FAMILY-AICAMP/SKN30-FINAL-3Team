@@ -94,10 +94,7 @@ export function CalendarView() {
       />
 
       <Modal variant="large" isOpen={isOpen} onClose={() => setOpen(false)} aria-label="캘린더">
-        <ModalHeader
-          title="캘린더"
-          description="Time Keeper가 읽는 장부 일정과 직접 추가한 일정을 함께 봅니다."
-        />
+        <ModalHeader title="캘린더" />
         <ModalBody>
           <div className="calendar" data-screen-id="F4-MOD-011" data-requirement-ids="F4-CAL-01~05">
             <div className="calendar__toolbar">
