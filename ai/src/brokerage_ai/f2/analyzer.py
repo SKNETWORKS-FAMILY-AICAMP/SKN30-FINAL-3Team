@@ -8,7 +8,7 @@ from brokerage_ai.core.types import (
     StructuredGenerationRequest,
 )
 from brokerage_ai.f2.prompts import SYSTEM_PROMPT, build_user_prompt
-from brokerage_ai.f2.types import ConsultationAnalysis, LedgerType
+from brokerage_ai.f2.types import ConsultationAnalysis
 from brokerage_ai.providers.ports import LlmProvider
 
 
@@ -36,7 +36,6 @@ class LlmConsultationAnalyzer:
         self,
         *,
         transcript: str,
-        ledger_type: LedgerType,
     ) -> tuple[ConsultationAnalysis, ProviderDiagnostics]:
         request = StructuredGenerationRequest(
             route=self._route,
@@ -44,10 +43,7 @@ class LlmConsultationAnalyzer:
                 ChatMessage(role=MessageRole.SYSTEM, content=SYSTEM_PROMPT),
                 ChatMessage(
                     role=MessageRole.USER,
-                    content=build_user_prompt(
-                        transcript=transcript,
-                        ledger_type=ledger_type,
-                    ),
+                    content=build_user_prompt(transcript=transcript),
                 ),
             ),
             temperature=0,
