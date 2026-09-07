@@ -31,7 +31,11 @@ from domain.agent_execution.models import (
 logger = structlog.get_logger()
 
 # Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
-LEASE_DURATION_SECONDS = 300
+#
+# 로컬 vLLM 평가에서 후보 5장 케이스가 239초까지 갔다. 300초로는 상담 로그가 조금만 길어져도
+# 작업 중인 실행을 다른 Worker가 빼앗아 `LEASE_EXPIRED_MAX_ATTEMPTS`로 끝난다. 실제로 그렇게
+# 죽은 실행이 있었다. 회수가 늦어지는 대가로 정상 실행이 살아남는 쪽을 택한다.
+LEASE_DURATION_SECONDS = 600
 MAX_CLAIM_ATTEMPTS = 3
 
 
