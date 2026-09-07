@@ -342,6 +342,8 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
   const selectComplex = (rawValue) => {
     const name = rawValue.trim();
     setComplexError("");
+    /* 새로 고른 값이 이전 선택을 대체하므로, 아직 안 끝난 생성 요청을 saveDraft가 참조하지 않게 한다. */
+    complexCreateRef.current = null;
     if (!name) { stagePatch({ complex: "", complexId: null, duplicateCheck: false }); return; }
     const existing = findComplexOption(name);
     if (existing) {
@@ -351,23 +353,26 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
     if (!onCreateComplex) { setComplexError("단지를 추가할 수 없습니다. 매물장 메인 화면에서 먼저 등록해 주세요."); return; }
     setComplexCreating(true);
     /*
-     * saveDraft와 requestClose가 이 요청이 끝날 때까지 기다리거나 막을 수 있도록,
-     * 완료 전에 ref에 실어 둔다. saveDraft는 실패해도 진행해야 하므로 여기서
-     * 예외를 삼키고 성공 여부는 complexError로만 알린다.
+     * 이 Promise는 만들어진 단지의 patch({ complex, complexId })를 그대로 반환하거나
+     * 실패하면 reject한다. saveDraft가 draft state의 리렌더 타이밍에 기대지 않고
+     * 이 반환값으로 저장할 draft를 직접 구성하도록, 값 자체를 ref에 실어 둔다.
+     * (state 갱신은 useEffect를 거쳐야 draftRef에 닿으므로 await 재개 시점에
+     * 아직 반영되지 않았을 수 있다.)
      */
     const createPromise = (async () => {
-      try {
-        const created = await onCreateComplex({ name });
-        if (!created?.id || !created?.name) throw new Error("단지를 추가하지 못했습니다. 서버 응답이 올바르지 않습니다.");
-        stagePatch({ complex: created.name, complexId: created.id, duplicateCheck: false });
-      } catch (error) {
-        setComplexError(error?.message || "단지를 추가하지 못했습니다.");
-      } finally {
-        setComplexCreating(false);
-        if (complexCreateRef.current === createPromise) complexCreateRef.current = null;
-      }
+      const created = await onCreateComplex({ name });
+      if (!created?.id || !created?.name) throw new Error("단지를 추가하지 못했습니다. 서버 응답이 올바르지 않습니다.");
+      const patch = { complex: created.name, complexId: created.id, duplicateCheck: false };
+      stagePatch(patch);
+      return patch;
     })();
     complexCreateRef.current = createPromise;
+    createPromise
+      .catch((error) => setComplexError(error?.message || "단지를 추가하지 못했습니다."))
+      .finally(() => {
+        setComplexCreating(false);
+        if (complexCreateRef.current === createPromise) complexCreateRef.current = null;
+      });
   };
 
   /*
@@ -383,13 +388,25 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
      * 목록에 없는 단지명을 입력하면 단지 생성이 끝나기 전에는 draft.complex/complexId가
      * 아직 이전 값이다. 그 상태로 저장하면 사용자가 입력한 단지가 아니라 옛 값이 저장되거나
      * 새로 만든 단지와 세대의 참조가 어긋난다. 생성이 끝날 때까지 저장을 미룬다.
+     *
+     * 생성 Promise가 반환하는 patch로 저장할 draft를 직접 구성한다. draftRef는 state가
+     * useEffect를 거쳐야 갱신되므로, await가 재개되는 시점에 아직 반영되지 않았을 수 있어
+     * 그 값만 믿고 읽으면 옛 draft를 저장하는 경로가 남는다. 생성이 실패하면 옛 draft를
+     * 저장하지 않고 바로 멈춘다.
      */
     const pendingComplexCreate = complexCreateRef.current;
+    let pendingComplexPatch = null;
     if (pendingComplexCreate) {
       setIsSaving(true);
-      try { await pendingComplexCreate; } catch { /* 실패 메시지는 단지 생성 쪽에서 이미 보여줬다. */ }
+      try {
+        pendingComplexPatch = await pendingComplexCreate;
+      } catch (error) {
+        setIsSaving(false);
+        setSaveError(error?.message || "단지를 추가하지 못해 저장하지 않았습니다. 단지를 다시 지정한 뒤 저장해 주세요.");
+        return;
+      }
     }
-    const current = draftRef.current;
+    const current = pendingComplexPatch ? { ...draftRef.current, ...pendingComplexPatch } : draftRef.current;
     if (!current.duplicateCheck && !allowDraft) { setDuplicateBlock(true); if (pendingComplexCreate) setIsSaving(false); return; }
     const hasSensitivePattern = PROTOTYPE_ASSUMPTIONS.security.sensitivePattern.test(`${current.memo || ""} ${current.log || ""}`);
     if (hasSensitivePattern && !allowSensitive && !securityConfirmed) { setSecurityWarning("주민등록번호·계좌번호로 보이는 패턴이 있습니다. 내용을 확인한 뒤 그대로 저장할 수 있습니다."); if (pendingComplexCreate) setIsSaving(false); return; }
