@@ -120,11 +120,11 @@ def run_disabled_worker(
 
 
 def require_ai_provider(profile: str, environ: Mapping[str, str] | None = None) -> AiConfig:
-    """실행을 선점하기 전에 LLM Provider 설정이 하나 이상 있는지 확인한다."""
+    """실행을 선점하기 전에 F3가 사용할 LLM 설정이 하나 이상 있는지 확인한다."""
     config = load_ai_config(profile, environ)
-    if config.openai is None and config.vllm.sllm is None:
+    if config.openai is None and not config.llm_endpoints:
         raise ConfigurationError(
-            "WORKER_ENABLED=true requires at least one configured LLM provider"
+            "WORKER_ENABLED=true requires OpenAI or a configured general LLM endpoint"
         )
     return config
 
@@ -135,8 +135,26 @@ def _route(config: AiModelConfig) -> ModelRoute:
         provider = ProviderKind(config.provider)
     except ValueError as error:
         raise ConfigurationError("the configured AI provider is not supported") from error
+    if provider is ProviderKind.OPENAI and config.endpoint_alias is not None:
+        raise ConfigurationError("the configured openai route cannot have an endpoint alias")
+    if (
+        provider
+        in {
+            ProviderKind.VLLM,
+            ProviderKind.LLAMA_CPP,
+            ProviderKind.BEDROCK,
+        }
+        and not (config.endpoint_alias or "").strip()
+    ):
+        raise ConfigurationError(
+            f"the configured {provider.value} route requires an endpoint alias"
+        )
     try:
-        return ModelRoute(provider=provider, model=config.model_name)
+        return ModelRoute(
+            provider=provider,
+            model=config.model_name,
+            endpoint_alias=config.endpoint_alias,
+        )
     except ValidationError as error:
         raise ConfigurationError("the configured AI model route is invalid") from error
 
@@ -144,7 +162,7 @@ def _route(config: AiModelConfig) -> ModelRoute:
 def _generator_inputs(runtime: AiRuntime, config: AiModelConfig) -> tuple[LlmProvider, ModelRoute]:
     route = _route(config)
     try:
-        provider = runtime.providers.get_llm(route.provider)
+        provider = runtime.providers.get_llm(route.provider, route.endpoint_alias)
     except ProviderConfigurationError as error:
         raise ConfigurationError("the configured AI provider is not available") from error
     return provider, route

@@ -131,6 +131,19 @@ test("pull_request_target keeps executing trusted base code while configuring bo
   assert.doesNotMatch(engine, /raw_url|download_url|contents_url/);
 });
 
+test("runner passes the block-scoped policy service tier explicitly to every OpenAI call", async () => {
+  const engine = await readFile(
+    path.join(rootDir, ".github/scripts/pr-policy-review.mjs"),
+    "utf8"
+  );
+  const explicitCallArguments = engine.match(/requestServiceTier: serviceTier/g) ?? [];
+
+  assert.equal(explicitCallArguments.length, 2);
+  assert.match(engine, /requestServiceTier = "default"/);
+  assert.match(engine, /serviceTier: requestServiceTier/);
+  assert.doesNotMatch(engine, /serviceTier: policyFile\.cost/);
+});
+
 test("draft and lifecycle events route correctly", () => {
   assert.deepEqual(planForEvent({ eventName: "pull_request_target", action: "opened", pr }), {
     notifyCreated: true,

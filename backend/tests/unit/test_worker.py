@@ -21,6 +21,7 @@ from domain.agent_execution.anchor_card import GenerationBindingError
 from domain.agent_execution.models import AgentRun, AiModelConfig
 from worker import (
     WORKER_ID_MAX_LENGTH,
+    _route,
     build_bindings,
     build_worker_id,
     process_run,
@@ -111,18 +112,31 @@ def test_worker_ids_are_unique_and_fit_the_lease_column() -> None:
 
 
 def test_enabled_worker_requires_an_explicit_llm_provider() -> None:
-    with pytest.raises(ConfigurationError, match="LLM provider"):
+    with pytest.raises(ConfigurationError, match="general LLM endpoint"):
         require_ai_provider("test", {})
+
+    with pytest.raises(ConfigurationError, match="general LLM endpoint"):
+        require_ai_provider(
+            "test",
+            {
+                "AI_F2_PROVIDER_STATUS": "active",
+                "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
+                "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
+            },
+        )
 
     configured = require_ai_provider(
         "test",
         {
-            "AI_F2_PROVIDER_STATUS": "active",
-            "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
-            "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
+            "AI_LLM_ENDPOINTS": (
+                '[{"alias":"general-dev-gpu","provider":"llama_cpp",'
+                '"base_url":"http://localhost:8080/v1",'
+                '"api_key_env":"AI_GENERAL_DEV_GPU_API_KEY"}]'
+            ),
+            "AI_GENERAL_DEV_GPU_API_KEY": "secret",
         },
     )
-    assert configured.vllm.sllm is not None
+    assert configured.llm_endpoints[0].alias == "general-dev-gpu"
 
 
 def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> None:
@@ -132,6 +146,7 @@ def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> Non
             "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
             "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
+            "AI_OPENAI_API_KEY": "test-key",
         },
     )
 
@@ -153,7 +168,7 @@ def test_enabled_worker_merges_ai_local_files_without_mutating_process_environme
         encoding="utf-8",
     )
     (tmp_path / ".env").write_text(
-        "AI_VLLM_SLLM_API_KEY=personal-secret\n",
+        "AI_VLLM_SLLM_API_KEY=personal-secret\nAI_OPENAI_API_KEY=personal-openai-secret\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(ai_config_module, "AI_ROOT", tmp_path)
@@ -168,6 +183,8 @@ def test_enabled_worker_merges_ai_local_files_without_mutating_process_environme
     assert config.vllm.sllm is not None
     assert config.vllm.sllm.api_key is not None
     assert config.vllm.sllm.api_key.get_secret_value() == "personal-secret"
+    assert config.openai is not None
+    assert config.openai.api_key.get_secret_value() == "personal-openai-secret"
     assert "AI_VLLM_SLLM_API_KEY" not in os.environ
 
 
@@ -251,9 +268,11 @@ class FakeProvider:
 
 
 class FakeRegistry:
-    def get_llm(self, kind: ProviderKind) -> LlmProvider:
+    def get_llm(self, kind: ProviderKind, endpoint_alias: str | None = None) -> LlmProvider:
         if kind is not ProviderKind.VLLM:
             raise AssertionError("unexpected provider")
+        if endpoint_alias != "general-dev-gpu":
+            raise AssertionError("unexpected endpoint alias")
         return cast(LlmProvider, FakeProvider())
 
 
@@ -270,7 +289,63 @@ def _model_config(capability: str, config_id: int) -> AiModelConfig:
         config_version=1,
         provider="vllm",
         model_name="prototype-model",
+        endpoint_alias="general-dev-gpu",
     )
+
+
+def test_db_model_routes_enforce_provider_endpoint_contract() -> None:
+    openai = AiModelConfig(
+        brokerage_id=1,
+        capability="POSITION_CARD",
+        config_key="local-openai",
+        config_version=1,
+        provider="openai",
+        model_name="gpt-5.6-luna",
+    )
+    llama_cpp = AiModelConfig(
+        brokerage_id=1,
+        capability="POSITION_CARD",
+        config_key="dev-llama",
+        config_version=1,
+        provider="llama_cpp",
+        model_name="qwen-gguf",
+        endpoint_alias="general-dev-gpu",
+    )
+    bedrock = AiModelConfig(
+        brokerage_id=1,
+        capability="BROKERAGE_JUDGMENT",
+        config_key="dev-bedrock-gpt56-luna",
+        config_version=1,
+        provider="bedrock",
+        model_name="global.openai.gpt-5.6-luna",
+        endpoint_alias="general-dev-bedrock",
+    )
+
+    assert _route(openai).endpoint_alias is None
+    assert _route(llama_cpp).provider is ProviderKind.LLAMA_CPP
+    assert _route(llama_cpp).endpoint_alias == "general-dev-gpu"
+    assert _route(bedrock).provider is ProviderKind.BEDROCK
+    assert _route(bedrock).endpoint_alias == "general-dev-bedrock"
+
+    with pytest.raises(ConfigurationError, match="vllm route requires"):
+        _route(
+            AiModelConfig(
+                brokerage_id=1,
+                capability="POSITION_CARD",
+                config_key="invalid-vllm",
+                config_version=1,
+                provider="vllm",
+                model_name="qwen-bnb",
+            )
+        )
+    with pytest.raises(ConfigurationError, match="openai route cannot have"):
+        _route(openai.model_copy(update={"endpoint_alias": "general-dev-gpu"}))
+    with pytest.raises(ConfigurationError, match="llama_cpp route requires"):
+        _route(llama_cpp.model_copy(update={"endpoint_alias": None}))
+    with pytest.raises(ConfigurationError, match="bedrock route requires"):
+        _route(bedrock.model_copy(update={"endpoint_alias": "  "}))
+    with pytest.raises(ConfigurationError, match="provider is not supported"):
+        _route(bedrock.model_copy(update={"provider": "unknown-provider"}))
 
 
 def test_bindings_use_separate_capabilities_and_explicit_synthetic_mode(

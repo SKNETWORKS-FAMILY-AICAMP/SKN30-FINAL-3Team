@@ -3,8 +3,9 @@
 --
 -- ## 이 파일이 만드는 것
 --
--- 합성 사무소 1곳, 개발 사용자 1명, AI 모델 설정 2건(POSITION_CARD·BROKERAGE_JUDGMENT),
--- 단지 5개, 세대 36개, 인물 87명, 매물 36건, 구입장 48건, 상담 로그 169건.
+-- 합성 사무소 1곳, 개발 사용자 1명, 단지 5개, 세대 36개, 인물 87명, 매물 36건,
+-- 구입장 48건, 상담 로그 169건. AI 모델 설정은 이 파일 다음에 선택한
+-- model-profiles/*.sql 한 개가 만든다.
 --
 -- ## 이 파일이 만들지 않는 것
 --
@@ -29,9 +30,9 @@
 --
 -- ## 재실행
 --
--- 001_F3_SYNTHETIC_RESET.sql 을 먼저 돌린 뒤 이 파일을 적용한다. 순서대로 몇 번을
--- 반복해도 같은 상태가 된다. seed 는 migration 실행기가 관리하지 않으므로 transaction 을
--- 이 파일이 직접 연다.
+-- 001_F3_SYNTHETIC_RESET.sql 을 먼저 돌리고 이 파일과 허용된 model profile 한 개를 적용한다.
+-- 순서대로 몇 번을 반복해도 같은 상태가 된다. seed 는 migration 실행기가 관리하지 않으므로
+-- transaction 을 이 파일이 직접 연다.
 --
 -- ## 케이스 설계 (기대 결과)
 --
@@ -81,37 +82,6 @@ WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
       SELECT 1 FROM app_user u
       WHERE u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
   );
-
-
--- ── AI 모델 설정 ─────────────────────────────────────────────────────────────
---
--- Worker 는 모델명을 하드코딩하지 않고 사무소별 활성 설정에서 찾는다. 두 capability 가
--- 모두 있어야 앵커 카드 생성과 중개 판정이 진행된다.
---
--- provider 와 model_name 은 팀에서 사용이 허용된 값으로 바꿔도 된다. 구조화 출력을
--- 지원하는 모델이어야 한다. API Key 는 여기에 넣지 않고 ai/.env 에 둔다.
-
-INSERT INTO ai_model_config (
-    brokerage_id, capability, config_key, config_version,
-    provider, model_name, parameters, is_active, created_by
-)
-SELECT
-    t.brokerage_id,
-    s.capability,
-    'f3-synthetic',
-    1,
-    'openai',
-    'gpt-4o-mini',
-    '{}'::jsonb,
-    TRUE,
-    t.user_id
-FROM (
-    SELECT b.id AS brokerage_id, u.id AS user_id
-    FROM brokerage b
-    JOIN app_user u ON u.brokerage_id = b.id AND u.login_id = 'f3_synthetic_dev'
-    WHERE b.name = 'F3_SYNTHETIC 합성중개사무소'
-) t
-CROSS JOIN (VALUES ('POSITION_CARD'), ('BROKERAGE_JUDGMENT')) AS s(capability);
 
 
 -- ── 단지 ─────────────────────────────────────────────────────────────────────
@@ -740,8 +710,8 @@ CROSS JOIN (
         ('L1', 'P_OWNER1', 12, 'CALL', 'INBOUND', 'CONNECTED', 'LANDLORD', 1,
          '28.3억까지는 조정해 줄 수 있다. 그 아래로는 안 한다고 못 박음.'),
         -- 부재중 로그를 가장 최신에 두지 않는다. 프롬프트는 최신 진술을 우선하므로 마지막
-        -- 로그가 불통 기록이면 모델이 의향 자체를 철회로 읽는다. 실제로 gpt-4o-mini 가
-        -- intent 를 WITHDRAWN 으로 판정했다. 불통은 중간에 두고 마지막은 진술로 끝낸다.
+        -- 로그가 불통 기록이면 모델이 의향 자체를 철회로 읽을 수 있다. 불통은 중간에 두고
+        -- 마지막은 진술로 끝낸다. 특정 모델의 등급·의향 출력을 seed 기대값으로 고정하지 않는다.
         ('L1', 'P_OWNER2', 8, 'CALL', 'OUTBOUND', 'NO_ANSWER', 'LANDLORD', 2,
          '부재중. 문자 발송. 공동명의자 동의 확인 필요.'),
         ('L1', 'P_OWNER1', 2, 'CALL', 'OUTBOUND', 'CONNECTED', 'LANDLORD', 1,

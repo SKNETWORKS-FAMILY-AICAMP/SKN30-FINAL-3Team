@@ -116,3 +116,71 @@ requirements:
     tests:
       - frontend/tests/time-keeper.test.ts
       - frontend/tests/time-keeper-dismissed.test.ts
+  - id: F4-CAL-01
+    summary: 캘린더 일정 CRUD. F4가 소유한 calendar_event 테이블
+    implementation:
+      - docs/db/migrate/018_CREATE_CALENDAR.sql
+      - backend/src/domain/calendar/models.py
+      - backend/src/domain/calendar/repository.py
+      - backend/src/domain/calendar/service.py
+      - backend/src/api/calendar.py
+      - backend/src/api/schemas/calendar.py
+      - frontend/src/features/calendar/api/httpTransport.ts
+      - frontend/src/features/calendar/hooks/useCalendarEvents.ts
+      - frontend/src/features/calendar/CalendarEventModal.tsx
+    tests:
+      - backend/tests/api/test_calendar.py
+      - backend/tests/api/test_calendar_delete_routes.py
+      - frontend/tests/calendar.test.ts
+  - id: F4-CAL-02
+    summary: row_version 낙관적 잠금으로 수정·삭제 충돌을 409로 거절
+    implementation:
+      - backend/src/domain/calendar/repository.py
+      - backend/src/domain/calendar/service.py
+    tests:
+      - backend/tests/api/test_calendar.py
+      - backend/tests/api/test_calendar_delete_routes.py
+  - id: F4-CAL-04
+    summary: 종류는 고정 열거형이 아닌 사용자 입력 문자열
+    implementation:
+      - backend/src/domain/calendar/models.py
+      - frontend/src/features/calendar/model/dto.ts
+    tests:
+      - backend/tests/api/test_calendar.py
+      - frontend/tests/calendar.test.ts
+  - id: F4-CAL-05
+    summary: Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 갈래로 포함
+    implementation:
+      - backend/src/domain/time_keeper/repository.py
+      - backend/src/domain/time_keeper/service.py
+      - backend/src/domain/time_keeper/models.py
+      - backend/src/api/schemas/time_keeper.py
+    tests:
+      - backend/tests/api/test_time_keeper_calendar_events.py
+  - id: F4-CAL-06
+    summary: 캘린더에서 온 행은 제목을 대상 이름으로 세운다
+    implementation:
+      - frontend/src/features/timeKeeper/model/viewModel.ts
+    tests:
+      - frontend/tests/time-keeper.test.ts
+  - id: F4-CAL-07
+    summary: 캘린더에서 온 행은 "연락처 없음" 같은 장부 전용 문구를 그리지 않는다
+    implementation:
+      - frontend/src/features/timeKeeper/AgendaList.tsx
+  - id: F4-CAL-09
+    summary: 상단바 별도 진입점이 월간 그리드 창을 연다
+    implementation:
+      - frontend/src/AppShell.jsx
+      - frontend/src/features/calendar/CalendarView.tsx
+  - id: F4-CAL-10
+    summary: 월간 그리드는 캘린더 일정을 직접 읽고 장부 읽기 전용 일정만 겹쳐 그린다
+    implementation:
+      - frontend/src/features/calendar/CalendarView.tsx
+      - frontend/src/features/calendar/model/viewModel.ts
+    tests:
+      - frontend/tests/calendar.test.ts
+  - id: F4-CAL-11
+    summary: 날짜 칸의 "+"가 생성 폼을, 캘린더 일정 칩이 수정 폼을 연다
+    implementation:
+      - frontend/src/features/calendar/CalendarView.tsx
+      - frontend/src/features/calendar/CalendarEventModal.tsx

@@ -1,0 +1,104 @@
+/* 캘린더 창의 본문. 모달이 테두리와 여백을 이미 갖고 있어 여기서는 배경만 비운다. */
+.calendar { display: flex; flex-direction: column; gap: 10px; }
+
+.calendar__toolbar { display: flex; align-items: center; gap: 6px; }
+.calendar__month-label {
+  min-width: 110px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendar__state { margin: 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+.calendar__state--error { color: #b91c1c; }
+.calendar__retry {
+  padding: 0;
+  color: #0066cc;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.calendar__retry:focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
+
+.calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 84px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+.calendar__cell--outside { background: #f8fafc; color: #94a3b8; }
+.calendar__cell--today { border-color: #0066cc; box-shadow: inset 0 0 0 1px #0066cc; }
+
+.calendar__cell-header { display: flex; align-items: center; justify-content: space-between; }
+.calendar__cell-date { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.calendar__add {
+  padding: 0 4px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.4;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.calendar__add:hover { background: #f1f5f9; }
+.calendar__add:focus-visible { outline: 2px solid #0066cc; outline-offset: 1px; }
+
+.calendar__items { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+.calendar__item {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-radius: 3px;
+}
+.calendar__item--ledger { padding: 0 4px; color: #475569; background: #f1f5f9; }
+.calendar__item--event { padding: 0; }
+
+.calendar__item-button {
+  width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  color: #0c4a6e;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  background: #e0f2fe;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.calendar__item-button:hover { background: #bae6fd; }
+.calendar__item-button:focus-visible { outline: 2px solid #0066cc; outline-offset: 1px; }
+
+.calendar__form-error { margin: 10px 0 0; color: #b91c1c; font-size: 13px; }
+
+@media (max-width: 640px) {
+  .calendar__cell { min-height: 64px; }
+}

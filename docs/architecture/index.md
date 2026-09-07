@@ -11,7 +11,7 @@ updated: 2026-08-18
 - **관련 요구사항:** [요구사항 인덱스](../requirements/index.md)
 - **관련 승인 ADR:** [ADR-0006: AI–Backend 실행 경계](../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md) · [ADR-0008: 개발·시연 런타임과 전달](../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md)
 - **이 문서가 소유하지 않는 상세:** 기능 요구사항, 승인된 프로젝트 공통 결정의 원문, 모듈 내부 폴더·클래스 구조
-- **탐색:** [인프라 개요](infra/overview.md) · [배포·운영](infra/deployment-and-operations.md) · [F2 개요](f2/overview.md) · [F2 온라인 실행](f2/online-runtime.md) · [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) · [F3 개요](f3/overview.md) · [F3 온라인 실행](f3/online-runtime.md) · [F3 오프라인 데이터·평가](f3/offline-data-evaluation.md)
+- **탐색:** [인프라 개요](infra/overview.md) · [배포·운영](infra/deployment-and-operations.md) · [F2 개요](f2/overview.md) · [F2 온라인 실행](f2/online-runtime.md) · [F2 프론트엔드 필드 반영](f2/frontend-voice-field-population.md) · [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) · [F3 개요](f3/overview.md) · [F3 온라인 실행](f3/online-runtime.md) · [F3 오프라인 데이터·평가](f3/offline-data-evaluation.md)
 
 ## 목적과 적용 범위
 
@@ -49,6 +49,7 @@ updated: 2026-08-18
 | [배포·운영 구조](infra/deployment-and-operations.md) | revision 선택부터 Build·승인·배포·롤백과 비용 운영을 확인할 때 | CodePipeline V2, CodeBuild, CodeDeploy, RunPod 운영, 관측·종료 절차 |
 | [F2 개요](f2/overview.md) | F2 전체 흐름과 팀별 책임을 처음 파악할 때 | 범위, 시스템 구성, 온라인·오프라인 관계, 파일럿 가정 |
 | [F2 온라인 실행](f2/online-runtime.md) | 업로드부터 사용자 승인 저장까지 구현 흐름을 논의할 때 | 작업 상태, Backend–AI 경계, 진행 알림, 복구, 저장 일관성 |
+| [F2 프론트엔드 필드 반영](f2/frontend-voice-field-population.md) | 현재 프론트엔드에서 음성 분석 결과가 매물장·구입장 필드로 들어가는 과정을 확인할 때 | 진입, 업로드, 장부 판정, 필드 매핑, draft 반영, 최종 저장과 구현 제약 |
 | [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) | 평가셋과 모델 개선·승격 기준을 논의할 때 | 합성 데이터, 분할, 평가 계층, 버전, 피드백 루프 |
 | [F3 개요](f3/overview.md) | F3 전체 흐름과 팀별 책임을 처음 파악할 때 | 핵심 교차 판정, 모듈 경계, SQL 후보와 하이브리드 로그 검색 |
 | [F3 온라인 실행](f3/online-runtime.md) | 자동 트리거부터 최종 판정까지 구현 흐름을 논의할 때 | 영속 작업, 단계 공개, AI facade·Backend capability, 캐시·복구 |

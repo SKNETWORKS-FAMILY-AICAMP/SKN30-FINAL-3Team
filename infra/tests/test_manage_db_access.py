@@ -226,8 +226,11 @@ class ManageDbAccessTest(unittest.TestCase):
         applied = mock.MagicMock(returncode=0)
         verified = mock.MagicMock(
             returncode=0,
-            stdout="\n".join(f"check-{index}|1|1|PASS" for index in range(29))
-            + "\n",
+            stdout="\n".join(
+                f"check-{index}|1|1|PASS"
+                for index in range(MODULE.F3_SEED_VERIFY_CHECK_COUNT)
+            )
+            + "\nselected-profile|dev-bedrock-gpt56-luna\n",
         )
 
         with (
@@ -245,17 +248,24 @@ class ManageDbAccessTest(unittest.TestCase):
                 MODULE.subprocess, "run", side_effect=[applied, verified]
             ) as run,
         ):
-            MODULE.seed_f3(settings, apply=True)
+            MODULE.seed_f3(
+                settings, apply=True, model_profile="dev-bedrock-gpt56-luna"
+            )
 
         port_forward.assert_called_once_with(
             direct, "i-0123456789abcdef0", self.target(), 15432
         )
         apply_command = run.call_args_list[0].args[0]
         verify_command = run.call_args_list[1].args[0]
-        self.assertEqual(apply_command.count("-f"), 2)
+        self.assertEqual(apply_command.count("-f"), 3)
         self.assertIn(str(MODULE.F3_SEED_RESET), apply_command)
         self.assertIn(str(MODULE.F3_SEED_DATA), apply_command)
+        self.assertIn(
+            str(MODULE.F3_MODEL_PROFILE_FILES["dev-bedrock-gpt56-luna"]),
+            apply_command,
+        )
         self.assertIn(str(MODULE.F3_SEED_VERIFY), verify_command)
+        self.assertIn(MODULE.F3_SELECTED_PROFILE_QUERY, verify_command)
         environment = run.call_args_list[0].kwargs["env"]
         self.assertEqual(environment["PGPASSWORD"], "signed/token")
         self.assertEqual(environment["PGHOSTADDR"], "127.0.0.1")
@@ -265,13 +275,24 @@ class ManageDbAccessTest(unittest.TestCase):
         self.assertNotIn("signed/token", " ".join(verify_command))
 
     def test_seed_f3_verification_rejects_fail_or_wrong_count(self) -> None:
-        passing = "\n".join(f"check-{index}|1|1|PASS" for index in range(29))
-        MODULE.verify_f3_seed_output(passing)
+        passing = "\n".join(
+            f"check-{index}|1|1|PASS"
+            for index in range(MODULE.F3_SEED_VERIFY_CHECK_COUNT)
+        ) + "\nselected-profile|dev-bedrock-gpt56-luna"
+        MODULE.verify_f3_seed_output(passing, "dev-bedrock-gpt56-luna")
 
         with self.assertRaisesRegex(MODULE.ToolError, "reported FAIL"):
-            MODULE.verify_f3_seed_output(passing.replace("|PASS", "|FAIL", 1))
+            MODULE.verify_f3_seed_output(
+                passing.replace("|PASS", "|FAIL", 1),
+                "dev-bedrock-gpt56-luna",
+            )
         with self.assertRaisesRegex(MODULE.ToolError, "unexpected check count"):
-            MODULE.verify_f3_seed_output("check|1|1|PASS")
+            MODULE.verify_f3_seed_output(
+                "check|1|1|PASS\nselected-profile|dev-bedrock-gpt56-luna",
+                "dev-bedrock-gpt56-luna",
+            )
+        with self.assertRaisesRegex(MODULE.ToolError, "selected model profile"):
+            MODULE.verify_f3_seed_output(passing, "local-openai")
 
     def test_ensure_role_formats_password_as_literal(self) -> None:
         executed: list[tuple[object, ...]] = []

@@ -143,6 +143,30 @@ def _entry(
 ) -> AgendaEntry | None:
     remaining = days_until_due(row.due_date, as_of)
 
+    if row.event_id is not None:
+        # 캘린더 갈래는 조인 없이 union 행 자체에 표시값이 있어 별도 조회가 필요 없다. 연결된
+        # 장부 대상이 없으므로 연락 대상도 항상 비어 있다.
+        return AgendaEntry(
+            category=row.category,
+            due_date=row.due_date,
+            days_until_due=remaining,
+            unit_id=None,
+            listing_id=None,
+            complex_name=None,
+            building_number=None,
+            unit_number=None,
+            tenancy_status=None,
+            requirement_id=None,
+            demand_type=None,
+            requirement_status=None,
+            assigned_user_id=None,
+            last_contact_at=None,
+            contacts=(),
+            event_id=row.event_id,
+            title=row.title,
+            location=row.location,
+        )
+
     if row.unit_id is not None:
         unit = units.get(row.unit_id)
         if unit is None:
@@ -171,6 +195,9 @@ def _entry(
                 )
                 for relation, party in relations_by_unit.get(unit.unit_id, [])
             ),
+            event_id=None,
+            title=None,
+            location=None,
         )
 
     if row.requirement_id is None:  # pragma: no cover - union의 분기가 모두 비는 행은 없다
@@ -205,4 +232,7 @@ def _entry(
                 contacts=tuple(contacts.get(party.id or 0, [])),
             ),
         ),
+        event_id=None,
+        title=None,
+        location=None,
     )
