@@ -28,7 +28,7 @@ ai/eval/f2_sLLM/
 ## 평가 데이터 형식
 
 각 줄이 하나의 JSON 객체인 JSONL 파일을 사용한다. 현재 평가는 상담 유형만 비교하는
-`classification`과 기존 분류·필드 추출을 함께 비교하는 `full` 두 가지 모드를 지원한다.
+`classification`과 분류·유형별 필드 추출을 함께 비교하는 `full` 두 가지 모드를 지원한다.
 
 ### 상담 유형 분류
 
@@ -70,7 +70,10 @@ ai/eval/f2_sLLM/
 }
 ```
 
-- `sample_id`, `transcript`, `ledger_type`, `expected`는 필수다. `full`은 기존 행의 장부 불일치까지 검증한다.
+- `sample_id`, `transcript`, `ledger_type`, `expected`는 원천 데이터의 필수값이다.
+  `ledger_type`은 기존 정답의 정합성 확인에만 쓰며 모델 입력에는 넣지 않는다.
+- 기존 장부와 상담 유형이 불일치한 행은 필드 정답이 비어 있으므로 단일 입력 자동 장부 추천
+  모델 평가에서 제외한다. 장부 추천과 상세 화면의 불일치 보호는 pipeline 테스트가 검증한다.
 - `consultation_type`은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다.
 - `fields`에는 음성에서 확인된 값만 넣는다.
 - 합성 데이터도 정답과 근거를 사람이 검수한 뒤 평가 릴리스로 발행한다.

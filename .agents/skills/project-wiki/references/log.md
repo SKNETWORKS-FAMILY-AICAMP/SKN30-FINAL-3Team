@@ -6,6 +6,7 @@ updated: 2026-09-07
 # 위키 변경 로그
 
 - 2026-09-07: 구입장 생성 계약(`POST /api/v1/property-requirements`)에 `new_party`·`privacy_consent`를 추가해, 인물 검색 화면이 없는 클라이언트가 새 손님의 이름·전화·동의를 요청 한 번에 실어 인물까지 함께 만들 수 있게 했다(매물장 `parties`와 같은 구조). 기존 `party_id` 경로는 유지하되 지금 화면은 쓰지 않는다. `new_party` 사용 시 동의가 없으면 `PRIVACY_CONSENT_REQUIRED`로 거절하고 인물을 만들지 않는다. F1 구입장의 "새 손님 추가" 저장이 항상 실패하던 문제(인물 생성 경로 부재)를 해소했다.
+- 2026-09-07: ADR-0028을 승인해 F2 신규 음성 접수에서 현재 장부를 생략하고 STT·sLLM 분석 한 번으로 상담 유형과 유형별 필드를 추출한 뒤, pipeline이 매도의뢰→매물장·매수문의→구입장을 추천하도록 변경했다. 모델 입력은 STT 원문만 포함하고 유형별 허용 필드 경계는 pipeline 검증이 강제한다. 기존 상세는 `current_ledger_type`과 추천 장부의 불일치 보호를 유지하며, 응답 `ledger_type`은 추천 대상 장부를 뜻한다. OQ-010과 Frontend 2회 분석 결정을 종료했다.
 - 2026-09-07: ADR-0026·0027의 부분 대체 범위에 renderer의 OpenAI key 강제 제거와 범용 endpoint 배포 설정 주입을 명시하고, 해당 항목의 현재 구현 상태는 ADR-0027을 따르도록 연결했다.
 - 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
 - 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
