@@ -419,7 +419,7 @@ def bootstrap(environment: dict[str, str] | None = None) -> Release:
     source = dict(os.environ if environment is None else environment)
     release_id = _required(source, "F2_SLLM_RELEASE_ID")
     expected_sha256 = _required(source, "F2_SLLM_BUNDLE_SHA256")
-    url = _required(source, "F2_SLLM_BUNDLE_URL")
+    url = source.get("F2_SLLM_BUNDLE_URL", "")
     if (
         RELEASE_ID.fullmatch(release_id) is None
         or SHA256.fullmatch(expected_sha256) is None
@@ -428,10 +428,23 @@ def bootstrap(environment: dict[str, str] | None = None) -> Release:
     destination = RELEASE_ROOT / release_id
     if destination.exists():
         try:
-            manifest = json.loads((destination / "release.json").read_text())
+            manifest_bytes = (destination / "release.json").read_bytes()
+            receipt = _json_object(
+                destination / "verified-bundle.json", "cached bundle receipt"
+            )
+            if receipt != {
+                "bundle_sha256": expected_sha256,
+                "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+            }:
+                raise BootstrapError(
+                    "cached release does not match the verified bundle; recreate Pod"
+                )
+            manifest = json.loads(manifest_bytes)
         except (OSError, json.JSONDecodeError) as error:
             raise BootstrapError("cached release manifest is invalid") from error
         return _validate(manifest, release_id, destination)
+    if not url:
+        raise BootstrapError("F2_SLLM_BUNDLE_URL is required for an uncached release")
     RELEASE_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=RELEASE_ROOT) as temporary:
         archive_path = Path(temporary) / "bundle.tar.gz"
@@ -439,6 +452,16 @@ def bootstrap(environment: dict[str, str] | None = None) -> Release:
         _download(url, expected_sha256, archive_path)
         manifest = _extract(archive_path, stage)
         release = _validate(manifest, release_id, stage)
+        (stage / "verified-bundle.json").write_text(
+            json.dumps(
+                {
+                    "bundle_sha256": expected_sha256,
+                    "manifest_sha256": hashlib.sha256(
+                        (stage / "release.json").read_bytes()
+                    ).hexdigest(),
+                }
+            )
+        )
         stage.rename(destination)
     return Release(
         release_id,

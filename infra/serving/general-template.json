@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "skn30-general-serving-v1",
+  "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:REPLACE_AFTER_FIRST_PUBLISH",
+  "container_disk_gb": 80,
+  "ports": ["8000/http"],
+  "env": {
+    "AI_GENERAL_API_KEY": "{{ RUNPOD_SECRET_AI_GENERAL_API_KEY }}"
+  },
+  "docker_start_cmd": "python,/opt/general/general_runtime.py"
+}
