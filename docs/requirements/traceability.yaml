@@ -33,6 +33,16 @@ requirements:
     implementation:
       - frontend/src/AppShell.jsx
       - frontend/src/features/DetailWorkspace.jsx
+  - id: F1-SR-01
+    summary: 동-호 호출 시 매물장 그리드에서 해당 행을 스크롤·강조(상세 팝업은 열지 않음)
+    implementation:
+      - frontend/src/AppShell.jsx
+      - frontend/src/features/LedgerGrid.jsx
+  - id: F1-DM-06
+    summary: 구입장 그리드에서 손님 행을 선택해 일괄 삭제
+    implementation:
+      - frontend/src/AppShell.jsx
+      - frontend/src/features/BuyerLedgerGrid.jsx
   - id: F4-TK-02
     summary: 세대·손님의 임대차 만기를 일정 목록에 포함
     implementation:
