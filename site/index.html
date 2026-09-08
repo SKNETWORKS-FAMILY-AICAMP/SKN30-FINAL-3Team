@@ -1,7 +1,7 @@
 <!DOCTYPE html><html class="light" lang="ko" style=""><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
-<title>Propeller AI - 부동산 AI 비서</title>
+<title>부동산 AI 비서</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
@@ -121,14 +121,14 @@
 <!-- TopNavBar -->
 <nav class="bg-background/80 dark:bg-background/80 backdrop-blur-md fixed top-0 w-full z-50 border-b border-outline-variant/30 dark:border-outline/20">
 <div class="flex justify-between items-center h-20 px-margin-desktop max-w-7xl mx-auto">
-<div class="font-display text-headline-md text-on-background dark:text-inverse-on-surface tracking-tight"><img src="assets/logo-header.png" alt="집크크 로고" class="h-14 w-auto object-contain"></div>
+<div class="font-display text-headline-md text-on-background dark:text-inverse-on-surface tracking-tight"><a href="index.html" aria-label="메인 페이지로 이동"><img src="assets/logo-header.png" alt="집크크" class="h-14 w-auto object-contain"></a></div>
 <div class="hidden md:flex gap-gutter items-center">
-<a class="font-label-md text-label-md text-secondary dark:text-secondary-fixed font-bold border-b-2 border-secondary hover:opacity-90 hover:scale-[0.98] transition-all" href="#">Features</a>
-<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">How it works</a>
+<a class="font-label-md text-label-md text-secondary dark:text-secondary-fixed font-bold border-b-2 border-secondary hover:opacity-90 hover:scale-[0.98] transition-all" href="index.html">Features</a>
+<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="page-1.html">How it works</a>
 <a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">Pricing</a>
 <a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">Contact Us</a>
 </div>
-<button class="hidden md:block bg-secondary text-on-secondary px-sm py-xs rounded-lg font-label-md hover:bg-secondary-container transition-colors">Start Free</button>
+<button class="hidden md:block bg-secondary text-on-secondary px-sm py-xs rounded-lg font-label-md hover:bg-secondary-container transition-colors">무료로 시작하기</button>
 <button class="md:hidden text-on-surface">
 <span class="material-symbols-outlined">menu</span>
 </button>
@@ -138,7 +138,7 @@
 <!-- Hero Section -->
 <section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-24 text-center">
 <h1 class="font-display text-display text-on-background mb-sm">통화가 끝나면, 장부 정리가 시작됩니다</h1>
-<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl mx-auto mb-lg">공인중개사를 위한 가장 똑똑한 AI 상담 비서, 프로펠러 AI. 통화 기록부터 장부 저장까지 한 번에.</p>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl mx-auto mb-lg">공인중개사를 위한 가장 똑똑한 AI 상담 비서, 집크크 AI. 통화 기록부터 장부 저장까지 한 번에.</p>
 <div class="flex flex-col md:flex-row justify-center items-center gap-xs md:gap-gutter mt-xl">
 <!-- Process Indicators -->
 <div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
@@ -177,8 +177,70 @@
 <span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Recording</span>
 <h3 class="font-headline-md text-headline-md text-on-background mb-sm">상담 내용을 장부에 자동 기록</h3>
 <p class="font-body-md text-body-md text-on-surface-variant mb-md">통화 내용을 텍스트로 변환하고 핵심 정보를 구조화하여, 각 항목에 맞는 내용을 장부에 자동으로 입력합니다.</p>
-<div class="bg-surface-dim h-48 rounded-lg relative overflow-hidden">
-<img class="object-cover w-full h-full opacity-80 mix-blend-multiply" data-alt="A modern software interface showing a real-time audio waveform being transcribed into text on a clean, light-mode background with navy blue and bright mint green accents. The design is sleek, professional, and corporate, emphasizing information density." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1oF9DAkf5HY9ygY8ZVSVXp0EBLxA_gHLVzkcneW25N-kvUwV2nPdzvkNSXszmb-5EB5ExTI1uqBM6zwxLJ7JZNu7H5VveUOUSeHVEuJjup7O2hVuG6EaOWl-vP1_h5VPvfc2jmWBsIljQf3vZtU17HtEvr8ujIOlHE4POroYbzgRImcMzEeNH0sAOcTCNhvAU0g9S1C2sJ9T7EFj2dc65GqhmsagtwJzkFbtziyyDJOLlpbpLOp9mFQ">
+<div class="bg-surface-container-low rounded-lg p-sm border border-outline-variant/30 flex flex-col justify-between overflow-hidden shadow-inner relative">
+  <style>
+    @keyframes soundwave {
+      0%, 100% { height: 8px; opacity: 0.35; }
+      50% { height: 38px; opacity: 1; }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .waveform-bar {
+      animation: soundwave 1.3s ease-in-out infinite alternate;
+    }
+  </style>
+  <!-- Top bar: Live recording pill & status -->
+  <div class="flex items-center justify-between pb-xs border-b border-outline-variant/20">
+    <div class="flex items-center gap-xs">
+      <span class="flex h-2.5 w-2.5 relative">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-error"></span>
+      </span>
+      <span class="font-label-sm text-label-sm text-error font-bold tracking-tight">REC 03:24</span>
+      <span class="bg-error-container text-on-error-container text-label-sm px-xs py-0.5 rounded font-label-sm">실시간 녹취 중</span>
+    </div>
+    <div class="flex items-center gap-xs text-secondary font-label-sm font-semibold">
+      <span class="material-symbols-outlined text-body-md animate-spin">sync</span>
+      <span class="">AI 분석 대기 0초</span>
+    </div>
+  </div>
+
+  <!-- Middle: Dynamic Audio Waveform Visualizer -->
+  <div class="py-xs flex items-center justify-center gap-1.5 h-14 bg-surface-container-lowest/70 rounded px-sm border border-outline-variant/20 my-xs">
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.05s; height: 16px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.2s; height: 26px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.4s; height: 34px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-tertiary-fixed-dim" style="animation-delay: 0.15s; height: 18px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.5s; height: 38px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.3s; height: 28px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-tertiary-fixed-dim" style="animation-delay: 0.65s; height: 14px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.1s; height: 32px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.45s; height: 22px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-tertiary-fixed-dim" style="animation-delay: 0.35s; height: 36px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.55s; height: 16px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.25s; height: 28px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-tertiary-fixed-dim" style="animation-delay: 0.6s; height: 32px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.18s; height: 12px;"></div>
+    <div class="waveform-bar w-1 rounded-full bg-secondary" style="animation-delay: 0.42s; height: 24px;"></div>
+  </div>
+
+  <!-- Bottom: Live STT Bubble & Extracted AI Tag Pills -->
+  <div class="bg-surface-container-lowest p-xs rounded border border-outline-variant/30 flex flex-col gap-1">
+    <div class="flex items-center gap-xs text-body-sm font-medium text-on-surface">
+      <span class="text-secondary font-bold font-label-sm">손님</span>
+      <span class="text-on-surface-variant font-body-sm truncate">“방배동 34평형 전세 15억 이하로 보고 있어요.”</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-1 mt-0.5">
+      <span class="bg-surface-container text-secondary text-label-sm px-1.5 py-0.5 rounded font-label-md border border-secondary/20">[단지: 방배동]</span>
+      <span class="bg-surface-container text-secondary text-label-sm px-1.5 py-0.5 rounded font-label-md border border-secondary/20">[평형: 34평형]</span>
+      <span class="bg-tertiary-container text-on-tertiary-container text-label-sm px-1.5 py-0.5 rounded font-label-md border border-tertiary-fixed-dim/30 font-semibold">[희망가: 전세 15억]</span>
+      <span class="ml-auto text-label-sm text-secondary font-semibold flex items-center gap-0.5">
+        <span class="material-symbols-outlined text-label-sm">check_circle</span> 자동 추출 완료
+      </span>
+    </div>
+  </div>
 </div>
 </div>
 <!-- Card 2 -->
@@ -236,7 +298,7 @@
 <footer class="bg-on-primary-fixed dark:bg-surface-container-lowest w-full py-xl mt-xl border-t border-outline-variant/20">
 <div class="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-desktop max-w-7xl mx-auto">
 <div class="col-span-1 md:col-span-2">
-<div class="font-display text-headline-md text-primary-fixed-dim dark:text-primary mb-sm"><img src="assets/logo-footer.png" alt="집크크 로고" class="h-12 w-auto object-contain mb-sm"></div>
+<div class="font-display text-headline-md text-primary-fixed-dim dark:text-primary mb-sm"><img src="assets/logo-footer.png" alt="집크크" class="h-12 w-auto object-contain mb-sm"></div>
 <p class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant mb-md">
                     © 2026 ZIPKEKE. All rights reserved.
                 </p>
@@ -257,6 +319,10 @@
 </div>
 </div>
 </footer>
+
+
+
+
 
 
 

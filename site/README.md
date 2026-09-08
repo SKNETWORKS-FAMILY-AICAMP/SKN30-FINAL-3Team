@@ -10,6 +10,7 @@ ZIPKEKE(Propeller AI) 제품 소개용 정적 랜딩 페이지와 그 생성 자
 | 경로 | 내용 |
 |---|---|
 | [index.html](index.html) | 현재 랜딩 페이지. Tailwind CDN 기반 단일 HTML. 빌드 없이 브라우저에서 바로 연다 |
+| [page-1.html](page-1.html) | 메인 페이지의 `How it works` 링크로 여는 후속 페이지 |
 | [prompts/how-it-works.md](prompts/how-it-works.md) | 상단 내비게이션 `How it works` 페이지를 UI 생성 AI로 만들기 위한 프롬프트 |
 | [assets/](assets/) | 집크크 로고와 에이전트 아이콘. 아래 표 참고 |
 
@@ -37,14 +38,14 @@ ZIPKEKE(Propeller AI) 제품 소개용 정적 랜딩 페이지와 그 생성 자
 
 종전에는 Property·Customer 두 카드가 Material Symbols 아이콘(`home_work`, `person_search`)을 쓰고 있었다. 세 카드를 같은 이미지 방식으로 맞췄다.
 
-Property·Customer 아이콘의 원본은 1254px·1296px에 합계 1.5MB였다. 80px 자리에 쓰기에 과해서 긴 변 256px로 축소해 넣었다(각 42KB·31KB). 더 큰 크기가 필요하면 원본을 다시 받아 축소 배율만 바꾼다.
+Property·Customer 아이콘은 제공된 투명 배경 원본을 그대로 보관한다. 화면에서는 고정 크기 박스와 `object-contain`으로 표시 크기와 비율을 제어한다.
 
 ## How it works 페이지 만드는 순서
 
 1. [prompts/how-it-works.md](prompts/how-it-works.md)의 `## 프롬프트 본문` 이후 전체를 복사한다.
 2. UI 생성 AI(v0, Stitch, Figma Make, Claude Artifacts 등)에 붙여넣어 단일 HTML을 받는다.
-3. 결과를 `site/how-it-works.html`로 저장한다.
-4. [index.html](index.html)의 내비게이션에서 `How it works` 링크 `href`를 `#`에서 `how-it-works.html`로 바꾼다.
+3. 결과를 `site/page-1.html`로 저장한다.
+4. [index.html](index.html)의 내비게이션에서 `How it works` 링크를 `page-1.html`로 연결한다.
    같은 링크의 클래스를 활성 상태(`text-secondary` + `font-bold` + `border-b-2 border-secondary`)로 옮기는 작업은 새 페이지 쪽에서 한다.
 5. 아래 점검 항목을 확인하고 커밋한다.
 
