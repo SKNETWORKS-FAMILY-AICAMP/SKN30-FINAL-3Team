@@ -145,6 +145,42 @@ class GeneralSelection(unittest.TestCase):
         controller.probe.assert_not_called()
         controller.runpod.return_value.delete.assert_not_called()
 
+    def test_reuse_requires_explicit_disabled_cuda_compatibility(self):
+        spec = {
+            "cloud": "runpod",
+            "gpu_id": "NVIDIA L40S",
+            "model_profile": "qwen3-14b-awq",
+        }
+        for compatibility in ("1", None, "0"):
+            with self.subTest(compatibility=compatibility):
+                controller = self.runpod_controller()
+                controller.runpod.return_value.pods.return_value = [
+                    {"name": serving.POD_NAME["general"], "id": "abc12345"}
+                ]
+                environment = {"GENERAL_MODEL_PROFILE": "qwen3-14b-awq"}
+                if compatibility is not None:
+                    environment["VLLM_ENABLE_CUDA_COMPATIBILITY"] = compatibility
+                controller.runpod.return_value.pod.return_value = {
+                    "id": "abc12345",
+                    "imageName": "image",
+                    "templateId": "template",
+                    "desiredStatus": "RUNNING",
+                    "env": environment,
+                }
+                with patch.object(serving.control, "validate_template"):
+                    if compatibility == "0":
+                        deployment = controller.prepare("general", spec)
+                        self.assertEqual(deployment["resource_id"], "abc12345")
+                        controller.probe.assert_called_once()
+                    else:
+                        with self.assertRaisesRegex(
+                            serving.ToolError, "disable CUDA compatibility"
+                        ):
+                            controller.prepare("general", spec)
+                        controller.probe.assert_not_called()
+                controller.runpod.return_value.request.assert_not_called()
+                controller.runpod.return_value.delete.assert_not_called()
+
     def test_create_injects_profile_and_rejects_existing_other_profile(self):
         controller = self.runpod_controller()
         spec = {
@@ -165,7 +201,7 @@ class GeneralSelection(unittest.TestCase):
             controller.runpod.return_value.request.call_args.args[2]["env"],
             {
                 "GENERAL_MODEL_PROFILE": "qwen3-32b-awq",
-                "VLLM_ENABLE_CUDA_COMPATIBILITY": "1",
+                "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
             },
         )
         controller.runpod.return_value.request.reset_mock()
@@ -229,7 +265,7 @@ class HostProfiles(unittest.TestCase):
                 (root / "runtime.env").read_text(),
             )
             self.assertIn(
-                "VLLM_ENABLE_CUDA_COMPATIBILITY=1", (root / "runtime.env").read_text()
+                "VLLM_ENABLE_CUDA_COMPATIBILITY=0", (root / "runtime.env").read_text()
             )
             self.assertFalse((root / "candidate.json").exists())
 

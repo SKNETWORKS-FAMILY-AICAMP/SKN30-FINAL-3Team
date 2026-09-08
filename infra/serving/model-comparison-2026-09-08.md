@@ -11,6 +11,10 @@
 
 - 공통 조건: vLLM 0.28.0 linux/amd64, L40S 48GB 1대, 8K context, 동시 추론 1건,
   GPU 메모리 비율 0.85, eager, thinking off. AWQ와 BnB의 loader만 다르다.
+- RunPod 호스트 선택은 `allowedCudaVersions=["13.0"]`, 실행은
+  `VLLM_ENABLE_CUDA_COMPATIBILITY=0`으로 고정한다. 호환 라이브러리를 켠 `1`은
+  실제 L40S에서 CUDA 803으로 실패했고 `0`에서 14B 로딩을 확인했다.
+  CUDA 필터는 호스트 선택 조건이며 실제 드라이버 버전을 증명하지 않는다. AWS 실기동은 미검증이다.
 - 가중치는 이미지에 포함하지 않는다. GPU에서 고정 revision을 다운로드한 후 실제 파일을
   해시 검증한다. 검증 결과는 인증된 `/ops/status`에 최소 metadata로 제공한다.
 - 공식 vLLM 0.28.0 이미지에는 bitsandbytes가 없어 `runtime-requirements.txt`로

@@ -417,7 +417,7 @@ class Serving:
                     "GENERAL_MODEL_PROFILE": spec.get(
                         "model_profile", DEFAULT_GENERAL_PROFILE
                     ),
-                    "VLLM_ENABLE_CUDA_COMPATIBILITY": "1",
+                    "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
                 }
             if matches:
                 details = client.pod(matches[0]["id"])
@@ -441,6 +441,14 @@ class Serving:
                 ) != spec.get("model_profile", DEFAULT_GENERAL_PROFILE):
                     raise ToolError(
                         "existing general Pod uses a different model profile; delete it explicitly"
+                    )
+                if (
+                    workload == "general"
+                    and details.get("env", {}).get("VLLM_ENABLE_CUDA_COMPATIBILITY")
+                    != "0"
+                ):
+                    raise ToolError(
+                        "existing general Pod must explicitly disable CUDA compatibility; delete it explicitly"
                     )
                 if f2.pod_status(details) != "RUNNING":
                     raise ToolError(
