@@ -112,6 +112,16 @@ class F2Config(BaseModel):
     max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
 
 
+class ChatbotConfig(BaseModel):
+    """Opt-in synthetic chatbot; execution deadlines include model and query time."""
+
+    enabled: bool = False
+    request_timeout_seconds: int = Field(default=60, ge=1, le=60)
+    poll_interval_seconds: float = Field(default=0.25, ge=0.05, le=1)
+    heartbeat_seconds: int = Field(default=15, ge=1, le=30)
+    max_concurrent_requests: int = Field(default=1, ge=1, le=1)
+
+
 class Config(BaseModel):
     app: AppConfig
     db: DbConfig
@@ -120,6 +130,7 @@ class Config(BaseModel):
     log: LogConfig
     worker: WorkerConfig
     f2: F2Config
+    chatbot: ChatbotConfig = Field(default_factory=ChatbotConfig)
 
     @model_validator(mode="after")
     def validate_environment_boundaries(self) -> Config:
@@ -135,6 +146,8 @@ class Config(BaseModel):
             )
         if self.app.environment is AppEnvironment.PROD and self.auth.development.enabled:
             raise ValueError("development authentication is forbidden in production")
+        if self.app.environment is AppEnvironment.PROD and self.chatbot.enabled:
+            raise ValueError("chatbot requires the synthetic local/dev environment")
         if "*" in self.http.cors_allowed_origins:
             raise ValueError("credentialed CORS cannot use a wildcard origin")
         if self.log.format not in {"console", "json"}:
@@ -252,6 +265,10 @@ def bind_config(source: Mapping[str, str]) -> Config:
         ),
         f2=F2Config(
             max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
+        ),
+        chatbot=ChatbotConfig(
+            enabled=_boolean(source, "CHATBOT_ENABLED", False),
+            request_timeout_seconds=_integer(source, "CHATBOT_REQUEST_TIMEOUT_SECONDS", 60),
         ),
     )
 

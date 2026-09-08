@@ -45,6 +45,7 @@ updated: 2026-09-08
 
 | 문서 | 언제 읽는가? | 다루는 범위 |
 |---|---|---|
+| [챗봇 구현·검증](chatbot/implementation-and-validation.md) | 활성화·실제 평가·검증 명령과 제한을 확인할 때 | Luna 실제 평가, Qwen 보류, 격리 DB·브라우저·HTTP/SSE 검증 |
 | [챗봇 도입 검토](chatbot/overview.md) | 도입 근거·구현 가능성·복잡성·공수·스택·확장 순서를 검토할 때 | 읽기 전용 자연어 조회·F2 연결, 현재 기반과 추가 작업 |
 | [챗봇 실행 구조](chatbot/runtime.md) | 도구·모델·멀티턴 구현을 검토할 때 | 제한된 조건 생성, Backend capability, local Luna·dev Qwen |
 | [챗봇 저장 설계](chatbot/persistence.md) | 대화 DB·상태·복구·삭제를 설계할 때 | 대화·메시지·요청 3테이블, 사용자별 1개, 영속 상태·즉시 삭제·경합 |

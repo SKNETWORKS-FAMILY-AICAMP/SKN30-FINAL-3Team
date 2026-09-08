@@ -5,10 +5,10 @@ updated: 2026-09-08
 
 # API 계약 규칙
 
-## F4 챗봇 — 사용자 설계 합의·구현 미착수
+## F4 챗봇 — 코드 구현·로컬 검증, 공유 dev 미적용
 
 1차는 사용자별 대화 1개·작성자 조회/전체 삭제·질문과 최종 답변/요청 상태 저장·새로고침 복원을 포함한다. 브라우저 연결이 끝나도 서버 처리는 계속하며 서버 자체 중단 후 자동 재실행과 SSE 이벤트 재생은 제공하지 않는다.
-기존 메모리 전용 POST 스트림 제안은 실행 접수와 GET 상태/SSE 구독을 분리하는 설계로 대체한다. 구체 경로·스키마·오류·멱등 규칙은 [챗봇 HTTP·SSE 설계](../../../../../docs/architecture/chatbot/api-and-stream.md)에 **제안**으로 관리한다. API 구현 후 그 검증 결과와 공개 계약 상태를 갱신한다.
+실행 접수와 GET 상태/SSE 구독을 분리했다. `/api/v1/chatbot`의 공개 경로·스키마·오류·중복 접수·버전 규칙은 [챗봇 HTTP·SSE 계약](../../../../../docs/architecture/chatbot/api-and-stream.md)이 정본이다. 기본 비활성화이며 합성 local/dev에서만 명시적으로 활성화한다.
 조회/구독/삭제는 세션의 사무소와 대화 작성자를 함께 검증하고 변경 요청에 CSRF를 적용한다. 저장·소유권·즉시 삭제 경합은 [저장 설계](../../../../../docs/architecture/chatbot/persistence.md), 보존은 [개인정보 정책](../privacy/policy.md)을 따른다.
 
 구체적인 API는 기능 기획이 승인될 때 추가한다.
@@ -745,6 +745,7 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
 | GET | /api/v1/calendar/events | 세션 | `from_date`~`to_date`(양끝 포함)의 일정 조회 |
+| GET | /api/v1/calendar/events/{event_id} | 세션 | 같은 사무소의 삭제되지 않은 일정 단건 조회. 현재 달 밖의 챗봇 결과도 상세 진입 |
 | POST | /api/v1/calendar/events | 세션 + CSRF | 일정 생성, 201 |
 | PATCH | /api/v1/calendar/events/{event_id} | 세션 + CSRF | 부분 수정. `row_version` 필수 |
 | DELETE | /api/v1/calendar/events/{event_id} | 세션 + CSRF | 소프트 삭제, 204. `row_version` 쿼리 파라미터 필수 |
