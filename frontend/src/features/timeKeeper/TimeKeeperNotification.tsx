@@ -51,7 +51,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
   const agenda = useAgenda({ limit: BRIEFING_LIMIT }, { enabled });
   const { items, status, total, overdueDays, settlementCount, reload, withinDays } = agenda;
   const dismissed = useDismissedNeglected();
-  // 서버의 total은 창 전체 참값이라 "다시 보지 않기"로 감춘 밀린 재연락·재확인도 세어져 있다.
+  // 서버의 total은 창 전체 참값이라 "다시 보지 않기"로 감춘 밀린 재확인도 세어져 있다.
   // 배지와 브리핑은 실제로 사용자에게 보이는 건수를 따라야 한다.
   const visibleTotal = visibleAgendaTotal(items, overdueDays ?? 7, total, dismissed.isDismissed);
 
