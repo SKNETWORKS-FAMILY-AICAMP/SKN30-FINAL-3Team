@@ -30,7 +30,13 @@ class ServingRoutes:
             usage = shutil.disk_usage(os.environ.get("HF_HOME", "/tmp"))
             status, body = (
                 200,
-                {"disk_total_bytes": usage.total, "disk_free_bytes": usage.free},
+                {
+                    "disk_total_bytes": usage.total,
+                    "disk_free_bytes": usage.free,
+                    "model": json.loads(
+                        os.environ.get("GENERAL_MODEL_METADATA", "null")
+                    ),
+                },
             )
         else:
             status, body = 404, {"error": "not found"}

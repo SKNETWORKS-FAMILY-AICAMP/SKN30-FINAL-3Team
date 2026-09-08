@@ -1,7 +1,7 @@
 {
-  "source": "vllm/vllm-openai:v0.26.0",
+  "source": "vllm/vllm-openai:v0.28.0",
   "platform": "linux/amd64",
-  "digest": "sha256:770fe65b2c73ee74a5c42165cf3433de4048cc2cd9c57a937ca4e35aba5aa87b",
-  "verified_registry_at": "2026-09-07",
-  "gpu_compatibility": "pending-live-validation"
+  "digest": "sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+  "verified_registry_at": "2026-09-08",
+  "gpu_compatibility": "pending-three-profile-evaluation"
 }
