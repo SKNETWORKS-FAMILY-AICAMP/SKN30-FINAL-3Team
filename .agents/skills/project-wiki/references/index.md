@@ -9,6 +9,7 @@ updated: 2026-09-08
 
 | 문서 | 읽는 조건 |
 |---|---|
+| [Qwen JSON 기록](../../../../infra/serving/qwen-records.md) | 평가·이미지 JSON 선행 반영과 후속 #107의 구현 경계를 확인할 때 |
 | [Qwen 검토 재현](../../../../infra/serving/comparison-reproduction.md) | 검토 코드·원본 집계 재생성·게시 태그별 양자화 재사용을 확인할 때 |
 | [Qwen 3모델 비교](../../../../infra/serving/model-comparison-2026-09-08.md) | 14B/32B AWQ와 공식 27B FP8 비교·BnB 기동 이력·비용을 확인할 때 |
 | [챗봇 구현·검증](../../../../docs/architecture/chatbot/implementation-and-validation.md) | 활성화·실제 Luna 평가·후속 Qwen 비교·격리 DB와 화면 검증 근거를 확인할 때 |
