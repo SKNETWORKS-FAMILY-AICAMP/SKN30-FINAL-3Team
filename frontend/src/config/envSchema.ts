@@ -15,8 +15,6 @@ export interface AppEnv {
    * 장부는 `api`, F3만 `mock`으로 두고 화면을 확인한다. 지정하지 않으면 장부를 따라간다.
    */
   f3Source: LedgerSource;
-  /** 캘린더 일정 출처. 지정하지 않으면 장부를 따라간다(F3와 같은 이유). */
-  calendarSource: LedgerSource;
   /** mock에서 생성할 매물장 행 수. */
   mockRowCount: number;
   /** mock 응답 지연(ms). */
@@ -29,7 +27,6 @@ export const APP_ENV_KEYS = [
   "VITE_AUTH_DEVELOPMENT_ENABLED",
   "VITE_LEDGER_SOURCE",
   "VITE_F3_SOURCE",
-  "VITE_CALENDAR_SOURCE",
   "VITE_API_BASE_URL",
   "VITE_MOCK_ROW_COUNT",
   "VITE_MOCK_LATENCY_MS",
@@ -60,7 +57,7 @@ function readLedgerSource(source: EnvSource): LedgerSource {
 
 /**
  * 지정하지 않으면 장부 출처를 따르는 값을 읽는다. 백엔드가 없는 환경에서 그 기능만 실서버를
- * 부르지 않게 한다. F3와 캘린더가 같은 이유로 이 함수를 공유한다.
+ * 부르지 않게 한다.
  */
 function readSourceWithFallback(source: EnvSource, key: string, fallback: LedgerSource): LedgerSource {
   const raw = source[key];
@@ -121,7 +118,6 @@ export function parseAppEnv(source: EnvSource): Readonly<AppEnv> {
     authDevelopmentEnabled: readRequiredBoolean(source, "VITE_AUTH_DEVELOPMENT_ENABLED"),
     ledgerSource,
     f3Source: readSourceWithFallback(source, "VITE_F3_SOURCE", ledgerSource),
-    calendarSource: readSourceWithFallback(source, "VITE_CALENDAR_SOURCE", ledgerSource),
     mockRowCount: readNonNegativeInteger(source, "VITE_MOCK_ROW_COUNT"),
     mockLatencyMs: readNonNegativeInteger(source, "VITE_MOCK_LATENCY_MS"),
   });

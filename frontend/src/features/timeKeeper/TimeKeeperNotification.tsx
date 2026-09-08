@@ -1,9 +1,9 @@
 /**
  * 일정 버튼과 아침 브리핑 창.
  *
- * 두 진입이 같은 조회를 공유한다. 매일 아침 한 번 저절로 열리고, 그 뒤로는 상단바의 달력
- * 버튼으로 다시 연다. 「만기도래일 보기」가 현업에서 쓰이지 않은 이유가 사용자가 찾아 열어야만
- * 보이기 때문이므로 (F1 10.4), 찾아오게 만드는 쪽을 기본으로 둔다.
+ * 두 진입이 같은 조회를 공유한다. 매일 아침 한 번 저절로 열리고, 그 뒤로는 상단바의 "다가오는
+ * 일정" 버튼으로 다시 연다. 「만기도래일 보기」가 현업에서 쓰이지 않은 이유가 사용자가 찾아
+ * 열어야만 보이기 때문이므로 (F1 10.4), 찾아오게 만드는 쪽을 기본으로 둔다.
  *
  * 옆의 종 아이콘은 F1 알림 센터(F1-AL-04)의 자리이고 이 버튼과 소유가 다르다. 아이콘을 나눠
  * 두면 "일정을 보러 가는 곳"과 "알림을 보러 가는 곳"이 화면에서 구분된다.
@@ -77,7 +77,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
     if (status === "error") failBriefing(briefingAttempt.businessDateKey);
   }, [briefingAttempt, completeBriefing, failBriefing, settlementCount, status, visibleTotal]);
 
-  /** 달력 버튼으로 여는 경로. 열 때마다 다시 읽어 기준일이 하루 밀린 목록을 보여주지 않는다. */
+  /** "다가오는 일정" 버튼으로 여는 경로. 열 때마다 다시 읽어 기준일이 하루 밀린 목록을 보여주지 않는다. */
   const openAgenda = useCallback(() => {
     reload();
     setOpen(true);

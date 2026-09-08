@@ -62,13 +62,10 @@ export function roleLabel(role: string | null): string {
 /**
  * 목록 왼쪽에 세우는 대상 이름.
  *
- * 세대는 부동산을, 구입장은 사람을, 캘린더는 사용자가 붙인 일정 제목을 가리킨다. 세대 행에
- * 인물 이름을 세우면 공동명의나 임대인·임차인이 함께 있는 세대에서 누구를 말하는지 흐려진다.
+ * 세대는 부동산을, 구입장은 사람을 가리킨다. 세대 행에 인물 이름을 세우면 공동명의나
+ * 임대인·임차인이 함께 있는 세대에서 누구를 말하는지 흐려진다.
  */
 export function agendaTargetLabel(item: AgendaItemDto): string {
-  if (item.event_id != null) {
-    return item.title == null || item.title === "" ? "일정" : item.title;
-  }
   if (item.unit_id != null) {
     const parts = [
       item.complex_name,
@@ -113,20 +110,9 @@ export function hasPrivacyConsent(contact: AgendaContactDto): boolean {
   return contact.party.privacy_consent_at != null;
 }
 
-/**
- * 목록 안에서 행을 구분하는 안정된 키. 같은 대상이 여러 종류로 걸릴 수 있다.
- *
- * `event_id`를 넣지 않으면 캘린더 행은 세대·구입장 id가 모두 null이라 같은 종류의 캘린더
- * 일정끼리 키가 겹친다.
- */
+/** 목록 안에서 행을 구분하는 안정된 키. 같은 대상이 여러 종류로 걸릴 수 있다. */
 export function agendaItemKey(item: AgendaItemDto): string {
-  return [
-    item.category,
-    item.unit_id,
-    item.listing_id,
-    item.requirement_id,
-    item.event_id,
-  ].join("-");
+  return [item.category, item.unit_id, item.listing_id, item.requirement_id].join("-");
 }
 
 /**

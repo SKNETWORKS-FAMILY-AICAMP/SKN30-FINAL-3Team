@@ -11,11 +11,9 @@ updated: 2026-09-08
 > 쓴다). 이 문서를 담은 PR이 검토를 거쳐 병합되면 `결정`으로 바꾸고 [OQ-012](../../../.agents/skills/project-wiki/references/open-questions.md)를
 > 닫는다. `F4-CM`·`F4-TK` ID도 같은 이유로 확정 부여가 아니라 제안이다.
 >
-> 아래 구성 표의 서비스 중 **Time Keeper와 캘린더가 구현됐고 나머지는 미착수**다. 미착수 서비스의
-> 상세 동작은 승인된 요구사항이 아니므로 이 문서에서 확정 사실로 쓰지 않는다. 캘린더가 F4-CM-06
-> (F4는 F1 장부를 직접 고치지 않는다)의 예외 없이 성립하는 이유는
-> [ADR-0025](../../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md)에
-> 있다 — 캘린더가 쓰는 `calendar_event`는 F1 장부 테이블이 아니라 F4가 소유한 새 테이블이다.
+> 아래 구성 표의 서비스 중 **Time Keeper가 구현됐고 나머지는 미착수**다. 미착수 서비스의
+> 상세 동작은 승인된 요구사항이 아니므로 이 문서에서 확정 사실로 쓰지 않는다. 캘린더는
+> 2026-09-08 사용자 요청으로 전체 폐기했다([calendar.md](calendar.md), [ADR-0025](../../../.agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md) 폐기됨).
 
 ## 1. 개요
 
@@ -43,7 +41,7 @@ F3와 갈리는 지점이 여기다. F3는 조건표에 안 들어간 말을 읽
 |---|---|---|---|
 | Time Keeper | 장부의 날짜에서 일정·할 일을 모아 아침에 알린다 | **구현됨** | [time-keeper.md](time-keeper.md) |
 | 업무 챗봇 | 자연어 장부·할 일 조회, 기존 F2 화면 연결, 사용자별 대화 저장·복원 | **계획됨 · 사용자 설계 합의, 구현 미착수** | [챗봇 요구사항](../chatbot/overview-and-scope.md) |
-| 캘린더 | 사용자가 직접 일정을 추가·관리하고, "다가오는 일정"과 통합해 보여준다 | **구현됨** | [calendar.md](calendar.md) |
+| 캘린더 | ~~사용자가 직접 일정을 추가·관리하고, "다가오는 일정"과 통합해 보여준다~~ | **폐기 · 2026-09-08** | [calendar.md](calendar.md) |
 | 뉴스 요약 | 날짜 기준으로 부동산 뉴스를 찾아 요약한다 | 미착수 | [scope-and-open-questions.md](scope-and-open-questions.md) |
 | 문자 초안 | 만기 안내·매물 등록 알림 등 문자 초안을 만든다 | 미착수 | 같은 문서 |
 | 블로그 초안 | 사용자 글의 어투를 반영한 광고글 초안을 만든다 | 미착수 | 같은 문서 |

@@ -14,4 +14,4 @@ updated: 2026-09-07
 | [ADR-005](ADR-005-feature-data-source.md) | 결정 | 데이터 출처를 기능 단위로 고르고, 지정하지 않으면 장부 출처를 따른다. |
 | [ADR-006](ADR-006-home-voice-intake.md) | 부분 대체됨 | 첫 화면과 검토 흐름은 유지하고, Frontend 2회 분석·장부 판정 소유는 프로젝트 ADR-0028로 대체한다. |
 | [ADR-007](ADR-007-editable-fields-must-persist.md) | 결정 | 편집 가능하게 보이는 칸은 저장 경로가 있어야 한다. 없으면 편집을 열지 않고 이유를 밝힌다. |
-| [ADR-008](ADR-008-calendar-month-grid.md) | 결정 | 캘린더 월간 뷰는 PatternFly `CalendarMonth`(단일 날짜 선택용)가 아니라 직접 만든 CSS Grid로 구현한다. |
+| [ADR-008](ADR-008-calendar-month-grid.md) | 대체됨 | 캘린더 월간 뷰는 PatternFly `CalendarMonth`(단일 날짜 선택용)가 아니라 직접 만든 CSS Grid로 구현한다; 캘린더 화면 폐기로 project ADR-0032가 대체 |

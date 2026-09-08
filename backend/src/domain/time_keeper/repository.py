@@ -1,9 +1,8 @@
 """일정·할 일 대상 조회.
 
-여섯 개의 날짜 원천을 ``UNION ALL``로 합친 뒤 DB에서 정렬·페이지를 자른다. 원천별로 따로 읽어
-파이썬에서 합치면 전체를 메모리에 올려야 총 건수와 페이지가 맞는다. 다섯 개는 장부(세대·매물·
-구입장)에서 계산하는 갈래이고, 나머지 하나(``_calendar_event_members``)는 사용자가 캘린더
-화면에서 직접 만든 일정이다. 장부 갈래와 달리 조인 없이 표시값을 이미 들고 있다.
+다섯 개의 날짜 원천을 ``UNION ALL``로 합친 뒤 DB에서 정렬·페이지를 자른다. 원천별로 따로 읽어
+파이썬에서 합치면 전체를 메모리에 올려야 총 건수와 페이지가 맞는다. 모두 장부(세대·매물·
+구입장)에서 계산하는 갈래다.
 
 날짜가 그대로 저장된 원천과, 매물 접수일에 재확인 주기를 더해 만드는 원천
 (``LISTING_REVALIDATION``)이 섞여 있다. 뒤쪽은 ``received_at`` 이 이미 ``DATE`` 라 시간대 변환
@@ -38,7 +37,6 @@ from sqlalchemy import (
 )
 from sqlmodel import Session, col
 
-from domain.calendar.models import CalendarEvent
 from domain.property_ledger.models import (
     Party,
     PropertyComplex,
@@ -83,9 +81,6 @@ def _member(
 
     ``due`` 는 화면에 보일 기한 표현식이고 ``in_window`` 는 창 안인지 가리는 조건이다. 저장된
     날짜는 둘이 같지만, 주기로 만드는 갈래는 컬럼에 연산이 붙지 않도록 조건을 따로 받는다.
-
-    장부 갈래는 ``event_id``·``title``·``location``이 없다. 캘린더 갈래(``_calendar_event_members``)
-    만 채우고 나머지 갈래는 NULL을 실어 컬럼 모양을 맞춘다.
     """
     return select(
         _category(category),
@@ -93,9 +88,6 @@ def _member(
         unit_id.label("unit_id"),
         listing_id.label("listing_id"),
         requirement_id.label("requirement_id"),
-        _no_id().label("event_id"),
-        _no_str().label("title"),
-        _no_str().label("location"),
     ).where(
         *conditions,
         due.between(window.earliest, window.latest) if in_window is None else in_window,
@@ -104,10 +96,6 @@ def _member(
 
 def _no_id() -> Any:
     return cast(null(), BigInteger)
-
-
-def _no_str() -> Any:
-    return cast(null(), String)
 
 
 def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
@@ -183,38 +171,11 @@ def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
     ]
 
 
-def _calendar_event_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
-    """사용자가 캘린더에서 직접 만든 일정. 종류가 열려 있어 문자열 컬럼을 그대로 싣는다.
-
-    조인 없이 표시에 필요한 값을 이미 들고 있으므로, 이 갈래만 ``title``·``location``이 채워진다.
-    ``F4-TK-07``처럼 앞뒤 창 양쪽에 경계를 둔다 — 재확인과 달리 날짜가 그대로 저장된 갈래이기
-    때문이다.
-    """
-    event_date = col(CalendarEvent.event_date)
-    return [
-        select(
-            cast(col(CalendarEvent.category), String).label("category"),
-            event_date.label("due_date"),
-            _no_id().label("unit_id"),
-            _no_id().label("listing_id"),
-            _no_id().label("requirement_id"),
-            col(CalendarEvent.id).label("event_id"),
-            col(CalendarEvent.title).label("title"),
-            col(CalendarEvent.location).label("location"),
-        ).where(
-            col(CalendarEvent.brokerage_id) == brokerage_id,
-            col(CalendarEvent.is_deleted) == false(),
-            event_date.between(window.earliest, window.latest),
-        )
-    ]
-
-
 def agenda_union(brokerage_id: int, window: AgendaWindow) -> Subquery:
     return union_all(
         *_unit_members(brokerage_id, window),
         *_listing_members(brokerage_id, window),
         *_requirement_members(brokerage_id, window),
-        *_calendar_event_members(brokerage_id, window),
     ).subquery("time_keeper_agenda")
 
 
@@ -230,8 +191,7 @@ def count_agenda_by_category(
     """창 안에 실제로 존재하는 종류와 건수. 0건인 종류는 행 자체가 나오지 않는다.
 
     종류별 상한을 적용하기 전의 값이다. 화면이 "임대차 만기 2건"처럼 참인 숫자를 쓰고, 상한에
-    걸려 잘린 나머지를 알릴 수 있어야 한다. 캘린더 갈래는 사용자가 정한 임의 문자열이라 고정
-    열거형으로 되돌려 파싱하지 않는다.
+    걸려 잘린 나머지를 알릴 수 있어야 한다.
     """
     combined = agenda_union(brokerage_id, window)
     statement = (
@@ -253,7 +213,6 @@ def _ordering(source: Any) -> list[Any]:
         source.c.unit_id.asc().nullslast(),
         source.c.listing_id.asc().nullslast(),
         source.c.requirement_id.asc().nullslast(),
-        source.c.event_id.asc().nullslast(),
     ]
 
 
@@ -272,9 +231,6 @@ def list_agenda(
         combined.c.unit_id,
         combined.c.listing_id,
         combined.c.requirement_id,
-        combined.c.event_id,
-        combined.c.title,
-        combined.c.location,
         func.row_number()
         .over(partition_by=combined.c.category, order_by=_ordering(combined))
         .label("category_rank"),
@@ -293,9 +249,6 @@ def list_agenda(
             unit_id=row.unit_id,
             listing_id=row.listing_id,
             requirement_id=row.requirement_id,
-            event_id=row.event_id,
-            title=row.title,
-            location=row.location,
         )
         for row in session.execute(statement).all()
     ]
