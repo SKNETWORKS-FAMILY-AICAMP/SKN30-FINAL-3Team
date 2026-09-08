@@ -120,7 +120,7 @@ class ChatExecution(ChatModel):
     diagnostics: ProviderDiagnostics | None = None
     model_calls: int = Field(default=0, ge=0, le=3)
     prompt_version: str = "chatbot-prompt:v1"
-    workflow_version: str = "chatbot-workflow:v1"
+    workflow_version: str = "chatbot-workflow:v2"
 
 
 class ChatReadPort(Protocol):

@@ -285,6 +285,7 @@ async def test_uncertain_filters_in_clarification_are_discarded_without_read_or_
 
 
 async def test_previously_blocked_secrets_are_not_forwarded_on_next_turn():
+    # Synthetic sentinels only: FakeProvider records locally and never calls a service.
     provider = FakeProvider({"tool": "properties"})
     history = (
         CompletedTurn(
@@ -306,3 +307,133 @@ async def test_previously_blocked_secrets_are_not_forwarded_on_next_turn():
     assert "sk-private" not in sent
     assert "secret-fixture-value" not in sent
     assert "지원 범위 밖" in sent
+
+
+@pytest.mark.parametrize(
+    ("tool", "filters"),
+    [
+        ("properties", {"transaction_type": "SALE"}),
+        ("properties", {"area_basis": "exclusive"}),
+        ("properties", {"sort": "price_asc"}),
+        ("properties", {"sort": "recent"}),
+        ("agenda", {"categories": ["MOVE_IN"]}),
+        ("agenda", {"sort": "date_asc"}),
+        ("properties", {"date_expression": "오늘"}),
+        ("buyers", {"categories": ["MOVE_IN"]}),
+        ("agenda", {"area_basis": "exclusive"}),
+        ("agenda", {"transaction_type": "SALE"}),
+    ],
+)
+async def test_unsupported_or_invented_filter_never_reaches_read(tool, filters):
+    invalid = {"tool": tool, "filters": filters}
+    provider = FakeProvider(invalid, invalid, invalid)
+    reads = FakeReads()
+    with pytest.raises(ChatbotContractError):
+        await workflow(provider).run(request("오늘 조회해줘"), capability=reads)
+    assert reads.calls == []
+    assert len(provider.requests) == 3
+
+
+@pytest.mark.parametrize(
+    ("question", "tool", "filters"),
+    [
+        ("매수 구입장", "buyers", {"transaction_type": "SALE"}),
+        ("전세 매물", "properties", {"transaction_type": "JEONSE"}),
+        ("월세 매물", "properties", {"transaction_type": "RENT"}),
+        ("공급 면적으로 매물", "properties", {"area_basis": "supply"}),
+        ("전용 면적으로 매물", "properties", {"area_basis": "exclusive"}),
+        ("최근 구입장", "buyers", {"sort": "recent"}),
+        ("그중 싼 순서", "properties", {"sort": "price_asc"}),
+        ("예산 높은 순으로", "buyers", {"sort": "price_desc"}),
+        ("날짜순 일정", "agenda", {"sort": "date_asc"}),
+        ("고객 재연락과 입주 일정", "agenda", {"categories": ["CLIENT_RECONTACT", "MOVE_IN"]}),
+    ],
+)
+async def test_grounded_enum_filters_reach_read(question, tool, filters):
+    reads = FakeReads()
+    await workflow(FakeProvider({"tool": tool, "filters": filters})).run(
+        request(question), capability=reads
+    )
+    assert len(reads.calls) == 1
+
+
+@pytest.mark.parametrize("active_tool", ["properties", "buyers"])
+async def test_inherited_filter_evidence_requires_same_tool(active_tool):
+    intent = {"tool": "properties", "mode": "refine", "filters": {"transaction_type": "SALE"}}
+    reads = FakeReads()
+    execution = workflow(FakeProvider(intent, intent, intent)).run(
+        request("그중 보여줘", active_filters={"tool": active_tool, "transaction_type": "SALE"}),
+        capability=reads,
+    )
+    if active_tool == "properties":
+        await execution
+        assert len(reads.calls) == 1
+    else:
+        with pytest.raises(ChatbotContractError):
+            await execution
+        assert not reads.calls
+
+
+async def test_explicit_new_enum_cannot_be_replaced_with_stale_active_value():
+    invalid = {"tool": "properties", "mode": "refine", "filters": {"transaction_type": "SALE"}}
+    reads = FakeReads()
+    with pytest.raises(ChatbotContractError):
+        await workflow(FakeProvider(invalid, invalid, invalid)).run(
+            request(
+                "그중 월세만", active_filters={"tool": "properties", "transaction_type": "SALE"}
+            ),
+            capability=reads,
+        )
+    assert not reads.calls
+
+
+async def test_category_list_validates_every_member_and_can_repair():
+    provider = FakeProvider(
+        {"tool": "agenda", "filters": {"categories": ["CALENDAR", "MOVE_IN"]}},
+        {"tool": "agenda", "filters": {"categories": ["CALENDAR"]}},
+    )
+    reads = FakeReads()
+    await workflow(provider).run(request("캘린더 일정"), capability=reads)
+    assert len(provider.requests) == 2
+    assert reads.calls[0][0].filters.categories == ("CALENDAR",)
+
+
+@pytest.mark.parametrize(
+    ("question", "tool", "active"),
+    [
+        ("그중 월세만", "properties", {"transaction_type": "SALE"}),
+        ("그중 최근 순으로", "buyers", {"sort": "price_desc"}),
+        ("그중 입주만", "agenda", {"categories": ["CALENDAR"]}),
+    ],
+)
+async def test_omitted_explicit_refinement_cannot_keep_conflicting_active_filter(
+    question, tool, active
+):
+    invalid = {"tool": tool, "mode": "refine"}
+    reads = FakeReads()
+    with pytest.raises(ChatbotContractError):
+        await workflow(FakeProvider(invalid, invalid, invalid)).run(
+            request(question, active_filters={"tool": tool, **active}), capability=reads
+        )
+    assert not reads.calls
+
+
+@pytest.mark.parametrize(
+    ("question", "tool", "filters"),
+    [
+        ("매매 말고 전세 매물", "properties", {"transaction_type": "SALE"}),
+        ("캘린더 제외하고 입주 일정", "agenda", {"categories": ["CALENDAR"]}),
+    ],
+)
+async def test_negated_enum_phrase_is_clarified_instead_of_used_as_positive_evidence(
+    question, tool, filters
+):
+    provider = FakeProvider(
+        {"tool": tool, "filters": filters},
+        {"tool": "clarification", "clarification_code": "ambiguous_condition"},
+    )
+    reads = FakeReads()
+    execution = await workflow(provider).run(request(question), capability=reads)
+    assert execution.result.kind == "clarification"
+    assert len(provider.requests) == 2
+    assert not reads.calls

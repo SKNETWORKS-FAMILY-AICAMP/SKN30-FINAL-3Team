@@ -124,3 +124,4 @@ updated: 2026-09-08
 - 2026-09-07: 사용자 승인으로 GPU 통합 기반 saved plan을 적용(9 생성·7 변경·16 삭제)하고 drift 없음을 확인. 감시 제거·SSM/IAM 반영, 앱/RDS 중지·GPU 0 및 기존 등록/저장소 보존. GPU 실배포는 후속 단계.
 
 - 2026-09-08: PR #99의 AI–Backend 공개 DTO·실행 facade·read capability·오류·권한과 저장 책임을 contracts/chatbot-ai.md에 구현 상태로 정리했다. AI 내부 문서와 실행 설계에서 공통 정본을 연결하며 Backend·HTTP/SSE 구현 완료와 구분했다. ADR-0006은 유지한다.
+- 2026-09-08: PR #99의 실제 AI 의도 도구와 생성 조건 근거 검증을 공개 계약·실행 문서에 맞췄다. 후속 PR #100의 Backend 저장·HTTP/SSE 구현과 구분하고, AI 평가기 v2의 명시적 최근 정렬 비교 및 기존 평가 요약을 수정 후 모델 평가로 간주하지 않는 경계를 기록했다.

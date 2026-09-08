@@ -8,7 +8,9 @@ updated: 2026-09-08
 구현된 공개 DTO·실행·read capability 계약은 [공통 계약](../../project-wiki/references/contracts/chatbot-ai.md)이
 정본이다. 저장·HTTP/SSE 연결 설계는 [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md)에서 관리한다. AI 구현은 `brokerage_ai.chatbot`의 선형 workflow이며 LangGraph·DB·HTTP를 추가하지 않는다.
 
-- 모델은 제한된 의도·원문 조건만 생성하고 Backend가 주입한 read port가 다시 검증한다.
+- 모델은 제한된 의도·원문 조건만 생성한다. AI가 모든 비어 있지 않은 생성 조건의 도구별 허용
+  범위·원문 또는 한국어 enum 근거·같은 도구의 refine 상속을 검사한 뒤 read port를 호출한다.
+  상세 규칙은 [공통 계약](../../project-wiki/references/contracts/chatbot-ai.md#생성-조건의-근거-검증)을 따른다. Backend도 실제 지원 조건과 권한을 다시 검증한다.
 - 질문 하나는 모델 생성 최대 3회와 주 조회 1회, 전체 60초 안에서 처리한다. 전송 오류는 재생성하지
   않으며 계약 오류의 고정 규칙만 되먹인다. 최종 답변은 검증된 Backend 결과 또는 고정 안내다.
 - 8K 문맥에서 UTF-8 byte 보수 상한, JSON Schema, 메시지 여유와 출력 1,024 token을 합산한다.
@@ -23,3 +25,13 @@ updated: 2026-09-08
 평가 절차와 실제 실행 근거는 [AI 평가 README](../../../../ai/eval/chatbot/README.md) 및 그 결과 링크를
 읽는다. 모델 해석 평가와 DB/API/브라우저 평가의 범위를 섞지 않는다. Qwen은 사용자 지시에 따라
 NOT_RUN이며 endpoint 기동이나 GPU 생성은 평가기의 책임이 아니다.
+
+이번 조건 검증 보완의 workflow 버전은 `chatbot-workflow:v2`이며 프롬프트 버전은 v1을 유지한다.
+현재 평가기는 `chatbot-intent-scorer:v2`다. `recent`도 명시된 조건으로 비교하므로 사용자가
+최근 정렬을 요청했는데 누락하거나 요청하지 않은 최근 정렬을 덧붙이면 오답이다. 기본 정렬이라는
+이유로 비교에서 지우지 않으며, refine은 현재 조건을 병합한 결과를 비교한다.
+
+기존 검토 요약과 원본 hash·점수는 당시 실행의 기록으로 보존한다. 이번 조건 검증·평가기 보완과
+단위 테스트 통과는 수정 후 실제 모델을 재평가했다는 근거가 아니다. 기존 요약을 v2 점수나 수정
+후 모델 성능으로 다시 표시하지 않으며, 새 모델 평가에는 수정된 workflow와 scorer 버전을
+기록한 별도 실행 결과가 필요하다.
