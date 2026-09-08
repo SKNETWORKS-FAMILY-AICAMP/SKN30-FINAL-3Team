@@ -53,28 +53,44 @@ class BackfillResult:
 
 
 def _anchor_ids(session: Session, brokerage_id: int) -> list[tuple[AnchorType, int]]:
-    """후보 선별이 활성으로 보는 것과 **같은 범위**를 쓴다.
+    """접수할 앵커. 후보 선별과 **같은 상태 범위**를 쓰고 실재 여부는 앵커 조회에 맡긴다.
 
-    범위가 갈리면 백필이 판정에 쓰이지 않을 카드를 만들거나, 쓰일 카드를 빠뜨린다.
+    상태 필터를 복사하면 백필이 판정에 쓰이지 않을 카드를 만들거나 쓰일 카드를 빠뜨린다.
+    그래서 `ACTIVE_*_STATUSES` 를 그대로 가져온다.
+
+    삭제 판정은 여기서 하지 않는다. 매물은 자기 `is_deleted` 뿐 아니라 **부모 세대의 삭제
+    여부**로도 가려지고, 그 규칙의 정본은 `repository.find_listing_anchor` 다. 여기에 join 을
+    다시 적으면 F1 이 범위를 바꿀 때 두 곳이 조용히 어긋난다 — 단건 조회에서 이미 한 번 그렇게
+    새어 화면에 없는 매물이 F3 앵커로 살아 있던 적이 있다.
+
+    상태 조회는 색인을 타는 값싼 1차 거르기이고, 통과한 것만 앵커 조회로 다시 확인한다.
+    백필은 일회성 관리 명령이라 앵커당 조회 한 번을 감수한다.
     """
-    listings = session.exec(
+    listing_ids = session.exec(
         select(col(PropertyListing.id)).where(
             col(PropertyListing.brokerage_id) == brokerage_id,
             col(PropertyListing.is_deleted).is_(False),
             col(PropertyListing.status).in_(sorted(ACTIVE_LISTING_STATUSES)),
         )
     ).all()
-    requirements = session.exec(
+    requirement_ids = session.exec(
         select(col(PropertyRequirement.id)).where(
             col(PropertyRequirement.brokerage_id) == brokerage_id,
             col(PropertyRequirement.is_deleted).is_(False),
             col(PropertyRequirement.status).in_(sorted(ACTIVE_REQUIREMENT_STATUSES)),
         )
     ).all()
-    return [
-        *((AnchorType.LISTING, anchor_id) for anchor_id in listings if anchor_id),
-        *((AnchorType.REQUIREMENT, anchor_id) for anchor_id in requirements if anchor_id),
-    ]
+
+    anchors: list[tuple[AnchorType, int]] = []
+    for listing_id in listing_ids:
+        if listing_id and repository.find_listing_anchor(session, brokerage_id, listing_id):
+            anchors.append((AnchorType.LISTING, listing_id))
+    for requirement_id in requirement_ids:
+        if requirement_id and repository.find_requirement_anchor(
+            session, brokerage_id, requirement_id
+        ):
+            anchors.append((AnchorType.REQUIREMENT, requirement_id))
+    return anchors
 
 
 def backfill_position_cards(
