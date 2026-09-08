@@ -12,9 +12,9 @@ from brokerage_ai.core.errors import translate_openai_error
 from brokerage_ai.f2.errors import AudioInputError, EmptyTranscriptionError, F2DependencyError
 from brokerage_ai.f2.types import Transcription
 
-# libsndfile은 MP4 컨테이너와 AAC를 열지 못해 vLLM 전사가 "Format not recognised"로 실패한다.
-# 해당 확장자만 호출 전에 WAV로 바꾸고 나머지는 원본 그대로 보낸다.
-TRANSCODED_SUFFIXES = frozenset({".aac", ".m4a", ".mp4"})
+# 확장자는 전사 서버가 읽을 수 있는지를 보장하지 않는다. libsndfile은 MP4 컨테이너와 AAC를
+# 열지 못하고, WAV라도 48kHz 스테레오나 24bit·float이면 거부될 수 있다. Whisper가 어차피
+# 16kHz mono로 다시 샘플링하므로 입력 형식을 하나로 정규화해서 보낸다.
 TRANSCODE_SAMPLE_RATE = 16000
 
 
@@ -25,7 +25,7 @@ def _frame_bytes(frame: Any) -> bytes:
 
 
 def decode_to_wav_bytes(path: Path) -> bytes:
-    """AAC 계열 음성을 16kHz mono WAV 바이트로 디코딩한다.
+    """업로드된 음성을 16kHz mono WAV 바이트로 디코딩한다.
 
     Whisper가 어차피 16kHz mono로 다시 샘플링하므로 여기서 맞춰 보내면 업로드 크기도
     줄어든다. PyAV는 ffmpeg 라이브러리를 wheel에 포함하므로 시스템 ffmpeg가 필요없다.
@@ -34,9 +34,7 @@ def decode_to_wav_bytes(path: Path) -> bytes:
     try:
         av = import_module("av")
     except ModuleNotFoundError as error:
-        raise F2DependencyError(
-            "av가 설치되어 있지 않아 AAC 계열 음성을 변환할 수 없습니다."
-        ) from error
+        raise F2DependencyError("av가 설치되어 있지 않아 음성을 변환할 수 없습니다.") from error
 
     resampler = av.AudioResampler(format="s16", layout="mono", rate=TRANSCODE_SAMPLE_RATE)
     chunks: list[bytes] = []
@@ -83,12 +81,8 @@ class VllmWhisperTranscriber:
         if not path.is_file():
             raise AudioInputError(f"음성 파일을 찾을 수 없습니다: {path}")
 
-        if path.suffix.lower() in TRANSCODED_SUFFIXES:
-            upload: Any = (f"{path.stem}.wav", decode_to_wav_bytes(path), "audio/wav")
-            response = self._create(upload)
-        else:
-            with path.open("rb") as audio_file:
-                response = self._create(audio_file)
+        upload: Any = (f"{path.stem}.wav", decode_to_wav_bytes(path), "audio/wav")
+        response = self._create(upload)
 
         text = response.text.strip()
         if not text:
