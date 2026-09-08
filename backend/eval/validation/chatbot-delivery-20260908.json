@@ -41,5 +41,12 @@
     "Default host Python 3.10/Node24 failed version preflight; the successful run used isolated Python3.13/Node22 paths.",
     "Public GHCR image pull succeeded with an empty temporary Docker config; user credentials and default runtime settings were not changed.",
     "New model inference was not needed for these deterministic checks. Qwen remains NOT_RUN."
-  ]
+  ],
+  "backend_lock_metadata_sync": {
+    "before_sha256": "d79b64702a99c4f840d8c7c9b0ad87fbbadc311adb4ff09663fc4741ee82322a",
+    "after_sha256": "d79b64702a99c4f840d8c7c9b0ad87fbbadc311adb4ff09663fc4741ee82322a",
+    "resolved_packages_unchanged": 89,
+    "change": "One requires-dev metadata entry for linked AI PyAV; no package/version/source/artifact changes",
+    "final_locked_ruff_and_pyright": "PASSED"
+  }
 }
