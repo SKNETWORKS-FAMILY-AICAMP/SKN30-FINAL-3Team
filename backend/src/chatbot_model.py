@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlmodel import Session
@@ -23,14 +25,45 @@ PROFILES = {
 }
 
 
-def activate_chatbot(config: Config, brokerage_id: int, profile: str, *, apply: bool) -> None:
+def resolve_profile(profile: str, profiles_file: Path | None = None) -> tuple:
+    """Read an explicitly supplied deployment contract, never another module's internals."""
+    if profiles_file is None:
+        if profile not in PROFILES:
+            raise ValueError("unknown model profile; supply --profiles-file")
+        return PROFILES[profile]
+    document = json.loads(profiles_file.read_bytes())
+    if document.get("schema_version") != 1:
+        raise ValueError("unsupported serving profile schema")
+    value = document.get("profiles", {}).get(profile)
+    if not isinstance(value, dict):
+        raise ValueError("unknown serving model profile")
+    if not isinstance(value.get("model"), str) or not value["model"].strip():
+        raise ValueError("serving model is required")
+    if not re.fullmatch(r"[0-9a-f]{40}", value.get("revision", "")):
+        raise ValueError("serving model revision must be pinned")
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", value.get("runtime_image", "")):
+        raise ValueError("serving runtime image must be pinned")
+    resolved = ("vllm", value["model"], value["revision"], "general-dev-gpu")
+    if profile in PROFILES and PROFILES[profile] != resolved:
+        raise ValueError("built-in model profiles cannot be overridden")
+    return resolved
+
+
+def activate_chatbot(
+    config: Config,
+    brokerage_id: int,
+    profile: str,
+    *,
+    apply: bool,
+    profiles_file: Path | None = None,
+) -> None:
     if config.app.environment is not AppEnvironment.LOCAL:
         raise ValueError("CHATBOT model selection only supports a local database")
     require_local_seed_target(config)
-    if brokerage_id < 1 or profile not in PROFILES:
+    if brokerage_id < 1:
         raise ValueError("a valid brokerage and model profile are required")
     ai_config = load_ai_config(config.app.environment.value)
-    provider, model, revision, alias = PROFILES[profile]
+    provider, model, revision, alias = resolve_profile(profile, profiles_file)
     if provider == "openai" and ai_config.openai is None:
         raise ValueError("configure AI_OPENAI_API_KEY first")
     if alias is not None and not any(e.alias == alias for e in ai_config.llm_endpoints):
@@ -97,11 +130,18 @@ def activate_chatbot(config: Config, brokerage_id: int, profile: str, *, apply: 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--brokerage-id", type=int, required=True)
-    parser.add_argument("--model-profile", choices=PROFILES, required=True)
+    parser.add_argument("--model-profile", required=True)
+    parser.add_argument("--profiles-file", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     try:
-        activate_chatbot(get_config(), args.brokerage_id, args.model_profile, apply=args.apply)
+        activate_chatbot(
+            get_config(),
+            args.brokerage_id,
+            args.model_profile,
+            apply=args.apply,
+            profiles_file=args.profiles_file,
+        )
     except Exception:
         raise SystemExit(
             "CHATBOT model selection failed; check local DB and provider setup."

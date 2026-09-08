@@ -79,6 +79,23 @@ def verify_summary(raw_bytes: bytes, summary: dict) -> dict:
     for field in ("route", "fixture_sha256", "started_at"):
         if raw["provenance"].get(field) != provenance.get(field):
             raise ValueError(f"provenance.{field} differs from the raw report")
+    if raw["provenance"]["route"]["provider"] != "openai":
+        _EVALUATION.validate_self_hosted_provenance(raw["provenance"])
+        for field in (
+            "runtime_label",
+            "runtime_image",
+            "deployment_image",
+            "artifact_revision",
+            "artifact_sha256",
+            "model_profile",
+            "profiles_sha256",
+            "profile",
+            "expected_weights_manifest_sha256",
+            "endpoint_attestation",
+            "final_endpoint_attestation",
+        ):
+            if raw["provenance"].get(field) != provenance.get(field):
+                raise ValueError(f"provenance.{field} differs from the raw report")
     if raw["provenance"]["prompt_sha256"] != provenance["evaluated_workflow_sha256"]:
         raise ValueError("evaluated workflow hash differs from the raw report")
     if raw.get("warmup_ms") != summary.get("warmup_ms"):

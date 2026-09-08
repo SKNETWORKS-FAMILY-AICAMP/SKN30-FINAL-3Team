@@ -99,16 +99,29 @@ def probe(base_url: str, key: str, model: str, *, stt: bool = False) -> None:
 
 
 if __name__ == "__main__":
+    import argparse
     import sys
     from pathlib import Path
 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--status", action="store_true")
+    parser.add_argument("--model")
+    args = parser.parse_args()
     try:
         config = json.loads(Path("/opt/brokerage-gpu/config.json").read_text())
         env = dict(
             line.split("=", 1)
             for line in Path("/opt/brokerage-gpu/runtime.env").read_text().splitlines()
         )
-        if sys.argv[1:] == ["--status"]:
+        if config["workload"] == "general" and "GENERAL_MODEL_PROFILE" in env:
+            from model_profiles import load_profile
+
+            config["model"] = load_profile(env["GENERAL_MODEL_PROFILE"])["model"]
+        if args.model is not None:
+            if config["workload"] != "general":
+                raise ValueError("explicit general model cannot be used for F2")
+            config["model"] = args.model
+        if args.status:
             result = {
                 "model_ready": False,
                 "disk_free_bytes": shutil.disk_usage("/srv/brokerage-gpu").free,

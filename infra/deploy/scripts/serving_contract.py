@@ -6,6 +6,7 @@ import ipaddress
 import re
 from urllib.parse import urlsplit
 
+DEFAULT_GENERAL_PROFILE = "qwen38-27b-bnb"
 GENERAL_MODEL = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
 GENERAL_REVISION = "8aa5f05d26b7205477066e1449e0af13f762a299"
 GENERAL_ALIAS = "general-dev-gpu"
