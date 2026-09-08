@@ -2,6 +2,7 @@
 status: 구현됨
 updated: 2026-09-08
 implementation: 코드 구현·로컬 검증, 공유 dev 미배포
+review: 사용자 구현 승인·팀 병합 검토 대기
 ---
 
 # F4 챗봇 HTTP·SSE·복구 설계
@@ -24,7 +25,7 @@ implementation: 코드 구현·로컬 검증, 공유 dev 미배포
 | POST `/conversations/{id}/requests` | 질문·문맥 기준 버전·`client_request_id` 검증 후 실행 접수, 202 응답 |
 | GET `/requests/{id}` | DB의 최신 단계·terminal 상태·최종 답변 참조/결과 조회 |
 | GET `/requests/{id}/events` | 최신 스냅샷으로 시작하는 SSE 구독. 지나간 이벤트 재생 없음 |
-| POST `/requests/{id}/cancel` | 명시적 중지. 조건부 상태 전이·원격 취소 시도 |
+| POST `/requests/{id}/cancel` | 명시적 중지. 즉시 상태 반영·후속 호출 차단, 진행 중 Provider는 정리까지 대기 |
 | PATCH `/conversations/{id}/filters` | `expected_version`을 검사하고 현재 검색 조건만 초기화. 활성 요청·버전 충돌은 409 |
 | GET `/requests/{id}/results?offset=10` | 저장된 조건으로 권한을 재검증해 현재 결과·총계·기준 시각 반환. 대화 이력 변경 없음 |
 | DELETE `/conversations/{id}` | 대화·메시지·요청 기록을 운영 DB에서 원자적으로 즉시 삭제 |
@@ -35,7 +36,7 @@ implementation: 코드 구현·로컬 검증, 공유 dev 미배포
 
 ## 질문 입력과 중복 접수
 
-요청 본문은 현재 질문, 화면의 명시 선택 대상, 현재 조건의 예상 버전, `client_request_id`만 받는 안이다.
+요청 본문은 `question`, `expected_version`, `client_request_id`와 선택한 과거 답변의 `reference_message_id`만 받는다. 현재 장부 선택 행을 자동 전달하지 않는다.
 과거 이력은 Backend가 DB에서 직전 완료 2회를 선택한다. 클라이언트 `history`를 권위 있는 이력으로 받지 않는다.
 현재 조건은 서버 저장값을 기준으로 하며 클라이언트의 조건 변경 요청은 전체 재검증한다. 오래된 버전은 충돌 안내한다.
 

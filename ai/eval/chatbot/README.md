@@ -55,3 +55,41 @@ Provider·alias·artifact는 실제 배치에 맞춰 선택한다. self-hosted �
 반복별 점수와 오답 조건은 결과 파일에 보존한다. 지원 조건이 항상 정확하다는 뜻은 아니며
 화면의 적용 조건을 확인할 수 있어야 한다. 검토 중 추가된 과거 차단 질문의 비밀값 제외 처리는
 별도 회귀 테스트로 확인했고, 모델이 실제 받은 59종 입력의 hash는 수정 전후 동일했다.
+
+
+## 원본 보고서와 검토 요약의 형식
+
+`evaluate.py --output ...`은 사례별 `rows`, 전체·반복별 `summary`, 실행 provenance가 있는 **원본
+보고서**를 만든다. `results/`의 원본은 수정하지 않고 SHA-256으로 결속한다. 2026-09-08 원본의
+`provenance.prompt_sha256`은 당시 workflow 파일 전체의 hash인 기존 필드명이다.
+
+`validation/luna-20260908.json`은 이 CLI의 직접 출력이 아닌 **수동 집계·검토 요약**이다.
+`artifact_kind=chatbot_evaluation_reviewed_summary`, `schema_version=1`,
+`creation_method=manual_aggregation_and_review`로 이를 구분한다. 수치·오답에는 원본의
+`rows`를 집계하고, 보안 검토 후 입력 동등성·검토 시점 workflow hash·Qwen 보류 결정은 별도
+검토 주석으로 추가했다. `evaluated_workflow_sha256`은 원본의 workflow hash를 보존한다.
+
+요약 생성 절차는 다음과 같다.
+
+1. 완료된 원본 파일을 보존하고 그 파일 바이트의 SHA-256을 `raw_report_sha256`에 기록한다.
+2. `verify_summary.recompute_aggregates(raw["rows"])`로 전체·반복별 점수, 그룹별 분모·정답 수,
+   오답 목록을 다시 계산해 요약에 넣는다. 이 함수는 현재 `evaluate.summarize`를 재사용한다.
+3. 실행 provenance를 대조하고 검토 주석을 별도 추가한다. 원본 실행을 다시 했다고 표시하지 않는다.
+4. 아래 검증기로 schema·원본 hash·80종×3회 구성·전체·반복별 집계·오답 목록을 확인한다.
+   검증기 버전은 `chatbot-summary-verifier:v1`이며 수동 검토 자체를 자동 생성했다고 주장하지 않는다.
+
+```bash
+uv run --locked --project ai python ai/eval/chatbot/verify_summary.py \
+  --raw ai/eval/chatbot/results/luna-20260908.json \
+  --summary ai/eval/chatbot/validation/luna-20260908.json
+```
+
+이 명령은 모델이나 DB를 호출하지 않는다. 원본 파일이 없으면 실제 검증을 완료할 수 없으며,
+요약만으로 원본 실행을 다시 만들 수 있다고 간주하지 않는다. 저장소 단위 테스트는 합성 원본으로
+수치·반복별 값 변경, 원본 바이트 변경, 중복 관측과 잘못된 artifact 형식의 거절을 검증한다.
+
+## 개발 검증 의존성
+
+AI의 기존 F2 AAC 변환 테스트와 Pyright 검사에는 PyAV가 필요하다. `av==18.1.0`은 AI의 `dev`
+그룹과 `uv.lock`에 고정한다. `uv sync --locked --project ai`로 재현하며 production 의존성에는
+추가하지 않는다. 이전 실행에서 사용한 임시 `--with av` 설치가 CI의 숨은 선행조건이 되지 않게 한다.
