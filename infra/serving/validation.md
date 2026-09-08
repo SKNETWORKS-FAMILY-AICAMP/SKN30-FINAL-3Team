@@ -1,6 +1,7 @@
 # LLM 통합 검증 기록
 
-기준일: 2026-09-07. 자동 검증 통과와 외부 운영 완료를 구분한다.
+기준일: 2026-09-07의 과거 검증 기록. 자동 검증 통과와 외부 운영 완료를 구분한다.
+후속 2026-09-08의 vLLM 0.28.0·14B/32B AWQ·27B BnB 검증은 [3모델 비교](model-comparison-2026-09-08.md)를 참조한다.
 
 ## 자동 검증
 
@@ -29,7 +30,7 @@
   비용은 [운영 절차](README.md)의 보존·실행 상태별 기준으로 평가한다.
 - NVIDIA Ubuntu 24.04 DLAMI 후보 `ami-0097a4a30ec557269`의 공식 소유·이름을 조회했다.
   Docker Compose·toolkit과 수정 runtime 후보의 AWS 실기동을 후속 검증에서 확인했다.
-- vLLM v0.26.0 linux/amd64 공식 digest는 [image-provenance.json](image-provenance.json)에 기록했다.
+- 당시 기반은 vLLM v0.26.0 linux/amd64였다. 현재 [image-provenance.json](image-provenance.json)은 후속 비교용 0.28.0을 가리킨다.
   이는 Qwen BnB GPU 추론 통과 기록이나 완성 프로젝트 이미지 digest가 아니다.
 
 ## 외부 적용과 실제 측정 — 미완료

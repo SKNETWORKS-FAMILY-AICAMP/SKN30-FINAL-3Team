@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-09-08",
+  "deployment_rule": "Resolve tags for discovery; deploy the immutable image digest. GENERAL_MODEL_PROFILE is required to select the intended model. No model weights are baked into these images.",
+  "status_meanings": {
+    "evaluated": "Full F4 synthetic 240-case and HTTP 36-case evaluation completed; this does not imply acceptance passed.",
+    "cpu_only": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result.",
+    "startup_only": "Exact GPU startup and weights verified; no quality evaluation.",
+    "not_in_image": "Profile absent in this image; select another published image.",
+    "failed": "Do not reuse this image for this profile; GPU startup failed."
+  },
+  "gpu_validation_environment": {
+    "gpu": "NVIDIA L40S 48GB",
+    "allowed_cuda_versions": [
+      "13.0"
+    ],
+    "cuda_compatibility": "0",
+    "max_model_len": 8192,
+    "max_num_seqs": 1,
+    "gpu_memory_utilization": 0.85,
+    "eager": true,
+    "enable_thinking": false
+  },
+  "images": [
+    {
+      "id": "awq-evaluated",
+      "tag": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving:git-cfd05ebe09de26fd96fd3e5dec66be3aff146715",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+      "source_revision": "cfd05ebe09de26fd96fd3e5dec66be3aff146715",
+      "workflow_run": 34190920284,
+      "platform": "linux/amd64",
+      "runtime_base": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "bitsandbytes_version": "0.50.2",
+      "bnb_plugin_version": null,
+      "profiles": {
+        "qwen3-14b-awq": {
+          "quantization": "awq",
+          "status": "evaluated",
+          "note": "Full F4 synthetic 240-case and HTTP 36-case evaluation completed; this does not imply acceptance passed."
+        },
+        "qwen3-32b-awq": {
+          "quantization": "awq",
+          "status": "evaluated",
+          "note": "Full F4 synthetic 240-case and HTTP 36-case evaluation completed; this does not imply acceptance passed."
+        },
+        "qwen38-27b-bnb": {
+          "quantization": "bitsandbytes",
+          "status": "failed",
+          "note": "GPU startup failed: Unknown quantization method bitsandbytes; plugin absent."
+        },
+        "qwen38-27b-fp8": {
+          "quantization": "fp8",
+          "status": "not_in_image",
+          "note": "Profile absent in this image; select another published image."
+        }
+      },
+      "profiles_sha256": "2e92885bb17bc4cea6e25cea95550a353dc619a44d4da978eac96f81cb38e34f"
+    },
+    {
+      "id": "bnb-plugin03-incompatible",
+      "tag": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving:git-9eea7a9e81e0ae582752384904cc91ffd413aec2",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:04eaa4d047b677f789a7294bf1131eb312f0d088fded3d2c1a042b912df2860f",
+      "source_revision": "9eea7a9e81e0ae582752384904cc91ffd413aec2",
+      "workflow_run": 34195570164,
+      "platform": "linux/amd64",
+      "runtime_base": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "bitsandbytes_version": "0.50.2",
+      "bnb_plugin_version": "0.0.3",
+      "profiles": {
+        "qwen3-14b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen3-32b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen38-27b-bnb": {
+          "quantization": "bitsandbytes",
+          "status": "failed",
+          "note": "GPU startup failed: plugin 0.0.3 calls WeightsMapper.get_rename_mapper absent from vLLM 0.28.0."
+        },
+        "qwen38-27b-fp8": {
+          "quantization": "fp8",
+          "status": "not_in_image",
+          "note": "Profile absent in this image; select another published image."
+        }
+      },
+      "profiles_sha256": "2e92885bb17bc4cea6e25cea95550a353dc619a44d4da978eac96f81cb38e34f"
+    },
+    {
+      "id": "bnb-startup-verified",
+      "tag": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving:git-53b97bff79a44a08c26e61111bdcc64469023016",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:c178666e09239c3366f32ad59e1aa85c13db43c8902a1a2729a9fc9fc09eb06f",
+      "source_revision": "53b97bff79a44a08c26e61111bdcc64469023016",
+      "workflow_run": 34197647141,
+      "platform": "linux/amd64",
+      "runtime_base": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "bitsandbytes_version": "0.50.2",
+      "bnb_plugin_version": "0.0.2",
+      "profiles": {
+        "qwen3-14b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen3-32b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen38-27b-bnb": {
+          "quantization": "bitsandbytes",
+          "status": "startup_only",
+          "note": "Exact GPU startup and weights verified; no quality evaluation."
+        },
+        "qwen38-27b-fp8": {
+          "quantization": "fp8",
+          "status": "not_in_image",
+          "note": "Profile absent in this image; select another published image."
+        }
+      },
+      "profiles_sha256": "2e92885bb17bc4cea6e25cea95550a353dc619a44d4da978eac96f81cb38e34f"
+    },
+    {
+      "id": "official-fp8-evaluated",
+      "tag": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving:git-8bfd2c8c83d11c5b9b03b7e031a62ffacf128fef",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:801473c822b3536c58dd310f0768dfacf0aebd968c06a4ea427d0d9561f5c1e7",
+      "source_revision": "8bfd2c8c83d11c5b9b03b7e031a62ffacf128fef",
+      "workflow_run": 34200029859,
+      "platform": "linux/amd64",
+      "runtime_base": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "bitsandbytes_version": "0.50.2",
+      "bnb_plugin_version": "0.0.2",
+      "profiles": {
+        "qwen3-14b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen3-32b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen38-27b-bnb": {
+          "quantization": "bitsandbytes",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen38-27b-fp8": {
+          "quantization": "fp8",
+          "status": "evaluated",
+          "note": "Full F4 synthetic 240-case and HTTP 36-case evaluation completed; this does not imply acceptance passed."
+        }
+      },
+      "profiles_sha256": "4e4c8937b0c4cceb0f31d5f9ff564d3cce370e9caea7c3e75dfd591a8e6d87f9"
+    }
+  ]
+}

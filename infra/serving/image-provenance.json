@@ -3,5 +3,5 @@
   "platform": "linux/amd64",
   "digest": "sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
   "verified_registry_at": "2026-09-08",
-  "gpu_compatibility": "pending-three-profile-evaluation"
+  "gpu_compatibility": "L40S-native-CUDA: AWQ14B/AWQ32B/BnB27B/official-FP8-27B startup verified; quality results in model-comparison-2026-09-08.md"
 }

@@ -34,8 +34,9 @@ uv run --locked --project ai python ai/eval/chatbot/evaluate.py \
 
 ## Qwen 재개
 
-사용자가 3모델 비교를 재개했다. `qwen3-14b-awq`, `qwen3-32b-awq`, `qwen38-27b-bnb`를
+사용자가 3모델 비교를 재개했다. `qwen3-14b-awq`, `qwen3-32b-awq`, `qwen38-27b-fp8`를
 같은 80개 사례·3회, 동시 추론 1건으로 각각 실행한다. GPU 시작·종료는 Infra 운영자가 수행하며,
+세 번째 모델은 사용자 최종 선택인 공식 Qwen FP8이며 BnB는 기동 이력만 보존한다.
 이 평가기는 이미 준비된 endpoint만 사용한다. 실제 완료 보고서가 없으면 합격으로 표시하지 않는다.
 
 ```bash
@@ -121,6 +122,48 @@ uv run --locked --project ai python ai/eval/chatbot/verify_summary.py \
 이 명령은 모델이나 DB를 호출하지 않는다. 원본 파일이 없으면 실제 검증을 완료할 수 없으며,
 요약만으로 원본 실행을 다시 만들 수 있다고 간주하지 않는다. 저장소 단위 테스트는 합성 원본으로
 수치·반복별 값 변경, 원본 바이트 변경, 중복 관측과 잘못된 artifact 형식의 거절을 검증한다.
+
+## Qwen 검토 과정 재현
+
+`review_summary.py`는 기존 임시 검토 도구를 저장소에 옮긴 오프라인 CLI다. 완료된 원본의
+전체 80개×3회 구성, 정본 fixture hash, 각 사례의 재채점, `actual`·`attempts` 구조와
+민감 문자열 패턴, 허용 metadata 필드, 가중치 manifest hash 및 실행 전후 모델 증빙을 검사한다.
+그 후 기존 `recompute_aggregates`와 `verify_summary`로 수치·실패 목록·원본 hash를 검증한다.
+모델·DB·GPU를 호출하지 않으며, endpoint 증빙 대조를 원격 파일 재검증이나 실제 Pod 이미지
+확인으로 해석하지 않는다. 민감 문자열 검사는 사람의 검토를 보조하며 완전한 탐지를 보장하지 않는다.
+
+검토자가 원본의 합성 출력과 실패 내용을 확인한 뒤 `--reviewed`를 명시한다. `RUNNING`,
+`FAILED`, 부분 평가 또는 일치하지 않는 fixture는 거절한다. 출력은 항상 새 파일이어야 하며
+원본·기존 요약을 덮어쓰지 않는다. `COMPLETED`는 실행 완료 상태이며 정확도 합격 여부와 별개다.
+
+```bash
+uv run --locked --project ai python ai/eval/chatbot/review_summary.py \
+  --raw ai/eval/chatbot/results/qwen38-27b-fp8-20260908.json \
+  --output /tmp/qwen38-27b-fp8-reviewed-new.json \
+  --verify-against ai/eval/chatbot/validation/qwen38-27b-fp8-20260908.json \
+  --reviewed
+```
+
+`--verify-against`는 기존 요약도 같은 원본으로 검증하여 집계와 원본 hash가 일치하는지 확인한다.
+기존 요약에 추가된 수동 원인 분석·채택 판단 주석을 새로 작성하거나 복제하지 않는다. 재현 범위는
+자동 검사·집계·원본 결속이며, 수동 주석은 기존 검토 문서에 남는다. 실행한 모델의 프로필 snapshot을
+원본에서 읽으므로 이후 다른 모델이 추가되어 현재 프로필 파일 hash가 달라져도 과거 검토가 가능하다.
+
+세 기존 결과를 새 디렉터리에서 재현하려면 다음을 실행한다.
+
+```bash
+review_output_dir="$(mktemp -d /tmp/qwen-review-replay.XXXXXX)"
+for profile in qwen3-14b-awq qwen3-32b-awq qwen38-27b-fp8; do
+  uv run --locked --project ai python ai/eval/chatbot/review_summary.py \
+    --raw "ai/eval/chatbot/results/${profile}-20260908.json" \
+    --output "${review_output_dir}/${profile}.json" \
+    --verify-against "ai/eval/chatbot/validation/${profile}-20260908.json" \
+    --reviewed
+done
+```
+
+원본 `results/`는 비추적 산출물이므로 새 checkout에는 없을 수 있다. 평가 때 보존한 정확한 원본
+파일이 필요하며, 요약만으로 원본 실행을 재생성하거나 검증을 통과했다고 표시하지 않는다.
 
 ## 개발 검증 의존성
 

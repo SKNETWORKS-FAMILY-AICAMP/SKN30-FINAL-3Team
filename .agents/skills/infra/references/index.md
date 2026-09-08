@@ -21,3 +21,5 @@ updated: 2026-08-18
 | [AWS·RunPod LLM 운영](../../../../infra/serving/README.md) | f2/general 등록, local 연결, 전환, GPU 캐시·전원과 실제 검증을 수행할 때 |
 
 모델별 선택·동일 조건 평가·프로필 provenance는 [3모델 비교 기록](../../../../infra/serving/model-comparison-2026-09-08.md)을 확인한다.
+
+검토 도구·원본 요약 재생성과 이미지 태그별 양자화 재사용은 [비교 재현 절차](../../../../infra/serving/comparison-reproduction.md)와 [게시 이미지 catalog](../../../../infra/serving/published-images.json)를 따른다.
