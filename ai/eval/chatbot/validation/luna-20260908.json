@@ -1,4 +1,10 @@
 {
+  "artifact_kind": "chatbot_evaluation_reviewed_summary",
+  "schema_version": 1,
+  "creation_method": "manual_aggregation_and_review",
+  "verification_tool_version": "chatbot-summary-verifier:v1",
+  "aggregation_source": "ai/eval/chatbot/evaluate.py:summarize",
+  "creation_notes": "Manually assembled reviewed summary of the hash-bound raw evaluate.py output; aggregate and failure evidence is reproducible with verify_summary.py. Review notes and deferred-provider decisions are human/agent-reviewed annotations, not raw model output.",
   "status": "COMPLETED",
   "scope": "Synthetic model interpretation and guarded workflow; DB/API/browser performance separate",
   "provenance": {
