@@ -41,10 +41,21 @@ CATEGORY_LABELS = {
     "CLIENT_TENANCY_EXPIRY": "손님 거주지 만기",
     "REQUEST_EXPIRY": "구입 의뢰 만기",
     "MOVE_IN": "희망 입주",
-    "LISTING_RECONTACT": "매물 재연락",
-    "CLIENT_RECONTACT": "손님 재연락",
     "LISTING_REVALIDATION": "매물 조건 재확인",
 }
+
+
+class UnsupportedAgenda(ClarificationNeeded):
+    """A stored AI vocabulary item can outlive its supported Backend capability."""
+
+
+def _ensure_supported_agenda(filters: dict) -> None:
+    if filters.get("tool") == "agenda" and {"LISTING_RECONTACT", "CLIENT_RECONTACT"}.intersection(
+        filters.get("categories", [])
+    ):
+        raise UnsupportedAgenda(
+            "재연락 기능은 지원하지 않아요. 일정·만기·매물 재확인을 조회해 주세요."
+        )
 
 
 def _scalar_conditions(column, values: dict) -> list:
@@ -103,6 +114,7 @@ def normalize(intent: ChatIntent, request: ChatInput) -> dict:
     filters = ChatFilters.model_validate(raw)
     result = filters.model_dump(mode="json", exclude_none=True)
     result["tool"] = intent.tool
+    _ensure_supported_agenda(result)
     if filters.status and filters.status not in ("RECEIVED", "ACTIVE"):
         raise ClarificationNeeded("현재 지원하는 진행 상태로 다시 알려 주세요.")
     if filters.status and (
@@ -224,6 +236,10 @@ class ChatLookup:
             if self.on_search is not None:
                 await self.on_search(filters)
             return await _completed_thread(self.search, filters, 0)
+        except UnsupportedAgenda as error:
+            return ChatResult(
+                kind="unsupported", text=str(error), filters=request.active_filters, as_of=now()
+            )
         except ClarificationNeeded as error:
             return ChatResult(
                 kind="clarification", text=str(error), filters=request.active_filters, as_of=now()
@@ -232,6 +248,12 @@ class ChatLookup:
     def search(self, filters: dict, offset: int = 0) -> ChatResult:
         if not 0 <= offset <= 100000 or filters.get("tool") not in QUERY_TOOLS:
             raise ClarificationNeeded("조회 조건이나 페이지가 올바르지 않아요.")
+        # Historical result pagination bypasses normalize(), so recheck capability
+        # before opening a DB session and never describe removed categories as empty.
+        try:
+            _ensure_supported_agenda(filters)
+        except UnsupportedAgenda as error:
+            return ChatResult(kind="unsupported", text=str(error), filters=filters, as_of=now())
         with Session(self.engine) as session:
             # Count and page share a snapshot during concurrent ledger edits.
             session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
@@ -431,7 +453,13 @@ class ChatLookup:
             date.fromisoformat(filters["start_date"]),
             date.fromisoformat(filters["end_date"]),
         )
-        window = AgendaWindow(start, start, end, 30, 30, 100)
+        window = AgendaWindow(
+            as_of=start,
+            earliest=start,
+            latest=end,
+            revalidation_days=30,
+            per_category_limit=100,
+        )
         combined = agenda_union(self.brokerage_id, window)
         query = select(combined).where(combined.c.due_date.between(start, end))
         categories = filters.get("categories", [])

@@ -42,14 +42,6 @@ def create_requirement(client, party_id: int, **overrides: object) -> int:
     return response.json()["requirement"]["id"]
 
 
-def set_last_contact(session: Session, table: str, row_id: int, days_ago: int) -> None:
-    """마지막 접촉 시각을 직접 옮긴다. 장부 API로는 과거 시각을 지정할 수 없다."""
-    session.execute(
-        text(f"UPDATE {table} SET last_contact_at = :moment WHERE id = :id"),  # noqa: S608
-        {"moment": f"{(TODAY - timedelta(days=days_ago)).isoformat()} 12:00:00+09", "id": row_id},
-    )
-
-
 def categories(body: dict) -> list[str]:
     return [item["category"] for item in body["items"]]
 
@@ -60,31 +52,27 @@ def test_merges_stored_dates_and_rule_tasks_into_one_soonest_first_list(config: 
         complex_id = create_complex(client, session, brokerage_id, "일정단지")
         create_unit(client, complex_id, unit_number="101", tenancy_expiry_date=in_days(40))
         party_id = create_consented_party(session, brokerage_id, user_id, "일정 손님")
-        requirement_id = create_requirement(
+        create_requirement(
             client,
             party_id,
             current_tenancy_expiry_date=in_days(10),
             request_expiry_date=in_days(80),
             desired_move_in_date=in_days(25),
         )
-        # 20일 전 접촉 + 재연락 주기 30일 → 열흘 뒤가 재연락 기한이다.
-        set_last_contact(session, "property_requirement", requirement_id, 20)
 
         body = client.get(AGENDA).json()
 
-        assert body["total"] == 5
+        assert body["total"] == 4
         assert categories(body) == [
-            "CLIENT_RECONTACT",
             "CLIENT_TENANCY_EXPIRY",
             "MOVE_IN",
             "TENANCY_EXPIRY",
             "REQUEST_EXPIRY",
         ]
-        assert [item["days_until_due"] for item in body["items"]] == [10, 10, 25, 40, 80]
+        assert [item["days_until_due"] for item in body["items"]] == [10, 25, 40, 80]
         assert body["as_of"] == TODAY.isoformat()
         # 해당되는 종류만, 각 1건씩 실린다. 0건인 종류는 아예 나오지 않는다.
         assert body["categories"] == [
-            {"category": "CLIENT_RECONTACT", "total": 1},
             {"category": "CLIENT_TENANCY_EXPIRY", "total": 1},
             {"category": "MOVE_IN", "total": 1},
             {"category": "REQUEST_EXPIRY", "total": 1},
@@ -148,54 +136,6 @@ def test_one_busy_kind_does_not_push_the_others_out_of_the_briefing(config: Conf
             {"category": "MOVE_IN", "total": 1},
             {"category": "TENANCY_EXPIRY", "total": 5},
         ]
-
-
-@requires_database
-def test_recontact_is_derived_from_the_last_contact_and_the_configured_period(
-    config: Config,
-) -> None:
-    with ledger_client(config) as (client, session, brokerage_id, user_id):
-        party_id = create_consented_party(session, brokerage_id, user_id, "뜸한 손님")
-        requirement_id = create_requirement(client, party_id)
-        set_last_contact(session, "property_requirement", requirement_id, 28)
-
-        # 기본 주기 30일이면 이틀 뒤가 기한이다.
-        default_window = client.get(AGENDA).json()
-        assert categories(default_window) == ["CLIENT_RECONTACT"]
-        assert default_window["items"][0]["days_until_due"] == 2
-
-        # 주기를 7일로 줄이면 기한이 21일 전으로 밀리지만 재연락은 아래쪽 경계가 없어 남는다.
-        shorter = client.get(AGENDA, params={"recontact_days": 7}).json()
-        assert categories(shorter) == ["CLIENT_RECONTACT"]
-        assert shorter["items"][0]["days_until_due"] == -21
-
-
-@requires_database
-def test_long_neglected_targets_stay_on_the_list(config: Config) -> None:
-    """F1-AL-03은 "일정 기간 이상 접촉이 없는" 대상을 알리라고 한다.
-
-    되돌아보는 창을 재연락에도 걸면 오래 방치된 대상이 빠지는데, 그 대상이야말로 알려야 할
-    사람이다. 기한 이른 순 정렬이라 가장 오래 방치된 쪽이 위에 온다.
-    """
-    with ledger_client(config) as (client, session, brokerage_id, user_id):
-        recent = create_consented_party(session, brokerage_id, user_id, "최근 손님")
-        stale = create_consented_party(session, brokerage_id, user_id, "방치 손님")
-        recent_id = create_requirement(client, recent)
-        stale_id = create_requirement(client, stale)
-        set_last_contact(session, "property_requirement", recent_id, 25)
-        set_last_contact(session, "property_requirement", stale_id, 400)
-
-        body = client.get(AGENDA).json()
-
-        assert body["total"] == 2
-        names = [item["contacts"][0]["party"]["name"] for item in body["items"]]
-        assert names == ["방치 손님", "최근 손님"]
-        # 400일 전 접촉 + 주기 30일 → 370일 지남
-        assert body["items"][0]["days_until_due"] == -370
-
-        # 되돌아보는 창을 0으로 줄여도 밀린 재연락은 그대로 남는다.
-        without_overdue = client.get(AGENDA, params={"overdue_days": 0}).json()
-        assert without_overdue["total"] == 2
 
 
 @requires_database
@@ -417,7 +357,7 @@ def test_arguments_outside_the_supported_range_are_rejected(config: Config) -> N
         for params in [
             {"within_days": 0},
             {"overdue_days": -1},
-            {"recontact_days": 0},
+            {"revalidation_days": 0},
             {"per_category_limit": 0},
         ]:
             assert client.get(AGENDA, params=params).status_code == 422, params

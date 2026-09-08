@@ -62,6 +62,17 @@ uv run --locked --project ai python ai/eval/chatbot/review_summary.py \
 원본 SHA256·반복별 집계·실패 ID·허용된 metadata·민감 출력 패턴을 검사한다.
 별도 해석 주석과 자동 집계는 구분하며, 코드 재생성이 사람의 검토를 자동 인증하지 않는다.
 
+## 평가 당시 코드와 최신 통합 코드
+
+원본 비교는 FP8 게시 소스 `8bfd2c8c83d11c5b9b03b7e031a62ffacf128fef`의
+AI workflow·고정 80개 사례를 사용했다. 게시 catalog의 모델별 source revision으로 별도 checkout을
+만들면 당시 실행 구성을 재현할 수 있다. 이후 검토 도구 추가는 프롬프트·fixture를 바꾸지 않았다.
+
+평가 종료 후 `dev`의 #109가 Time Keeper 재연락 기능을 제거하여 최신 Backend 통합은
+재연락 종류를 미지원으로 안내한다. 과거 모델 평가의 재연락 2개 사례는 역사적 비교 입력으로
+보존하며 현재 지원 범위를 증명하지 않는다. 새 범위를 평가할 때는 새 버전의 fixture와 별도
+원본 파일을 사용하고 이 보고서를 소급 채점하거나 덮어쓰지 않는다.
+
 ## 같은 모델 다시 평가
 
 운영자가 위 catalog에서 프로필과 이미지 digest를 명시해 격리 Pod를 준비한다. 기존
