@@ -10,7 +10,7 @@ import {
   UserIcon,
 } from "@patternfly/react-icons";
 import { useBuyerLedger, useComplexOptions, useComplexQuickAdd, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser, isEmptyDraft } from "./features/ledger/index.ts";
+import { describeForUser, isEmptyDraft, loadSavedBuyer, loadSavedProperty } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
@@ -21,7 +21,9 @@ import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { HomeScreen } from "./features/HomeScreen.tsx";
 import { TimeKeeperNotification } from "./features/timeKeeper/index.ts";
-import { CalendarView } from "./features/calendar/index.ts";
+import { CalendarView, loadSavedCalendarEvent } from "./features/calendar/index.ts";
+import { Chatbot } from "./features/chatbot/index.ts";
+import { ApiError } from "./shared/api/index.ts";
 import VoiceMemoModal from "./features/VoiceMemoModal.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -105,6 +107,11 @@ export function AppShell() {
   // 로그인 여부는 AuthGate가 이미 걸렀다. 여기서는 헤더 표시와 로그아웃만 다룬다.
   const { state: authState, isSubmitting: authSubmitting, signOut, markSessionExpired } = useAuth();
   const user = currentUser(authState);
+  const chatbotUserKey = user ? `${user.brokerageId}:${user.id}` : "anonymous";
+  const chatbotActionRequest = useRef(null);
+  const [chatbotCalendarEvent, setChatbotCalendarEvent] = useState(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  useEffect(() => () => chatbotActionRequest.current?.abort(), [chatbotUserKey]);
   // 장부 데이터는 features/ledger가 소유한다. mock/API 전환은 VITE_LEDGER_SOURCE가 정한다.
   const ledgerEnabled = isMockSource() || user != null;
   const ledgerQuery = useMemo(() => ({}), []);
@@ -517,6 +524,32 @@ export function AppShell() {
     setCrossMatchOpen(false);
     setDetailRow(null);
   };
+  const handleChatbotAction = async (action) => {
+    chatbotActionRequest.current?.abort();
+    const controller = new AbortController();
+    chatbotActionRequest.current = controller;
+    if (action.type === "open_f2") {
+      setIntakeOpen(true);
+      return;
+    }
+    try {
+      if (action.type === "open_calendar") {
+        const event = await loadSavedCalendarEvent(action.target_id, controller.signal);
+        if (!controller.signal.aborted) setChatbotCalendarEvent(event);
+        return;
+      }
+      const row = action.type === "open_property"
+        ? await loadSavedProperty(action.target_id, controller.signal)
+        : await loadSavedBuyer(action.target_id, controller.signal);
+      if (controller.signal.aborted) return;
+      setCrossMatchOpen(false);
+      setDetailRow(row);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof ApiError && error.kind === "unauthorized") markSessionExpired();
+      else setToast({ variant: "warning", title: `상세를 열지 못했습니다 · ${describeForUser(error)}` });
+    }
+  };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
     else if (detailRow) propertyLedger.discardRow(detailRow);
@@ -626,7 +659,7 @@ export function AppShell() {
           {/* 달력 버튼과 아침 일정 브리핑 창을 함께 소유한다. 상단바는 위치만 정한다. */}
           <TimeKeeperNotification enabled={ledgerEnabled} />
           {/* 월간 캘린더. 자기 일정 CRUD와 장부 읽기 전용 일정을 함께 보여준다(F4-CAL). */}
-          <CalendarView />
+          <CalendarView requestedEvent={chatbotCalendarEvent} onOpenChange={setCalendarOpen} />
           {/* F1 알림 센터(F1-AL-04)의 자리. 아직 동작하지 않는다. */}
           <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
           <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />
@@ -854,6 +887,7 @@ export function AppShell() {
       <ModalFooter><Button variant="primary" onClick={() => { setScheduleSuggestion(null); setToast({ variant: "success", title: "F3 제안을 승인해 F1 일정으로 저장했습니다." }); }}>일정 저장</Button><Button variant="link" onClick={() => setScheduleSuggestion(null)}>취소</Button></ModalFooter>
     </Modal>
     {effectiveViewState === "loading" && <div className="global-progress" aria-label="그리드 데이터 불러오는 중"><Spinner size="md" /></div>}
+    {user && <Chatbot key={chatbotUserKey} userKey={chatbotUserKey} onAction={handleChatbotAction} onSessionExpired={markSessionExpired} suspended={Boolean(detailRow) || intakeOpen || calendarOpen} />}
     {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
   </div>;
 }

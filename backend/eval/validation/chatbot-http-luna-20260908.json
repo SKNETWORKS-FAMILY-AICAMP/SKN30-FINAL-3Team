@@ -1,0 +1,444 @@
+{
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "rounds": 3,
+  "samples": 36,
+  "first_progress_p95_ms": 223.39746100078628,
+  "completion_p95_ms": 3273.243722999723,
+  "deleted": true,
+  "passed": true,
+  "rows": [
+    {
+      "case": 0,
+      "warmup": true,
+      "first_progress_ms": 513.6740190000637,
+      "elapsed_ms": 3134.8629320000327,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 1,
+      "warmup": false,
+      "first_progress_ms": 143.94861300024786,
+      "elapsed_ms": 1959.5145009998305,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 2,
+      "warmup": false,
+      "first_progress_ms": 167.81668800012994,
+      "elapsed_ms": 1832.041929999832,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 15,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 3,
+      "warmup": false,
+      "first_progress_ms": 140.28007700017042,
+      "elapsed_ms": 2173.962780000693,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 4,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 4,
+      "warmup": false,
+      "first_progress_ms": 132.59991800077842,
+      "elapsed_ms": 2194.3582570002036,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 6,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 5,
+      "warmup": false,
+      "first_progress_ms": 131.90786599989224,
+      "elapsed_ms": 2185.6288959997983,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 6,
+      "warmup": false,
+      "first_progress_ms": 151.83576100025675,
+      "elapsed_ms": 1680.6856550001612,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 7,
+      "warmup": false,
+      "first_progress_ms": 163.9867880003294,
+      "elapsed_ms": 3273.243722999723,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 8,
+      "warmup": false,
+      "first_progress_ms": 159.6147150003162,
+      "elapsed_ms": 1960.7579869998517,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 9,
+      "warmup": false,
+      "first_progress_ms": 163.9633810000305,
+      "elapsed_ms": 2478.0220980001104,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 10,
+      "warmup": false,
+      "first_progress_ms": 135.7746749999933,
+      "elapsed_ms": 1923.724623000453,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 11,
+      "warmup": false,
+      "first_progress_ms": 143.64250600010564,
+      "elapsed_ms": 1678.6113080006544,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 12,
+      "warmup": false,
+      "first_progress_ms": 152.14477400058968,
+      "elapsed_ms": 1932.9318790005345,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 13,
+      "warmup": false,
+      "first_progress_ms": 135.88548299958347,
+      "elapsed_ms": 1936.1950519996753,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 14,
+      "warmup": false,
+      "first_progress_ms": 135.84526200065739,
+      "elapsed_ms": 1693.8430250002057,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 15,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 15,
+      "warmup": false,
+      "first_progress_ms": 158.39681299985386,
+      "elapsed_ms": 8196.704798999235,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 4,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 16,
+      "warmup": false,
+      "first_progress_ms": 139.3064140002025,
+      "elapsed_ms": 1395.4131720001897,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 6,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 17,
+      "warmup": false,
+      "first_progress_ms": 176.13346699999965,
+      "elapsed_ms": 1716.0586239997428,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 18,
+      "warmup": false,
+      "first_progress_ms": 179.4439989998864,
+      "elapsed_ms": 1700.9770679997018,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 19,
+      "warmup": false,
+      "first_progress_ms": 216.1725589994603,
+      "elapsed_ms": 2275.050380999346,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 20,
+      "warmup": false,
+      "first_progress_ms": 251.6790839999885,
+      "elapsed_ms": 1803.7154680005187,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 21,
+      "warmup": false,
+      "first_progress_ms": 164.5992390003812,
+      "elapsed_ms": 2223.478756000077,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 22,
+      "warmup": false,
+      "first_progress_ms": 159.32929399968998,
+      "elapsed_ms": 2217.061169999397,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 23,
+      "warmup": false,
+      "first_progress_ms": 171.68056399987108,
+      "elapsed_ms": 1983.0686469995271,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 24,
+      "warmup": false,
+      "first_progress_ms": 175.49390000021958,
+      "elapsed_ms": 1962.0848120002847,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 25,
+      "warmup": false,
+      "first_progress_ms": 156.16858299927117,
+      "elapsed_ms": 1956.900289999794,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 26,
+      "warmup": false,
+      "first_progress_ms": 167.82358000000386,
+      "elapsed_ms": 1978.3011700001225,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 15,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 27,
+      "warmup": false,
+      "first_progress_ms": 191.51206700007606,
+      "elapsed_ms": 2814.5230170002833,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 4,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 28,
+      "warmup": false,
+      "first_progress_ms": 191.61731699932716,
+      "elapsed_ms": 1754.5106589996067,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 6,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 29,
+      "warmup": false,
+      "first_progress_ms": 203.7261280001985,
+      "elapsed_ms": 2002.8346690005492,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 30,
+      "warmup": false,
+      "first_progress_ms": 219.7532290001618,
+      "elapsed_ms": 1789.0333149998696,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 31,
+      "warmup": false,
+      "first_progress_ms": 170.92365699954826,
+      "elapsed_ms": 1957.9338559997268,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 32,
+      "warmup": false,
+      "first_progress_ms": 183.99658599992108,
+      "elapsed_ms": 1971.7034429995692,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 33,
+      "warmup": false,
+      "first_progress_ms": 191.5050549996522,
+      "elapsed_ms": 2507.0289610002874,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 34,
+      "warmup": false,
+      "first_progress_ms": 223.39746100078628,
+      "elapsed_ms": 2291.311302000395,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 35,
+      "warmup": false,
+      "first_progress_ms": 156.1131150001529,
+      "elapsed_ms": 1429.381834999731,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 36,
+      "warmup": false,
+      "first_progress_ms": 159.7996319997037,
+      "elapsed_ms": 2254.4191309998496,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    }
+  ],
+  "scope": "localhost HTTP admission and native SSE snapshots, real Luna, isolated PostgreSQL 15 synthetic data",
+  "provenance": {
+    "date": "2026-09-08",
+    "concurrency": 1,
+    "warmup_excluded": true,
+    "source_sha256": {
+      "backend/eval/chatbot_http.py": "3ca7168f1f6bec33e83fc3fdd800fc9711a2a332fee4a1f6bdeb878d14951582",
+      "backend/src/domain/chatbot/manager.py": "93d38a6e34782906a298a6ffbea1387fb244f7d9ea89dd71c062d4adf9bcbe68",
+      "backend/src/domain/chatbot/query.py": "075dd1d66f0640ff97fab2544a92aec2f93ad02c2292d0f671ae8a846ded6aa0",
+      "ai/src/brokerage_ai/chatbot/workflow.py": "50235a81ecb8c84eeb8d78bc2d2187055be7abe72f508f57b31924fb1a2a2caf"
+    }
+  },
+  "qwen": {
+    "status": "NOT_RUN",
+    "reason": "User deferred RunPod startup"
+  },
+  "limitations": [
+    "Local HTTP path only; shared dev ingress and F3 shared GPU contention not exercised",
+    "One model call warms the connection; deployment cold start is not measured",
+    "Synthetic property, buyer and calendar fixtures; history and delete checks included"
+  ],
+  "post_evaluation_review": {
+    "change": "CLI now exits nonzero for a failed report; measurement path and model inputs are unchanged",
+    "current_runner_sha256": "ddc9d10daf38702936b60a9296830ca084058e96a692779bb4655c47371c3317"
+  }
+}

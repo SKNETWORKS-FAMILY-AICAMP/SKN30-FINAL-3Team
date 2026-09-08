@@ -1,18 +1,18 @@
 ---
-status: 제안
+status: 구현됨
 updated: 2026-09-08
-implementation: 미착수
+implementation: 코드 구현·로컬 PostgreSQL 검증, 공유 dev 미적용
 ---
 
 # F4 챗봇 저장·실행 수명주기 설계
 
 [사용자 설계 합의](../../requirements/sources/chatbot-design-decisions-2026-09-08.md)를 구현하기 위한 논리 설계다.
 제품 범위는 [요구사항](../../requirements/chatbot/overview-and-scope.md), 전송 계약은 [HTTP·SSE 설계](api-and-stream.md), 보존 정본은 [개인정보 정책](../../../.agents/skills/project-wiki/references/privacy/policy.md)의 F4 챗봇 절이다.
-사용자 선택은 계획에 반영됐지만 구체 컬럼·상태·인덱스는 구현 검토 전 제안이다. 이번 작업은 SQL migration·DB 적용을 수행하지 않는다.
+구체 SQL은 [019_CREATE_CHATBOT](../../db/migrate/019_CREATE_CHATBOT.sql)이 정본이다. 격리된 로컬 PostgreSQL에서 검증하며 기존 migration과 업무 데이터는 변경하지 않는다. 공유 dev 적용은 별도 배포 작업이다.
 
 ## 최소 테이블 3종
 
-| 테이블 | 소유 데이터 | 주요 컬럼 후보 |
+| 테이블 | 소유 데이터 | 주요 컬럼 |
 |---|---|---|
 | `chat_conversation` | 사용자별 현재 대화 1개·현재 검색 조건 | `id`, `brokerage_id`, `owner_user_id`, `active_filters`, `state_version`, `created_at`, `updated_at` |
 | `chat_request` | 사용자 질문 한 건의 처리·중복 접수·최종 상태 | `id`, `brokerage_id`, `conversation_id`, `client_request_id`, `request_fingerprint`, `status`, `stage`, `revision`, `context_snapshot`, `owner_instance_id`, `heartbeat_at`, `deadline_at`, `started_at`, `completed_at`, `failure_code` |
@@ -37,7 +37,7 @@ implementation: 미착수
 
 ## 요청 상태와 영속화 순서
 
-상태 후보: `ACCEPTED → RUNNING → COMPLETED | FAILED | CANCELLED | INTERRUPTED`.
+구현 상태: `ACCEPTED → RUNNING → COMPLETED | FAILED | CANCELLED | INTERRUPTED`. 접수 직후 취소·중단은 `ACCEPTED`에서도 terminal 상태로 이동한다.
 추가 질문이 필요한 경우에도 답변 형태가 `clarification`인 `COMPLETED`로 종료한다. 모델 문맥의 1회는 이처럼 완료된 사용자 질문·응답 한 쌍이다.
 
 1. 인증·CSRF·입력·GPU 수용 가능 여부를 확인한다. 서비스 불가/혼잡은 장시간 큐에 넣지 않고 503/429로 반환한다.
@@ -77,4 +77,6 @@ Backend가 DB에서 직전 완료 2회와 현재 검색 조건을 선택한다. 
 - 접수 직후·모델 실행 중·완료 commit 전 서버 중단, SSE 연결 종료, 새로고침 후 DB 상태 복원.
 - 완료/취소/삭제의 경합에서 답변 중복과 삭제한 대화의 재생성 0건.
 - 전체 삭제의 트랜잭션 원자성, 운영 DB 잔여 데이터, 오래된 탭과 늦은 이벤트 무효화.
-- 새 SQL은 실제 구현 시 최신 migration 번호를 확인해 전진 migration으로 추가하고 PostgreSQL에서 검증한다.
+- 전진 migration `019_CREATE_CHATBOT`의 적용·rollback·재적용과 복합 FK를 격리된 PostgreSQL에서 검증한다.
+
+구현은 요청에 `search_filters`와 안전한 `diagnostics` JSONB도 저장한다. 모델·workflow·prompt 버전, 호출 횟수·토큰·지연을 기록하며 원시 prompt·모델 응답은 보관하지 않는다.

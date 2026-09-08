@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from api.authentication import development_router
 from api.authentication import router as authentication_router
 from api.calendar import router as calendar_router
+from api.chatbot import router as chatbot_router
 from api.f2 import router as f2_router
 from api.f3_runs import router as f3_runs_router
 from api.property_ledger import router as property_ledger_router
@@ -18,6 +19,7 @@ def create_api_router(config: Config) -> APIRouter:
     router.include_router(f3_runs_router)
     router.include_router(time_keeper_router)
     router.include_router(calendar_router)
+    router.include_router(chatbot_router)
     if config.auth.development.enabled and config.app.environment in {
         AppEnvironment.LOCAL,
         AppEnvironment.DEV,
