@@ -11,6 +11,7 @@ updated: 2026-09-08
 |---|---|
 | [챗봇 도입 검토](../../../../docs/architecture/chatbot/overview.md) | F4 업무 챗봇의 도입 근거·범위·공수·문서 위치를 검토할 때. 사용자 설계 합의·구현 미착수 |
 | [챗봇 저장 설계](../../../../docs/architecture/chatbot/persistence.md) | 사용자별 대화 1개·메시지·요청 상태의 관계, 소유권·중복·삭제·중단 복구를 검토할 때 |
+| [챗봇 AI–Backend 계약](contracts/chatbot-ai.md) | 구현된 Python DTO·실행 facade·read capability·오류와 책임 경계를 확인할 때 |
 | [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md) | 챗봇의 AI–Backend 도구 경계·모델·멀티턴을 검토할 때 |
 | [챗봇 SSE 계약안](../../../../docs/architecture/chatbot/api-and-stream.md) | 챗봇의 요청·진행 이벤트·취소·복구 제안을 검토할 때 |
 | [챗봇 화면안](../../../../docs/screen/chatbot.md) | 플로팅 UI·추천 질문·F2 연결·기억 범위 안내를 검토할 때 |
