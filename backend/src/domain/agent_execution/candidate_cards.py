@@ -26,6 +26,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -37,6 +38,7 @@ from domain.agent_execution import repository
 from domain.agent_execution.anchor_card import (
     CardTarget,
     GenerationBinding,
+    PreparedGeneration,
     prepare_generation,
     store_position_card,
 )
@@ -284,24 +286,78 @@ async def generate_and_store_candidate_cards(
     moment = as_of or datetime.now(UTC)
     plan = plan_candidate_cards(session, run_id, worker_id, attempt_count)
 
-    cards: list[CandidateCard] = []
-    input_tokens = output_tokens = latency_ms = 0
+    def failed(ordinal: int, error: BaseException) -> None:
+        # 후보 순번과 고정 오류 타입만 남긴다. 후보 표시명, 상담 본문,
+        # Provider 응답과 예외 메시지는 로그하지 않는다.
+        logger.warning(
+            "f3_candidate_card_failed",
+            run_id=run_id,
+            attempt=attempt_count,
+            candidate_ordinal=ordinal,
+            candidate_count=len(plan.candidate_ids),
+            error_type=type(error).__name__,
+        )
+
+    # 1단계. 모든 후보의 입력을 조립한다. 각 호출이 자기 transaction 을 닫고 나온다.
+    prepared_cards: list[tuple[int, int, PreparedGeneration]] = []
     for candidate_ordinal, candidate_id in enumerate(plan.candidate_ids, start=1):
         try:
-            prepared = prepare_generation(
-                session,
-                run_id,
-                worker_id,
-                attempt_count,
-                binding,
-                target=CardTarget(anchor_type=plan.candidate_side, anchor_id=candidate_id),
-                expected_status=CANDIDATES_READY_STATUS,
-                as_of=moment,
+            prepared_cards.append(
+                (
+                    candidate_ordinal,
+                    candidate_id,
+                    prepare_generation(
+                        session,
+                        run_id,
+                        worker_id,
+                        attempt_count,
+                        binding,
+                        target=CardTarget(anchor_type=plan.candidate_side, anchor_id=candidate_id),
+                        expected_status=CANDIDATES_READY_STATUS,
+                        as_of=moment,
+                    ),
+                )
             )
-            result: PositionCardGenerationResult | None = None
-            if prepared.request is not None:
-                # cache miss 일 때만 모델을 부른다. transaction 은 이미 닫혀 있다.
-                result = await binding.generator.generate_position_card(prepared.request)
+        except BaseException as error:
+            failed(candidate_ordinal, error)
+            raise
+
+    # 2단계. cache miss 만 **동시에** 부른다. vLLM 은 continuous batching 이라 동시 요청을
+    # 거의 공짜로 처리하는데, 한 장씩 부르면 GPU 를 한 번에 하나씩만 쓴다. 후보 5장 기준
+    # 순차 85초가 동시 20초로 줄어드는 것을 실측했다. 후보 수는 선별 단계가 5건으로 제한한다.
+    #
+    # transaction 은 준비 단계에서 이미 닫혔다. 이 구간은 DB 를 건드리지 않는다.
+    produced: dict[int, PositionCardGenerationResult] = {}
+    misses = [
+        (index, prepared.request)
+        for index, (_, _, prepared) in enumerate(prepared_cards)
+        if prepared.request is not None
+    ]
+    if misses:
+        outcomes = await asyncio.gather(
+            *(binding.generator.generate_position_card(request) for _, request in misses),
+            return_exceptions=True,
+        )
+        first_error: tuple[int, BaseException] | None = None
+        for (index, _), outcome in zip(misses, outcomes, strict=True):
+            if isinstance(outcome, BaseException):
+                if first_error is None:
+                    first_error = (prepared_cards[index][0], outcome)
+                continue
+            produced[index] = outcome
+    else:
+        first_error = None
+
+    # 3단계. 요청 순서대로 저장한다. 실패가 있어도 **성공한 카드는 저장하고** 예외를 올린다.
+    # 그래야 다음 시도가 cache hit 으로 건너뛴다. 상태는 아래에서 전부 확보됐을 때만 옮긴다.
+    cards: list[CandidateCard] = []
+    input_tokens = output_tokens = latency_ms = 0
+    for index, (candidate_ordinal, candidate_id, prepared) in enumerate(prepared_cards):
+        if prepared.request is not None and index not in produced:
+            break  # 이 후보가 실패했다. 뒤 후보도 저장하지 않는다 — 순서를 유지한다.
+        result = produced.get(index)
+        try:
+            if result is not None:
                 diagnostics = result.diagnostics
                 usage = diagnostics.usage if diagnostics else None
                 if usage is not None:
@@ -329,17 +385,12 @@ async def generate_and_store_candidate_cards(
                 )
             )
         except BaseException as error:
-            # 후보 순번과 고정 오류 타입만 남긴다. 후보 표시명, 상담 본문,
-            # Provider 응답과 예외 메시지는 로그하지 않는다.
-            logger.warning(
-                "f3_candidate_card_failed",
-                run_id=run_id,
-                attempt=attempt_count,
-                candidate_ordinal=candidate_ordinal,
-                candidate_count=len(plan.candidate_ids),
-                error_type=type(error).__name__,
-            )
+            failed(candidate_ordinal, error)
             raise
+
+    if first_error is not None:
+        failed(*first_error)
+        raise first_error[1]
 
     stored = tuple(cards)
     _record_cards(
