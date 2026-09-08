@@ -80,6 +80,20 @@ POSITION_CARD_COVERAGE = {
     ),
 }
 
+# 모델에게 요구하는 것이 없어 프롬프트로 전달할 문장도 없는 validator.
+#
+# ADR-0003 의 취지는 "모델이 지켜야 할 규칙이 프롬프트로 전달되는가"다. 저장된 예전 형식을
+# 되살리는 정규화는 모델 출력에 대한 요구가 아니므로 전달할 것이 없다. 다만 그 판단을 사람이
+# 한 번 내리고 **이름으로 남긴다.** 새 validator 가 생기면 이 목록에도 표에도 없어 아래
+# 검사가 깨지고, 그때 어느 쪽인지 정해야 한다.
+READ_COMPATIBILITY_ONLY = {
+    # 예전 `Evidence` 는 네 필드를 모두 담고 해당 없는 자리를 null 로 채워 저장했다. 그 카드를
+    # 판정 입력으로 되살리려면 null 자리 표시를 버려야 한다. 지금 모델 출력에는 그 자리가 아예
+    # 없으므로 모델이 알아야 할 규칙이 아니다.
+    ("QuoteEvidence", "drop_legacy_null_placeholders"),
+    ("InferenceEvidence", "drop_legacy_null_placeholders"),
+}
+
 JUDGMENT_COVERAGE = {
     ("BrokerageJudgmentModelOutput", "each_candidate_appears_once"): (
         "같은 card_id 를 두 번 판정하지 않는다"
@@ -100,11 +114,12 @@ def _nested_models(annotation: object) -> typing.Iterator[type[BaseModel]]:
 
 
 def model_validators(*roots: type[BaseModel]) -> set[tuple[str, str]]:
-    """루트에서 재귀적으로 도달 가능한 `model_validator` 중 **출력 계약을 표현하는 것**.
+    """루트에서 재귀적으로 도달 가능한 모든 `model_validator`.
 
-    `mode="before"` 는 넣지 않는다. 그것은 들어온 값을 우리가 다듬는 코드이지 모델이 지켜야 할
-    규칙이 아니다. 예전 형식으로 저장된 카드를 되살리는 호환 장치가 여기 해당한다. 모델에게
-    알려 줄 것이 없는 규칙을 표에 넣으면 진짜 교차 필드 규칙이 묻힌다.
+    `mode` 로 거르지 않는다. ADR-0003 이 고정한 것은 "도달 가능한 **모든** validator 가 표에
+    등록되어 있어야 한다"이고, `mode` 같은 기계적 성질로 예외를 만들면 앞으로 모델이 알아야
+    할 교차 필드 규칙을 `before` 로 구현했을 때 이 검사가 조용히 놓친다. 전달할 문장이 없는
+    validator 는 아래 `READ_COMPATIBILITY_ONLY` 에 이름을 적어 이유를 남긴다.
     """
     found: set[tuple[str, str]] = set()
     seen: set[type[BaseModel]] = set()
@@ -113,9 +128,7 @@ def model_validators(*roots: type[BaseModel]) -> set[tuple[str, str]]:
         if model in seen:
             return
         seen.add(model)
-        for name, decorator in model.__pydantic_decorators__.model_validators.items():
-            if decorator.info.mode == "before":
-                continue
+        for name in model.__pydantic_decorators__.model_validators:
             found.add((model.__name__, name))
         for field in model.model_fields.values():
             for nested in _nested_models(field.annotation):
@@ -167,10 +180,26 @@ def judgment_prompt() -> str:
     return build_brokerage_judgment_messages(request)[0].content
 
 
+def test_read_compatibility_exceptions_still_exist() -> None:
+    """예외 목록이 낡지 않게 한다.
+
+    validator 를 지우거나 이름을 바꾸고 목록을 그대로 두면, 그 자리가 조용히 남아 나중에
+    같은 이름으로 만들어진 **다른** validator 를 면제해 준다.
+    """
+    reachable = model_validators(
+        PositionCardModelOutput,
+        PositionCardAnalysis,
+        BrokerageJudgmentModelOutput,
+        CandidateJudgment,
+    )
+    stale = READ_COMPATIBILITY_ONLY - reachable
+    assert stale == set(), f"더 이상 존재하지 않는 validator 가 예외 목록에 남아 있다: {stale}"
+
+
 def test_every_position_card_validator_is_carried_by_the_prompt() -> None:
     reachable = model_validators(PositionCardModelOutput, PositionCardAnalysis)
 
-    assert reachable == set(POSITION_CARD_COVERAGE), (
+    assert reachable - READ_COMPATIBILITY_ONLY == set(POSITION_CARD_COVERAGE), (
         "모델 출력 계약의 교차 필드 규칙이 바뀌었다. 새 규칙은 프롬프트가 전달할 문장을 정해 "
         "위 표에 등록하고, 없어진 규칙은 표에서 지운다."
     )
@@ -183,7 +212,7 @@ def test_every_position_card_validator_is_carried_by_the_prompt() -> None:
 def test_every_judgment_validator_is_carried_by_the_prompt() -> None:
     reachable = model_validators(BrokerageJudgmentModelOutput, CandidateJudgment)
 
-    assert reachable == set(JUDGMENT_COVERAGE)
+    assert reachable - READ_COMPATIBILITY_ONLY == set(JUDGMENT_COVERAGE)
 
     prompt = judgment_prompt()
     for (schema, validator), sentence in JUDGMENT_COVERAGE.items():
