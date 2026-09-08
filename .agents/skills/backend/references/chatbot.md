@@ -10,7 +10,7 @@ updated: 2026-09-08
 [실행 구조](../../../../docs/architecture/chatbot/runtime.md),
 [API·SSE](../../../../docs/architecture/chatbot/api-and-stream.md),
 [저장 설계](../../../../docs/architecture/chatbot/persistence.md)가 정본이다.
-PR #100에는 read adapter·인증·DB 저장·HTTP/SSE가 구현돼 있으며 화면 통합은 후속 PR #101의 범위다.
+PR #100에는 read adapter·인증·DB 저장·HTTP/SSE가, PR #101에는 이 계약을 사용하는 화면 통합이 구현됐다.
 이 문서는 Backend 내부 구현과 변경 시 검증할 불변식만 설명한다. 공유 환경 배포 완료를 뜻하지 않는다.
 
 ## 구성과 책임
@@ -22,7 +22,7 @@ PR #100에는 read adapter·인증·DB 저장·HTTP/SSE가 구현돼 있으며 �
   단순한 전달 계층과 별도 서비스를 만들지 않고 기존 Backend의 기능별 응집 구조를 따른다.
 - `manager.py`는 `workflow_factory(brokerage_id)`로 workflow를 주입받고 lifespan에서 시작·종료한다.
   AI에 넘기는 것은 공개 `brokerage_ai.chatbot` DTO와 `ChatReadPort` 구현이며 DB 세션을 넘기지 않는다.
-  AI의 workflow v2 조건 근거 검증 통과 후에도 Backend는 정규화·권한·현재 DB 상태를 다시 검사한다.
+  현재 workflow v3가 유지하는 v2 조건 근거 검증 통과 후에도 Backend는 정규화·권한·현재 DB 상태를 다시 검사한다.
   계약 재생성용 고정 규칙 메시지는 AI가 소유하며 Backend에서 프롬프트를 조립하지 않는다.
 - 앱 조립과 모델 선택은 `main.py`, `chatbot_runtime.py`, `chatbot_model.py`가 담당한다.
   `CHATBOT` capability는 기존 판단용 모델 설정과 분리한다. 모델 선택 명령은 local loopback DB에서만

@@ -1,5 +1,5 @@
 ---
-status: AI·Backend 구현됨·화면 통합 계획됨
+status: 구현됨
 updated: 2026-09-08
 ---
 
@@ -8,7 +8,7 @@ updated: 2026-09-08
 [도입 검토](overview.md) · [요구사항](../../requirements/chatbot/overview-and-scope.md) · [SSE 계약](api-and-stream.md) · [저장 설계](persistence.md)
 PR #99에서 구현한 Python DTO·실행 facade·read capability·오류의 정본은
 [AI–Backend 공개 계약](../../../.agents/skills/project-wiki/references/contracts/chatbot-ai.md)이다.
-AI 의도 도구와 실행 제한은 PR #99, Backend 조회 adapter·인증·저장·HTTP/SSE 연결은 PR #100에 구현됐다. 화면 통합은 후속 PR #101의 범위다. 아래 전체 흐름에는 후속 화면 동작도 포함하며, 공유 dev 배포 완료를 뜻하지 않는다. 실제 평가 기록은 [구현·검증](implementation-and-validation.md)을 참고한다. 기존 [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)의 모듈 경계를 유지한다.
+AI 의도 도구와 실행 제한은 PR #99, Backend 조회 adapter·인증·저장·HTTP/SSE 연결은 PR #100에 구현됐다. 공통 셸의 챗봇 패널·이력·SSE·상세/F2 화면 연결은 PR #101에 구현됐다. 기본 비활성 상태이며 공유 dev 배포 완료를 뜻하지 않는다. 실제 평가 기록은 [구현·검증](implementation-and-validation.md)을 참고한다. 기존 [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)의 모듈 경계를 유지한다.
 
 ## 권장 실행 흐름
 

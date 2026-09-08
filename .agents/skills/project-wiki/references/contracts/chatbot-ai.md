@@ -7,7 +7,7 @@ updated: 2026-09-08
 
 이 문서는 PR #99의 Python 공개 계약과 PR #100의 Backend 연결 책임 정본이다.
 AI facade·DTO·workflow와 Backend adapter·인증·DB 저장·HTTP/SSE 연결은 구현됐다.
-화면 통합은 후속 PR #101의 범위이며 공유 dev 배포 완료를 뜻하지 않는다. [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)의 책임 분리를 유지한다.
+PR #101에는 공통 셸의 챗봇 화면·이력·SSE 구독과 기존 상세/F2 이동이 구현됐다. 기본 비활성 상태이며 공유 dev 배포 완료를 뜻하지 않는다. [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)의 책임 분리를 유지한다.
 HTTP 동작과 저장 규칙은 각각 [API·SSE 계약](../../../../../docs/architecture/chatbot/api-and-stream.md)과
 [저장 설계](../../../../../docs/architecture/chatbot/persistence.md)에서 관리하며, 기존 모듈 경계는 변경하지 않는다.
 

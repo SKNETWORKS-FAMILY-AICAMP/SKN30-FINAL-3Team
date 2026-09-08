@@ -95,4 +95,4 @@ SSE가 불안정하면 제한된 재연결 또는 상태 polling으로 복원한
 - Message: 정수 `id`·`sequence_no`, `request_id`, `role`, `content`, `result_payload`, 생성 시각. 이력은 `{items, next_cursor}`이며 `before` 순번 이전 페이지를 시간순으로 반환한다.
 - Result: `kind`, `text`, `filters`, `items`, `total`, `offset`, `limit=10`, `as_of`, `actions`. 결과 카드는 `id`, `title`, `subtitle`, 표시 필드와 내부 action을 가진다.
 - Action은 `open_f2`, `open_property`, `open_buyer`, `open_calendar`만 허용한다. 대상 ID는 상세 조회에서 재검증하며 임의 URL을 실행하지 않는다.
-- `reference_message_id`는 같은 대화의 최근 완료 두 답변 중 결과 메시지만 허용한다. 두 번째 이후 결과 페이지에서는 번호 참조 대신 카드의 상세 버튼을 사용한다.
+- `reference_message_id`는 같은 대화의 최근 완료 두 답변 중 결과 메시지만 허용한다. 결과 페이지를 재조회한 답변은 첫 페이지로 돌아와도 원래 저장 순번과 달라질 수 있어 번호 참조를 제한하고 카드의 상세 버튼을 사용한다.
