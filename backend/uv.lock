@@ -71,6 +71,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "av", specifier = "==18.1.0" },
     { name = "pre-commit", specifier = ">=4.6.2" },
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "pytest", specifier = ">=9.1.1" },
