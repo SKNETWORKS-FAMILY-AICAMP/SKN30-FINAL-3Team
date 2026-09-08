@@ -1,4 +1,5 @@
 # Required by the BnB profile; retain the upstream image's torch/numpy versions.
 bitsandbytes==0.50.2 --hash=sha256:55348a9a4a21bfd99cf8c7b32fe67b4030ae5c2a05738e03c1747f65fa6ec283
 # vLLM 0.28 moved BnB quantization/loading to this official out-of-tree plugin.
-vllm-bnb-plugin==0.0.3 --hash=sha256:46d5ce93018ea8daf92bc15235f19a01078e1f4c16303f5946cc1575404c094c
+# 0.0.3 targets a newer WeightsMapper API than the pinned vLLM 0.28 image.
+vllm-bnb-plugin==0.0.2 --hash=sha256:b393b0b5f8ae4bb447d8206de8571e767236e8b0aafb613b753b9be7790746dc
