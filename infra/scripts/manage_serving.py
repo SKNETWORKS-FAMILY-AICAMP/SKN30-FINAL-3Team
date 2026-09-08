@@ -31,6 +31,7 @@ from model_profiles import load_profile
 from probe import probe, read_status
 from serving_contract import (
     DEFAULT_GENERAL_PROFILE,
+    GENERAL_CUDA_VERSIONS,
     GENERAL_KEY,
     POD_NAME,
     WORKLOADS,
@@ -461,6 +462,11 @@ class Serving:
                         "templateId": registered["template_id"],
                         "volumeInGb": 0,
                         "env": environment,
+                        **(
+                            {"allowedCudaVersions": list(GENERAL_CUDA_VERSIONS)}
+                            if workload == "general"
+                            else {}
+                        ),
                     },
                 )
             deployment = {"cloud": "runpod", "resource_id": f2.resource_id(details)}

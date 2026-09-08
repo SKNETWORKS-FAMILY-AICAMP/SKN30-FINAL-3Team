@@ -121,6 +121,29 @@ class GeneralSelection(unittest.TestCase):
         environment = controller.runpod.return_value.request.call_args.args[2]["env"]
         self.assertNotIn("VLLM_ENABLE_CUDA_COMPATIBILITY", environment)
         self.assertNotIn("GENERAL_MODEL_PROFILE", environment)
+        self.assertNotIn(
+            "allowedCudaVersions",
+            controller.runpod.return_value.request.call_args.args[2],
+        )
+
+    def test_unavailable_cuda_capacity_is_not_retried_without_constraint(self):
+        controller = self.runpod_controller()
+        controller.runpod.return_value.request.side_effect = serving.f2.ToolError(
+            "capacity unavailable"
+        )
+        spec = {
+            "cloud": "runpod",
+            "gpu_id": "NVIDIA L40S",
+            "model_profile": "qwen3-14b-awq",
+        }
+        with (
+            patch.object(serving.control, "validate_template"),
+            self.assertRaises(serving.f2.ToolError),
+        ):
+            controller.prepare("general", spec)
+        controller.runpod.return_value.request.assert_called_once()
+        controller.probe.assert_not_called()
+        controller.runpod.return_value.delete.assert_not_called()
 
     def test_create_injects_profile_and_rejects_existing_other_profile(self):
         controller = self.runpod_controller()
@@ -132,6 +155,12 @@ class GeneralSelection(unittest.TestCase):
         with patch.object(serving.control, "validate_template"):
             deployment = controller._prepare("general", spec)
         self.assertEqual(deployment["model"], "Qwen/Qwen3-32B-AWQ")
+        self.assertEqual(
+            controller.runpod.return_value.request.call_args.args[2][
+                "allowedCudaVersions"
+            ],
+            ["13.0"],
+        )
         self.assertEqual(
             controller.runpod.return_value.request.call_args.args[2]["env"],
             {
