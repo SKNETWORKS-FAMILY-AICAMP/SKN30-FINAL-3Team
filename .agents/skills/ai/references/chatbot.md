@@ -5,8 +5,8 @@ updated: 2026-09-08
 
 # F4 챗봇 내부 실행과 평가
 
-공개 실행 경계와 저장·권한 계약은 [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md)가
-정본이다. AI 구현은 `brokerage_ai.chatbot`의 선형 workflow이며 LangGraph·DB·HTTP를 추가하지 않는다.
+구현된 공개 DTO·실행·read capability 계약은 [공통 계약](../../project-wiki/references/contracts/chatbot-ai.md)이
+정본이다. 저장·HTTP/SSE 연결 설계는 [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md)에서 관리한다. AI 구현은 `brokerage_ai.chatbot`의 선형 workflow이며 LangGraph·DB·HTTP를 추가하지 않는다.
 
 - 모델은 제한된 의도·원문 조건만 생성하고 Backend가 주입한 read port가 다시 검증한다.
 - 질문 하나는 모델 생성 최대 3회와 주 조회 1회, 전체 60초 안에서 처리한다. 전송 오류는 재생성하지

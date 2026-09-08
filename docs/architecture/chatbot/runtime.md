@@ -6,7 +6,9 @@ updated: 2026-09-08
 # 챗봇 실행·모델·조회 구조
 
 [도입 검토](overview.md) · [요구사항](../../requirements/chatbot/overview-and-scope.md) · [SSE 계약안](api-and-stream.md) · [저장 설계](persistence.md)
-아래 도구 이름과 제한값은 설계 제안이다. 기존 [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)의 모듈 경계를 유지한다.
+PR #99에서 구현한 Python DTO·실행 facade·read capability·오류의 정본은
+[AI–Backend 공개 계약](../../../.agents/skills/project-wiki/references/contracts/chatbot-ai.md)이다.
+이 문서의 Backend 저장·HTTP/SSE 연결과 아래 도구 이름·제한값은 설계 제안이다. 기존 [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)의 모듈 경계를 유지한다.
 
 ## 권장 실행 흐름
 
