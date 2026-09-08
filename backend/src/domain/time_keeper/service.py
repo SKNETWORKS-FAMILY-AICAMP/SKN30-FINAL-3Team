@@ -18,7 +18,6 @@ from domain.time_keeper import repository
 from domain.time_keeper.models import (
     DEFAULT_OVERDUE_DAYS,
     DEFAULT_PER_CATEGORY_LIMIT,
-    DEFAULT_RECONTACT_DAYS,
     DEFAULT_REVALIDATION_DAYS,
     DEFAULT_WITHIN_DAYS,
     AgendaCategoryCount,
@@ -45,7 +44,6 @@ def load_agenda(
     offset: int,
     within_days: int = DEFAULT_WITHIN_DAYS,
     overdue_days: int = DEFAULT_OVERDUE_DAYS,
-    recontact_days: int = DEFAULT_RECONTACT_DAYS,
     revalidation_days: int = DEFAULT_REVALIDATION_DAYS,
     per_category_limit: int = DEFAULT_PER_CATEGORY_LIMIT,
     as_of: date | None = None,
@@ -59,7 +57,6 @@ def load_agenda(
         resolved_as_of,
         within_days,
         overdue_days,
-        recontact_days=recontact_days,
         revalidation_days=revalidation_days,
         per_category_limit=per_category_limit,
     )

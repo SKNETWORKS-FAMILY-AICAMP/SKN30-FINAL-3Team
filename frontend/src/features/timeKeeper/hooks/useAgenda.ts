@@ -20,7 +20,7 @@ export interface AgendaState {
   /** 서버가 D-day를 계산한 기준일(ISO 날짜). */
   asOf: string | null;
   withinDays: number | null;
-  /** 서버가 실제로 적용한 되돌아보는 기간. 재연락·재확인 묶음을 가르는 기준으로도 쓴다. */
+  /** 서버가 실제로 적용한 되돌아보는 기간. 재확인 묶음을 가르는 기준으로도 쓴다. */
   overdueDays: number | null;
   status: "loading" | "ready" | "error";
   error: ApiError | null;
@@ -31,8 +31,7 @@ export interface AgendaState {
 
 export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {}): AgendaState {
   const enabled = options.enabled ?? true;
-  const { withinDays, overdueDays, recontactDays, revalidationDays, perCategoryLimit, limit, offset } =
-    query;
+  const { withinDays, overdueDays, revalidationDays, perCategoryLimit, limit, offset } = query;
 
   const [items, setItems] = useState<AgendaItemDto[]>([]);
   const [categories, setCategories] = useState<AgendaCategorySummaryDto[]>([]);
@@ -55,7 +54,6 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
         {
           withinDays,
           overdueDays,
-          recontactDays,
           revalidationDays,
           perCategoryLimit,
           limit,
@@ -92,7 +90,6 @@ export function useAgenda(query: AgendaQuery, options: { enabled?: boolean } = {
     enabled,
     withinDays,
     overdueDays,
-    recontactDays,
     revalidationDays,
     perCategoryLimit,
     limit,

@@ -49,13 +49,6 @@ requirements:
       - backend/src/domain/time_keeper/repository.py
     tests:
       - backend/tests/api/test_time_keeper.py
-  - id: F4-TK-04
-    summary: 마지막 접촉에 주기를 더해 재연락 기한 생성
-    implementation:
-      - backend/src/domain/time_keeper/repository.py
-      - backend/src/domain/time_keeper/models.py
-    tests:
-      - backend/tests/api/test_time_keeper.py
   - id: F4-TK-05
     summary: 매물 접수일에 주기를 더해 조건 재확인 기한 생성
     implementation:
@@ -115,7 +108,7 @@ requirements:
     implementation:
       - frontend/src/features/timeKeeper/TimeKeeperNotification.tsx
   - id: F4-TK-22
-    summary: 되돌아보는 기간을 넘긴 재연락·재확인을 별도 묶음으로 보여주고 "다시 보지 않기"로 감춘다
+    summary: 되돌아보는 기간을 넘긴 재확인을 별도 묶음으로 보여주고 "다시 보지 않기"로 감춘다
     implementation:
       - frontend/src/features/timeKeeper/AgendaList.tsx
       - frontend/src/features/timeKeeper/model/viewModel.ts
@@ -159,7 +152,7 @@ requirements:
       - backend/tests/api/test_calendar.py
       - frontend/tests/calendar.test.ts
   - id: F4-CAL-05
-    summary: Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 갈래로 포함
+    summary: Time Keeper "다가오는 일정" 조회가 캘린더 일정을 갈래 중 하나로 포함
     implementation:
       - backend/src/domain/time_keeper/repository.py
       - backend/src/domain/time_keeper/service.py
