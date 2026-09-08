@@ -5,10 +5,11 @@ updated: 2026-09-08
 
 # F4 챗봇 AI–Backend 공개 계약
 
-이 문서는 PR #99의 Python 공개 계약 정본이다. AI facade·DTO·workflow는 구현됐으며,
-Backend adapter·인증·DB 저장·HTTP/SSE 연결의 구현 완료를 뜻하지 않는다. 해당 연결은 후속
-PR #100·#101의 범위다. [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)의 책임 분리를 유지한다.
-별도 HTTP API나 새 프레임워크·영속성 결정을 추가하지 않으므로 새 ADR은 만들지 않는다.
+이 문서는 PR #99의 Python 공개 계약과 PR #100의 Backend 연결 책임 정본이다.
+AI facade·DTO·workflow와 Backend adapter·인증·DB 저장·HTTP/SSE 연결은 구현됐다.
+화면 통합은 후속 PR #101의 범위이며 공유 dev 배포 완료를 뜻하지 않는다. [ADR-0006](../decisions/ADR-0006-ai-backend-boundary.md)의 책임 분리를 유지한다.
+HTTP 동작과 저장 규칙은 각각 [API·SSE 계약](../../../../../docs/architecture/chatbot/api-and-stream.md)과
+[저장 설계](../../../../../docs/architecture/chatbot/persistence.md)에서 관리하며, 기존 모듈 경계는 변경하지 않는다.
 
 ## 공개 진입점과 책임
 
@@ -47,6 +48,11 @@ DTO는 Pydantic 모델이며 미정의 필드를 거절하고 최상위 필드 �
 `clarification_code`는 `area_basis/missing_context/ambiguous_condition/unsupported_condition`이며
 clarification에만 허용한다. `reference_ordinal`은 open_result에만 허용한다. 비조회 도구의
 불확실한 필터는 조회·조건 갱신에 사용하지 않는다. `open_f2`는 이동 버튼만 반환하며 분석을 실행하지 않는다.
+
+AI DTO에 남은 `LISTING_RECONTACT`·`CLIENT_RECONTACT`는 기존 형식 읽기 호환 값이다.
+최신 Time Keeper에서 제거된 업무 종류이므로 Backend는 최초·후속·저장 페이지 및 과거 장부
+참조 요청을 안내로 종료하며 0건 조회 성공으로 보고하지 않는다. 같은 문자열을 사용자가 캘린더
+종류로 저장한 경우는 별개다. AI 의도 평가 성공은 실제 Backend 조회 지원을 뜻하지 않는다.
 
 ## 생성 조건의 근거 검증
 
@@ -109,6 +115,7 @@ Backend가 저장 후 전달해야 한다. 프롬프트·내부 추론·개인�
   [외부 전송 정책](../privacy/policy.md)을 대신하지 않는다.
 - 8K 문맥과 출력 1,024 token을 예산화하고 초과 입력을 조용히 자르지 않는다. 상한 초과는
   `ChatbotContextLimitError`다. Provider가 사용량을 보고하면 실제 총량·출력량도 검사한다.
+- 재생성 요청에는 고정 규칙 식별자·문구만 전달하고 예외 원문·동적 경로·모델 생성값을 보내지 않는다.
 - 구조화 출력·생성 조건 근거 등 계약 위반만 동일 모델로 최초 호출 포함 최대 3회 생성한다. 마지막 실패는
   `ChatbotContractError`, Provider의 `ProviderOutputInvalidError` 또는 Pydantic `ValidationError`로 전파된다.
 - Provider 전송·rate-limit 오류와 capability·callback 예외는 호출자에게 전파한다. 모델 자동 fallback은 없다.

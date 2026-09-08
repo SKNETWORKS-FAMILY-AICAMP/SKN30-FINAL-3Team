@@ -2,6 +2,21 @@ version: 1
 updated: "2026-09-08"
 
 sources:
+  - id: "chatbot-implementation-scope-2026-09-08"
+    type: "user-provided-direction"
+    location: "docs/requirements/sources/chatbot-implementation-scope-2026-09-08.md"
+    received: "2026-09-08"
+    decision_status: "user-implementation-authorized; local-validation; qwen-deferred; team-review-pending"
+    reflected_in:
+      - "docs/requirements/chatbot/overview-and-scope.md"
+      - "docs/architecture/chatbot/implementation-and-validation.md"
+      - "docs/architecture/chatbot/api-and-stream.md"
+      - "docs/architecture/chatbot/persistence.md"
+      - "docs/screen/chatbot.md"
+      - ".agents/skills/project-wiki/references/contracts/api.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+    scope: "F4 1차 구현·독립 검토·로컬 검증·의존 PR 3개. 사용자 후속 지시로 Qwen 기동·실제 평가는 보류하고 Luna 사용. 공유 dev DB 변경·배포 제외. 팀원 사용성 평가는 비차단"
+
   - id: "chatbot-design-decisions-2026-09-08"
     type: "user-provided-direction"
     location: "docs/requirements/sources/chatbot-design-decisions-2026-09-08.md"

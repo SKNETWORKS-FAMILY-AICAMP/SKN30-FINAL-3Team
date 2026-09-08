@@ -7,7 +7,7 @@ updated: 2026-09-08
 
 **권장안: 읽기 전용 자연어 조회, 기존 F2 화면 연결, SSE 진행 표시, 제한된 멀티턴부터 도입한다.**
 F3 연동은 사용자 요청대로 개발 보류하고, 공공 시세 기능은 선택 확장으로 둔다.
-기능 상세 정본은 [요구사항](../../requirements/chatbot/overview-and-scope.md)이다. [사용자 합의](../../requirements/sources/chatbot-design-decisions-2026-09-08.md)로 F4 소속·조회 3종·F2 연결·DB 저장/복원을 1차 범위에 포함했다. 구체 기술 설계는 제안이며 구현 미착수·팀 병합 검토 전이다.
+기능 상세 정본은 [요구사항](../../requirements/chatbot/overview-and-scope.md)이다. [사용자 합의](../../requirements/sources/chatbot-design-decisions-2026-09-08.md)와 [구현 요청](../../requirements/sources/chatbot-implementation-scope-2026-09-08.md)에 따라 1차 코드를 구현했다. 이 문서의 도입 효과·공수는 기획 당시의 추정이며, 현재 코드·Luna 평가·Qwen 보류·배포 범위는 [구현·검증](implementation-and-validation.md)이 정본이다. 팀 병합 검토와 공유 dev 적용은 별도다.
 
 ## 도입 근거와 한계
 

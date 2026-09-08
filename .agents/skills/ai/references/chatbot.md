@@ -6,7 +6,7 @@ updated: 2026-09-08
 # F4 챗봇 내부 실행과 평가
 
 구현된 공개 DTO·실행·read capability 계약은 [공통 계약](../../project-wiki/references/contracts/chatbot-ai.md)이
-정본이다. 저장·HTTP/SSE 연결 설계는 [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md)에서 관리한다. AI 구현은 `brokerage_ai.chatbot`의 선형 workflow이며 LangGraph·DB·HTTP를 추가하지 않는다.
+정본이다. PR #100에 구현된 저장·HTTP/SSE 연결은 [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md)에서 관리한다. AI 구현은 `brokerage_ai.chatbot`의 선형 workflow이며 LangGraph·DB·HTTP를 추가하지 않는다.
 
 - 모델은 제한된 의도·원문 조건만 생성한다. AI가 모든 비어 있지 않은 생성 조건의 도구별 허용
   범위·원문 또는 한국어 enum 근거·같은 도구의 refine 상속을 검사한 뒤 read port를 호출한다.
@@ -23,10 +23,10 @@ updated: 2026-09-08
   capability route는 호출자가 명시하며 자동 fallback은 없다.
 
 평가 절차와 실제 실행 근거는 [AI 평가 README](../../../../ai/eval/chatbot/README.md) 및 그 결과 링크를
-읽는다. 모델 해석 평가와 DB/API/브라우저 평가의 범위를 섞지 않는다. Qwen은 사용자 지시에 따라
-NOT_RUN이며 endpoint 기동이나 GPU 생성은 평가기의 책임이 아니다.
+읽는다. 모델 해석 평가와 DB/API/브라우저 평가의 범위를 섞지 않는다. 이 PR의 평가 기록에서
+Qwen은 당시 사용자 지시에 따른 NOT_RUN이며 endpoint 기동이나 GPU 생성은 평가기의 책임이 아니다.
 
-이번 조건 검증 보완의 workflow 버전은 `chatbot-workflow:v2`이며 프롬프트 버전은 v1을 유지한다.
+PR #99의 조건 검증 보완은 `chatbot-workflow:v2`에 도입됐고, 현재 v3에도 유지된다.
 현재 평가기는 `chatbot-intent-scorer:v2`다. `recent`도 명시된 조건으로 비교하므로 사용자가
 최근 정렬을 요청했는데 누락하거나 요청하지 않은 최근 정렬을 덧붙이면 오답이다. 기본 정렬이라는
 이유로 비교에서 지우지 않으며, refine은 현재 조건을 병합한 결과를 비교한다.
@@ -35,3 +35,9 @@ NOT_RUN이며 endpoint 기동이나 GPU 생성은 평가기의 책임이 아니�
 단위 테스트 통과는 수정 후 실제 모델을 재평가했다는 근거가 아니다. 기존 요약을 v2 점수나 수정
 후 모델 성능으로 다시 표시하지 않으며, 새 모델 평가에는 수정된 workflow와 scorer 버전을
 기록한 별도 실행 결과가 필요하다.
+
+
+`chatbot-workflow:v3`는 계약 오류 재생성 메시지에 고정 `CHATBOT_OUTPUT_CONTRACT` 규칙만
+전달한다. 주입 Provider가 던진 계약 오류도 원문·동적 필드 경로·모델 값을 되먹이지 않는다.
+초기 프롬프트는 `chatbot-prompt:v1`, 채점기는 v2를 유지한다. 최초 호출 포함 3회 상한과 마지막
+예외 타입 보존은 동일하다. 실제 모델 재평가 전에는 과거 측정을 v3 성능으로 해석하지 않는다.

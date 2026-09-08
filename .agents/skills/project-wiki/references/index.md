@@ -9,11 +9,12 @@ updated: 2026-09-08
 
 | 문서 | 읽는 조건 |
 |---|---|
-| [챗봇 도입 검토](../../../../docs/architecture/chatbot/overview.md) | F4 업무 챗봇의 도입 근거·범위·공수·문서 위치를 검토할 때. 사용자 설계 합의·구현 미착수 |
+| [챗봇 구현·검증](../../../../docs/architecture/chatbot/implementation-and-validation.md) | 활성화·실제 Luna 평가·Qwen 보류·격리 DB와 화면 검증 근거를 확인할 때 |
+| [챗봇 도입 검토](../../../../docs/architecture/chatbot/overview.md) | F4 업무 챗봇의 도입 근거·범위·공수·문서 위치를 검토할 때. 코드 구현·로컬 검증, 공유 dev 미적용 |
 | [챗봇 저장 설계](../../../../docs/architecture/chatbot/persistence.md) | 사용자별 대화 1개·메시지·요청 상태의 관계, 소유권·중복·삭제·중단 복구를 검토할 때 |
 | [챗봇 AI–Backend 계약](contracts/chatbot-ai.md) | 구현된 Python DTO·실행 facade·read capability·오류와 책임 경계를 확인할 때 |
 | [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md) | 챗봇의 AI–Backend 도구 경계·모델·멀티턴을 검토할 때 |
-| [챗봇 SSE 계약안](../../../../docs/architecture/chatbot/api-and-stream.md) | 챗봇의 요청·진행 이벤트·취소·복구 제안을 검토할 때 |
+| [챗봇 SSE 계약](../../../../docs/architecture/chatbot/api-and-stream.md) | 챗봇의 요청·진행 이벤트·취소·복구 구현을 검토할 때 |
 | [챗봇 화면안](../../../../docs/screen/chatbot.md) | 플로팅 UI·추천 질문·F2 연결·기억 범위 안내를 검토할 때 |
 | [실거래 API 조사](../../../../docs/architecture/chatbot/public-market-data.md) | 선택 시세 기능의 공공 데이터 출처·연동 조건을 확인할 때 |
 | [governance.md](governance.md) | 위키를 추가·수정하거나 지식 상태를 판정할 때 |

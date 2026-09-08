@@ -34,6 +34,13 @@ from brokerage_ai.providers.ports import LlmProvider
 CONTEXT_TOKENS = 8192
 OUTPUT_TOKENS = 1024
 MAX_ATTEMPTS = 3
+_REPAIR_INSTRUCTION = (
+    "Rule: CHATBOT_OUTPUT_CONTRACT. Output violated schema or evidence rules. "
+    "Follow every system rule; use null for absent fields and copy numeric phrases exactly. "
+    "Use only filters allowed for the selected tool and grounded in the current question "
+    "or authorized active conditions. Preserve explicit refinements. "
+    "Never invent conditions or IDs. Use clarification for negated or uncertain conditions."
+)
 _KST = timezone(timedelta(hours=9))
 
 _SYSTEM = """You interpret Korean brokerage queries. Return only the supplied JSON schema.
@@ -321,22 +328,16 @@ class ChatbotWorkflow:
                     raise ChatbotContextLimitError("provider exceeded the declared token budget")
                 _validate_intent(produced.output, request)
                 return produced.output, produced.diagnostics, attempt
-            except (ProviderOutputInvalidError, ValidationError, ChatbotContractError) as error:
+            except (ProviderOutputInvalidError, ValidationError, ChatbotContractError):
                 if attempt == MAX_ATTEMPTS:
                     raise
-                # Only our own fixed contract rules may accompany generic correction text.
-                detail = (
-                    str(error) if isinstance(error, ChatbotContractError) else "schema mismatch"
-                )
+                # Exception classes can also originate in injected providers. Never include
+                # their message, dynamic field paths, or model-generated values (ADR-0003).
                 attempted = (
                     *original,
                     ChatMessage(
                         role=MessageRole.USER,
-                        content="Output violated the schema or source-copy rules. "
-                        "Follow every system "
-                        "rule; use null for absent fields and copy numeric phrases exactly. "
-                        "Never invent conditions or IDs. Use clarification if uncertain. Rule: "
-                        + detail,
+                        content=_REPAIR_INSTRUCTION,
                     ),
                 )
         raise AssertionError("unreachable")

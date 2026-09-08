@@ -137,6 +137,56 @@ async def test_contract_repair_is_bounded_and_contains_no_untrusted_error_text()
     assert "secret payload" not in provider.requests[1].messages[-1].content
 
 
+@pytest.mark.parametrize("failure_origin", ["contract", "provider", "schema", "model_value"])
+async def test_repair_never_forwards_exception_or_model_payload(failure_origin):
+    # Synthetic sentinels stay inside FakeProvider; no external service is contacted.
+    payload = "SYNTHETIC_SECRET synthetic@example.invalid 010-0000-0000"
+    if failure_origin == "contract":
+        invalid = ChatbotContractError(payload)
+    elif failure_origin == "provider":
+        invalid = ProviderOutputInvalidError(payload)
+    elif failure_origin == "schema":
+        invalid = {"tool": payload}
+    else:
+        invalid = {"tool": "properties", "filters": {"complex_name": payload}}
+    provider = FakeProvider(invalid, {"tool": "properties"})
+    reads = FakeReads()
+    result = await workflow(provider).run(request(), capability=reads)
+    assert result.model_calls == 2
+    assert len(reads.calls) == 1
+    correction = provider.requests[1].messages[-1].content
+    assert "CHATBOT_OUTPUT_CONTRACT" in correction
+    for marker in ("SYNTHETIC_SECRET", "synthetic@example.invalid", "010-0000-0000"):
+        assert marker not in " ".join(m.content for m in provider.requests[1].messages)
+
+
+async def test_repair_does_not_stringify_provider_contract_exception():
+    class ProviderContractError(ChatbotContractError):
+        def __str__(self):
+            raise AssertionError("exception payload must never be inspected for correction")
+
+    provider = FakeProvider(ProviderContractError(), {"tool": "properties"})
+    result = await workflow(provider).run(request(), capability=FakeReads())
+    assert result.model_calls == 2
+
+
+async def test_exhausted_repair_preserves_final_exception_without_forwarding_payload():
+    failures = [ChatbotContractError(f"SYNTHETIC_SECRET_{index}") for index in range(3)]
+    provider = FakeProvider(*failures)
+    reads = FakeReads()
+    with pytest.raises(ChatbotContractError) as caught:
+        await workflow(provider).run(request(), capability=reads)
+    assert caught.value is failures[-1]
+    assert len(provider.requests) == 3
+    assert not reads.calls
+    assert provider.requests[1].messages[-1] == provider.requests[2].messages[-1]
+    assert all(
+        "SYNTHETIC_SECRET" not in message.content
+        for sent in provider.requests
+        for message in sent.messages
+    )
+
+
 async def test_exhausted_invalid_source_never_reaches_read():
     provider = FakeProvider(
         *[{"tool": "properties", "filters": {"price_expression": "999억 이하"}}] * 3

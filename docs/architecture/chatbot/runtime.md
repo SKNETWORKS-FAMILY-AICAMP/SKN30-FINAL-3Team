@@ -1,14 +1,14 @@
 ---
-status: AI 계약 구현됨·Backend 연결 계획됨
+status: AI·Backend 구현됨·화면 통합 계획됨
 updated: 2026-09-08
 ---
 
 # 챗봇 실행·모델·조회 구조
 
-[도입 검토](overview.md) · [요구사항](../../requirements/chatbot/overview-and-scope.md) · [SSE 계약안](api-and-stream.md) · [저장 설계](persistence.md)
+[도입 검토](overview.md) · [요구사항](../../requirements/chatbot/overview-and-scope.md) · [SSE 계약](api-and-stream.md) · [저장 설계](persistence.md)
 PR #99에서 구현한 Python DTO·실행 facade·read capability·오류의 정본은
 [AI–Backend 공개 계약](../../../.agents/skills/project-wiki/references/contracts/chatbot-ai.md)이다.
-AI 의도 도구와 실행 제한은 PR #99에 구현됐다. Backend 조회 adapter·저장·HTTP/SSE 연결은 후속 PR #100, 화면 통합은 PR #101의 범위다. 아래 전체 흐름은 이 연결을 포함한 설계이며, 기존 [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)의 모듈 경계를 유지한다.
+AI 의도 도구와 실행 제한은 PR #99, Backend 조회 adapter·인증·저장·HTTP/SSE 연결은 PR #100에 구현됐다. 화면 통합은 후속 PR #101의 범위다. 아래 전체 흐름에는 후속 화면 동작도 포함하며, 공유 dev 배포 완료를 뜻하지 않는다. 실제 평가 기록은 [구현·검증](implementation-and-validation.md)을 참고한다. 기존 [ADR-0006](../../../.agents/skills/project-wiki/references/decisions/ADR-0006-ai-backend-boundary.md)의 모듈 경계를 유지한다.
 
 ## 권장 실행 흐름
 
@@ -48,10 +48,10 @@ flowchart LR
 | `unsupported` | 지원 범위 밖 요청 | 고정 제한 안내, 조회 없음 |
 | `open_f2` | 음성메모 접수 화면 진입 요청 | F2 이동 버튼만 반환. 사용자가 이동한 뒤 기존 화면에서 분석·승인 수행 |
 
-위 이름은 HTTP 경로가 아닌 AI의 `ChatIntent.tool` 값이다. 실제 DB 조회·카드·권한 검증은 후속 Backend adapter가 구현한다.
+위 이름은 HTTP 경로가 아닌 AI의 `ChatIntent.tool` 값이다. 실제 DB 조회·카드·권한 검증은 PR #100의 Backend adapter가 구현한다.
 AI는 질문당 주 조회 port를 최대 1회 호출하고, 계약 위반에 대한 모델 생성은 최초 호출 포함 최대 3회, 전체 실행은 60초 이내로 제한한다. 단지명 해소 등 adapter 내부 보조 조회를 포함한 DB 조회 최대 3회는 Backend 설계 상한이며 모델 생성 횟수와 별개다.
 결과는 첫 10건과 정확한 총건수·다음 페이지를 제공한다. “전체 100건 중 10건 표시”와 “총 10건”을 구분한다.
-최신 매물 1건을 고르는 현재 장부 규칙을 그대로 쓸지 필터 평가 전에 확정하고, 챗봇과 그리드의 결과 집합을 비교한다.
+최신 매물은 기존 장부의 접수일·ID 내림차순 1건 선택 규칙을 재사용하며 그 뒤 검색 필터를 적용한다.
 F3 후보 조회는 앵커의 추정값·점수 규칙을 사용하므로 일반 장부 검색에 그대로 연결하지 않는다. 재사용은 Backend의 검증된 저수준 조회 조각에 한정한다.
 
 ## 자연어를 안전한 조건으로 바꾸는 방식
@@ -60,6 +60,7 @@ AI에 구현된 자연어→제한된 JSON 조건 해석을 Backend 쿼리에 �
 예: “A단지 매매 15억 이하” → 거래 `매매`, 단지 후보 `A단지`, 금액 표현 `15억 이하` → Backend가 실제 단지 ID와 원 단위 상한으로 정규화한다.
 억/만원·전세 보증금/월세·전용/공급 면적·미만/이하·날짜 경계를 검증하며, 모델이 계산한 숫자만 신뢰하지 않는다.
 AI는 Schema 검증에 더해 비어 있지 않은 생성 조건마다 도구별 허용 필드와 질문·허용 문맥의 근거를 검사한다. enum의 한국어 의미 근거, 같은 도구의 후속 조건 상속과 재생성 규칙은 [공개 계약](../../../.agents/skills/project-wiki/references/contracts/chatbot-ai.md#생성-조건의-근거-검증)을 따른다.
+최신 Time Keeper에서 제거된 재연락 종류는 Backend가 기존 조건·참조를 포함해 안내로 처리한다.
 JSON Schema 적합성은 의미 정확성을 보장하지 않는다. 서로 모순된 조건, 존재하지 않는 단지, 가격 원문만 있고 정규화 값이 없는 경우를 별도 처리한다.
 
 - Backend allowlist 밖의 필드·연산자·정렬·임의 URL·SQL은 거절한다. 범용 SQL/Repository를 AI 도구로 노출하지 않는다.
@@ -93,3 +94,11 @@ F2는 기존 STT·추출 모델을 유지하며 범용 챗봇 LLM으로 교체�
 
 초기 조회 workflow는 선형 구조로 충분하다. 요청·결과 저장은 Backend가 소유하고 AI에 DB 타입을 전달하지 않는다. 분기·중단/재개가 복잡해지면 AI 내부에서 LangGraph 사용을 검토하되 Backend에는 그래프 타입을 노출하지 않는다.
 도구 추가는 권한·DTO·결과 UI·평가 사례가 함께 준비된 경우에만 노출한다. 범용 에이전트 플랫폼을 먼저 만들 필요는 없다.
+
+## 구현한 조회의 의미
+
+- 구입장의 거래 종류는 저장된 `매수`·`전세`·`월세` 어휘에 매핑한다. 예산은 저장된 희망 범위와 검색 범위의 교집합을 조회하며, 양끝 모두 NULL인 예산은 제외한다.
+- 구입장 면적은 현재 DB에 전용/공급 기준이 없어 이를 가정하지 않는다. 기준이 필요한 면적 질문은 제한을 안내하며 해당 필터를 조용히 무시하지 않는다.
+- 단지명은 정확히 일치하는 이름을 우선하고, 부분 이름이 여러 단지에 해당하면 구체적인 단지명을 다시 묻는다.
+- 초기 실행은 선형 workflow로 구현했다. GPU 공유 전체 스케줄러·Redis·별도 큐·LangGraph 체크포인트는 추가하지 않았다.
+- 이 PR에 포함된 실제 모델 검증 기록은 local OpenAI Luna를 대상으로 하며 Qwen은 당시 보류 상태다. 기록된 측정값은 workflow v2의 조건 검증 보완 이전 결과이며, 이번 병합·회귀 검사를 수정 후 실제 모델 평가로 간주하지 않는다.
