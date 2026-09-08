@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core";
-import { OutlinedCalendarAltIcon } from "@patternfly/react-icons";
+import { ListIcon } from "@patternfly/react-icons";
 import { AgendaList } from "./AgendaList.tsx";
 import { useAgenda } from "./hooks/useAgenda.ts";
 import { useDailyBriefing } from "./hooks/useDailyBriefing.ts";
@@ -94,7 +94,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
         onClick={openAgenda}
         icon={
           <span className="time-keeper__launcher">
-            <OutlinedCalendarAltIcon />
+            <ListIcon />
             {hasCount && (
               <Badge className="time-keeper__badge" isRead={false}>
                 {badgeLabel(visibleTotal)}
