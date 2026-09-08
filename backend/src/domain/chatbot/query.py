@@ -41,10 +41,18 @@ CATEGORY_LABELS = {
     "CLIENT_TENANCY_EXPIRY": "손님 거주지 만기",
     "REQUEST_EXPIRY": "구입 의뢰 만기",
     "MOVE_IN": "희망 입주",
-    "LISTING_RECONTACT": "매물 재연락",
-    "CLIENT_RECONTACT": "손님 재연락",
     "LISTING_REVALIDATION": "매물 조건 재확인",
 }
+RETIRED_AGENDA_CATEGORIES = frozenset({"LISTING_RECONTACT", "CLIENT_RECONTACT"})
+
+
+def _ensure_supported_agenda(filters: dict) -> None:
+    if filters.get("tool") == "agenda" and RETIRED_AGENDA_CATEGORIES.intersection(
+        filters.get("categories", [])
+    ):
+        raise ClarificationNeeded(
+            "재연락 기능은 지원하지 않아요. 일정·만기·매물 재확인을 다시 조회해 주세요."
+        )
 
 
 def _scalar_conditions(column, values: dict) -> list:
@@ -103,6 +111,7 @@ def normalize(intent: ChatIntent, request: ChatInput) -> dict:
     filters = ChatFilters.model_validate(raw)
     result = filters.model_dump(mode="json", exclude_none=True)
     result["tool"] = intent.tool
+    _ensure_supported_agenda(result)
     if filters.status and filters.status not in ("RECEIVED", "ACTIVE"):
         raise ClarificationNeeded("현재 지원하는 진행 상태로 다시 알려 주세요.")
     if filters.status and (
@@ -232,6 +241,11 @@ class ChatLookup:
     def search(self, filters: dict, offset: int = 0) -> ChatResult:
         if not 0 <= offset <= 100000 or filters.get("tool") not in QUERY_TOOLS:
             raise ClarificationNeeded("조회 조건이나 페이지가 올바르지 않아요.")
+        # Saved result pages bypass normalize; retired capabilities are not empty results.
+        try:
+            _ensure_supported_agenda(filters)
+        except ClarificationNeeded as error:
+            return ChatResult(kind="clarification", text=str(error), filters=filters, as_of=now())
         with Session(self.engine) as session:
             # Count and page share a snapshot during concurrent ledger edits.
             session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
@@ -431,7 +445,13 @@ class ChatLookup:
             date.fromisoformat(filters["start_date"]),
             date.fromisoformat(filters["end_date"]),
         )
-        window = AgendaWindow(start, start, end, 30, 30, 100)
+        window = AgendaWindow(
+            as_of=start,
+            earliest=start,
+            latest=end,
+            revalidation_days=30,
+            per_category_limit=100,
+        )
         combined = agenda_union(self.brokerage_id, window)
         query = select(combined).where(combined.c.due_date.between(start, end))
         categories = filters.get("categories", [])
@@ -488,6 +508,10 @@ class ChatLookup:
             raise ClarificationNeeded("최근 검색 결과에서 몇 번째 항목인지 알려 주세요.")
         item = reference.items[ordinal - 1]
         action = item.action
+        if reference.kind == "agenda" and action is not None and action.type != "open_calendar":
+            # Stored agenda identifiers preserve their original source category.
+            # Calendar categories are user text and can coincide with a retired name.
+            _ensure_supported_agenda({"tool": "agenda", "categories": [item.id.partition(":")[0]]})
         if action is None or action.target_id is None:
             raise ClarificationNeeded("이 결과는 상세 화면을 열 수 없어요.")
         model = {

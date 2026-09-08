@@ -585,19 +585,21 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 |---|---|---|---|
 | `within_days` | 90 | 1~730 | 앞으로 며칠까지 볼지. F1-AL-01의 "기본 3개월"을 일수로 옮긴 값 |
 | `overdue_days` | 7 | 0~365 | 이미 지난 기한을 며칠까지 함께 볼지. **장부에 날짜가 적힌 종류에만 적용한다** |
-| `recontact_days` | 30 | 1~365 | 마지막 접촉 후 며칠이면 재연락 대상으로 볼지 (F1-AL-03) |
 | `revalidation_days` | 30 | 1~365 | 매물 접수 후 며칠이면 조건 재확인 대상으로 볼지 |
 | `per_category_limit` | 3 | 1~100 | 한 종류에서 실을 최대 건수 |
 | `limit` | 50 | 1~500 | 페이지 크기 |
 | `offset` | 0 | 0 이상 | 페이지 시작 위치 |
 
-`recontact_days`·`revalidation_days`·`per_category_limit`의 기본값은 MVP 조정값이며 승인된
-요구사항 수치가 아니다. 사무소별 설정 위치는 [미해결 질문](../open-questions.md)에 남긴다.
+`revalidation_days`·`per_category_limit`의 기본값은 MVP 조정값이며 승인된 요구사항 수치가
+아니다. 사무소별 설정 위치는 [미해결 질문](../open-questions.md)에 남긴다.
+
+> **[2026-09-08]** `recontact_days`와 `LISTING_RECONTACT`·`CLIENT_RECONTACT` 종류(F4-TK-04)는
+> 사용자 요청으로 계약에서 뺐다. 사유는 별도로 확인되지 않았다.
 
 ### 종류 어휘
 
 `category`는 **고정 열거형이 아니다.** 계약과 일정 테이블이 생기면 값이 늘어나므로 클라이언트는
-모르는 값을 오류로 다루지 않고 코드를 그대로 표시한다. 장부에서 계산하는 갈래는 다음 일곱 가지다.
+모르는 값을 오류로 다루지 않고 코드를 그대로 표시한다. 장부에서 계산하는 갈래는 다음 다섯 가지다.
 
 | category | 원천 | 성격 |
 |---|---|---|
@@ -605,12 +607,10 @@ LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코�
 | `CLIENT_TENANCY_EXPIRY` | `property_requirement.current_tenancy_expiry_date` | 저장된 날짜 |
 | `REQUEST_EXPIRY` | `property_requirement.request_expiry_date` | 저장된 날짜 |
 | `MOVE_IN` | `property_requirement.desired_move_in_date` | 저장된 날짜 |
-| `LISTING_RECONTACT` | `property_unit.last_contact_at` + `recontact_days` | 주기 규칙 |
-| `CLIENT_RECONTACT` | `property_requirement.last_contact_at` + `recontact_days` | 주기 규칙 |
 | `LISTING_REVALIDATION` | `property_listing.received_at` + `revalidation_days` | 주기 규칙 |
 
-주기 규칙으로 만드는 세 종류에는 `overdue_days` 를 적용하지 않는다. 밀린 연락과 확인은 시간이 지난다고
-사라지지 않고 오히려 급해지므로 아래쪽 경계를 두지 않는다. 1년 전에 접촉한 손님도 목록에 남으며
+주기 규칙으로 만드는 종류에는 `overdue_days` 를 적용하지 않는다. 밀린 확인은 시간이 지난다고
+사라지지 않고 오히려 급해지므로 아래쪽 경계를 두지 않는다. 1년 전에 접수한 매물도 목록에 남으며
 기한 이른 순 정렬이라 가장 오래 방치된 쪽이 위에 온다. 분량은 `per_category_limit` 이 잡고, 밀린
 전체 건수는 `categories` 의 총계가 알린다.
 

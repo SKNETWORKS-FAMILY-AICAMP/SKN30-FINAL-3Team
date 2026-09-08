@@ -54,7 +54,10 @@ AI 워크플로의 첫 콜백 시간은 HTTP·SSE 전달 시간과 다르므로 
 모델 원문·프롬프트·비밀값 대신 케이스 ID, 도구·조건, 안전한 진단 정보와 집계 결과를 기록한다.
 팀원 사용성 평가는 이번 완료 조건에 포함하지 않는다.
 
-## 2026-09-08 로컬 검증 결과
+## 2026-09-08 기존 로컬 검증 결과
+
+아래 모델·HTTP 측정은 workflow v2의 조건 근거 검사와 v3의 고정 재생성 메시지 도입 전 기록이다.
+원본·요약을 보존하며, 새 workflow/scorer의 실제 모델 정확도·성능 합격 근거로 재사용하지 않는다.
 
 | 검사 | 결과·근거 |
 |---|---|
@@ -64,8 +67,8 @@ AI 워크플로의 첫 콜백 시간은 HTTP·SSE 전달 시간과 다르므로 
 | 별도 공격 20건 × 3회 | **60/60 차단**. 워크플로 사전 차단이며 모델 자체의 주입 저항성 측정은 아님 |
 | 실제 모델 실행 | 240개 시나리오, 모델 호출 177회, 호출 오류 0건. 모델 해석 p95 **2.884초** |
 | 실제 HTTP·SSE·Luna·PostgreSQL | 12개 조회 × 3회 **36/36 통과**. 첫 진행 p95 **0.223초**, 완료 p95 **3.273초**, 매회 DB 복원과 최종 전체 삭제 통과 |
-| AI 회귀 | 최종 전체 **319개 통과**, Ruff·Pyright 통과. PyAV 18.1.0은 dev 의존성으로 고정하며 운영 의존성에는 추가하지 않음 |
-| Backend 회귀 | 최종 전체 **664개 통과**. 실제 PostgreSQL 소유권·경합·삭제·참조/기간/금액·장애 회귀를 포함 |
+| 당시 AI 회귀 | 전체 **319개 통과**, Ruff·Pyright 통과. PyAV 18.1.0은 dev 의존성으로 고정하며 운영 의존성에는 추가하지 않음 |
+| 당시 Backend 회귀 | 전체 **664개 통과**. 실제 PostgreSQL 소유권·경합·삭제·참조/기간/금액·장애 회귀를 포함 |
 | 추가 Backend 검사 | 모델 선택 CLI **7개**, Provider·최종 DB 저장 장애 **8개**, 설정·캘린더 상세 **6개** 통과. 전체 Backend Ruff·Pyright 통과 |
 | Qwen | **NOT_RUN** — 사용자 요청으로 RunPod 기동·실제 품질·성능 평가 보류 |
 
@@ -89,7 +92,10 @@ uv run --locked --project backend pyright --project backend
 
 AI 실제 실행 옵션과 Qwen의 고정 artifact 인자는 [평가 README](../../../ai/eval/chatbot/README.md)를 따른다. Backend 검증은 기존 사용자 DB를 초기화하지 않는 격리 DB에서만 실행한다.
 
-## 화면·통합 및 독립 검토
+## 기존 화면·통합 및 독립 검토 기록
+
+이 절과 다음 delivery 절은 PR #101의 최초 구현 당시 기록이다. 최신 dev 병합 후 검사 결과와
+구분하며, 실제 Luna 연결 확인도 workflow v2·v3 도입 전 실행으로 보존한다.
 
 - Frontend 순수 테스트 **12개**, 실제 HTTP/SSE fixture를 사용하는 챗봇 Playwright **8개**, 기존 F3 브라우저 **5개**가 통과했다. 계정 전환·전체 삭제·역순/중복 이벤트·구독 실패·재접속·참조 만료·키보드/IME·초점 복귀를 포함한다.
 - 기존 인증·장부·F2·F3·Time Keeper·캘린더·환경·오류 경계 회귀를 통과했다. `npm run typecheck`와 임시 outDir의 production build도 통과했다. 기존 대형 bundle 경고는 유지된다.
@@ -108,7 +114,7 @@ npm run typecheck
 npm run build -- --outDir /tmp/chatbot-validation-build
 ```
 
-## 전체 delivery 검증과 자동 검토 확인
+## 기존 delivery 검증과 자동 검토 기록
 
 [Delivery 결과](../../../backend/eval/validation/chatbot-delivery-20260908.json): 개인 `.env`와 기존 build 산출물을 포함하지 않은 임시 복사본에서 `infra/delivery/scripts/verify_local_delivery.sh`가 종료 코드 0으로 통과했다. Python 3.13.12·Node 22.23.2·uv 0.11.2·PostgreSQL 15.18/pgvector 0.8.6을 사용했다. 사용자 기본 런타임은 변경하지 않았다.
 
@@ -117,8 +123,40 @@ npm run build -- --outDir /tmp/chatbot-validation-build
 - 자동 리뷰의 매물 조인 누락 지적은 기존 `latest_listing_alias()` 내부 사무소·세대 상관과 `LIMIT 1 LATERAL`, 실제 PostgreSQL 총계·페이지 회귀로 오탐임을 확인했다. CI DB 누락 지적도 `verify_backend_ai.sh`의 필수 `TEST_DB_URL` 검사와 전체 pytest 실행이 이미 적용됨을 확인했다.
 - 비밀값 경고는 외부 client를 만들지 않는 합성 FakeProvider 회귀 입력이며 실제 키는 변경 파일에 포함되지 않았다. 원문과 다른 평가 요약 형식은 종류·스키마·수동 집계 방식을 명시하고 `verify_summary.py`로 원본 240행의 해시·집계·오답을 검증한다. 경고를 사람 승인으로 간주하지 않는다.
 
+## PR #100 최신 dev 통합·리뷰 수정 검증
+
+- 기준 dev: `bd4b9df` (#99 병합 포함). 이전 AI 계약을 되돌리지 않고 workflow v3의 고정 재생성
+  안내로 변경했다. 외부 예외 원문·동적 경로·모델 값을 Provider에 다시 보내지 않는 회귀를 포함한다.
+- 최신 Time Keeper의 5필드 `AgendaWindow`를 사용한다. 제거된 재연락 종류는 최초·후속·저장
+  페이지와 과거 장부 참조에서 안내로 처리하며, 기존 Time Keeper 화면의 규칙은 유지한다.
+- 별도 PostgreSQL 15 컨테이너의 빈 DB에 전체 migration 적용 및 재적용을 검증했다. Backend 전체
+  **668개**, AI 전체 **361개** 테스트를 통과했다. 실제 인증·CSRF·SSE·저장·복구와 기존
+  장부·F2·F3 회귀를 포함한다. 최종 챗봇·Time Keeper 대상 75개, 두 모듈 Ruff·Pyright도
+  통과했으며 외부 모델 호출과 공유 DB 변경은 하지 않았다.
+- 위 모델·HTTP 성능 원본은 변경하지 않았다. 이번 결과는 결정적 회귀 검증이며 실제 Luna/Qwen
+  재평가나 공유 환경 배포 검증을 대신하지 않는다.
+
 ## 후속 검증
 
 - Qwen endpoint를 운영자가 준비한 뒤 동일 fixture·반복 횟수로 평가한다. 모델 revision·artifact hash·runtime을 함께 기록한다.
 - 공유 dev 배포 시 CloudFront→ALB→API의 SSE buffering·idle timeout과 F3 경합을 실제 경로에서 검증한다.
 - 현재 공개 dev의 공용 합성 계정은 같은 작성자다. 실제 사람별 인증·개인정보 이용 승인을 대신하지 않는다.
+
+
+## PR #101 최신 dev 통합·리뷰 수정
+
+- 기준 dev `1ba8cae` (#100 병합 포함)의 AI workflow v3·scorer v2·Time Keeper 호환 수정을
+  보존했다. AI 소스와 lockfile은 최신 dev와 동일하다. 두 Python 모듈의 `uv sync --locked`가
+  새 가상환경에서 성공했다.
+- `latest_listing_alias`는 LATERAL 내부에서 사무소·세대를 상관시키므로 `outerjoin(..., true())`는
+  교차 사무소 조인이 아니다. 두 사무소·다른 세대 가격·동일 접수일 순번·삭제 매물·무매물 세대를
+  함께 검사하는 실제 PostgreSQL 회귀를 추가했다.
+- 다른 탭에서 대화를 삭제·재생성한 경우, 이전 이력·페이지·조건 초기화 응답을 폐기하고 진행 중
+  표시를 해제한다. 삭제·재생성·기능 비활성화의 9개 경합 회귀를 추가했다.
+- 별도 임시 PostgreSQL 15에서 migration 적용·재적용 및 Backend 전체 **670개**,
+  AI 전체 **361개** 테스트가 통과했다. Backend Ruff·포맷과 두 모듈 Pyright도 통과했다.
+- Frontend 전체 **223개**(챗봇 단위 21개·브라우저 8개, 기존 F3 브라우저 5개 및 기능 회귀·
+  환경·release 검사 포함), 타입 검사·프로덕션 빌드를 통과했다. 브라우저는 합성 서버의 SSE와
+  이동 콜백까지 검증하며 실제 모델·상세 API의 새 종단 검증을 뜻하지 않는다.
+- 외부 모델 재평가·공유 DB 변경·배포는 수행하지 않았다. 위 역사적 모델·HTTP·delivery 측정을
+  이 수정본의 실제 모델 성능으로 재사용하지 않는다.

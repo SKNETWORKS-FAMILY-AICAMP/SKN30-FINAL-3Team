@@ -1,13 +1,13 @@
 """일정·할 일 대상 조회.
 
-여덟 개의 날짜 원천을 ``UNION ALL``로 합친 뒤 DB에서 정렬·페이지를 자른다. 원천별로 따로 읽어
-파이썬에서 합치면 전체를 메모리에 올려야 총 건수와 페이지가 맞는다. 일곱 개는 장부(세대·매물·
+여섯 개의 날짜 원천을 ``UNION ALL``로 합친 뒤 DB에서 정렬·페이지를 자른다. 원천별로 따로 읽어
+파이썬에서 합치면 전체를 메모리에 올려야 총 건수와 페이지가 맞는다. 다섯 개는 장부(세대·매물·
 구입장)에서 계산하는 갈래이고, 나머지 하나(``_calendar_event_members``)는 사용자가 캘린더
 화면에서 직접 만든 일정이다. 장부 갈래와 달리 조인 없이 표시값을 이미 들고 있다.
 
-날짜가 그대로 저장된 원천과, 마지막 접촉·접수일에 주기를 더해 만드는 원천이 섞여 있다. 뒤쪽은
-`timestamptz`를 사무소 시간대의 날짜로 옮긴 뒤 더한다. 서버 시간대에 맡기면 배포 환경에 따라
-하루가 밀린다.
+날짜가 그대로 저장된 원천과, 매물 접수일에 재확인 주기를 더해 만드는 원천
+(``LISTING_REVALIDATION``)이 섞여 있다. 뒤쪽은 ``received_at`` 이 이미 ``DATE`` 라 시간대 변환
+없이 날짜끼리 더한다.
 
 모든 갈래의 ``WHERE``는 migration 002·009·017이 만든 부분 인덱스 조건과 **같은 모양**으로 둔다.
 조건이 어긋나면 인덱스를 두고도 전체 스캔이 된다. 두 가지를 지킨다.
@@ -26,7 +26,6 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
-    Date,
     String,
     Subquery,
     cast,
@@ -49,13 +48,11 @@ from domain.property_ledger.models import (
 )
 from domain.property_ledger.repository import Page
 from domain.time_keeper.models import (
-    BUSINESS_TIMEZONE,
     AgendaCategory,
     AgendaRow,
     AgendaWindow,
     RequirementAgendaDetail,
     UnitAgendaDetail,
-    recontact_contact_deadline,
     revalidation_received_deadline,
 )
 
@@ -69,11 +66,6 @@ ACTIVE_LISTING_STATUSES = frozenset({"RECEIVED"})
 def _category(category: AgendaCategory) -> Any:
     """UNION의 첫 분기가 컬럼 타입을 정하므로 문자열 상수에 타입을 명시한다."""
     return cast(literal(category.value), String).label("category")
-
-
-def _business_date(timestamp_column: Any) -> Any:
-    """`timestamptz`를 사무소 시간대의 달력 날짜로 옮긴다."""
-    return cast(func.timezone(BUSINESS_TIMEZONE, timestamp_column), Date)
 
 
 def _member(
@@ -118,21 +110,12 @@ def _no_str() -> Any:
     return cast(null(), String)
 
 
-def _recontact_due(timestamp_column: Any, window: AgendaWindow) -> Any:
-    """재연락할 때가 된 대상. 원본 컬럼의 상한 하나로 건다.
-
-    아래쪽 경계가 없어 오래 방치된 대상일수록 기한이 앞서고 목록 위에 온다.
-    """
-    return timestamp_column < recontact_contact_deadline(window)
-
-
 def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
     live_unit = [
         col(PropertyUnit.brokerage_id) == brokerage_id,
         col(PropertyUnit.is_deleted) == false(),
     ]
     expiry = col(PropertyUnit.tenancy_expiry_date)
-    last_contact = col(PropertyUnit.last_contact_at)
     return [
         _member(
             AgendaCategory.TENANCY_EXPIRY,
@@ -142,16 +125,6 @@ def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
             requirement_id=_no_id(),
             conditions=[*live_unit, expiry.is_not(None)],
             window=window,
-        ),
-        _member(
-            AgendaCategory.LISTING_RECONTACT,
-            _business_date(last_contact) + window.recontact_days,
-            unit_id=col(PropertyUnit.id),
-            listing_id=_no_id(),
-            requirement_id=_no_id(),
-            conditions=[*live_unit, last_contact.is_not(None)],
-            window=window,
-            in_window=_recontact_due(last_contact, window),
         ),
     ]
 
@@ -190,14 +163,13 @@ def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
         col(PropertyRequirement.is_deleted) == false(),
         col(PropertyRequirement.status).in_(sorted(ACTIVE_REQUIREMENT_STATUSES)),
     ]
-    last_contact = col(PropertyRequirement.last_contact_at)
     client_tenancy = col(PropertyRequirement.current_tenancy_expiry_date)
     stored: list[tuple[AgendaCategory, Any]] = [
         (AgendaCategory.CLIENT_TENANCY_EXPIRY, client_tenancy),
         (AgendaCategory.REQUEST_EXPIRY, col(PropertyRequirement.request_expiry_date)),
         (AgendaCategory.MOVE_IN, col(PropertyRequirement.desired_move_in_date)),
     ]
-    members = [
+    return [
         _member(
             category,
             column,
@@ -209,27 +181,14 @@ def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
         )
         for category, column in stored
     ]
-    members.append(
-        _member(
-            AgendaCategory.CLIENT_RECONTACT,
-            _business_date(last_contact) + window.recontact_days,
-            unit_id=_no_id(),
-            listing_id=_no_id(),
-            requirement_id=col(PropertyRequirement.id),
-            conditions=[*live_requirement, last_contact.is_not(None)],
-            window=window,
-            in_window=_recontact_due(last_contact, window),
-        )
-    )
-    return members
 
 
 def _calendar_event_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
     """사용자가 캘린더에서 직접 만든 일정. 종류가 열려 있어 문자열 컬럼을 그대로 싣는다.
 
     조인 없이 표시에 필요한 값을 이미 들고 있으므로, 이 갈래만 ``title``·``location``이 채워진다.
-    ``F4-TK-07``처럼 앞뒤 창 양쪽에 경계를 둔다 — 재연락·재확인과 달리 날짜가 그대로 저장된
-    갈래이기 때문이다.
+    ``F4-TK-07``처럼 앞뒤 창 양쪽에 경계를 둔다 — 재확인과 달리 날짜가 그대로 저장된 갈래이기
+    때문이다.
     """
     event_date = col(CalendarEvent.event_date)
     return [

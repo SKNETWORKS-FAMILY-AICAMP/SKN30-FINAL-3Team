@@ -63,6 +63,44 @@ def test_p95_uses_nearest_rank_and_empty_samples_remain_unavailable():
     assert EVAL.percentile(list(range(1, 21))) == 19
 
 
+def test_explicit_recent_sort_cannot_be_omitted():
+    case = {"expected": {"tool": "buyers", "filters": {"sort": "recent"}}}
+    actual = {"tool": "buyers", "mode": "replace", "filters": {}}
+    assert not EVAL.intent_matches(actual, case)
+    actual["filters"]["sort"] = "recent"
+    assert EVAL.intent_matches(actual, case)
+
+
+def test_refine_price_desc_to_recent_requires_actual_sort_change():
+    case = {
+        "active_filters": {"tool": "properties", "sort": "price_desc"},
+        "expected": {"tool": "properties", "mode": "refine", "filters": {"sort": "recent"}},
+    }
+    actual = {"tool": "properties", "mode": "refine", "filters": {}}
+    assert not EVAL.intent_matches(actual, case)
+    actual["filters"]["sort"] = "price_desc"
+    assert not EVAL.intent_matches(actual, case)
+    actual["filters"]["sort"] = "recent"
+    assert EVAL.intent_matches(actual, case)
+
+
+def test_unrequested_recent_sort_is_not_silently_removed():
+    case = {"expected": {"tool": "properties", "filters": {}}}
+    actual = {"tool": "properties", "mode": "replace", "filters": {"sort": "recent"}}
+    assert not EVAL.intent_matches(actual, case)
+
+
+def test_aggregation_preserves_historical_verdicts_without_rescoring():
+    # The old scorer incorrectly accepted omission of an explicit recent sort.
+    historical = {"tool": "buyers", "mode": "replace", "filters": {}}
+    case = {"expected": {"tool": "buyers", "filters": {"sort": "recent"}}}
+    assert not EVAL.intent_matches(historical, case)
+    report = EVAL.summarize(
+        [{"group": "basic", "passed": True, "elapsed_ms": 1, "actual": historical}]
+    )
+    assert report["supported_accuracy"] == 1
+
+
 @pytest.mark.parametrize("selected", ["", "missing-01", "basic-01,missing-01", "basic-01,"])
 def test_invalid_diagnostic_selection_fails_before_provider_initialization(selected):
     with pytest.raises(ValueError):

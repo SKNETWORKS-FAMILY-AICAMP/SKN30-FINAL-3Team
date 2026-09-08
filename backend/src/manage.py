@@ -8,6 +8,7 @@ from dataclasses import asdict
 from sqlmodel import Session
 
 from core.config import get_config
+from domain.agent_execution.backfill import backfill_position_cards, position_card_coverage
 from domain.authentication.commands import (
     create_development_user,
     purge_expired_sessions,
@@ -51,6 +52,15 @@ def build_parser() -> argparse.ArgumentParser:
         "seed-f3-synthetic",
         help="로컬 loopback DB의 F3 합성 seed를 초기화하고 검증한다",
     )
+    backfill = subcommands.add_parser(
+        "backfill-position-cards",
+        help="활성 매물·손님의 포지션 카드를 미리 만들도록 F3 실행을 접수한다",
+    )
+    backfill.add_argument("--brokerage-id", type=int, required=True)
+    backfill.add_argument("--user-id", type=int, required=True, help="실행 요청자로 기록할 사용자")
+    backfill.add_argument("--limit", type=int, help="한 번에 접수할 앵커 수. 나눠서 돌릴 때 쓴다")
+    backfill.add_argument("--dry-run", action="store_true", help="접수하지 않고 대상 수만 센다")
+
     f3_seed.add_argument(
         "--confirm-reset",
         action="store_true",
@@ -140,6 +150,25 @@ def main() -> None:
             )
         elif arguments.command == "purge-expired-sessions":
             print(json.dumps({"purged": purge_expired_sessions(session)}))
+        elif arguments.command == "backfill-position-cards":
+            before = position_card_coverage(session, arguments.brokerage_id)
+            result = backfill_position_cards(
+                session,
+                brokerage_id=arguments.brokerage_id,
+                requested_by=arguments.user_id,
+                limit=arguments.limit,
+                dry_run=arguments.dry_run,
+            )
+            print(
+                json.dumps(
+                    {
+                        **asdict(result),
+                        "coverage_before": before,
+                        "next": "Worker 를 실행하면 접수된 앵커의 카드를 만든다",
+                    },
+                    ensure_ascii=False,
+                )
+            )
         elif arguments.command == "seed-sample-ledger":
             if has_sample_ledger(session, arguments.brokerage_id):
                 if not arguments.reset:

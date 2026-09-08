@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core";
-import { OutlinedCalendarAltIcon } from "@patternfly/react-icons";
+import { ListIcon } from "@patternfly/react-icons";
 import { AgendaList } from "./AgendaList.tsx";
 import { useAgenda } from "./hooks/useAgenda.ts";
 import { useDailyBriefing } from "./hooks/useDailyBriefing.ts";
@@ -51,7 +51,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
   const agenda = useAgenda({ limit: BRIEFING_LIMIT }, { enabled });
   const { items, status, total, overdueDays, settlementCount, reload, withinDays } = agenda;
   const dismissed = useDismissedNeglected();
-  // 서버의 total은 창 전체 참값이라 "다시 보지 않기"로 감춘 밀린 재연락·재확인도 세어져 있다.
+  // 서버의 total은 창 전체 참값이라 "다시 보지 않기"로 감춘 밀린 재확인도 세어져 있다.
   // 배지와 브리핑은 실제로 사용자에게 보이는 건수를 따라야 한다.
   const visibleTotal = visibleAgendaTotal(items, overdueDays ?? 7, total, dismissed.isDismissed);
 
@@ -94,7 +94,7 @@ export function TimeKeeperNotification({ enabled = true }: TimeKeeperNotificatio
         onClick={openAgenda}
         icon={
           <span className="time-keeper__launcher">
-            <OutlinedCalendarAltIcon />
+            <ListIcon />
             {hasCount && (
               <Badge className="time-keeper__badge" isRead={false}>
                 {badgeLabel(visibleTotal)}

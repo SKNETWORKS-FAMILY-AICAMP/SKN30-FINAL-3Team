@@ -34,6 +34,13 @@ from brokerage_ai.providers.ports import LlmProvider
 CONTEXT_TOKENS = 8192
 OUTPUT_TOKENS = 1024
 MAX_ATTEMPTS = 3
+_REPAIR_INSTRUCTION = (
+    "Rule: CHATBOT_OUTPUT_CONTRACT. Output violated schema or evidence rules. "
+    "Follow every system rule; use null for absent fields and copy numeric phrases exactly. "
+    "Use only filters allowed for the selected tool and grounded in the current question "
+    "or authorized active conditions. Preserve explicit refinements. "
+    "Never invent conditions or IDs. Use clarification for negated or uncertain conditions."
+)
 _KST = timezone(timedelta(hours=9))
 
 _SYSTEM = """You interpret Korean brokerage queries. Return only the supplied JSON schema.
@@ -134,6 +141,52 @@ def build_messages(request: ChatInput) -> tuple[ChatMessage, ...]:
     )
 
 
+# Deliberately bounded Korean evidence vocabulary; unknown paraphrases are repaired
+# or clarified, never treated as permission to add a model-selected condition.
+_ENUM_EVIDENCE = {
+    "transaction_type": {"SALE": r"매매|매수", "JEONSE": r"전세", "RENT": r"월세"},
+    "area_basis": {"exclusive": r"전용", "supply": r"공급"},
+    "sort": {
+        "recent": r"최근|최신|등록순",
+        "price_asc": r"싼|저렴|(?:가격|예산|금액).{0,4}(?:낮은|낮게|오름차순)",
+        "price_desc": r"비싼|(?:가격|예산|금액).{0,4}(?:높은|높게|내림차순)",
+        "date_asc": r"날짜순|일자순|시간순|빠른순|(?:날짜|일자|시간).{0,4}오름차순",
+    },
+    "categories": {
+        "TENANCY_EXPIRY": r"(?:세대|매물)임대차만료",
+        "CLIENT_TENANCY_EXPIRY": r"고객임대차만료",
+        "REQUEST_EXPIRY": r"구입장만료",
+        "MOVE_IN": r"입주",
+        "LISTING_RECONTACT": r"매물재연락",
+        "CLIENT_RECONTACT": r"고객재연락",
+        "LISTING_REVALIDATION": r"매물재확인",
+        "CALENDAR": r"캘린더",
+    },
+}
+_LEDGER_FIELDS = frozenset(
+    {
+        "complex_name",
+        "transaction_type",
+        "status",
+        "price_expression",
+        "deposit_expression",
+        "rent_expression",
+        "area_expression",
+        "area_basis",
+        "sort",
+    }
+)
+_TOOL_FIELDS = {
+    "properties": _LEDGER_FIELDS,
+    "buyers": _LEDGER_FIELDS,
+    "agenda": frozenset({"date_expression", "categories", "sort"}),
+}
+
+
+def _enum_values(key: str, source: str) -> set[str]:
+    return {value for value, pattern in _ENUM_EVIDENCE[key].items() if re.search(pattern, source)}
+
+
 def _validate_intent(intent: ChatIntent, request: ChatInput) -> None:
     if intent.tool == "clarification":
         if intent.clarification_code is None:
@@ -152,15 +205,47 @@ def _validate_intent(intent: ChatIntent, request: ChatInput) -> None:
     if request.history and request.history[-1].answer_summary.startswith("clarification"):
         source += " " + request.history[-1].question
     allowed_source = re.sub(r"\s+", "", source)
+    if re.search(r"말고|제외|아닌|아니라|빼고|빼줘|않", allowed_source):
+        raise ChatbotContractError("negated conditions require clarification")
+    generated = intent.filters.model_dump(exclude_none=True)
+    if intent.mode == "refine" and request.active_filters.get("tool") == intent.tool:
+        for key in _ENUM_EVIDENCE:
+            evidence = _enum_values(key, re.sub(r"\s+", "", request.question))
+            effective = generated.get(key) or request.active_filters.get(key)
+            if evidence and effective:
+                values = set(effective) if isinstance(effective, (list, tuple)) else {effective}
+                if not values <= evidence:
+                    raise ChatbotContractError(f"filters.{key} conflicts with explicit refinement")
     for key, value in intent.filters.model_dump(exclude_none=True).items():
-        if not (key.endswith("_expression") or key in {"complex_name", "status"}):
+        if value == ():
             continue
-        if intent.mode == "refine" and re.sub(r"\s+", "", value) == re.sub(
-            r"\s+", "", str(request.active_filters.get(key, ""))
+        if key not in _TOOL_FIELDS[intent.tool]:
+            raise ChatbotContractError(f"filters.{key} is not permitted for this tool")
+        if key == "sort" and (
+            (intent.tool == "agenda" and value != "date_asc")
+            or (intent.tool != "agenda" and value == "date_asc")
         ):
+            raise ChatbotContractError("filters.sort is not permitted for this tool")
+        previous = request.active_filters.get(key)
+        inherited = (
+            intent.mode == "refine"
+            and request.active_filters.get("tool") == intent.tool
+            and (
+                tuple(previous) == value
+                if isinstance(value, tuple) and isinstance(previous, (list, tuple))
+                else value == previous
+            )
+        )
+        if key in _ENUM_EVIDENCE:
+            values = set(value) if isinstance(value, tuple) else {value}
+            # Explicit current-turn changes cannot be overwritten by stale context.
+            current_evidence = _enum_values(key, re.sub(r"\s+", "", request.question))
+            evidence = current_evidence or _enum_values(key, allowed_source)
+            if values <= evidence or (inherited and not evidence):
+                continue
+        elif inherited or (isinstance(value, str) and re.sub(r"\s+", "", value) in allowed_source):
             continue
-        if re.sub(r"\s+", "", value) not in allowed_source:
-            raise ChatbotContractError(f"filters.{key} must copy an authorized question phrase")
+        raise ChatbotContractError(f"filters.{key} requires authorized question or active evidence")
 
 
 def _bounded_messages(messages: tuple[ChatMessage, ...]) -> None:
@@ -243,22 +328,16 @@ class ChatbotWorkflow:
                     raise ChatbotContextLimitError("provider exceeded the declared token budget")
                 _validate_intent(produced.output, request)
                 return produced.output, produced.diagnostics, attempt
-            except (ProviderOutputInvalidError, ValidationError, ChatbotContractError) as error:
+            except (ProviderOutputInvalidError, ValidationError, ChatbotContractError):
                 if attempt == MAX_ATTEMPTS:
                     raise
-                # Only our own fixed contract rules may accompany generic correction text.
-                detail = (
-                    str(error) if isinstance(error, ChatbotContractError) else "schema mismatch"
-                )
+                # Exception classes can also originate in injected providers. Never include
+                # their message, dynamic field paths, or model-generated values (ADR-0003).
                 attempted = (
                     *original,
                     ChatMessage(
                         role=MessageRole.USER,
-                        content="Output violated the schema or source-copy rules. "
-                        "Follow every system "
-                        "rule; use null for absent fields and copy numeric phrases exactly. "
-                        "Never invent conditions or IDs. Use clarification if uncertain. Rule: "
-                        + detail,
+                        content=_REPAIR_INSTRUCTION,
                     ),
                 )
         raise AssertionError("unreachable")

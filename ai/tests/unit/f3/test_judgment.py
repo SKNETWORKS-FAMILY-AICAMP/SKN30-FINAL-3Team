@@ -31,7 +31,7 @@ from brokerage_ai.f3 import (
     ContactabilityStatus,
     ContactChannel,
     Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     JudgmentCard,
@@ -42,6 +42,7 @@ from brokerage_ai.f3 import (
     NegotiationSide,
     PositionCardAnalysis,
     PositionCondition,
+    QuoteEvidence,
     RecommendedAction,
     TimingAssessment,
     Urgency,
@@ -61,11 +62,11 @@ CANDIDATE_INTERACTION = 22
 
 
 def quote(interaction_id: int, text: str) -> Evidence:
-    return Evidence(kind=EvidenceKind.QUOTE, interaction_id=interaction_id, quote_text=text)
+    return QuoteEvidence(interaction_id=interaction_id, quote_text=text)
 
 
 def inference(note: str = "카드 값을 비교했다") -> Evidence:
-    return Evidence(kind=EvidenceKind.INFERENCE, note=note)
+    return InferenceEvidence(note=note)
 
 
 def analysis(evidence: Evidence) -> PositionCardAnalysis:
@@ -551,7 +552,7 @@ async def test_the_prompt_carries_no_run_or_tenant_identifier() -> None:
         assert forbidden not in body
 
 
-async def test_the_prompt_requires_unused_evidence_fields_to_be_null() -> None:
+async def test_the_prompt_states_that_evidence_kind_picks_the_shape() -> None:
     source = request()
     provider = FakeProvider(model_output(model_candidate(2, 1), model_candidate(3, 2)))
     generator = generator_for(provider)
@@ -559,7 +560,7 @@ async def test_the_prompt_requires_unused_evidence_fields_to_be_null() -> None:
     await generator.judge_candidates(source)
 
     body = "".join(message.content for message in provider.calls[0].messages)
-    for rule in ("kind=QUOTE", "kind=INFERENCE", "해당하지 않는 필드는 반드시 null"):
+    for rule in ("kind=QUOTE", "kind=INFERENCE", "kind 가 형태를 정한다"):
         assert rule in body
 
 

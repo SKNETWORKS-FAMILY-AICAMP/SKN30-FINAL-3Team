@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 
 from core.errors import ValidationError
@@ -34,10 +34,8 @@ MAX_WITHIN_DAYS = 730
 DEFAULT_OVERDUE_DAYS = 7
 MAX_OVERDUE_DAYS = 365
 
-# 마지막 접촉 후 이 일수가 지나면 재연락 대상으로 본다 (F1-AL-03).
 # 매물 접수 후 이 일수가 지나면 조건이 아직 유효한지 재확인 대상으로 본다.
-# 두 값 모두 MVP 조정값이며 승인된 요구사항 수치가 아니다. 사무소별 설정이 생기면 그리로 옮긴다.
-DEFAULT_RECONTACT_DAYS = 30
+# MVP 조정값이며 승인된 요구사항 수치가 아니다. 사무소별 설정이 생기면 그리로 옮긴다.
 DEFAULT_REVALIDATION_DAYS = 30
 MAX_RULE_DAYS = 365
 
@@ -81,10 +79,6 @@ class AgendaCategory(StrEnum):
     REQUEST_EXPIRY = "REQUEST_EXPIRY"
     #: 손님의 희망 입주일 (`property_requirement.desired_move_in_date`)
     MOVE_IN = "MOVE_IN"
-    #: 세대 재연락 시점. 마지막 접촉 + 재연락 주기
-    LISTING_RECONTACT = "LISTING_RECONTACT"
-    #: 손님 재연락 시점. 마지막 접촉 + 재연락 주기
-    CLIENT_RECONTACT = "CLIENT_RECONTACT"
     #: 매물 조건 재확인 시점. 접수일 + 재확인 주기
     LISTING_REVALIDATION = "LISTING_REVALIDATION"
 
@@ -96,7 +90,6 @@ class AgendaWindow:
     as_of: date
     earliest: date
     latest: date
-    recontact_days: int
     revalidation_days: int
     per_category_limit: int
 
@@ -235,7 +228,6 @@ def build_window(
     within_days: int,
     overdue_days: int,
     *,
-    recontact_days: int = DEFAULT_RECONTACT_DAYS,
     revalidation_days: int = DEFAULT_REVALIDATION_DAYS,
     per_category_limit: int = DEFAULT_PER_CATEGORY_LIMIT,
 ) -> AgendaWindow:
@@ -244,8 +236,6 @@ def build_window(
         raise ValidationError(f"within_days must be between 1 and {MAX_WITHIN_DAYS}")
     if not 0 <= overdue_days <= MAX_OVERDUE_DAYS:
         raise ValidationError(f"overdue_days must be between 0 and {MAX_OVERDUE_DAYS}")
-    if not 1 <= recontact_days <= MAX_RULE_DAYS:
-        raise ValidationError(f"recontact_days must be between 1 and {MAX_RULE_DAYS}")
     if not 1 <= revalidation_days <= MAX_RULE_DAYS:
         raise ValidationError(f"revalidation_days must be between 1 and {MAX_RULE_DAYS}")
     if not 1 <= per_category_limit <= MAX_PER_CATEGORY_LIMIT:
@@ -254,7 +244,6 @@ def build_window(
         as_of=as_of,
         earliest=as_of - timedelta(days=overdue_days),
         latest=as_of + timedelta(days=within_days),
-        recontact_days=recontact_days,
         revalidation_days=revalidation_days,
         per_category_limit=per_category_limit,
     )
@@ -265,27 +254,12 @@ def days_until_due(due: date, as_of: date) -> int:
     return (due - as_of).days
 
 
-def recontact_contact_deadline(window: AgendaWindow) -> datetime:
-    """재연락 대상이 되는 ``last_contact_at`` 의 위쪽 경계. 열린 구간이다.
-
-    **아래쪽 경계는 두지 않는다.** 밀린 연락은 시간이 지난다고 사라지지 않고 오히려 급해진다.
-    되돌아보는 창(``overdue_days``)을 여기에도 걸면 1년 방치된 손님이 목록에서 빠지는데, 그
-    손님이야말로 F1-AL-03 이 말하는 "일정 기간 이상 접촉이 없는" 대상이다. 기한 이른 순 정렬과
-    종류별 상한이 분량을 잡고, 밀린 전체 건수는 종류별 총계가 알린다.
-
-    조건을 컬럼이 아니라 상수 쪽에 둔다. ``날짜(last_contact_at) + 주기 <= 기준`` 으로 쓰면 컬럼에
-    연산이 붙어 인덱스를 타지 못한다. 같은 뜻을 ``last_contact_at`` 자체의 상한으로 옮긴다.
-
-    경계는 사무소 시간대의 자정이며 위쪽을 열어 마지막 날 하루를 통째로 담는다.
-    """
-    shift = timedelta(days=window.recontact_days)
-    return datetime.combine(window.latest - shift + timedelta(days=1), time.min, tzinfo=KST)
-
-
 def revalidation_received_deadline(window: AgendaWindow) -> date:
     """재확인 대상이 되는 ``received_at`` 의 위쪽 경계. 이 날짜를 포함한다.
 
-    재연락과 같은 이유로 아래쪽 경계를 두지 않는다. 오래 묵은 매물일수록 조건이 아직 유효한지
-    확인할 필요가 크다. ``received_at`` 은 DATE 라 시간대 변환 없이 날짜끼리 옮기면 된다.
+    **아래쪽 경계는 두지 않는다.** 오래 묵은 매물일수록 조건이 아직 유효한지 확인할 필요가 크다.
+    되돌아보는 창(``overdue_days``)을 여기에도 걸면 오래 방치된 매물이 목록에서 빠지는데, 그
+    매물이야말로 확인이 급한 대상이다. 기한 이른 순 정렬과 종류별 상한이 분량을 잡고, 밀린 전체
+    건수는 종류별 총계가 알린다. ``received_at`` 은 DATE 라 시간대 변환 없이 날짜끼리 옮기면 된다.
     """
     return window.latest - timedelta(days=window.revalidation_days)

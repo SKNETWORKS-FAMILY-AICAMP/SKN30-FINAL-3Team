@@ -1634,3 +1634,32 @@ def add_decision_feedback(session: Session, feedback: AiDecisionFeedback) -> AiD
     session.add(feedback)
     session.flush()
     return feedback
+
+
+def count_covered_anchors(
+    session: Session,
+    brokerage_id: int,
+    listing_ids: set[int],
+    requirement_ids: set[int],
+) -> tuple[int, int]:
+    """무효화되지 않은 카드를 가진 앵커 수. 백필 전후 확인용이다."""
+
+    def covered(column, identifiers: set[int]) -> int:
+        if not identifiers:
+            return 0
+        return len(
+            set(
+                session.exec(
+                    select(column).where(
+                        col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
+                        col(NegotiationPositionAnalysis.invalidated_at).is_(None),
+                        column.in_(sorted(identifiers)),
+                    )
+                ).all()
+            )
+        )
+
+    return (
+        covered(col(NegotiationPositionAnalysis.listing_id), listing_ids),
+        covered(col(NegotiationPositionAnalysis.requirement_id), requirement_ids),
+    )

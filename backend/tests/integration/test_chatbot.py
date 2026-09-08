@@ -312,6 +312,78 @@ def test_query_latest_listing_null_price_and_exact_total(chat_engine, user):
     assert lookup.search(filters).total == 0  # Older cheap listing is not selected after filtering.
 
 
+def test_latest_listing_is_correlated_per_unit_and_office(chat_engine, user):
+    """A newer listing elsewhere cannot supply another unit's price or remove empty units."""
+    with chat_engine.begin() as connection:
+        other_office = connection.execute(
+            text("INSERT INTO brokerage(name) VALUES ('다른 합성 사무소') RETURNING id")
+        ).scalar_one()
+        units = {}
+        for office, labels in (
+            (user.brokerage_id, ("A", "B", "NO_LISTING")),
+            (other_office, ("OTHER",)),
+        ):
+            complex_id = connection.execute(
+                text(
+                    "INSERT INTO property_complex(brokerage_id,name) "
+                    "VALUES(:b,'상관 조회 합성단지') RETURNING id"
+                ),
+                {"b": office},
+            ).scalar_one()
+            for label in labels:
+                units[label] = connection.execute(
+                    text(
+                        "INSERT INTO property_unit(brokerage_id,complex_id,unit_number) "
+                        "VALUES(:b,:c,:n) RETURNING id"
+                    ),
+                    {"b": office, "c": complex_id, "n": label},
+                ).scalar_one()
+        for label, price, received, deleted in (
+            ("A", 200000000, "2026-08-01", False),
+            ("A", 500000000, "2026-09-01", False),
+            ("A", 100000000, "2026-09-20", True),
+            ("B", 300000000, "2026-09-02", False),
+            ("B", 350000000, "2026-09-02", False),
+            ("OTHER", 50000000, "2027-01-01", False),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO property_listing(brokerage_id,unit_id,is_sale_available,"
+                    "sale_price,received_at,is_deleted) VALUES(:b,:u,true,:p,:d,:deleted)"
+                ),
+                {
+                    "b": other_office if label == "OTHER" else user.brokerage_id,
+                    "u": units[label],
+                    "p": price,
+                    "d": date.fromisoformat(received),
+                    "deleted": deleted,
+                },
+            )
+    lookup = ChatLookup(chat_engine, user.brokerage_id)
+    all_units = lookup.search({"tool": "properties"})
+    assert all_units.total == 3
+    assert {item.id for item in all_units.items} == {
+        str(units[label]) for label in ("A", "B", "NO_LISTING")
+    }
+    for expression, expected in (
+        ("5억 이하", {str(units["A"]): "500,000,000원", str(units["B"]): "350,000,000원"}),
+        ("3억 이하", {}),
+    ):
+        filters = normalize(
+            ChatIntent(
+                tool="properties",
+                filters=ChatFilters(transaction_type="SALE", price_expression=expression),
+            ),
+            ChatInput(question=f"매매 {expression}", as_of=date(2026, 9, 8)),
+        )
+        page = lookup.search(filters)
+        assert page.total == len(expected)
+        assert {
+            item.id: next(field.value for field in item.fields if field.label == "매매")
+            for item in page.items
+        } == expected
+
+
 def test_agenda_period_before_count_and_no_category_cap(chat_engine, user):
     with chat_engine.begin() as connection:
         for index in range(12):
