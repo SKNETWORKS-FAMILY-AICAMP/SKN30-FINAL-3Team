@@ -21,7 +21,7 @@ from brokerage_ai.f3 import (
     ContactabilityAssessment,
     ContactabilityStatus,
     Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     NegotiationIntent,
@@ -34,6 +34,7 @@ from brokerage_ai.f3 import (
     PositionCondition,
     PriceAssessment,
     PriceKind,
+    QuoteEvidence,
     TimingAssessment,
     Urgency,
     UrgencyAssessment,
@@ -176,14 +177,12 @@ def quote(request: PositionCardGenerationRequest, text_value: str) -> Evidence:
     """요청에 실제로 들어 있는 로그에서 인용을 만든다."""
     for log in request.consultation_logs:
         if text_value in log.masked_content:
-            return Evidence(
-                kind=EvidenceKind.QUOTE, interaction_id=log.interaction_id, quote_text=text_value
-            )
+            return QuoteEvidence(interaction_id=log.interaction_id, quote_text=text_value)
     raise AssertionError(f"quote {text_value!r} is not in the request")
 
 
 def inference(note: str = "접촉 이력이 짧다") -> Evidence:
-    return Evidence(kind=EvidenceKind.INFERENCE, note=note)
+    return InferenceEvidence(note=note)
 
 
 def default_analysis(request: PositionCardGenerationRequest) -> PositionCardAnalysis:
@@ -200,8 +199,7 @@ def default_analysis(request: PositionCardGenerationRequest) -> PositionCardAnal
     elif request.consultation_logs:
         first = request.consultation_logs[0]
         evidence = (
-            Evidence(
-                kind=EvidenceKind.QUOTE,
+            QuoteEvidence(
                 interaction_id=first.interaction_id,
                 quote_text=first.masked_content[:6],
             ),
