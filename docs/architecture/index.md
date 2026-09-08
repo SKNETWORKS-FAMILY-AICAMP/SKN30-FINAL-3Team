@@ -1,6 +1,6 @@
 ---
 status: 제안
-updated: 2026-08-18
+updated: 2026-09-08
 ---
 
 # 아키텍처 문서 안내
@@ -45,6 +45,11 @@ updated: 2026-08-18
 
 | 문서 | 언제 읽는가? | 다루는 범위 |
 |---|---|---|
+| [챗봇 도입 검토](chatbot/overview.md) | 도입 근거·구현 가능성·복잡성·공수·스택·확장 순서를 검토할 때 | 읽기 전용 자연어 조회·F2 연결, 현재 기반과 추가 작업 |
+| [챗봇 실행 구조](chatbot/runtime.md) | 도구·모델·멀티턴 구현을 검토할 때 | 제한된 조건 생성, Backend capability, local Luna·dev Qwen |
+| [챗봇 저장 설계](chatbot/persistence.md) | 대화 DB·상태·복구·삭제를 설계할 때 | 대화·메시지·요청 3테이블, 사용자별 1개, 영속 상태·즉시 삭제·경합 |
+| [챗봇 SSE 계약안](chatbot/api-and-stream.md) | 진행 표시·통신·취소·복구를 검토할 때 | 실행 접수와 GET 구독 분리, DB snapshot 복원, 서버 중단 후 수동 재시도 |
+| [선택 실거래 API 조사](chatbot/public-market-data.md) | 시세 관련 공공 API 도입을 판단할 때 | 국토부 매매·전월세, R-ONE, 단지 매핑·집계·신선도 |
 | [인프라 개요](infra/overview.md) | 공유 개발·시연 환경의 AWS·RunPod 배치와 자원 상태를 파악할 때 | VPC, EC2·RDS·S3, RunPod, 데이터 흐름, 조건부 ECS 확장 |
 | [배포·운영 구조](infra/deployment-and-operations.md) | revision 선택부터 Build·승인·배포·롤백과 비용 운영을 확인할 때 | CodePipeline V2, CodeBuild, CodeDeploy, RunPod 운영, 관측·종료 절차 |
 | [F2 개요](f2/overview.md) | F2 전체 흐름과 팀별 책임을 처음 파악할 때 | 범위, 시스템 구성, 온라인·오프라인 관계, 파일럿 가정 |

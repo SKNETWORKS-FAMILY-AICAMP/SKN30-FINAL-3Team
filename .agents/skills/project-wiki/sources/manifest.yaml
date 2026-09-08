@@ -1,7 +1,25 @@
 version: 1
-updated: "2026-09-07"
+updated: "2026-09-08"
 
 sources:
+  - id: "chatbot-design-decisions-2026-09-08"
+    type: "user-provided-direction"
+    location: "docs/requirements/sources/chatbot-design-decisions-2026-09-08.md"
+    received: "2026-09-08"
+    decision_status: "user-design-agreed; implementation-pending; team-review-pending"
+    reflected_in:
+      - "docs/requirements/chatbot/overview-and-scope.md"
+      - "docs/requirements/f4/overview-and-common.md"
+      - "docs/screen/chatbot.md"
+      - "docs/architecture/chatbot/overview.md"
+      - "docs/architecture/chatbot/runtime.md"
+      - "docs/architecture/chatbot/api-and-stream.md"
+      - "docs/architecture/chatbot/persistence.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+      - ".agents/skills/project-wiki/references/contracts/api.md"
+      - ".agents/skills/project-wiki/references/open-questions.md"
+    scope: "F4 소속·조회 3종/F2 연결·DB 저장/복원·작성자 접근·사용자별 대화 1개·삭제/환경 폐기까지 보존·운영 DB 즉시 전체 삭제·직전 2회 문맥·화면 종료 후 서버 처리 지속. 메모리 전용 설계 대체, 코드/SQL/DB 적용은 미수행"
+
   - id: "retain-runpod-deployment-path-2026-09-07"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-09-07)"
@@ -30,6 +48,68 @@ sources:
       요청 없는 실행 상태와 정지·삭제 상태의 GPU·저장소·IPv4·예약 용량 과금 구분.
       계정의 실제 자원·청구액과 서울 GPU 시간당 견적은 조회하지 않음.
 
+  - id: "chatbot-planning-2026-09-08"
+    type: "user-provided-direction"
+    location: "docs/requirements/sources/chatbot-planning-2026-09-08.md"
+    received: "2026-09-08"
+    decision_status: "planning-request; proposal; f2-existing-screen-handoff-selected"
+    reflected_in:
+      - "docs/requirements/chatbot/overview-and-scope.md"
+      - "docs/screen/chatbot.md"
+      - "docs/architecture/chatbot/overview.md"
+      - "docs/architecture/chatbot/runtime.md"
+      - "docs/architecture/chatbot/api-and-stream.md"
+      - "docs/architecture/chatbot/public-market-data.md"
+      - ".agents/skills/project-wiki/references/open-questions.md"
+    scope: "자연어 DB 조회·기존 F2 화면 연결·F3 개발 보류·local Luna/dev Qwen·플로팅 UI·SSE·멀티턴·선택 시세 기능의 기획 검토. 구현·팀 승인으로 간주하지 않음"
+
+  - id: "molit-apartment-sale-api-2026-09-08"
+    type: "official-documentation"
+    url: "https://www.data.go.kr/data/15126469/openapi.do"
+    accessed: "2026-09-08"
+    reflected_in:
+      - "docs/architecture/chatbot/public-market-data.md"
+    scope: "매매 실거래 지역·계약년월·REST/XML·공개 정보·이용 조건 확인. 실제 인증 API 호출은 미수행"
+
+  - id: "molit-apartment-rent-api-2026-09-08"
+    type: "official-documentation"
+    url: "https://www.data.go.kr/data/15126474/openapi.do"
+    accessed: "2026-09-08"
+    reflected_in:
+      - "docs/architecture/chatbot/public-market-data.md"
+    scope: "전월세 신고·확정일자 자료, 지역·월 조회, 동/호 미제공·이용 조건 확인"
+
+  - id: "reb-rone-openapi-2026-09-08"
+    type: "official-documentation"
+    url: "https://www.reb.or.kr/r-one/portal/openapi/openApiDevPage.do"
+    accessed: "2026-09-08"
+    reflected_in:
+      - "docs/architecture/chatbot/public-market-data.md"
+    scope: "통계표·지역·항목·인증키·XML/JSON·페이지·서버 중계 방식 확인"
+
+  - id: "mdn-sse-chatbot-2026-09-08"
+    type: "official-documentation"
+    url: "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events"
+    accessed: "2026-09-08"
+    reflected_in:
+      - "docs/architecture/chatbot/api-and-stream.md"
+    scope: "SSE 단방향 이벤트·프레임·EventSource 구독과 요청 단위 fetch 스트림 설계의 비교 근거"
+
+  - id: "starlette-streaming-response-2026-09-08"
+    type: "official-documentation"
+    url: "https://starlette.dev/responses/"
+    accessed: "2026-09-08"
+    reflected_in:
+      - "docs/architecture/chatbot/api-and-stream.md"
+    scope: "StreamingResponse 기반 비동기 응답 설계의 근거"
+
+  - id: "llamacpp-structured-chatbot-2026-09-08"
+    type: "official-documentation"
+    url: "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md"
+    accessed: "2026-09-08"
+    reflected_in:
+      - "docs/architecture/chatbot/runtime.md"
+    scope: "JSON 제약 출력 지원과 실제 모델·템플릿·고정 서버 버전에서 별도 검증해야 하는 경계"
   - id: "general-ai-provider-model-profiles-2026-09-03"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-09-03)"

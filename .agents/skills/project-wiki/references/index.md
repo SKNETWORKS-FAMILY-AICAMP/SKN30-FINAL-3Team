@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-31
+updated: 2026-09-08
 ---
 
 # 프로젝트 위키 인덱스
@@ -9,6 +9,12 @@ updated: 2026-08-31
 
 | 문서 | 읽는 조건 |
 |---|---|
+| [챗봇 도입 검토](../../../../docs/architecture/chatbot/overview.md) | F4 업무 챗봇의 도입 근거·범위·공수·문서 위치를 검토할 때. 사용자 설계 합의·구현 미착수 |
+| [챗봇 저장 설계](../../../../docs/architecture/chatbot/persistence.md) | 사용자별 대화 1개·메시지·요청 상태의 관계, 소유권·중복·삭제·중단 복구를 검토할 때 |
+| [챗봇 실행 구조](../../../../docs/architecture/chatbot/runtime.md) | 챗봇의 AI–Backend 도구 경계·모델·멀티턴을 검토할 때 |
+| [챗봇 SSE 계약안](../../../../docs/architecture/chatbot/api-and-stream.md) | 챗봇의 요청·진행 이벤트·취소·복구 제안을 검토할 때 |
+| [챗봇 화면안](../../../../docs/screen/chatbot.md) | 플로팅 UI·추천 질문·F2 연결·기억 범위 안내를 검토할 때 |
+| [실거래 API 조사](../../../../docs/architecture/chatbot/public-market-data.md) | 선택 시세 기능의 공공 데이터 출처·연동 조건을 확인할 때 |
 | [governance.md](governance.md) | 위키를 추가·수정하거나 지식 상태를 판정할 때 |
 | [project-overview.md](project-overview.md) | 프로젝트 목표, 범위, 제약을 확인할 때 |
 | [요구사항 인덱스](../../../../docs/requirements/index.md) | 기능 범위, 사용자 동작, 수용 기준 또는 F1·F2·F3 요구사항 ID를 확인할 때 |
