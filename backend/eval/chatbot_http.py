@@ -1,6 +1,6 @@
-"""Real Luna + localhost HTTP/SSE + isolated PostgreSQL latency and restore evaluation.
+"""Real model + localhost HTTP/SSE + isolated PostgreSQL latency and restore evaluation.
 
-Requires TEST_DB_URL on loopback, an account with CREATE DATABASE, and AI_OPENAI_API_KEY.
+Requires TEST_DB_URL on loopback, CREATE DATABASE and explicit provider configuration.
 Never targets a shared database. The temporary database is removed after evaluation.
 """
 
@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import math
 import os
+import re
 import socket
 import sys
 from pathlib import Path
@@ -26,8 +28,8 @@ from yoyo import get_backend, read_migrations
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from core.config import bind_config  # noqa: E402
-from main import create_app  # noqa: E402
+from chatbot_model import resolve_profile  # noqa: E402
+from core.config import bind_config, load_ai_config  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 QUERIES = [
@@ -51,7 +53,8 @@ def replace_database(url: str, database: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, f"/{database}", parts.query, parts.fragment))
 
 
-def seed(url: str) -> int:
+def seed(url: str, model_route: tuple) -> int:
+    provider, model, revision, alias = model_route
     engine = create_engine(url)
     try:
         with engine.begin() as db:
@@ -115,10 +118,16 @@ def seed(url: str) -> int:
             db.execute(
                 text(
                     "INSERT INTO ai_model_config(brokerage_id,capability,config_key,"
-                    "config_version,provider,model_name) VALUES (:b,'CHATBOT',"
-                    "'http-eval-luna',1,'openai','gpt-5.6-luna')"
+                    "config_version,provider,model_name,model_version,endpoint_alias) "
+                    "VALUES (:b,'CHATBOT','http-eval',1,:provider,:model,:revision,:alias)"
                 ),
-                {"b": brokerage},
+                {
+                    "b": brokerage,
+                    "provider": provider,
+                    "model": model,
+                    "revision": revision,
+                    "alias": alias,
+                },
             )
             return brokerage
     finally:
@@ -129,7 +138,97 @@ def p95(values: list[float]) -> float:
     return sorted(values)[math.ceil(len(values) * 0.95) - 1]
 
 
-async def measure(url: str, brokerage: int, rounds: int) -> dict:
+async def verify_deployment_image(base_url: str, declared: str, *, transport=None) -> dict:
+    """Read RunPod control-plane identity, never an image claimed by the model process."""
+    base = urlsplit(base_url)
+    pod = re.fullmatch(r"([a-z0-9]+)-8000\.proxy\.runpod\.net", base.hostname or "")
+    if (
+        base.scheme != "https"
+        or base.port not in (None, 443)
+        or pod is None
+        or base.username
+        or base.password
+        or base.query
+        or base.fragment
+        or base.path.rstrip("/") != "/v1"
+    ):
+        raise ValueError("Deployment verification requires a direct HTTPS RunPod proxy endpoint")
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", declared or ""):
+        raise ValueError("Deployment image must be digest pinned")
+    key = os.environ.get("RUNPOD_API_KEY", "")
+    if not key or key.strip() != key:
+        raise ValueError("RUNPOD_API_KEY is required for deployment verification")
+    try:
+        async with httpx.AsyncClient(
+            timeout=15, follow_redirects=False, transport=transport
+        ) as client:
+            response = await client.get(
+                f"https://rest.runpod.io/v1/pods/{pod[1]}",
+                headers={"Authorization": "Bearer " + key},
+            )
+            response.raise_for_status()
+            actual = response.json()
+        if (
+            not isinstance(actual, dict)
+            or actual.get("id") != pod[1]
+            or actual.get("image") != declared
+            or actual.get("desiredStatus") != "RUNNING"
+            or "8000/http" not in (actual.get("ports") or [])
+        ):
+            raise ValueError("Deployment identity missing or mismatched")
+    except (httpx.HTTPError, ValueError):
+        raise ValueError("RunPod deployment image verification failed") from None
+    return {"source": "runpod-control-plane", "deployment_image": declared}
+
+
+async def verify_model_metadata(model_route: tuple, provenance: dict) -> dict | None:
+    if model_route[0] == "openai":
+        return
+    config = load_ai_config("local")
+    endpoint = next(
+        (
+            e
+            for e in config.llm_endpoints
+            if e.alias == model_route[3] and e.provider == model_route[0]
+        ),
+        None,
+    )
+    if endpoint is None or endpoint.provider == "bedrock":
+        raise ValueError("explicit evaluation endpoint is missing")
+    api_key = getattr(endpoint, "api_key", None)
+    if api_key is None:
+        raise ValueError("evaluation endpoint credential is missing")
+    base = urlsplit(str(endpoint.base_url))
+    status_url = urlunsplit((base.scheme, base.netloc, "/ops/status", "", ""))
+    expected = {
+        "model": model_route[1],
+        "revision": model_route[2],
+        "artifact_sha256": provenance["artifact_sha256"],
+    }
+    if "profile" in provenance:
+        expected.update(
+            runtime_version=provenance["profile"]["runtime_version"],
+            runtime_image=provenance["profile"]["runtime_image"],
+            profile=provenance["model_profile"],
+        )
+    async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
+        response = await client.get(
+            status_url, headers={"Authorization": "Bearer " + api_key.get_secret_value()}
+        )
+        response.raise_for_status()
+        actual = response.json().get("model")
+    if not isinstance(actual, dict) or any(actual.get(k) != v for k, v in expected.items()):
+        raise ValueError("endpoint metadata differs from HTTP evaluation profile")
+    deployment = await verify_deployment_image(
+        str(endpoint.base_url), provenance.get("deployment_image", "")
+    )
+    return {**expected, **deployment}
+
+
+async def measure(
+    url: str, brokerage: int, rounds: int, model_route: tuple, provenance: dict
+) -> dict:
+    metadata_before = await verify_model_metadata(model_route, provenance)
     config = bind_config(
         {
             "APP_ENV": "local",
@@ -143,6 +242,8 @@ async def measure(url: str, brokerage: int, rounds: int) -> dict:
             "LOG_LEVEL": "WARNING",
         }
     )
+    from main import create_app
+
     app = create_app(config)
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -218,9 +319,14 @@ async def measure(url: str, brokerage: int, rounds: int) -> dict:
             measured = rows[1:]
             first_p95 = p95([r["first_progress_ms"] for r in measured])
             total_p95 = p95([r["elapsed_ms"] for r in measured])
+            metadata_after = await verify_model_metadata(model_route, provenance)
             return {
-                "provider": "openai",
-                "model": "gpt-5.6-luna",
+                "endpoint_metadata_before": metadata_before,
+                "endpoint_metadata_after": metadata_after,
+                "provider": model_route[0],
+                "model": model_route[1],
+                "revision": model_route[2],
+                "endpoint_alias": model_route[3],
                 "rounds": rounds,
                 "samples": len(measured),
                 "first_progress_p95_ms": first_p95,
@@ -244,12 +350,38 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
     parser.add_argument("--rounds", type=int, default=3, choices=range(1, 4))
+    parser.add_argument("--model-profile", default="local-openai")
+    parser.add_argument("--profiles-file", type=Path)
+    parser.add_argument("--deployment-image")
+    parser.add_argument("--artifact-sha256")
     args = parser.parse_args()
     base = os.environ["TEST_DB_URL"]
     if urlsplit(base).hostname not in {"localhost", "127.0.0.1", "::1"}:
         raise SystemExit("Only a loopback test PostgreSQL server is permitted")
-    if not os.environ.get("AI_OPENAI_API_KEY"):
+    route = resolve_profile(args.model_profile, args.profiles_file)
+    provenance = {
+        "model_profile": args.model_profile,
+        "deployment_image": args.deployment_image,
+        "artifact_sha256": args.artifact_sha256,
+    }
+    if route[0] == "openai" and not os.environ.get("AI_OPENAI_API_KEY"):
         raise SystemExit("AI_OPENAI_API_KEY is required")
+    if route[0] != "openai" and (
+        not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", args.deployment_image or "")
+        or not re.fullmatch(r"[0-9a-f]{64}", args.artifact_sha256 or "")
+    ):
+        raise SystemExit("Self-hosted HTTP evaluation requires deployment image and artifact hash")
+    if args.profiles_file is not None:
+        profile_bytes = args.profiles_file.read_bytes()
+        profile = json.loads(profile_bytes)["profiles"][args.model_profile]
+        provenance.update(
+            profiles_sha256=hashlib.sha256(profile_bytes).hexdigest(), profile=profile
+        )
+        expected_hash = hashlib.sha256(
+            json.dumps(profile["weights"], sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        if expected_hash != args.artifact_sha256:
+            raise SystemExit("Artifact hash differs from selected profile weights manifest")
     database = f"chatbot_http_{uuid4().hex[:12]}"
     admin = create_engine(replace_database(base, "postgres"), isolation_level="AUTOCOMMIT")
     created = False
@@ -264,7 +396,8 @@ def main() -> None:
                 migration.to_apply(read_migrations(str(ROOT / "docs/db/migrate")))
             )
         os.environ["AI_F2_PROVIDER_STATUS"] = "offline"
-        report = asyncio.run(measure(url, seed(url), args.rounds))
+        report = asyncio.run(measure(url, seed(url, route), args.rounds, route, provenance))
+        report.update(provenance)
         Path(args.output).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps({k: v for k, v in report.items() if k != "rows"}))
         if not report["passed"]:

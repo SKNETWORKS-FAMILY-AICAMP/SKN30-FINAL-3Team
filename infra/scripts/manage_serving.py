@@ -27,10 +27,12 @@ from botocore.exceptions import BotoCoreError, ClientError
 INFRA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INFRA / "deploy" / "scripts"))
 sys.path.insert(0, str(INFRA / "serving"))
+from model_profiles import load_profile
 from probe import probe, read_status
 from serving_contract import (
+    DEFAULT_GENERAL_PROFILE,
+    GENERAL_CUDA_VERSIONS,
     GENERAL_KEY,
-    GENERAL_MODEL,
     POD_NAME,
     WORKLOADS,
     endpoint_urls,
@@ -38,6 +40,20 @@ from serving_contract import (
 
 ToolError = power.ToolError
 emit = power.emit
+
+
+def general_profile(spec: dict) -> dict:
+    return load_profile(spec.get("model_profile", DEFAULT_GENERAL_PROFILE))
+
+
+def general_metadata(spec: dict) -> dict:
+    profile = general_profile(spec)
+    return {
+        "model_profile": spec.get("model_profile", DEFAULT_GENERAL_PROFILE),
+        "model": profile["model"],
+        "revision": profile["revision"],
+        "runtime_image": profile["runtime_image"],
+    }
 
 
 def f2_record(previous: dict, deployment: dict | None, release_id: str | None) -> dict:
@@ -237,6 +253,7 @@ class Serving:
                 value = {
                     "status": "active",
                     **deployment,
+                    **general_metadata(spec),
                     "base_url": endpoint_urls(
                         deployment["cloud"],
                         deployment["resource_id"],
@@ -395,6 +412,13 @@ class Serving:
                     "F2_SLLM_BUNDLE_SHA256": checksum,
                     "F2_SLLM_BUNDLE_URL": url,
                 }
+            else:
+                environment = {
+                    "GENERAL_MODEL_PROFILE": spec.get(
+                        "model_profile", DEFAULT_GENERAL_PROFILE
+                    ),
+                    "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
+                }
             if matches:
                 details = client.pod(matches[0]["id"])
                 if (
@@ -411,6 +435,20 @@ class Serving:
                 ):
                     raise ToolError(
                         "existing F2 Pod uses a different release; delete it explicitly"
+                    )
+                if workload == "general" and details.get("env", {}).get(
+                    "GENERAL_MODEL_PROFILE", DEFAULT_GENERAL_PROFILE
+                ) != spec.get("model_profile", DEFAULT_GENERAL_PROFILE):
+                    raise ToolError(
+                        "existing general Pod uses a different model profile; delete it explicitly"
+                    )
+                if (
+                    workload == "general"
+                    and details.get("env", {}).get("VLLM_ENABLE_CUDA_COMPATIBILITY")
+                    != "0"
+                ):
+                    raise ToolError(
+                        "existing general Pod must explicitly disable CUDA compatibility; delete it explicitly"
                     )
                 if f2.pod_status(details) != "RUNNING":
                     raise ToolError(
@@ -432,11 +470,18 @@ class Serving:
                         "templateId": registered["template_id"],
                         "volumeInGb": 0,
                         "env": environment,
+                        **(
+                            {"allowedCudaVersions": list(GENERAL_CUDA_VERSIONS)}
+                            if workload == "general"
+                            else {}
+                        ),
                     },
                 )
             deployment = {"cloud": "runpod", "resource_id": f2.resource_id(details)}
             if not matches:
                 self.started_candidate = deployment
+        if workload == "general":
+            deployment.update(general_metadata(spec))
         deadline = time.monotonic() + 1800
         while time.monotonic() < deadline:
             try:
@@ -452,7 +497,12 @@ class Serving:
         if deployment["cloud"] == "aws":
             self.command(
                 deployment["resource_id"],
-                "python3 /opt/brokerage-gpu/probe.py",
+                "python3 /opt/brokerage-gpu/probe.py"
+                + (
+                    " --model " + shlex.quote(general_profile(deployment)["model"])
+                    if workload == "general"
+                    else ""
+                ),
                 timeout=300,
             )
         else:
@@ -462,14 +512,19 @@ class Serving:
                 probe(urls[0], keys["AI_VLLM_SLLM_API_KEY"], "sllm")
                 probe(urls[1], keys["AI_VLLM_STT_API_KEY"], "stt", stt=True)
             else:
-                probe(urls[0], keys[GENERAL_KEY], GENERAL_MODEL)
+                probe(urls[0], keys[GENERAL_KEY], general_profile(deployment)["model"])
 
     def application_smoke(self, workload: str) -> None:
         instance = self.app_id()
         if not instance:
             raise ToolError("application smoke requires a running app")
         script = "smoke_f2.sh" if workload == "f2" else "smoke_general.sh"
-        self.command(instance, f"/opt/brokerage/revision/scripts/{script}", timeout=600)
+        command = f"/opt/brokerage/revision/scripts/{script}"
+        if workload == "general":
+            command += " " + shlex.quote(
+                general_profile(self.endpoint(workload))["model"]
+            )
+        self.command(instance, command, timeout=600)
 
     def stop_resources(self, workload: str, *, keep: dict | None = None) -> None:
         errors = []
@@ -523,7 +578,7 @@ class Serving:
             aws_capacity="must be provisioned by reviewed Terraform plan",
             standby="AWS stopped/EBS retained; RunPod deleted",
             apply=apply,
-            model=GENERAL_MODEL
+            model=general_profile(spec)["model"]
             if workload == "general"
             else "existing F2 SLLM + Whisper",
             release=spec.get("release_id"),
@@ -758,7 +813,9 @@ class Serving:
                                 if name == "general"
                                 else "AI_VLLM_SLLM_API_KEY"
                             ],
-                            GENERAL_MODEL if name == "general" else "sllm",
+                            general_profile(selection[name] or {})["model"]
+                            if name == "general"
+                            else "sllm",
                         )
                     )
                     if name == "f2":
@@ -786,6 +843,9 @@ def validate_selection(workload: str, spec: dict) -> None:
     ):
         raise ToolError("invalid workload/cloud selection")
     allowed = {"cloud", "gpu_id", "release_id", "bucket", "allow_dev_release"}
+    if workload == "general":
+        allowed.add("model_profile")
+        general_profile(spec)
     if set(spec) - allowed:
         raise ToolError("unsupported selection fields")
     if not isinstance(spec.get("gpu_id"), str) or not re.fullmatch(
@@ -812,6 +872,7 @@ def parser() -> argparse.ArgumentParser:
             p.add_argument("--workloads-stopped-confirmed", action="store_true")
     activation = commands.add_parser("activate-general")
     activation.add_argument("brokerage_id", type=int)
+    activation.add_argument("--model-profile")
     activation.add_argument("--apply", action="store_true")
     activation.add_argument("--workloads-stopped-confirmed", action="store_true")
     capacity = commands.add_parser("capacity-config")
@@ -824,6 +885,7 @@ def parser() -> argparse.ArgumentParser:
             p.add_argument("--apply", action="store_true")
         if action == "configure":
             p.add_argument("--gpu-id", required=True)
+            p.add_argument("--model-profile")
             p.add_argument("--release-id")
             p.add_argument("--bucket")
             p.add_argument("--allow-dev-release", action="store_true")
@@ -859,6 +921,17 @@ def main() -> int:
             power.require_stop_confirmation(args.workloads_stopped_confirmed)
             if args.brokerage_id < 1:
                 raise ToolError("positive brokerage ID required")
+            endpoint = controller.endpoint("general")
+            if endpoint.get("status") != "active":
+                raise ToolError("activate-general requires an active general endpoint")
+            selected_profile = args.model_profile or endpoint.get(
+                "model_profile", DEFAULT_GENERAL_PROFILE
+            )
+            model = general_profile({"model_profile": selected_profile})["model"]
+            if model != general_profile(endpoint)["model"]:
+                raise ToolError(
+                    "activation model must match the active general endpoint"
+                )
             controller.no_deployment()
             controller.app("stop")
             instance = controller.app_id()
@@ -866,7 +939,7 @@ def main() -> int:
                 raise ToolError("app instance unavailable")
             controller.command(
                 instance,
-                f"/opt/brokerage/revision/scripts/serving_maintenance.sh activate-general {args.brokerage_id}",
+                f"/opt/brokerage/revision/scripts/serving_maintenance.sh activate-general {args.brokerage_id} {shlex.quote(model)}",
                 timeout=360,
             )
             try:
@@ -890,6 +963,12 @@ def main() -> int:
                     bucket=args.bucket,
                     allow_dev_release=args.allow_dev_release,
                 )
+            else:
+                spec["model_profile"] = args.model_profile or (
+                    selection["general"] or {}
+                ).get("model_profile", DEFAULT_GENERAL_PROFILE)
+            if args.workload == "f2" and args.model_profile is not None:
+                raise ToolError("model profile selection is only supported for general")
             validate_selection(args.workload, spec)
             selection[args.workload] = spec
             if args.apply:

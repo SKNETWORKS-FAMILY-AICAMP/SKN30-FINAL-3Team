@@ -10,7 +10,9 @@ updated: 2026-09-08
 | 문서 | 읽는 조건 |
 |---|---|
 | [Qwen JSON 기록](../../../../infra/serving/qwen-records.md) | 평가·이미지 JSON 선행 반영과 후속 #107의 구현 경계를 확인할 때 |
-| [챗봇 구현·검증](../../../../docs/architecture/chatbot/implementation-and-validation.md) | 활성화·실제 Luna 평가·Qwen 보류·격리 DB와 화면 검증 근거를 확인할 때 |
+| [Qwen 검토 재현](../../../../infra/serving/comparison-reproduction.md) | 검토 코드·원본 집계 재생성·게시 태그별 양자화 재사용을 확인할 때 |
+| [Qwen 3모델 비교](../../../../infra/serving/model-comparison-2026-09-08.md) | 14B/32B AWQ와 공식 27B FP8 비교·BnB 기동 이력·비용을 확인할 때 |
+| [챗봇 구현·검증](../../../../docs/architecture/chatbot/implementation-and-validation.md) | 활성화·실제 Luna 평가·후속 Qwen 비교·격리 DB와 화면 검증 근거를 확인할 때 |
 | [챗봇 도입 검토](../../../../docs/architecture/chatbot/overview.md) | F4 업무 챗봇의 도입 근거·범위·공수·문서 위치를 검토할 때. 코드 구현·로컬 검증, 공유 dev 미적용 |
 | [챗봇 저장 설계](../../../../docs/architecture/chatbot/persistence.md) | 사용자별 대화 1개·메시지·요청 상태의 관계, 소유권·중복·삭제·중단 복구를 검토할 때 |
 | [챗봇 AI–Backend 계약](contracts/chatbot-ai.md) | 구현된 Python DTO·실행 facade·read capability·오류와 책임 경계를 확인할 때 |

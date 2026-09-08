@@ -39,6 +39,8 @@ updated: 2026-09-07
 | [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md) | 사용자 구현·기반 적용 승인·AWS/RunPod 후보 합성 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료 | local 개인 OpenAI 유지, dev F2/general 독립 AWS·RunPod 전환, alias·업무 데이터 보존 |
 | [ADR-0031](ADR-0031-runpod-junior-operations.md) | 사용자 구현 승인·코드 구현·팀 병합 검토 대기. Console 등록과 후속 감시 제거의 적용 기록은 Infra validation 참조; F2 정식 앱 배포는 미완료 | 약 10명 부트캠프 시연: Console 등록, 게시 품질 검증, API 전용 refresh·F2 동시 1건, 단일 GPU·점검 중단 허용 |
 
+| [ADR-0032](ADR-0032-general-model-comparison-profiles.md) | 사용자 구현·평가 승인·코드 구현·팀 검토 대기 | 범용 3모델 고정 프로필·실제 가중치 검증·명시 선택과 동일 조건 비교 |
+
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 
 LangGraph의 AI 모듈 내부 채택 범위는 [AI ADR-0002](../../../ai/references/decisions/ADR-0002-langgraph-adoption.md)에서 관리한다. Terraform의 루트·state 세부 기준은 [Infra ADR-0001](../../../infra/references/decisions/ADR-0001-terraform-layout-and-state.md)에서 관리한다. 개발·시연 자원과 전달 세부 기준은 [Infra ADR-0002](../../../infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)에서 관리한다.

@@ -23,8 +23,9 @@ updated: 2026-09-08
   capability route는 호출자가 명시하며 자동 fallback은 없다.
 
 평가 절차와 실제 실행 근거는 [AI 평가 README](../../../../ai/eval/chatbot/README.md) 및 그 결과 링크를
-읽는다. 모델 해석 평가와 DB/API/브라우저 평가의 범위를 섞지 않는다. 이 PR의 평가 기록에서
-Qwen은 당시 사용자 지시에 따른 NOT_RUN이며 endpoint 기동이나 GPU 생성은 평가기의 책임이 아니다.
+읽는다. 모델 해석 평가와 DB/API/브라우저 평가의 범위를 섞지 않는다. 초기 Qwen 보류 후
+사용자 승인으로 14B AWQ·32B AWQ·공식 27B FP8 비교를 실행했다. 그 결과는 workflow v2·v3
+도입 전 기록이며 현재 모델 성능이 아니다. endpoint 기동이나 GPU 생성은 평가기의 책임이 아니다.
 
 PR #99의 조건 검증 보완은 `chatbot-workflow:v2`에 도입됐고, 현재 v3에도 유지된다.
 현재 평가기는 `chatbot-intent-scorer:v2`다. `recent`도 명시된 조건으로 비교하므로 사용자가

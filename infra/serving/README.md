@@ -49,7 +49,7 @@ just -f infra/justfile ai-ghcr-secret
 읽기 전용 GHCR 사용자·token을 기존 Secret 컨테이너에 넣는다. F2·OpenAI 키를 삭제하지 않는다.
 
 이미지 게시 전 Docker build 안에서 해당 이미지에 설치된 vLLM parser로 실제 시작 인자를
-검증한다. 범용은 `python3`을 사용하며 F2의 vLLM 0.11과 범용의 0.26 옵션을 섞지 않는다.
+검증한다. 범용은 `python3`을 사용하며 F2의 vLLM 0.11과 범용의 고정 0.28 옵션을 섞지 않는다.
 F2 기본 이미지의 선택적 HF transfer는 비활성화한다. RunPod의 `RUNNING`만으로 준비를
 판단하지 말고 추론·fatal 로그를 확인한다. 컨테이너 재시작 중에도 Pod 과금이 이어질 수 있다.
 
@@ -170,3 +170,9 @@ AWS 누적 30만원·기존 종료일, RunPod 2개월 $300의 기존 한도를 �
 [EC2 stop/start](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html),
 [RunPod 요금](https://docs.runpod.io/pods/pricing)을 기준으로 잔존 비용을 확인한다.
 [validation.md](validation.md)의 실제 환경 행을 모두 통과해야 운영 완료다.
+
+## 비교 검토와 게시 이미지 재사용
+
+[검토 재현 절차](comparison-reproduction.md)에서 저장된 근거 검사와 원본 요약 재생성,
+동일 조건 재평가 명령을 확인한다. [게시 이미지 catalog](published-images.json)는 태그·digest별
+AWQ·BnB·공식 FP8의 실제 GPU 검증 범위를 구분한다. 최신 이미지를 모든 모델의 검증 완료로 간주하지 않는다.

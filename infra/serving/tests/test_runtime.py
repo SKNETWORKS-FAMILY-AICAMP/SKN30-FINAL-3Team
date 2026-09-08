@@ -54,7 +54,7 @@ class GeneralHttpSurface(unittest.TestCase):
             _, messages = self.request("GET", "/ops/status", headers)
         self.assertEqual(messages[0]["status"], 200)
         payload = json.loads(messages[1]["body"])
-        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes"})
+        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes", "model"})
 
 
 class GeneralStartup(unittest.TestCase):
@@ -77,6 +77,9 @@ class GeneralStartup(unittest.TestCase):
         }
         with (
             patch.dict("os.environ", environment, clear=True),
+            patch.object(
+                general_runtime, "prepare_model", return_value=("/snapshot", "a" * 64)
+            ),
             patch.object(general_runtime.os, "execvp") as execute,
         ):
             general_runtime.main()

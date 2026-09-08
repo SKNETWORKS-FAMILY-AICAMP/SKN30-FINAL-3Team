@@ -15,4 +15,4 @@ updated: 2026-09-08
 
 질문이 해결되면 관련 정본 문서 또는 ADR에 결과를 반영하고 이 표에서 제거한다. Git 이력은 토론의 과거 상태를 보존한다.
 
-OQ-CHAT-01·02는 2026-09-08 사용자 설계 합의로 해소했다. [F4 챗봇 요구사항](../../../../docs/requirements/chatbot/overview-and-scope.md), [저장 설계](../../../../docs/architecture/chatbot/persistence.md), [대화 보존 정책](privacy/policy.md)에 반영했으며 코드 구현·로컬 검증을 진행했으며 팀 병합 검토와 공유 dev 배포는 별도다. Qwen 실제 평가는 사용자 후속 지시로 보류했다.
+OQ-CHAT-01·02는 2026-09-08 사용자 설계 합의로 해소했다. [F4 챗봇 요구사항](../../../../docs/requirements/chatbot/overview-and-scope.md), [저장 설계](../../../../docs/architecture/chatbot/persistence.md), [대화 보존 정책](privacy/policy.md)에 반영했으며 코드 구현·로컬 검증을 진행했으며 팀 병합 검토와 공유 dev 배포는 별도다. Qwen은 초기 구현에서 보류했으나 후속 승인으로 [3모델 비교](../../../../infra/serving/model-comparison-2026-09-08.md)를 수행한다. 해당 결과와 모델 채택 판단은 비교 기록을 따른다.

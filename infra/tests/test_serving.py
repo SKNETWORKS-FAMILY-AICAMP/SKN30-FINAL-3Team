@@ -335,7 +335,7 @@ class GeneralHttpSurface(unittest.TestCase):
             _, messages = self.request("GET", "/ops/status", headers)
         self.assertEqual(messages[0]["status"], 200)
         payload = json.loads(messages[1]["body"])
-        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes"})
+        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes", "model"})
 
 
 class PreparationFailures(unittest.TestCase):

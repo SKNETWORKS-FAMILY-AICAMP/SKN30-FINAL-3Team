@@ -7,10 +7,14 @@ import asyncio
 import hashlib
 import json
 import math
+import re
 import time
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
+
+import httpx
 
 from brokerage_ai import load_ai_config
 from brokerage_ai.chatbot import ChatbotWorkflow, ChatFilters, ChatInput, ChatResult, CompletedTurn
@@ -128,6 +132,100 @@ def select_cases(cases: list[dict], requested: str | None) -> list[dict]:
     return [case for case in cases if case["id"] in identifiers]
 
 
+def apply_profile(args) -> dict:
+    """Consume an explicit JSON deployment contract without importing Infra internals."""
+    selected = getattr(args, "model_profile", None)
+    source = getattr(args, "profiles_file", None)
+    if bool(selected) != bool(source):
+        raise ValueError("model-profile and profiles-file must be supplied together")
+    if not selected:
+        return {}
+    if source is None:
+        raise ValueError("profiles-file is required")
+    profile_bytes = Path(source).read_bytes()
+    document = json.loads(profile_bytes)
+    if document.get("schema_version") != 1:
+        raise ValueError("unsupported serving profile schema")
+    profile = document.get("profiles", {}).get(selected)
+    if not isinstance(profile, dict):
+        raise ValueError("unknown serving model profile")
+    args.provider = "vllm"
+    args.model = profile["model"]
+    args.artifact_revision = profile["revision"]
+    args.runtime_image = profile["runtime_image"]
+    args.runtime_label = profile["runtime_version"]
+    args.endpoint_alias = args.endpoint_alias or "general-dev-gpu"
+    return {
+        "model_profile": selected,
+        "profiles_sha256": hashlib.sha256(profile_bytes).hexdigest(),
+        "profile": profile,
+        "expected_weights_manifest_sha256": hashlib.sha256(
+            json.dumps(profile["weights"], sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+    }
+
+
+def validate_self_hosted_provenance(provenance: dict) -> None:
+    if provenance["route"]["provider"] == "openai":
+        return
+    if not provenance.get("runtime_label"):
+        raise ValueError("self-hosted runtime label is required")
+    if not re.fullmatch(r"[0-9a-f]{40}", provenance.get("artifact_revision") or ""):
+        raise ValueError("self-hosted artifact revision must be a pinned commit")
+    if not re.fullmatch(r"[0-9a-f]{64}", provenance.get("artifact_sha256") or ""):
+        raise ValueError("self-hosted artifact manifest SHA256 is required")
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", provenance.get("runtime_image") or ""):
+        raise ValueError("self-hosted runtime image must be pinned by digest")
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", provenance.get("deployment_image") or ""):
+        raise ValueError("self-hosted deployment image must be pinned by digest")
+    expected = provenance.get("expected_weights_manifest_sha256")
+    if expected is not None and expected != provenance["artifact_sha256"]:
+        raise ValueError("artifact hash differs from the selected profile weights manifest")
+
+
+async def verify_endpoint(config, provenance: dict, *, transport=None) -> dict:
+    """Compare authenticated runtime attestation; container identity is verified by Infra."""
+    route = provenance["route"]
+    endpoint = next(
+        (
+            item
+            for item in config.llm_endpoints
+            if item.alias == route["endpoint_alias"] and item.provider == route["provider"]
+        ),
+        None,
+    )
+    if endpoint is None:
+        raise ValueError("evaluation endpoint must match the explicit provider and alias")
+    base = urlsplit(str(endpoint.base_url))
+    status_url = urlunsplit((base.scheme, base.netloc, "/ops/status", "", ""))
+    expected = {
+        "model": route["model"],
+        "revision": provenance["artifact_revision"],
+        "artifact_sha256": provenance["artifact_sha256"],
+        "runtime_version": provenance["runtime_label"],
+        "runtime_image": provenance["runtime_image"],
+    }
+    if provenance.get("model_profile"):
+        expected["profile"] = provenance["model_profile"]
+    async with httpx.AsyncClient(timeout=15, follow_redirects=False, transport=transport) as client:
+        response = await client.get(
+            status_url, headers={"Authorization": "Bearer " + endpoint.api_key.get_secret_value()}
+        )
+        response.raise_for_status()
+        metadata = response.json().get("model")
+    if not isinstance(metadata, dict) or any(metadata.get(k) != v for k, v in expected.items()):
+        raise ValueError("authenticated endpoint metadata differs from evaluation profile")
+    return {**expected, "checked_at": datetime.now(UTC).isoformat()}
+
+
+def save_report(path: str, report: dict) -> None:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_suffix(output.suffix + ".tmp")
+    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    temporary.replace(output)
+
+
 async def evaluate(args) -> dict:
     fixture_path = Path(args.cases)
     fixture_bytes = fixture_path.read_bytes()
@@ -136,6 +234,7 @@ async def evaluate(args) -> dict:
         raise ValueError("evaluation fixture must be marked synthetic_only")
     selected = select_cases(fixture["cases"], args.case_ids)
     diagnostic_subset = args.case_ids is not None or args.rounds != 3
+    profile_provenance = apply_profile(args)
     route = ModelRoute(
         provider=ProviderKind(args.provider), model=args.model, endpoint_alias=args.endpoint_alias
     )
@@ -148,89 +247,128 @@ async def evaluate(args) -> dict:
         ).hexdigest(),
         "started_at": datetime.now(UTC).isoformat(),
         "runtime_label": args.runtime_label,
+        "runtime_image": getattr(args, "runtime_image", None),
+        "deployment_image": getattr(args, "deployment_image", None),
         "artifact_revision": args.artifact_revision,
         "artifact_sha256": args.artifact_sha256,
+        **profile_provenance,
     }
-    if route.provider != ProviderKind.OPENAI and not all(
-        (args.runtime_label, args.artifact_revision, args.artifact_sha256)
-    ):
-        raise ValueError("self-hosted evaluations require runtime, artifact revision and hash")
+    validate_self_hosted_provenance(provenance)
     rows = []
-    async with create_ai_runtime(load_ai_config(args.environment)) as runtime:
-        provider = RecordingProvider(
-            runtime.providers.get_llm(route.provider, route.endpoint_alias)
-        )
-        workflow = ChatbotWorkflow(provider=provider, route=route)
-        # Warm-up is a real request and separately reported; never mixed into latency samples.
-        warm_start = time.perf_counter()
-        await workflow.run(
-            ChatInput(question="매매 매물 조회", as_of=date.fromisoformat(fixture["as_of"])),
-            capability=RecordingRead(),
-        )
-        warmup_ms = (time.perf_counter() - warm_start) * 1000
-        for round_number in range(1, args.rounds + 1):
-            for case in selected:
-                started = time.perf_counter()
-                read = RecordingRead()
-                provider.attempts = []
-                row = {
-                    "id": case["id"],
-                    "group": case["group"],
-                    "round": round_number,
-                    "first_progress_ms": None,
-                }
+    warmup_ms = None
+    stage = "initialization"
+    save_report(
+        args.output,
+        {
+            "status": "RUNNING",
+            "stage": stage,
+            "diagnostic_subset": diagnostic_subset,
+            "provenance": provenance,
+            "rows": rows,
+        },
+    )
+    try:
+        config = load_ai_config(args.environment)
+        if route.provider != ProviderKind.OPENAI:
+            stage = "provenance"
+            provenance["endpoint_attestation"] = await verify_endpoint(config, provenance)
+        async with create_ai_runtime(config) as runtime:
+            provider = RecordingProvider(
+                runtime.providers.get_llm(route.provider, route.endpoint_alias)
+            )
+            workflow = ChatbotWorkflow(provider=provider, route=route)
+            # Warm-up is a real request and separately reported; never mixed into latency samples.
+            stage = "warmup"
+            warm_start = time.perf_counter()
+            await workflow.run(
+                ChatInput(question="매매 매물 조회", as_of=date.fromisoformat(fixture["as_of"])),
+                capability=RecordingRead(),
+            )
+            warmup_ms = (time.perf_counter() - warm_start) * 1000
+            stage = "cases"
+            for round_number in range(1, args.rounds + 1):
+                for case in selected:
+                    started = time.perf_counter()
+                    read = RecordingRead()
+                    provider.attempts = []
+                    row = {
+                        "id": case["id"],
+                        "group": case["group"],
+                        "round": round_number,
+                        "first_progress_ms": None,
+                    }
 
-                async def progress(stage, sample=row, origin=started):
-                    if sample["first_progress_ms"] is None:
-                        sample["first_progress_ms"] = (time.perf_counter() - origin) * 1000
+                    async def progress(stage, sample=row, origin=started):
+                        if sample["first_progress_ms"] is None:
+                            sample["first_progress_ms"] = (time.perf_counter() - origin) * 1000
 
-                try:
-                    result = await workflow.run(
-                        ChatInput(
-                            question=case["question"],
-                            active_filters=case.get("active_filters", {}),
-                            history=tuple(
-                                CompletedTurn.model_validate(turn)
-                                for turn in case.get("history", [])
+                    try:
+                        result = await workflow.run(
+                            ChatInput(
+                                question=case["question"],
+                                active_filters=case.get("active_filters", {}),
+                                history=tuple(
+                                    CompletedTurn.model_validate(turn)
+                                    for turn in case.get("history", [])
+                                ),
+                                as_of=date.fromisoformat(fixture["as_of"]),
                             ),
-                            as_of=date.fromisoformat(fixture["as_of"]),
-                        ),
-                        capability=read,
-                        on_progress=progress,
-                    )
-                    actual = result.intent.model_dump(mode="json")
+                            capability=read,
+                            on_progress=progress,
+                        )
+                        actual = result.intent.model_dump(mode="json")
+                        row.update(
+                            passed=intent_matches(actual, case),
+                            actual=actual,
+                            model_calls=result.model_calls,
+                            diagnostics=result.diagnostics.model_dump(mode="json")
+                            if result.diagnostics
+                            else None,
+                        )
+                    except Exception as error:
+                        # Exception text may contain SDK details; only the fixed type is reportable.
+                        row.update(passed=False, error_type=type(error).__name__)
                     row.update(
-                        passed=intent_matches(actual, case),
-                        actual=actual,
-                        model_calls=result.model_calls,
-                        diagnostics=result.diagnostics.model_dump(mode="json")
-                        if result.diagnostics
-                        else None,
+                        elapsed_ms=(time.perf_counter() - started) * 1000, read_calls=read.calls
                     )
-                except Exception as error:
-                    # Exception text may contain SDK details; only the fixed type is reportable.
-                    row.update(passed=False, error_type=type(error).__name__)
-                row.update(elapsed_ms=(time.perf_counter() - started) * 1000, read_calls=read.calls)
-                row["attempts"] = provider.attempts
-                rows.append(row)
-                print(
-                    json.dumps({k: row[k] for k in ("id", "round", "passed", "elapsed_ms")}),
-                    flush=True,
-                )
-                # Save checkpoint after each completed case so interruption cannot erase evidence.
-                Path(args.output).write_text(
-                    json.dumps(
+                    row["attempts"] = provider.attempts
+                    rows.append(row)
+                    print(
+                        json.dumps({k: row[k] for k in ("id", "round", "passed", "elapsed_ms")}),
+                        flush=True,
+                    )
+                    # Keep each completed case even when a later request is interrupted.
+                    save_report(
+                        args.output,
                         {
                             "status": "RUNNING",
+                            "stage": "cases",
                             "diagnostic_subset": diagnostic_subset,
                             "provenance": provenance,
+                            "warmup_ms": warmup_ms,
                             "rows": rows,
                         },
-                        ensure_ascii=False,
-                        indent=2,
                     )
-                    + "\n"
-                )
+            if route.provider != ProviderKind.OPENAI:
+                stage = "final_provenance"
+                provenance["final_endpoint_attestation"] = await verify_endpoint(config, provenance)
+    except BaseException as error:
+        save_report(
+            args.output,
+            {
+                "status": "INTERRUPTED"
+                if isinstance(error, (KeyboardInterrupt, asyncio.CancelledError))
+                else "FAILED",
+                "stage": stage,
+                "error_type": type(error).__name__,
+                "diagnostic_subset": diagnostic_subset,
+                "provenance": provenance,
+                "warmup_ms": warmup_ms,
+                "summary": summarize(rows),
+                "rows": rows,
+            },
+        )
+        raise
     report = {
         "status": "COMPLETED",
         "diagnostic_subset": diagnostic_subset,
@@ -247,7 +385,7 @@ async def evaluate(args) -> dict:
         },
         "rows": rows,
     }
-    Path(args.output).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    save_report(args.output, report)
     return report
 
 
@@ -262,6 +400,10 @@ def main():
     parser.add_argument("--model", default="gpt-5.6-luna")
     parser.add_argument("--endpoint-alias")
     parser.add_argument("--runtime-label")
+    parser.add_argument("--runtime-image")
+    parser.add_argument("--deployment-image", help="Actual running container image digest")
+    parser.add_argument("--model-profile")
+    parser.add_argument("--profiles-file", type=Path)
     parser.add_argument("--artifact-revision")
     parser.add_argument("--artifact-sha256")
     parser.add_argument("--rounds", type=int, choices=[1, 3], default=3)

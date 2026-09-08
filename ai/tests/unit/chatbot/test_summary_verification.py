@@ -102,3 +102,29 @@ def test_raw_cli_output_cannot_be_misidentified_as_reviewed_summary():
     raw, _ = artifacts()
     with pytest.raises(ValueError, match="artifact schema"):
         VERIFY.verify_summary(raw, json.loads(raw))
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["runtime_image", "deployment_image", "artifact_revision", "artifact_sha256", "profile"],
+)
+def test_self_hosted_summary_must_preserve_deployment_evidence(field):
+    raw_bytes, summary = artifacts()
+    raw = json.loads(raw_bytes)
+    additions = {
+        "route": {"provider": "vllm", "model": "synthetic-model"},
+        "runtime_label": "0.28.0",
+        "runtime_image": "vllm/vllm-openai@sha256:" + "a" * 64,
+        "deployment_image": "ghcr.io/example/general-serving@sha256:" + "d" * 64,
+        "artifact_revision": "b" * 40,
+        "artifact_sha256": "c" * 64,
+        "profile": {"model": "synthetic-model"},
+    }
+    raw["provenance"].update(additions)
+    summary["provenance"].update(additions)
+    raw_bytes = json.dumps(raw).encode()
+    summary["provenance"]["raw_report_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
+    assert VERIFY.verify_summary(raw_bytes, summary)["verified"]
+    summary["provenance"][field] = "changed"
+    with pytest.raises(ValueError, match="provenance"):
+        VERIFY.verify_summary(raw_bytes, summary)

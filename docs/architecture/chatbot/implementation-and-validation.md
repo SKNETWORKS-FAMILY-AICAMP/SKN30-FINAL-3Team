@@ -20,7 +20,8 @@ updated: 2026-09-08
 ## 활성화와 모델 선택
 
 기본 `CHATBOT_ENABLED=false`다. prod 활성화는 합성 시연 범위를 벗어나므로 거절한다.
-공유 dev 배포·migration·GPU 기동은 이번 구현의 실행 범위에서 제외한다.
+공유 dev 배포·migration은 이번 구현의 실행 범위에서 제외한다. GPU 기동은 초기 구현에서 보류했으나,
+후속 승인된 [Qwen 3모델 비교](../../../infra/serving/model-comparison-2026-09-08.md)에서 평가 전용 Pod로 수행한다.
 
 1. 기존 절차로 격리된 로컬 PostgreSQL에 migration을 적용한다.
 2. Backend 로컬 환경에 기존 개발 계정을 설정하고 Provider 비밀값을 주입한다. 개인 AI 키가 `ai/.env`에만 있으면 Backend 명령 실행 시 해당 파일도 명시적으로 주입한다. 키를 다른 tracked 파일에 복사하지 않는다.
@@ -38,7 +39,11 @@ Qwen용 `dev-qwen38-vllm-bnb` 프로필은 고정 revision과 `general-dev-gpu` 
 
 ## 평가 합의
 
-2026-09-08 구현 요청 후 사용자는 **RunPod 기동과 Qwen 실제 평가를 보류하고 OpenAI로 구현·평가 진행**을 선택했다. 따라서 이번 필수 실제 모델은 Luna이며 Qwen의 실제 품질·성능은 미검증으로 남긴다.
+초기 구현에서는 사용자 요청으로 RunPod 기동과 Qwen 평가를 보류하고 Luna를 평가했다.
+이후 사용자가 Infra 프로필 도입과 비교 평가를 승인했고, 세 번째 모델을 공식 FP8으로 바꿔
+**14B AWQ·32B AWQ·공식 27B FP8**을 평가했다. BnB는 기동 성공·품질 미평가 이력으로 보존한다.
+후속 Qwen 결과와 한계는 [비교 기록](../../../infra/serving/model-comparison-2026-09-08.md)이 정본이며,
+아래 Luna 표는 초기 구현 당시의 검증 기록이다.
 
 | 검증 | 기준 |
 |---|---|
@@ -70,7 +75,7 @@ AI 워크플로의 첫 콜백 시간은 HTTP·SSE 전달 시간과 다르므로 
 | 당시 AI 회귀 | 전체 **319개 통과**, Ruff·Pyright 통과. PyAV 18.1.0은 dev 의존성으로 고정하며 운영 의존성에는 추가하지 않음 |
 | 당시 Backend 회귀 | 전체 **664개 통과**. 실제 PostgreSQL 소유권·경합·삭제·참조/기간/금액·장애 회귀를 포함 |
 | 추가 Backend 검사 | 모델 선택 CLI **7개**, Provider·최종 DB 저장 장애 **8개**, 설정·캘린더 상세 **6개** 통과. 전체 Backend Ruff·Pyright 통과 |
-| Qwen | **NOT_RUN** — 사용자 요청으로 RunPod 기동·실제 품질·성능 평가 보류 |
+| Qwen | 초기 구현에서 보류. 후속 승인된 [3모델 비교 결과](../../../infra/serving/model-comparison-2026-09-08.md)를 별도 기록 |
 
 [Luna 평가 근거](../../../ai/eval/chatbot/validation/luna-20260908.json)에는 fixture·workflow·prompt hash, 반복별 결과와 불일치를 기록했다. 평가 후 보안 수정으로 이전 차단 질문의 비밀값을 후속 문맥에서 제외했으며 실제 모델을 호출한 59종 입력의 전후 hash가 동일함을 확인했다. **조건 해석 점수는 실제 DB 조회 지원율과 다르다.** 구입장 면적은 저장 기준 부재로 Backend가 안내하며 무리하게 검색하지 않는다.
 
@@ -138,7 +143,7 @@ npm run build -- --outDir /tmp/chatbot-validation-build
 
 ## 후속 검증
 
-- Qwen endpoint를 운영자가 준비한 뒤 동일 fixture·반복 횟수로 평가한다. 모델 revision·artifact hash·runtime을 함께 기록한다.
+- Qwen 3모델의 역사적 비교는 완료했다. 공식 FP8은 지원 질문 94%·멀티턴 100%·HTTP 36/36이지만 모호·미지원 80%로 당시 평가기 전체 기준에 미달했다. 이 점수를 workflow v3·scorer v2 도입 후 성능으로 사용하지 않는다. 현재 조건 검증·재생성을 적용한 실제 모델 재평가가 남아 있다. [비교 기록](../../../infra/serving/model-comparison-2026-09-08.md)의 원본 점수와 hash를 보존하며 활성 모델을 자동 변경하지 않는다.
 - 공유 dev 배포 시 CloudFront→ALB→API의 SSE buffering·idle timeout과 F3 경합을 실제 경로에서 검증한다.
 - 현재 공개 dev의 공용 합성 계정은 같은 작성자다. 실제 사람별 인증·개인정보 이용 승인을 대신하지 않는다.
 

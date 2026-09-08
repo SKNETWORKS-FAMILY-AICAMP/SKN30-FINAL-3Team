@@ -116,6 +116,8 @@ resource "aws_instance" "gpu" {
     host_script     = base64encode(file("${path.module}/../../serving/gpu_host.py"))
     probe_script    = base64encode(file("${path.module}/../../serving/probe.py"))
     download_script = base64encode(file("${path.module}/../../serving/download_models.py"))
+    profiles_script = base64encode(file("${path.module}/../../serving/model_profiles.py"))
+    profiles_json   = base64encode(file("${path.module}/../../serving/model-profiles.json"))
     config = base64encode(jsonencode({ workload = each.key, prefix = local.name_prefix, image = each.value.image, model_bucket = aws_s3_bucket.workload["data_model"].id,
     model = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit", revision = "8aa5f05d26b7205477066e1449e0af13f762a299" }))
   }))

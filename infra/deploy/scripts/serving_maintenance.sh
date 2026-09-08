@@ -25,7 +25,7 @@ case "${1:-}" in
     [[ "${2:-}" =~ ^[1-9][0-9]*$ ]]
     [[ -z "$(compose ps --status running --quiet api worker)" ]]
     compose run --rm --no-deps -T worker python src/manage.py activate-general-qwen \
-      --brokerage-id "$2" --shared-dev --apply --workloads-stopped-confirmed
+      --brokerage-id "$2" --model "${3:-unsloth/Qwen3.8-27B-unsloth-bnb-4bit}" --shared-dev --apply --workloads-stopped-confirmed
     ;;
   start)
     python3 "${REVISION_DIR}/scripts/render_env.py" --api-output "${API_ENV_FILE}" --worker-output "${WORKER_ENV_FILE}" --migration-output "${MIGRATION_ENV_FILE}"

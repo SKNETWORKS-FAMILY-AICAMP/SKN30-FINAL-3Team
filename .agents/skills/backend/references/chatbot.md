@@ -83,8 +83,9 @@ SQL을 적용해 검증한다.
 
 변경 후 저장소 지정 Ruff 검사·포맷과 Backend Pyright·관련 pytest를 실행한다. 실제 모델·HTTP 성능
 평가는 단위·통합 테스트와 구분하여 기록하며, 평가 명령·환경 설정은 Backend README와 평가 문서에서
-확인한다. Qwen 실제 평가는 사용자 요청으로 보류되었으며 합격한 것으로 표기하지 않는다.
+확인한다. 초기 보류 후 실행한 Qwen 비교의 결과·한계는 [비교 기록](../../../../infra/serving/model-comparison-2026-09-08.md)을 따른다.
+공식 FP8 선택은 [ADR-0032](../../project-wiki/references/decisions/ADR-0032-general-model-comparison-profiles.md)를 따르며 기존 활성 모델을 자동 변경하지 않는다.
 
-기록된 Luna 모델 측정값은 workflow v2 보완 이전 실행이다. 병합 후 fake·DB 회귀 검사는 변경된
+기록된 Luna·Qwen 모델 측정값은 workflow v2 조건 검증·v3 재생성 보완 이전 실행이다. 병합 후 fake·DB 회귀 검사는 변경된
 계약과 저장 경로의 검증이며, 새 실제 모델 호출 없이 수정 후 모델 정확도·성능을 통과한 것으로
 표시하지 않는다. 원본 평가와 검토 요약의 hash·수치는 유지한다.
