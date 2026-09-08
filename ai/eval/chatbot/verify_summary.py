@@ -76,7 +76,7 @@ def verify_summary(raw_bytes: bytes, summary: dict) -> dict:
     provenance = summary["provenance"]
     if hashlib.sha256(raw_bytes).hexdigest() != provenance["raw_report_sha256"]:
         raise ValueError("raw report SHA256 does not match")
-    for field in ("route", "fixture_sha256", "started_at"):
+    for field in ("route", "fixture_sha256", "started_at", "scorer_version"):
         if raw["provenance"].get(field) != provenance.get(field):
             raise ValueError(f"provenance.{field} differs from the raw report")
     if raw["provenance"]["route"]["provider"] != "openai":

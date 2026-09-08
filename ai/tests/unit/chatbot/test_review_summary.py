@@ -253,3 +253,54 @@ def test_cli_failure_never_prints_malformed_report_contents(tmp_path, capsys):
         REVIEW.main(["--raw", str(raw_path), "--output", str(tmp_path / "new.json"), "--reviewed"])
     assert "sensitive" not in str(error.value)
     assert "sensitive" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "version", [None, REVIEW.LEGACY_SCORER_VERSION, REVIEW.CURRENT_SCORER_VERSION]
+)
+def test_review_replays_the_recorded_sort_rule_without_changing_raw(raw_report, version):
+    if version is not None:
+        raw_report["provenance"]["scorer_version"] = version
+    target = next(row for row in raw_report["rows"] if row["id"] == "basic-01")
+    target["actual"]["filters"]["sort"] = "recent"
+    target["passed"] = version != REVIEW.CURRENT_SCORER_VERSION
+    before = encoded(raw_report)
+    summary, result = REVIEW.prepare(before)
+    assert result["verified"]
+    assert summary["summary"]["supported_accuracy"] == (
+        149 / 150 if version == REVIEW.CURRENT_SCORER_VERSION else 1
+    )
+    assert encoded(raw_report) == before
+    assert summary["provenance"].get("scorer_version") == version
+
+
+@pytest.mark.parametrize("version", [None, "", "chatbot-intent-scorer:v99"])
+def test_review_rejects_unknown_explicit_scorer_even_without_actual_outputs(raw_report, version):
+    raw_report["provenance"]["scorer_version"] = version
+    for row in raw_report["rows"]:
+        row["actual"] = None
+        row["passed"] = False
+    with pytest.raises(ValueError, match="unsupported recorded scorer"):
+        REVIEW.prepare(encoded(raw_report))
+
+
+@pytest.mark.parametrize("active", [{}, {"sort": "price_desc"}])
+def test_legacy_sort_replay_preserves_explicit_recent_blind_spot_and_does_not_mutate(active):
+    case = {
+        "active_filters": active,
+        "expected": {"tool": "properties", "mode": "refine", "filters": {"sort": "recent"}},
+    }
+    actual = {"tool": "properties", "mode": "refine", "filters": {}}
+    original = deepcopy((actual, case))
+    assert REVIEW.recorded_intent_matches(actual, case, REVIEW.LEGACY_SCORER_VERSION)
+    assert not REVIEW.recorded_intent_matches(actual, case, REVIEW.CURRENT_SCORER_VERSION)
+    assert (actual, case) == original
+
+
+def test_summary_verifier_binds_recorded_scorer_metadata(raw_report):
+    raw_report["provenance"]["scorer_version"] = REVIEW.CURRENT_SCORER_VERSION
+    raw_bytes = encoded(raw_report)
+    summary, _ = REVIEW.prepare(raw_bytes)
+    summary["provenance"]["scorer_version"] = REVIEW.LEGACY_SCORER_VERSION
+    with pytest.raises(ValueError, match="scorer_version"):
+        REVIEW.verifier.verify_summary(raw_bytes, summary)

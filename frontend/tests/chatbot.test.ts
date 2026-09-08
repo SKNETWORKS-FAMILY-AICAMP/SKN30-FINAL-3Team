@@ -174,3 +174,37 @@ test("history refresh restores a cursor after a gap larger than the latest page"
   assert.deepEqual(f.controller.getSnapshot().messages.map((entry) => entry.sequence_no), [41]);
   assert.equal(f.controller.getSnapshot().nextCursor, 41);
 });
+
+for (const operation of ["history", "page", "reset"] as const) {
+  for (const replacement of ["deleted", "recreated", "disabled"] as const) {
+    test(`conversation ${replacement} rejects late ${operation} responses from another tab`, async () => {
+      const f = fixture(req("COMPLETED", 2));
+      f.db.conversation = conversation();
+      f.db.messages = [message(), message("assistant")];
+      f.transport.history = async () => ({ items: f.db.messages, next_cursor: 1 });
+      f.controller.start(); await tick();
+      const oldHistory = deferred<{ items: ChatbotMessage[]; next_cursor: number | null }>();
+      const oldPage = deferred<ChatbotResult>();
+      const oldReset = deferred<ChatbotConversation>();
+      f.transport.history = async (_id, before) => before === null
+        ? { items: f.db.messages, next_cursor: null } : oldHistory.promise;
+      f.transport.results = () => oldPage.promise;
+      f.transport.reset = () => oldReset.promise;
+      const pending = operation === "history" ? f.controller.loadOlder()
+        : operation === "page" ? f.controller.page(rid, 10) : f.controller.resetFilters();
+      f.db.conversation = replacement === "recreated" ? { ...conversation(), id: "10000000-0000-4000-8000-000000000002" } : null;
+      if (replacement === "disabled") f.transport.discover = async () => ({ enabled: false, conversation: null });
+      f.db.messages = [];
+      await f.controller.refresh();
+      oldHistory.resolve({ items: [message()], next_cursor: 1 });
+      oldPage.resolve({ ...result, offset: 10 });
+      oldReset.resolve({ ...conversation(), state_version: 2 });
+      await pending;
+      assert.equal(f.controller.getSnapshot().conversation?.id, f.db.conversation?.id);
+      assert.deepEqual(f.controller.getSnapshot().messages, []);
+      assert.deepEqual(f.controller.getSnapshot().pages, {});
+      assert.equal(f.controller.getSnapshot().nextCursor, null);
+      assert.equal(f.controller.getSnapshot().busy, null);
+    });
+  }
+}

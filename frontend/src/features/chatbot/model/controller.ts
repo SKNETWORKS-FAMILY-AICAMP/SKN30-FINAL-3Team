@@ -46,7 +46,7 @@ export function chatbotError(error: unknown): string {
 }
 
 /** One controller per signed-in identity; only validated server state lives in memory.
- * Generation invalidates every in-flight read and SSE callback on delete or unmount.
+ * Generation invalidates every in-flight read and SSE callback on conversation replacement, delete or unmount.
  * No HTTP read, timer or reconnect calls submit().
  */
 export class ChatbotController {
@@ -143,13 +143,17 @@ export class ChatbotController {
       const latestRequest = conversation?.active_request ?? (latestMessage ? await this.transport.status(latestMessage.request_id, this.abort.signal) : null);
       if (!this.current(generation) || readRevision !== this.readRevision) return;
       const sameConversation = conversation !== null && conversation.id === this.state.conversation?.id;
+      const replaced = conversation?.id !== this.state.conversation?.id;
+      // Another tab may delete/recreate the conversation while history, paging or reset
+      // is pending. Abort and invalidate all old-conversation callbacks before publishing.
+      if (replaced) this.invalidate();
       // A stream may have already received a newer completion while these reads were running.
       const candidate = latestRequest;
       const retained = sameConversation && this.state.request && candidate?.id === this.state.request.id && !acceptsSnapshot(this.state.request, candidate) ? this.state.request : candidate;
       const merged = sameConversation ? mergeMessages(this.state.messages, history.items) : history.items;
       // A long absence can exceed one page. Do not silently display a gap as complete history.
       const gap = merged.some((message, i) => i > 0 && message.sequence_no > (merged[i - 1]?.sequence_no ?? 0) + 1);
-      this.patch({ availability: response.enabled ? "enabled" : "disabled", conversation, messages: gap ? history.items : merged, nextCursor: sameConversation && this.state.messages.length > 0 && !gap ? this.state.nextCursor : history.next_cursor, request: retained, pages: sameConversation ? this.state.pages : {}, connection: "online", admissionUnknown: false, error: null });
+      this.patch({ busy: replaced ? null : this.state.busy, availability: response.enabled ? "enabled" : "disabled", conversation, messages: gap ? history.items : merged, nextCursor: sameConversation && this.state.messages.length > 0 && !gap ? this.state.nextCursor : history.next_cursor, request: retained, pages: sameConversation ? this.state.pages : {}, connection: "online", admissionUnknown: false, error: null });
       this.watch();
     } catch (error) {
       if (!this.current(generation) || readRevision !== this.readRevision) return;

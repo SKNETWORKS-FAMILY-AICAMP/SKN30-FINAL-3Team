@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 
 from brokerage_ai.chatbot import ChatIntent
@@ -24,6 +25,7 @@ verifier = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verifier)
 
 PROVENANCE_FIELDS = {
+    "scorer_version",
     "route",
     "fixture_sha256",
     "started_at",
@@ -137,6 +139,36 @@ def validate_deployment_metadata(provenance: dict) -> None:
             raise ValueError("endpoint metadata differs from the pinned deployment snapshot")
 
 
+LEGACY_SCORER_VERSION = "chatbot-intent-scorer:v1"
+CURRENT_SCORER_VERSION = "chatbot-intent-scorer:v2"
+
+
+def recorded_intent_matches(actual: dict, case: dict, version: str) -> bool:
+    """Replay the recorded rule, including v1's historical recent-sort blind spot.
+
+    The original reports did not record a scorer version; callers map that original
+    format to v1. Never silently regrade those reports using the corrected v2 rule.
+    """
+    if version not in {LEGACY_SCORER_VERSION, CURRENT_SCORER_VERSION}:
+        raise ValueError("unsupported recorded scorer version")
+    if verifier._EVALUATION.SCORER_VERSION != CURRENT_SCORER_VERSION:
+        raise ValueError("review replay requires an explicit scorer compatibility update")
+    if version == LEGACY_SCORER_VERSION:
+        actual = deepcopy(actual)
+        case = deepcopy(case)
+        # v1 stripped recent after whitespace normalization from all three inputs,
+        # before active conditions and refinements were merged. Preserve that bug.
+        for filters in (
+            actual.get("filters", {}),
+            case["expected"].get("filters", {}),
+            case.get("active_filters", {}),
+        ):
+            value = filters.get("sort")
+            if isinstance(value, str) and "".join(value.split()) == "recent":
+                filters.pop("sort")
+    return verifier._EVALUATION.intent_matches(actual, case)
+
+
 def prepare(raw_bytes):
     raw = json.loads(raw_bytes)
     if raw.get("status") != "COMPLETED" or raw.get("diagnostic_subset") is not False:
@@ -147,6 +179,9 @@ def prepare(raw_bytes):
         raise ValueError("fixture is not marked synthetic")
     if raw["provenance"]["fixture_sha256"] != hashlib.sha256(fixture_bytes).hexdigest():
         raise ValueError("raw fixture does not match the checked-in synthetic fixture")
+    scorer_version = raw["provenance"].get("scorer_version", LEGACY_SCORER_VERSION)
+    if scorer_version not in {LEGACY_SCORER_VERSION, CURRENT_SCORER_VERSION}:
+        raise ValueError("unsupported recorded scorer version")
     expected = {case["id"]: case for case in fixture["cases"]}
     if {(r["id"], r["round"]) for r in raw["rows"]} != {
         (key, n) for key in expected for n in (1, 2, 3)
@@ -157,12 +192,12 @@ def prepare(raw_bytes):
         if row["group"] != case["group"]:
             raise ValueError("case group differs from fixture")
         score = (
-            verifier._EVALUATION.intent_matches(row["actual"], case)
+            recorded_intent_matches(row["actual"], case, scorer_version)
             if row.get("actual") is not None
             else False
         )
         if row["passed"] is not score:
-            raise ValueError("stored verdict differs from the unchanged scorer")
+            raise ValueError("stored verdict differs from the recorded scorer")
     checked_outputs = validate_outputs(raw["rows"])
     provenance = {
         key: raw["provenance"][key] for key in PROVENANCE_FIELDS if key in raw["provenance"]

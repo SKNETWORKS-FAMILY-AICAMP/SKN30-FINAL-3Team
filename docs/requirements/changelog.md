@@ -6,6 +6,7 @@ updated: 2026-09-08
 # 요구사항 변경 이력
 
 - 2026-09-08 (`CHATBOT-IMPLEMENT-20260908`): 사용자 구현 요청에 따라 F4 챗봇 1차와 DB 저장·복원을 구현했다. 정확도·안전성·warm 성능은 필수로, 팀원 사용성 평가는 후속으로 정했다. 후속 지시에 따라 Qwen 기동·실제 평가는 보류하고 Luna로 검증한다. 공유 dev DB 변경·배포는 제외한다. [범위 출처](sources/chatbot-implementation-scope-2026-09-08.md)와 [검증 결과](../architecture/chatbot/implementation-and-validation.md)를 연결한다.
+
 - 2026-09-08: `F4-TK-04`(재연락 기한)를 폐기로 표시하고 Time Keeper의 세대·손님 재연락 계산과
   화면 표시를 모두 제거함(사용자 요청, 사유는 별도로 확인되지 않음). `LISTING_RECONTACT`·
   `CLIENT_RECONTACT` 종류와 `recontact_days` 조회 파라미터를 API·도메인·화면에서 함께 뺐다.

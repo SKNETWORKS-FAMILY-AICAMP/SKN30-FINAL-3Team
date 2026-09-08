@@ -21,6 +21,8 @@ from brokerage_ai.chatbot import ChatbotWorkflow, ChatFilters, ChatInput, ChatRe
 from brokerage_ai.core.types import ModelRoute, ProviderKind
 from brokerage_ai.runtime import create_ai_runtime
 
+SCORER_VERSION = "chatbot-intent-scorer:v2"
+
 
 class RecordingRead:
     """No DB facts or fabricated successful rows are supplied to the model."""
@@ -64,8 +66,6 @@ def _filters(raw: dict) -> dict:
             value = "".join(value.split())
         if key == "status" and value in {"진행", "진행중", "진행중인", "ACTIVE"}:
             value = "ACTIVE"
-        if key == "sort" and value == "recent":
-            continue  # The Backend's default ledger order.
         cleaned[key] = value
     return cleaned
 
@@ -239,6 +239,7 @@ async def evaluate(args) -> dict:
         provider=ProviderKind(args.provider), model=args.model, endpoint_alias=args.endpoint_alias
     )
     provenance = {
+        "scorer_version": SCORER_VERSION,
         "route": route.model_dump(mode="json"),
         "fixture_sha256": hashlib.sha256(fixture_bytes).hexdigest(),
         "prompt_sha256": hashlib.sha256(

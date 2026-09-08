@@ -118,3 +118,20 @@ HTTP 명령은 별도 loopback PostgreSQL의 `TEST_DB_URL`과 CREATE DATABASE �
 
 F4 합성 평가를 F3 업무 품질·모델 자체의 공격 저항성·공유 배포 성능으로 확장하지 않는다.
 모델 세대·크기·양자화가 동시에 다르므로 양자화만의 효과로 해석하지 않는다.
+
+
+## 최신 dev 병합 시 평가 기록의 경계
+
+PR #99~#101의 workflow v3·필터 근거 검사·scorer v2·UI 경합 수정을 보존했다. 위 Qwen
+평가는 이 변경 전의 역사적 결과이며 새 코드의 성능 합격 근거가 아니다. 원본에 scorer 버전이
+없으면 당시 v1 규칙으로만 검토 요약을 재현하고, 명시된 v2는 현재 규칙을 사용한다. 알 수 없는
+버전은 거절한다. 원본·요약 점수는 소급 변경하지 않으며 새 모델 평가는 별도 원본으로 수행한다.
+
+
+이번 dev 통합의 기준은 `29d6ae7`이다. 새 AI·Backend 가상환경의 locked sync, AI 전체 416개,
+Infra 209개·serving 23개, Terraform fmt·오프라인 init/validate를 검증했다. Qwen 3종 원본의
+검토 요약 재생성은 각 240건의 기존 hash·집계와 일치했고, Luna 초기 원본도 기존 요약 검증기를
+통과했다. 원격 plan/apply·이미지 재게시·모델 재평가는 실행하지 않았다.
+
+격리 PostgreSQL 15에서 전체 migration 적용·재적용과 Backend 전체 691개 테스트를 통과했다.
+AI·Backend의 지정 Ruff·포맷·Pyright도 통과했다. 임시 검증 DB는 작업 종료 시 제거한다.

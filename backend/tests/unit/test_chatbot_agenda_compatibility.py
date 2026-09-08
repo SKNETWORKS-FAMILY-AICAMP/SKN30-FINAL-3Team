@@ -12,7 +12,7 @@ from domain.chatbot import query
 
 @pytest.mark.parametrize("category", ["LISTING_RECONTACT", "CLIENT_RECONTACT"])
 @pytest.mark.parametrize("mode", ["replace", "refine"])
-def test_retired_recontact_returns_unsupported_before_lookup(category, mode, monkeypatch):
+def test_retired_recontact_requests_clarification_before_lookup(category, mode, monkeypatch):
     session = Mock()
     monkeypatch.setattr(query, "Session", session)
     active = {"tool": "agenda", "categories": [category], "date_expression": "오늘"}
@@ -28,7 +28,7 @@ def test_retired_recontact_returns_unsupported_before_lookup(category, mode, mon
             ChatIntent(tool="agenda", mode=mode, filters=filters), request
         )
     )
-    assert result.kind == "unsupported"
+    assert result.kind == "clarification"
     assert "재연락 기능은 지원하지 않아요" in result.text
     assert result.filters == active
     assert result.items == ()
@@ -47,7 +47,7 @@ def test_historical_recontact_result_page_is_not_reported_as_empty(offset, monke
         "end_date": "2026-09-30",
     }
     result = query.ChatLookup(Mock(), 1).search(filters, offset)
-    assert result.kind == "unsupported"
+    assert result.kind == "clarification"
     assert "재연락 기능은 지원하지 않아요" in result.text
     session.assert_not_called()
 
