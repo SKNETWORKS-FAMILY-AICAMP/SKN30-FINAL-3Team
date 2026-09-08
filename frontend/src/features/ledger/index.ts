@@ -6,6 +6,7 @@
  */
 
 export { usePropertyLedger } from "./hooks/usePropertyLedger.ts";
+export { loadSavedProperty, loadSavedBuyer } from "./api/loadSavedDetail.ts";
 export type { PropertyLedger, UserNameLookup } from "./hooks/usePropertyLedger.ts";
 export { useBuyerLedger } from "./hooks/useBuyerLedger.ts";
 export type { BuyerLedger } from "./hooks/useBuyerLedger.ts";

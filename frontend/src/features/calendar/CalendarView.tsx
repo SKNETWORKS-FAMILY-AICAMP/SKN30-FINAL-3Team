@@ -10,7 +10,7 @@
  * 같은 일정이 두 번 보인다.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Modal, ModalBody, ModalHeader } from "@patternfly/react-core";
 import { CalendarAltIcon, AngleLeftIcon, AngleRightIcon } from "@patternfly/react-icons";
 import { useAgenda } from "../timeKeeper/index.ts";
@@ -57,12 +57,24 @@ function excludeCalendarSourced(items: readonly AgendaItemDto[]): AgendaItemDto[
   return items.filter((item) => item.event_id == null);
 }
 
-export function CalendarView() {
+export function CalendarView({ requestedEvent = null, onOpenChange }: {
+  requestedEvent?: CalendarEventDto | null;
+  onOpenChange?: (open: boolean) => void;
+} = {}) {
   const [isOpen, setOpen] = useState(false);
   const [monthStart, setMonthStart] = useState(() => startOfMonth(new Date()));
   const [modalTarget, setModalTarget] = useState<
     { kind: "create"; date: string } | { kind: "edit"; event: CalendarEventDto } | null
   >(null);
+
+  useEffect(() => {
+    if (requestedEvent == null) return;
+    setMonthStart(startOfMonth(new Date(`${requestedEvent.event_date}T12:00:00`)));
+    setModalTarget({ kind: "edit", event: requestedEvent });
+    setOpen(true);
+  }, [requestedEvent]);
+
+  useEffect(() => { onOpenChange?.(isOpen); }, [isOpen, onOpenChange]);
 
   const days = useMemo(() => monthGridDays(monthStart), [monthStart]);
   const range = useMemo(() => monthQueryRange(monthStart), [monthStart]);

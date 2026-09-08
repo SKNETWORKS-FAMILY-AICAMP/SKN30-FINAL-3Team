@@ -10,7 +10,7 @@ updated: 2026-09-08
 ## 구현 경계
 
 - AI 공개 계약·워크플로는 `ai/src/brokerage_ai/chatbot/`, HTTP·조회·저장·작업 관리는 `backend/src/domain/chatbot/`과 `backend/src/api/chatbot.py`가 소유한다.
-- UI 통합은 의존 PR의 `frontend/src/features/chatbot/`에서 수행한다. 이 API PR의 기본 비활성 상태를 유지하고 기존 F2·장부·캘린더 상세 연결은 화면 PR에서 검토한다.
+- UI는 `frontend/src/features/chatbot/`이며 공통 앱 셸에서 기존 F2·장부·캘린더 상세를 연결했다. Backend가 활성화된 경우에만 버튼을 제공하며 기능의 기본 비활성 상태를 유지한다.
 - 챗봇 결과의 숫자·조건·총계는 Backend가 계산한다. 조회 자료·개인정보·원시 결과 행은 모델 프롬프트에 보내지 않는다.
 - `CHATBOT` 전용 모델 설정만 읽는다. F2 모델과 F3의 `POSITION_CARD`·`BROKERAGE_JUDGMENT` 설정을 변경하지 않는다.
 - PostgreSQL 15의 전진 migration `019_CREATE_CHATBOT`으로 세 테이블을 추가한다. 기존 migration과 업무 데이터를 초기화하지 않는다.
@@ -88,6 +88,25 @@ uv run --locked --project backend pyright --project backend
 ```
 
 AI 실제 실행 옵션과 Qwen의 고정 artifact 인자는 [평가 README](../../../ai/eval/chatbot/README.md)를 따른다. Backend 검증은 기존 사용자 DB를 초기화하지 않는 격리 DB에서만 실행한다.
+
+## 화면·통합 및 독립 검토
+
+- Frontend 순수 테스트 **12개**, 실제 HTTP/SSE fixture를 사용하는 챗봇 Playwright **8개**, 기존 F3 브라우저 **5개**가 통과했다. 계정 전환·전체 삭제·역순/중복 이벤트·구독 실패·재접속·참조 만료·키보드/IME·초점 복귀를 포함한다.
+- 기존 인증·장부·F2·F3·Time Keeper·캘린더·환경·오류 경계 회귀를 통과했다. `npm run typecheck`와 임시 outDir의 production build도 통과했다. 기존 대형 bundle 경고는 유지된다.
+- 별도 실제 앱 확인에서는 Vite→FastAPI→Luna→임시 PostgreSQL로 로그인, 가격 조건 조회(정확한 15건), 새로고침 복원, 기존 상세 이동, 전체 삭제, F2 기존 접수 화면 진입을 확인했다. F2 화면 진입에 따른 분석 POST는 **0회**였다.
+- 저장 결과의 순번은 당시 첫 페이지 기준이다. 페이지를 다시 조회한 답변은 첫 페이지로 돌아와도 후속 순번 선택을 제한하고 개별 상세 버튼을 제공한다. 다른 탭에서 문맥이 만료되면 선택을 해제한다.
+- 작성자와 다른 담당자가 교차 검토했다. Frontend 담당은 데이터·실행, Backend 담당은 AI·조회, AI 담당은 UI·통합을 검토했다. 취소 후 슬롯 조기 반환, 모델 변경 경합, 참조 SQL timeout, 이전 차단 질문의 비밀값 전달, 재조회/만료된 순번 선택을 수정하고 재확인했다. 미해결 blocking finding은 없으며 사람의 PR 검토는 별도다.
+
+```bash
+cd frontend
+npm run test:chatbot
+npm run test:chatbot:browser
+npm run test:ledger && npm run test:auth && npm run test:f2 && npm run test:f3
+npm run test:time-keeper && npm run test:calendar && npm run test:root-error && npm run test:env
+npm run test:browser
+npm run typecheck
+npm run build -- --outDir /tmp/chatbot-validation-build
+```
 
 ## 후속 검증
 
