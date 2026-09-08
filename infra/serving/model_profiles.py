@@ -24,7 +24,7 @@ def load_profile(name: str = DEFAULT_PROFILE) -> dict:
         r"vllm/vllm-openai@sha256:[0-9a-f]{64}", profile["runtime_image"]
     ):
         raise ValueError("runtime image must be an immutable official image")
-    if profile["quantization"] not in {"awq", "bitsandbytes"}:
+    if profile["quantization"] not in {"awq", "bitsandbytes", "fp8"}:
         raise ValueError("unsupported quantization")
     if profile["load_format"] != (
         "bitsandbytes" if profile["quantization"] == "bitsandbytes" else "auto"

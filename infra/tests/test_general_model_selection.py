@@ -27,7 +27,12 @@ class GeneralSelection(unittest.TestCase):
             serving.general_profile(legacy)["model"],
             "unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
         )
-        for name in ("qwen3-14b-awq", "qwen3-32b-awq", "qwen38-27b-bnb"):
+        for name in (
+            "qwen3-14b-awq",
+            "qwen3-32b-awq",
+            "qwen38-27b-bnb",
+            "qwen38-27b-fp8",
+        ):
             spec = {**legacy, "model_profile": name}
             serving.validate_selection("general", spec)
             self.assertEqual(serving.general_metadata(spec)["model_profile"], name)

@@ -27,6 +27,7 @@ def main() -> None:
 
         load_general_plugins()
         assert get_quantization_config("bitsandbytes") is BitsAndBytesConfig
+        assert get_quantization_config("fp8").get_name() == "fp8"
         loader = get_model_loader(LoadConfig(load_format="bitsandbytes"))
         assert isinstance(loader, BitsAndBytesModelLoader)
         # Exercise the plugin's real mapper setup, which registry-only checks
@@ -47,7 +48,10 @@ def main() -> None:
         assert "projection" in loader.target_modules
         parser = make_arg_parser(FlexibleArgumentParser())
     for name in json.loads(PROFILE_FILE.read_text())["profiles"]:
-        args = parser.parse_args(build_command(load_profile(name)["model"], name)[2:])
+        profile = load_profile(name)
+        args = parser.parse_args(build_command(profile["model"], name)[2:])
+        assert args.quantization == profile["quantization"]
+        assert args.load_format == profile["load_format"]
         assert args.enable_log_requests is False
     print("general vLLM BnB registries and runtime command parsing: OK")
 

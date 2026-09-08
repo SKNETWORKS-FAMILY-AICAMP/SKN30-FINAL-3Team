@@ -17,6 +17,7 @@ PROFILE = "dev-qwen38-vllm-bnb"
 # Deployment contract allowlist; a test checks this against Infra's pinned manifest.
 MODEL_PROFILES = {
     MODEL: (PROFILE, REVISION),
+    "Qwen/Qwen3.8-27B-FP8": ("qwen38-27b-fp8", "017b9c7af6b5689d5dd426a76e0bc077eb5ca20a"),
     "Qwen/Qwen3-14B-AWQ": ("qwen3-14b-awq", "31c69efc29464b6bb0aee1398b5a7b50a99340c3"),
     "Qwen/Qwen3-32B-AWQ": ("qwen3-32b-awq", "0499c3ac83fdef8810b907a23894ba91e95eddd8"),
 }
