@@ -415,7 +415,8 @@ class Serving:
                 environment = {
                     "GENERAL_MODEL_PROFILE": spec.get(
                         "model_profile", DEFAULT_GENERAL_PROFILE
-                    )
+                    ),
+                    "VLLM_ENABLE_CUDA_COMPATIBILITY": "1",
                 }
             if matches:
                 details = client.pod(matches[0]["id"])

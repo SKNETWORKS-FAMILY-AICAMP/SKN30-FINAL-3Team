@@ -107,6 +107,21 @@ class GeneralSelection(unittest.TestCase):
         controller.probe = Mock()
         return controller
 
+    def test_f2_create_does_not_enable_general_cuda_compatibility(self):
+        controller = self.runpod_controller()
+        controller.release = Mock(return_value=({}, "checksum", "synthetic-url"))
+        spec = {
+            "cloud": "runpod",
+            "gpu_id": "NVIDIA L40S",
+            "release_id": "synthetic-release",
+            "bucket": "synthetic-bucket",
+        }
+        with patch.object(serving.control, "validate_template"):
+            controller._prepare("f2", spec)
+        environment = controller.runpod.return_value.request.call_args.args[2]["env"]
+        self.assertNotIn("VLLM_ENABLE_CUDA_COMPATIBILITY", environment)
+        self.assertNotIn("GENERAL_MODEL_PROFILE", environment)
+
     def test_create_injects_profile_and_rejects_existing_other_profile(self):
         controller = self.runpod_controller()
         spec = {
@@ -119,7 +134,10 @@ class GeneralSelection(unittest.TestCase):
         self.assertEqual(deployment["model"], "Qwen/Qwen3-32B-AWQ")
         self.assertEqual(
             controller.runpod.return_value.request.call_args.args[2]["env"],
-            {"GENERAL_MODEL_PROFILE": "qwen3-32b-awq"},
+            {
+                "GENERAL_MODEL_PROFILE": "qwen3-32b-awq",
+                "VLLM_ENABLE_CUDA_COMPATIBILITY": "1",
+            },
         )
         controller.runpod.return_value.request.reset_mock()
         controller.runpod.return_value.pods.return_value = [
@@ -180,6 +198,9 @@ class HostProfiles(unittest.TestCase):
             self.assertIn(
                 "GENERAL_MODEL_PROFILE=qwen3-14b-awq",
                 (root / "runtime.env").read_text(),
+            )
+            self.assertIn(
+                "VLLM_ENABLE_CUDA_COMPATIBILITY=1", (root / "runtime.env").read_text()
             )
             self.assertFalse((root / "candidate.json").exists())
 

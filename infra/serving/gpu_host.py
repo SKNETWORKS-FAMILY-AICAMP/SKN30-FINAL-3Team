@@ -114,6 +114,7 @@ def main() -> None:
             AI_GENERAL_API_KEY=keys["AI_GENERAL_API_KEY"],
             GENERAL_MODEL_PATH="/models/general",
             GENERAL_MODEL_PROFILE=profile_name,
+            VLLM_ENABLE_CUDA_COMPATIBILITY="1",
         )
         ports = ["8000:8000"]
     else:
