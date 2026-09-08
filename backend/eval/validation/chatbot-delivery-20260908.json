@@ -1,0 +1,45 @@
+{
+  "status": "PASSED",
+  "date": "2026-09-08",
+  "scope": "Local delivery verification on an isolated tracked-file copy; no shared dev change or deployment",
+  "application_tree": "33afaa4194c8f7fc7211742109c471f3c66db5b6",
+  "ai_lock_sha256": "e9716e092c98560f00b61eadc67275da23e870278182cefbad41ffc0ff42042e",
+  "runtime": {
+    "python": "3.13.12",
+    "node": "22.23.2",
+    "uv": "0.11.2",
+    "postgres": "15.18",
+    "pgvector": "0.8.6"
+  },
+  "full_delivery": {
+    "command": "infra/delivery/scripts/verify_local_delivery.sh",
+    "exit_code": 0,
+    "ai_tests": 311,
+    "backend_tests": 664,
+    "deployment_script_tests": 56,
+    "frontend_component_tests": 136,
+    "frontend_release_tests": 2,
+    "frontend_build": "PASSED",
+    "backend_image_build": "PASSED",
+    "runtime_uid": 10001,
+    "compose_config": "PASSED",
+    "log_sha256": "3c0a1c688467d1795c45033d352f3aa64d4c2dcef09994afe4a8e9a4e88cd989"
+  },
+  "additional_checks": {
+    "final_ai_tests_with_summary_verifier": 319,
+    "summary_raw_observations_verified": 240,
+    "chatbot_unit_tests": 12,
+    "chatbot_browser_tests": 8,
+    "existing_f3_browser_tests": 5,
+    "backend_image_no_cache": "PASSED",
+    "no_cache_runtime_uid": 10001,
+    "no_cache_log_sha256": "2cc797f8a8505d86cb1a07ad8a763d0cb003407968bee722b610ace63dff346a"
+  },
+  "notes": [
+    "The isolated application copy added the pinned PyAV dev lock before running delivery. Final changes after application_tree affect summary verification and documentation, not model workflow or application runtime.",
+    "The final AI suite includes eight summary-verifier tests added after the delivery AI stage. It passed separately without temporary dependencies.",
+    "Default host Python 3.10/Node24 failed version preflight; the successful run used isolated Python3.13/Node22 paths.",
+    "Public GHCR image pull succeeded with an empty temporary Docker config; user credentials and default runtime settings were not changed.",
+    "New model inference was not needed for these deterministic checks. Qwen remains NOT_RUN."
+  ]
+}

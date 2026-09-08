@@ -64,8 +64,8 @@ AI 워크플로의 첫 콜백 시간은 HTTP·SSE 전달 시간과 다르므로 
 | 별도 공격 20건 × 3회 | **60/60 차단**. 워크플로 사전 차단이며 모델 자체의 주입 저항성 측정은 아님 |
 | 실제 모델 실행 | 240개 시나리오, 모델 호출 177회, 호출 오류 0건. 모델 해석 p95 **2.884초** |
 | 실제 HTTP·SSE·Luna·PostgreSQL | 12개 조회 × 3회 **36/36 통과**. 첫 진행 p95 **0.223초**, 완료 p95 **3.273초**, 매회 DB 복원과 최종 전체 삭제 통과 |
-| AI 회귀 | 전체 **306개 통과**(PyAV 임시환경). 후속 평가기·보안 수정 대상과 모듈 경계 **37개 통과**, Ruff·Pyright 통과 |
-| Backend 회귀 | 전체 **646개 통과**. 이후 경합·조회 수정은 실제 PostgreSQL **15개**, 정규화 **19개**, migration 정적 검사 **6개**로 재검증 |
+| AI 회귀 | 최종 전체 **319개 통과**, Ruff·Pyright 통과. PyAV 18.1.0은 dev 의존성으로 고정하며 운영 의존성에는 추가하지 않음 |
+| Backend 회귀 | 최종 전체 **664개 통과**. 실제 PostgreSQL 소유권·경합·삭제·참조/기간/금액·장애 회귀를 포함 |
 | 추가 Backend 검사 | 모델 선택 CLI **7개**, Provider·최종 DB 저장 장애 **8개**, 설정·캘린더 상세 **6개** 통과. 전체 Backend Ruff·Pyright 통과 |
 | Qwen | **NOT_RUN** — 사용자 요청으로 RunPod 기동·실제 품질·성능 평가 보류 |
 
@@ -107,6 +107,15 @@ npm run test:browser
 npm run typecheck
 npm run build -- --outDir /tmp/chatbot-validation-build
 ```
+
+## 전체 delivery 검증과 자동 검토 확인
+
+[Delivery 결과](../../../backend/eval/validation/chatbot-delivery-20260908.json): 개인 `.env`와 기존 build 산출물을 포함하지 않은 임시 복사본에서 `infra/delivery/scripts/verify_local_delivery.sh`가 종료 코드 0으로 통과했다. Python 3.13.12·Node 22.23.2·uv 0.11.2·PostgreSQL 15.18/pgvector 0.8.6을 사용했다. 사용자 기본 런타임은 변경하지 않았다.
+
+- Backend 664개, 배포 스크립트 56개, Frontend component 136개·release 2개 및 production build, Backend image·비특권 UID·Compose config를 확인했다. 해당 AI 단계는 311개이며 이후 요약 검증기 8개를 추가한 최종 전체 319개도 별도로 통과했다.
+- lockfile 변경에 따른 추가 `docker build --no-cache --file backend/Dockerfile`도 통과했고 UID 10001 실행을 확인했다. 공개 GHCR 이미지의 기존 자격 설정 오류는 빈 임시 Docker 설정의 익명 pull로 해소했다. 이미지 게시·배포는 하지 않았다.
+- 자동 리뷰의 매물 조인 누락 지적은 기존 `latest_listing_alias()` 내부 사무소·세대 상관과 `LIMIT 1 LATERAL`, 실제 PostgreSQL 총계·페이지 회귀로 오탐임을 확인했다. CI DB 누락 지적도 `verify_backend_ai.sh`의 필수 `TEST_DB_URL` 검사와 전체 pytest 실행이 이미 적용됨을 확인했다.
+- 비밀값 경고는 외부 client를 만들지 않는 합성 FakeProvider 회귀 입력이며 실제 키는 변경 파일에 포함되지 않았다. 원문과 다른 평가 요약 형식은 종류·스키마·수동 집계 방식을 명시하고 `verify_summary.py`로 원본 240행의 해시·집계·오답을 검증한다. 경고를 사람 승인으로 간주하지 않는다.
 
 ## 후속 검증
 
