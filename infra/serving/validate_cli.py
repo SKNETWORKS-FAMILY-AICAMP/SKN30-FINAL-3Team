@@ -12,14 +12,27 @@ def main() -> None:
     from vllm.platforms import current_platform
     from vllm.utils.argparse_utils import FlexibleArgumentParser
 
-    # Image builders have no GPU. Only construct/parse the real CLI here;
-    # device detection and model compatibility are checked on the actual GPU.
+    # Image builders have no GPU. Register the installed entry-point and inspect
+    # the actual registries, without downloading weights or creating an engine.
     with patch.object(current_platform, "device_type", "cpu"):
+        from vllm.config import LoadConfig
+        from vllm.model_executor.layers.quantization import get_quantization_config
+        from vllm.model_executor.model_loader import get_model_loader
+        from vllm.plugins import load_general_plugins
+        from vllm_bnb_plugin.bitsandbytes import BitsAndBytesConfig
+        from vllm_bnb_plugin.bitsandbytes_loader import BitsAndBytesModelLoader
+
+        load_general_plugins()
+        assert get_quantization_config("bitsandbytes") is BitsAndBytesConfig
+        assert isinstance(
+            get_model_loader(LoadConfig(load_format="bitsandbytes")),
+            BitsAndBytesModelLoader,
+        )
         parser = make_arg_parser(FlexibleArgumentParser())
     for name in json.loads(PROFILE_FILE.read_text())["profiles"]:
         args = parser.parse_args(build_command(load_profile(name)["model"], name)[2:])
         assert args.enable_log_requests is False
-    print("general vLLM runtime command parsing: OK")
+    print("general vLLM BnB registries and runtime command parsing: OK")
 
 
 if __name__ == "__main__":

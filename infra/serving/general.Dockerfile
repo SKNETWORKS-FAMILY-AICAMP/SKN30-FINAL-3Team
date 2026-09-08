@@ -9,6 +9,6 @@ COPY validate_cli.py /opt/general/validate_cli.py
 ENTRYPOINT []
 COPY runtime-requirements.txt /opt/general/runtime-requirements.txt
 RUN python3 -m pip install --no-cache-dir --no-deps --require-hashes -r /opt/general/runtime-requirements.txt
-RUN python3 -c "import vllm, bitsandbytes; import py_compile; py_compile.compile('/opt/general/general_runtime.py', doraise=True)"
+RUN python3 -c "import vllm, bitsandbytes, vllm_bnb_plugin; import py_compile; py_compile.compile('/opt/general/general_runtime.py', doraise=True)"
 RUN python3 /opt/general/validate_cli.py
 CMD ["python3", "/opt/general/general_runtime.py"]
