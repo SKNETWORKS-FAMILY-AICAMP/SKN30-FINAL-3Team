@@ -1,0 +1,185 @@
+{
+  "scope": "isolated synthetic evaluation; not shared deployment",
+  "pods": [
+    {
+      "id": "eg9pvu5yy8pnc4",
+      "profile": "qwen3-14b-awq",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+      "created_at": 1788846383.2733388,
+      "deleted_at": 1788846679.1487226,
+      "deleted": true,
+      "cost_per_hour": 1.09
+    },
+    {
+      "id": "e0mooxdsorkq3h",
+      "profile": "qwen3-14b-awq",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+      "created_at": 1788846819.6039596,
+      "deleted_at": 1788848054.7275877,
+      "deleted": true,
+      "cost_per_hour": 1.09,
+      "verified": {
+        "profile": "qwen3-14b-awq",
+        "model": "Qwen/Qwen3-14B-AWQ",
+        "revision": "31c69efc29464b6bb0aee1398b5a7b50a99340c3",
+        "artifact_sha256": "1eddcd4655f4b63376be82ad09157f9b1a850da7feb073fe6461d84edb09a912",
+        "runtime_version": "0.28.0",
+        "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635"
+      },
+      "inventory_verified_at": 1788847923.9580865,
+      "cuda_compatibility": "0"
+    },
+    {
+      "id": "5dr6xl348v03y2",
+      "profile": "qwen3-32b-awq",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+      "created_at": 1788848060.2474687,
+      "deleted_at": 1788849148.4481835,
+      "deleted": true,
+      "cost_per_hour": 1.09,
+      "verified": {
+        "profile": "qwen3-32b-awq",
+        "model": "Qwen/Qwen3-32B-AWQ",
+        "revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+        "artifact_sha256": "eee6ecb34a0b1c032e76f5f58d9af08736696cba8bdfa6247c670b065dd9c1ac",
+        "runtime_version": "0.28.0",
+        "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635"
+      },
+      "inventory_verified_at": 1788848223.9440715,
+      "cuda_compatibility": "0"
+    },
+    {
+      "id": "vc0btigg6ehe8r",
+      "profile": "qwen38-27b-bnb",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+      "created_at": 1788849153.4124563,
+      "deleted_at": 1788849379.6537216,
+      "deleted": true,
+      "cost_per_hour": 1.09,
+      "error_code": "UNKNOWN_QUANTIZATION_METHOD_BITSANDBYTES",
+      "artifact_sha256": "625d35c03bc4fbb6031a923f303517abfa7775991e653f2c31db5b5bbb3a3ea5"
+    },
+    {
+      "id": "ydmintmzktje8u",
+      "profile": "qwen38-27b-bnb",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:04eaa4d047b677f789a7294bf1131eb312f0d088fded3d2c1a042b912df2860f",
+      "created_at": 1788850338.9028726,
+      "deleted_at": 1788850906.8837345,
+      "deleted": true,
+      "cost_per_hour": 1.09,
+      "cuda_compatibility": "0",
+      "plugin_version": "0.0.3",
+      "error_code": "BNB_PLUGIN_WEIGHTSMAPPER_API_MISMATCH",
+      "artifact_sha256": "625d35c03bc4fbb6031a923f303517abfa7775991e653f2c31db5b5bbb3a3ea5"
+    },
+    {
+      "id": "rronl45ivzgb10",
+      "profile": "qwen38-27b-bnb",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:c178666e09239c3366f32ad59e1aa85c13db43c8902a1a2729a9fc9fc09eb06f",
+      "created_at": 1788851714.476538,
+      "deleted_at": 1788852198.4619808,
+      "deleted": true,
+      "cost_per_hour": 1.09,
+      "verified": {
+        "profile": "qwen38-27b-bnb",
+        "model": "unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
+        "revision": "8aa5f05d26b7205477066e1449e0af13f762a299",
+        "artifact_sha256": "625d35c03bc4fbb6031a923f303517abfa7775991e653f2c31db5b5bbb3a3ea5",
+        "runtime_version": "0.28.0",
+        "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635"
+      },
+      "cuda_compatibility": "0",
+      "evaluation_status": "NOT_RUN_PENDING_MODEL_SELECTION",
+      "startup_status": "READY",
+      "plugin_version": "0.0.2"
+    },
+    {
+      "id": "s0yg4ym6hovl9y",
+      "profile": "qwen38-27b-fp8",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:801473c822b3536c58dd310f0768dfacf0aebd968c06a4ea427d0d9561f5c1e7",
+      "created_at": 1788853971.4579208,
+      "deleted_at": 1788857160.6330519,
+      "deleted": true,
+      "cost_per_hour": 1.09,
+      "verified": {
+        "profile": "qwen38-27b-fp8",
+        "model": "Qwen/Qwen3.8-27B-FP8",
+        "revision": "017b9c7af6b5689d5dd426a76e0bc077eb5ca20a",
+        "artifact_sha256": "df7b86af780f7bfac95ccefe48ef888724e78967039588e62453cae08c9f4e62",
+        "runtime_version": "0.28.0",
+        "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635"
+      },
+      "inventory_verified_at": 1788854654.1609054,
+      "cuda_compatibility": "0"
+    }
+  ],
+  "runtime_observations": {
+    "qwen3-14b-awq": {
+      "model_loading_gib": 9.44,
+      "model_loading_seconds": 8.163586,
+      "source": "RunPod container startup log",
+      "host_cuda_filter": [
+        "13.0"
+      ],
+      "cuda_compatibility": "0",
+      "cold_start_includes_failed_compatibility_attempt": true
+    },
+    "qwen3-32b-awq": {
+      "model_loading_gib": 18.24,
+      "model_loading_seconds": 13.934616,
+      "source": "RunPod container startup log",
+      "host_cuda_filter": [
+        "13.0"
+      ],
+      "cuda_compatibility": "0",
+      "cold_start_includes_failed_compatibility_attempt": false
+    },
+    "qwen38-27b-bnb": {
+      "model_loading_gib": 17.92,
+      "model_loading_seconds": 3.068056,
+      "source": "RunPod container startup log",
+      "host_cuda_filter": [
+        "13.0"
+      ],
+      "cuda_compatibility": "0",
+      "plugin_version": "0.0.2",
+      "startup_ready": true,
+      "model_quality_evaluation_started": false
+    },
+    "qwen38-27b-fp8": {
+      "model_loading_gib": 27.64,
+      "model_loading_seconds": 3.668761,
+      "source": "RunPod container startup log",
+      "host_cuda_filter": [
+        "13.0"
+      ],
+      "cuda_compatibility": "0",
+      "startup_ready": true,
+      "model_quality_evaluation_started": true
+    }
+  },
+  "total_pod_seconds": 7086.582427978516,
+  "estimated_gpu_usd": 2.145659679582384,
+  "cost_excludes": [
+    "storage",
+    "tax",
+    "billing_rounding"
+  ],
+  "builds": [
+    {
+      "source_revision": "cfd05ebe09de26fd96fd3e5dec66be3aff146715",
+      "workflow_run": 34190920284,
+      "purpose": "AWQ comparison"
+    },
+    {
+      "source_revision": "53b97bff79a44a08c26e61111bdcc64469023016",
+      "workflow_run": 34197647141,
+      "purpose": "BnB ready, no quality evaluation"
+    },
+    {
+      "source_revision": "8bfd2c8c83d11c5b9b03b7e031a62ffacf128fef",
+      "workflow_run": 34200029859,
+      "purpose": "official FP8 comparison"
+    }
+  ]
+}
