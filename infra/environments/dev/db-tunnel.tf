@@ -7,7 +7,12 @@ resource "aws_iam_group" "team_db_tunnel" {
 
 data "aws_iam_policy_document" "team_db_tunnel" {
   statement {
-    sid     = "StartPortForwardingOnDevApp"
+    sid = "StartPortForwardingOnDevApp"
+    condition {
+      test     = "StringEquals"
+      variable = "ssm:resourceTag/Name"
+      values   = ["${local.name_prefix}-app"]
+    }
     effect  = "Allow"
     actions = ["ssm:StartSession"]
     resources = [

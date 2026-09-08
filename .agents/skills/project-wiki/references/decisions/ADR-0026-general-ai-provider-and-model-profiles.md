@@ -5,6 +5,8 @@ updated: 2026-09-07
 
 # ADR-0026: 범용 AI Provider 정책과 합성 Seed 모델 프로필
 
+> 2026-09-07 부분 대체: GPU 배치·local/dev 연결·전원 범위는 [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md)를 따른다. 아래 내용은 기존 결정의 기록이다.
+
 - 상태: 부분 대체됨·seed와 Provider runtime 구현, GPU Infra 보류
 - 결정일: 2026-09-03
 - 부분 대체됨: 환경별 활성 Provider, GPU Infra 우선순위, IMDSv2 hop limit 조항과

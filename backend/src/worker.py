@@ -20,7 +20,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import structlog
-from brokerage_ai.core.config import AiConfig, load_ai_config
+from brokerage_ai.core.config import AiConfig
 from brokerage_ai.core.errors import ProviderConfigurationError
 from brokerage_ai.core.types import ModelRoute, ProviderKind
 from brokerage_ai.f3 import (
@@ -34,7 +34,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlmodel import Session
 
-from core.config import Config, get_config
+from core.config import Config, get_config, load_ai_config
 from core.errors import ConfigurationError
 from core.logging import configure_logging
 from domain.agent_execution import pipeline, repository, service

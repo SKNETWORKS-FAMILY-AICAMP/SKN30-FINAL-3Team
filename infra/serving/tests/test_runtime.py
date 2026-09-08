@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from general_middleware import ServingRoutes
 import general_runtime
+from general_middleware import ServingRoutes
 
 
 class GeneralHttpSurface(unittest.TestCase):

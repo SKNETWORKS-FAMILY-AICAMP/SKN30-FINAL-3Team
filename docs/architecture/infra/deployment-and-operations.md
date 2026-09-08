@@ -1,14 +1,17 @@
 ---
 status: 결정
 implementation: 기존 delivery 적용됨·Alarm 전용 전달 및 Bedrock POC 코드 구현/AWS 미적용·S3 dev release 게시 완료·RunPod 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # 배포 및 운영 구조
 
+현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](../../../infra/serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
+
+
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md) · [프로젝트 ADR-0031](../../../.agents/skills/project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md) · [Infra ADR-0020](../../../.agents/skills/infra/references/decisions/ADR-0020-runpod-console-registration.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
 - **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐고 S3 dev release는 게시됐다. RunPod Pod와 이번 Terraform 변경은 미적용이다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
 
@@ -125,23 +128,64 @@ Secure Cloud에 생성하고 작업 종료 시 삭제한다. Volume·SSH는 사�
 presigned S3 URL만 전달한다. 기반 모델은 공개 Hugging Face의 불변 commit에서 받고 HF token 계열은
 Template과 자식 프로세스에서 제거한다. `/v1/models`가 각각 `sllm`, `stt`를 실제 반환한 뒤 SSM
 `AI_VLLM_ENDPOINT_SET`을
-`active`로, 삭제 전에는 `offline`으로 바꾸고 같은 Backend image의 API·Worker만 재생성한다.
+`active`로, 삭제 전에는 `offline`으로 바꾸고 같은 Backend image의 API만 재생성한다. API의 F2 환경변수만 갱신하며 Worker·migration 설정은 보존한다.
 refresh 실패 시 이전 JSON을 복원한다.
 
 F2 smoke는 배포 bundle의 합성 음성만 사용해 개발 세션·CSRF를 거쳐 실제
 `POST /api/v1/f2/analyses`를 호출한다. 응답 body, 전사와 인증값은 운영 도구 출력에 복사하지 않는다.
 
-최초 구축은 성공한 image digest의 `runpod-bootstrap-plan → 확인 → runpod-bootstrap` 한 경로를
-사용한다. 새 digest generation은 endpoint offline과 공유 Pod 부재에서만 만든다. Pod 생성 전
+최초 Secret·GHCR registry·private Template은 Console에서 생성한다.
+`runpod-register-plan → 확인 → runpod-register`는 기존 자원을 검증하고 ID·digest만 SSM에 기록한다.
+등록·Console 설정 변경은 endpoint offline과 공유 Pod 부재에서만 수행한다. Pod 생성 전
 `runpod-create-plan`이 S3 release·control ready·공유 Pod 부재와 Backend API·Worker health를 확인한다.
 평가 전 개발 기동은 `dev-*` ID와 `not-evaluated` marker를 가진 `dev` stage로만 허용하며 일반 create가
 아닌 `runpod-create-dev-plan → runpod-create-dev`를 사용한다. 이 예외도 기반 commit·adapter checksum과
-동일한 health·rollback·삭제 계약을 유지하며 정식 품질 승격으로 간주하지 않는다.
-SSM 제어 문서가 registry·Template ID, digest와 AI Secret 동기화 version을 소유하며
-개인 `.env`나 영구 `runpodctl` 설정을 요구하지 않는다. 기본 30분 읽기 전용 감시와 8시간 경고는
-기존 Alarm SNS·Discord로 전달한다. 실행·회전·수동 reconcile과 비용 절차는
+동일한 health·offline 정리·삭제 계약을 유지하며 정식 품질 승격으로 간주하지 않는다.
+SSM 제어 문서는 registry·Template ID와 digest만 등록하며 generation·Secret version 동기화는 관리하지 않는다.
+현재 Template을 Pod 생성 전 다시 검증하고
+개인 `.env`나 영구 `runpodctl` 설정을 요구하지 않는다. 자체 감시 Lambda·주기 실행·RunPod 경보는
+제거하고 운영자가 시작·종료에 status·smoke와 Console 사용액을 확인한다. 실패 시 이전 active
+endpoint를 자동 복원하지 않고 offline으로 정리·재시도한다. 실행·회전·수동 reconcile 절차는
 [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다. 자동 중지는 없고 생성 작업자가 종료 시
 정확한 Pod ID로 삭제한다. 모델 정본은 private S3에 남는다.
+
+## AWS GPU 검토와 RunPod 배포 경로 유지
+
+**사용자 요구(2026-09-07):** AWS GPU 배포 실패나 비용 부담 시 전환할 수 있도록 RunPod 배포
+경로를 유지한다. AWS 이전을 이유로 기존 RunPod Template·등록·생성·삭제·smoke 경로를 제거하지
+않는다. 현재 RunPod 도구는 F2용이며 F3 Qwen 배포와 AWS GPU 배포·상호 전환은 아직 구현되지 않았다.
+이 요구만으로 ADR-0027의 현재 활성 모델을 변경하거나 GPU 자원을 생성하지 않는다.
+
+**구현 제안:** F2·F3별로 AWS 또는 RunPod 중 한 경로를 활성화하고 운영자가 명시적으로 전환한다.
+배포 환경별 endpoint·인증 설정을 분리하되 기능별 모델 revision·서빙 설정·smoke 기준은 공유한다.
+F2의 STT·SLLM은 함께 전환하고, F3는 endpoint alias와 DB 모델 프로필의 일치를 검증한다.
+신규 작업을 막고 진행 중 작업을 확인한 뒤 대상 환경을 준비·검증하고 설정을 전환한다.
+전환 후 실제 합성 추론이 성공하면 이전 AWS GPU는 정지하고 이전 RunPod는 삭제한다.
+자동 fallback이나 두 환경의 상시 대기는 추가하지 않는다. 일시적인 이중 실행 비용과
+모델 다운로드·기동 시간은 전환 비용에 포함하며 재시작 시 GPU 가용성을 보장하지 않는다.
+
+**요금 확인(2026-09-07, 약정 없는 On-Demand 기준):**
+
+| 상태 | 남는 요금 |
+|---|---|
+| AWS·RunPod 실행 중, 요청 없음 또는 컨테이너만 정지 | GPU 인스턴스·Pod 실행 요금 계속 발생 |
+| AWS EC2 정지 | GPU 실행 요금 없음, root·모델 EBS와 snapshot 등 보존 자원은 계속 과금 |
+| AWS Elastic IP 보유 | EC2 정지 여부와 관계없이 주소당 시간당 $0.005; 자동 할당 public IPv4는 EC2 정지 시 반환 |
+| RunPod 정지 | GPU 실행 요금 없음, container disk 과금 없음, volume disk는 $0.20/GB/월, network volume 별도 과금 |
+| RunPod 삭제, 별도 network volume 없음 | 해당 Pod의 GPU·disk 요금 없음; S3 모델 정본 등 외부 보존 자원은 별도 과금 |
+
+현재 F2 생성 요청은 `volumeInGb=0`이고 종료 시 Pod를 삭제한다. 이 방식을 유지하면 RunPod의
+배포 경로를 보존하는 것만으로 GPU·Pod 디스크 유휴 요금이 생기지 않는다. AWS EBS는 실제 파일
+사용량이 아닌 할당 용량 기준이므로 root·모델 디스크를 함께 산정한다. 장기 미사용 시에는 재생성
+가능한 모델 캐시와 EC2 제거를 별도로 검토한다. Capacity Reservation은 미사용 용량도 과금되며
+Savings Plans 등 약정은 인스턴스 정지로 취소되지 않으므로 이번 비용 비교는 약정 없는 구성을 기준으로 한다.
+공유 ALB·RDS·S3·Secrets Manager 등 기존 환경 요금은 GPU 전원과 별개다.
+
+공식 근거: [EC2 정지·시작](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html),
+[EBS 요금](https://aws.amazon.com/ebs/pricing/), [IPv4 요금](https://aws.amazon.com/vpc/pricing/),
+[Capacity Reservation 요금](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/capacity-reservations-pricing-billing.html),
+[RunPod 요금](https://docs.runpod.io/pods/pricing), [RunPod 정지·삭제](https://docs.runpod.io/pods/manage-pods).
+이는 공식 요금 정책 확인이며 실제 계정 잔존 자원·청구액 조회 결과는 아니다.
 
 ## Bedrock 범용 모델 POC
 
@@ -185,10 +229,10 @@ Infra는 보류한다.
 - CodeDeploy는 AWS 관리 service role을 사용한다.
 - EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write, migration DB connect와 Luna 전용 최소 Bedrock 권한만 둔다.
 - 운영자 policy는 `pipeline_operator_user_names`에 지정한 기존 IAM 사용자에게 직접 연결하고 `team-readonly`에는 쓰기 권한을 추가하지 않는다.
-- 선택적 OpenAI·vLLM key, delivery·Alarm Discord webhook, RunPod 운영·감시 key와 GHCR credential의 정본은
-  AWS Secrets Manager다. Terraform은 컨테이너만 만들고 값은 TTY bootstrap/rotation 명령이
+- 선택적 OpenAI·vLLM key, delivery·Alarm Discord webhook, RunPod 운영 key의 정본은
+  AWS Secrets Manager다. Terraform은 컨테이너만 만들고 값은 TTY secret-rotate 명령이
   AWSCURRENT로 관리한다. F2 active 시에는 SLLM·STT key 두 개가 모두 필요하다. Bedrock은
-  Instance Role SigV4를 사용하므로 Secret을 추가하지 않는다. Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
+  Instance Role SigV4를 사용하므로 Secret을 추가하지 않는다. GHCR credential은 RunPod Console에서만 관리한다. Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
 - RDS runtime 비밀번호와 migration IAM token은 서비스가 자동 생성하는 기존 경계를 유지한다.
 - state, Build log, artifact, release manifest와 Discord 메시지에 DB URL, IAM token, API key 또는 webhook을 기록하지 않는다.
 

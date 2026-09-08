@@ -24,6 +24,8 @@ export type ApiErrorKind =
   | "conflict"
   /** 입력값이 서버 검증을 통과하지 못했다(422 등). */
   | "validation"
+  /** 현재 처리 용량이 가득 찼다(429). 잠시 후 수동 재시도한다. */
+  | "rateLimited"
   /** 서버 내부 오류(5xx). */
   | "server"
   /** 응답이 계약과 다르다. 배포 불일치일 가능성이 높다. */
@@ -80,6 +82,7 @@ export function kindFromStatus(status: number): ApiErrorKind {
   if (status === 403) return "forbidden";
   if (status === 404) return "notFound";
   if (status === 409) return "conflict";
+  if (status === 429) return "rateLimited";
   if (status === 400 || status === 422) return "validation";
   if (status >= 500) return "server";
   if (status >= 400) return "contract";

@@ -20,6 +20,7 @@ from healthcheck import check
 
 SHUTDOWN_GRACE_SECONDS = 30
 STARTUP_TIMEOUT_SECONDS = 1500
+SLLM_CHAT_TEMPLATE = Path("/tmp/f2-sllm-chat-template.jinja")
 API_KEY_PATTERN = re.compile(r"[A-Za-z0-9_-]{43,128}\Z")
 MODEL_ID_PATTERN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*\Z"
@@ -136,6 +137,27 @@ def load_config(
     )
 
 
+def prepare_chat_template(config: RuntimeConfig) -> None:
+    """Keep Qwen non-thinking mode on the pinned vLLM 0.11 CLI."""
+    if config.sllm_model_id == "/models/sllm":
+        source = Path(config.sllm_model_id, "tokenizer_config.json")
+    else:
+        from huggingface_hub import hf_hub_download
+
+        source = Path(
+            hf_hub_download(
+                repo_id=config.sllm_model_id,
+                filename="tokenizer_config.json",
+                revision=config.sllm_model_revision,
+                token=False,
+            )
+        )
+    template = json.loads(source.read_text())["chat_template"]
+    if not isinstance(template, str) or not template.strip():
+        raise ConfigurationError("pinned SLLM chat template is missing")
+    SLLM_CHAT_TEMPLATE.write_text("{% set enable_thinking = false %}" + template)
+
+
 def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str]]:
     common = [
         "--host",
@@ -163,8 +185,8 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         str(config.sllm_max_model_len),
         "--gpu-memory-utilization",
         str(config.sllm_gpu_memory_utilization),
-        "--default-chat-template-kwargs",
-        '{"enable_thinking":false}',
+        "--chat-template",
+        str(SLLM_CHAT_TEMPLATE),
     ]
     if config.release_mode == "lora":
         if config.sllm_adapter_path is None:
@@ -296,6 +318,7 @@ def run() -> int:
     signal.signal(signal.SIGINT, lambda number, _frame: requested.append(number))
     serving: dict[str, subprocess.Popen[bytes]] = {}
     try:
+        prepare_chat_template(config)
         deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
         print(
             f"f2-serving: starting sllm release {release.release_id} and stt",
@@ -344,8 +367,10 @@ def run() -> int:
                 )
                 return process.returncode if process.returncode not in (None, 0) else 1
             time.sleep(0.25)
-    except (OSError, RuntimeError):
-        print("f2-serving startup failed; stopping container", file=sys.stderr, flush=True)
+    except (OSError, RuntimeError, ValueError, KeyError):
+        print(
+            "f2-serving startup failed; stopping container", file=sys.stderr, flush=True
+        )
         return 128 + requested[0] if requested else 1
     finally:
         _stop(list(serving.values()))

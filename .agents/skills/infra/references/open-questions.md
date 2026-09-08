@@ -13,3 +13,8 @@ updated: 2026-09-01
 | INFRA-OQ-010 | Versioned Terraform state bucket의 비운영자 Deny에 `GetObjectVersion`·`DeleteObjectVersion`·`ListBucketVersions`를 언제 추가하고 policy change를 적용할 것인가? | 이전 state version 기밀성·무결성 | 다음 bootstrap 보안 변경 전 |
 
 프로젝트 공통 미해결 질문인 업무 데이터 보존기간과 큐 전환 계약은 project-wiki `open-questions.md`를 정본으로 사용한다. Identity Center 전환은 폐기하고 기존 IAM 접근을 유지하기로 결정했다. 첫 런타임, 예산·비밀 저장, RDS·S3·설정, EC2·관측성과 Frontend origin 기준은 [ADR-0008](../../project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md), [Infra ADR-0002](decisions/ADR-0002-dev-demo-aws-runpod-architecture.md), [Infra ADR-0003](decisions/ADR-0003-dev-storage-database-and-configuration.md), [Infra ADR-0004](decisions/ADR-0004-dev-runtime-and-observability-baseline.md), [Infra ADR-0005](decisions/ADR-0005-dev-frontend-origin-and-api-routing.md)에서 해결됐다. RunPod 소유 경계였던 `INFRA-OQ-009`는 [ADR-0017](decisions/ADR-0017-runpod-ephemeral-sllm-serving.md)에서 해결했다.
+
+## GPU 배포 수용 검증
+
+- 고정한 범용 vLLM의 Qwen BnB 48GB 호환성과 DLAMI의 Compose·NVIDIA toolkit을 실제 기동에서 검증한다. 영향: 배포 승격 조건. 담당: Infra·AI 운영자.
+- 기동 시간·VRAM·OOM·한국어 구조화 출력·왕복 전환은 [검증 기록](../../../../infra/serving/validation.md)에 남긴다. 실제 통과 전 dev DB 기본값을 변경하지 않는다.

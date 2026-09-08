@@ -53,6 +53,19 @@ class FakeRequester:
 
 
 class TemplateTests(unittest.TestCase):
+    def test_doctor_detects_console_template_drift_before_creation(self):
+        spec = load_spec()
+        expected = MODULE.control.template_payload(
+            MODULE.asdict(spec), spec.image, "registry-1", spec.name
+        )
+        client = mock.Mock()
+        client.template.return_value = {**expected, "imageName": "different-image"}
+        with self.assertRaisesRegex(MODULE.ToolError, "imageName"):
+            MODULE.doctor(
+                client, spec, template_id="template-1", registry_id="registry-1"
+            )
+        client.create.assert_not_called()
+
     def test_repository_template_is_ephemeral_and_task_named(self) -> None:
         spec = MODULE.load_template_spec(TEMPLATE, allow_placeholder=True)
         self.assertEqual(spec.name, "skn30-f2-serving-v2")
@@ -134,6 +147,7 @@ class RunpodApiTests(unittest.TestCase):
             terminate_after=None,
         )
         request = requester.requests[0]
+        self.assertEqual(request.get_header("User-agent"), "skn30-infra/1.0")
         payload = json.loads(request.data)
         self.assertEqual(result["id"], POD_ID)
         self.assertEqual(payload["cloudType"], "SECURE")
@@ -178,6 +192,9 @@ class RunpodApiTests(unittest.TestCase):
                 "https://pod-8001.proxy.runpod.net/v1", SLLM_KEY, "sllm"
             )
         self.assertFalse(result["ok"])
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.get_header("User-agent"), "skn30-infra/1.0")
+        self.assertEqual(request.get_header("Authorization"), f"Bearer {SLLM_KEY}")
 
 
 class FakeRunpod:
@@ -264,6 +281,9 @@ class FakeAws:
         self.smokes += 1
         if self.fail_smoke:
             raise MODULE.ToolError("smoke fixture failure")
+
+    def smoke_offline(self):
+        self.smokes += 1
 
 
 def healthy(_url, _key, _expected_model):
@@ -470,7 +490,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(aws.refreshes, 1)
         self.assertEqual(aws.smokes, 1)
 
-    def test_create_smoke_failure_restores_endpoint_and_deletes_pod(self) -> None:
+    def test_create_smoke_failure_sets_offline_and_deletes_pod(self) -> None:
         runpod = FakeRunpod()
         aws = FakeAws()
         previous = dict(aws.endpoint)
@@ -483,7 +503,9 @@ class ControllerTests(unittest.TestCase):
                 apply=True,
                 keys=(SLLM_KEY, STT_KEY),
             )
-        self.assertEqual(aws.endpoint, previous)
+        self.assertEqual(aws.endpoint["status"], "offline")
+        self.assertIsNone(aws.endpoint["pod_id"])
+        self.assertGreater(aws.endpoint["revision"], previous["revision"])
         self.assertEqual(aws.refreshes, 2)
         self.assertEqual(runpod.deleted, [POD_ID])
 
@@ -503,7 +525,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(aws.writes, [])
         self.assertEqual(runpod.deleted, [POD_ID])
 
-    def test_failed_rollback_refresh_reports_reconcile_guidance(self) -> None:
+    def test_failed_offline_refresh_reports_reconcile_guidance(self) -> None:
         runpod = FakeRunpod()
         aws = FakeAws()
         aws.fail_smoke = True
@@ -524,6 +546,24 @@ class ControllerTests(unittest.TestCase):
         self.assertNotIn("pod-create-complete", output.getvalue())
         self.assertEqual(runpod.deleted, [POD_ID])
 
+    def test_aws_cli_error_during_cleanup_still_attempts_pod_deletion(self):
+        aws, runpod = FakeAws(), FakeRunpod()
+        with (
+            mock.patch.object(
+                aws, "refresh", side_effect=MODULE.artifact.ToolError("AWS failure")
+            ),
+            self.assertRaisesRegex(MODULE.ToolError, "reconciliation is incomplete"),
+        ):
+            self.controller(runpod, aws).create(
+                release_id="consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=True,
+                keys=(SLLM_KEY, STT_KEY),
+            )
+        self.assertEqual(runpod.deleted, [POD_ID])
+        self.assertEqual(aws.endpoint["status"], "offline")
+
     def test_delete_requires_exact_id_and_sets_offline_first(self) -> None:
         runpod = FakeRunpod(present=True)
         aws = FakeAws()
@@ -541,7 +581,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(aws.endpoint["status"], "offline")
         self.assertEqual(runpod.deleted, [POD_ID])
 
-    def test_delete_failure_restores_previous_endpoint(self) -> None:
+    def test_delete_failure_keeps_offline_for_explicit_retry(self) -> None:
         runpod = FakeRunpod(present=True, fail_delete=True)
         aws = FakeAws()
         aws.endpoint = MODULE.endpoint_value(
@@ -550,13 +590,85 @@ class ControllerTests(unittest.TestCase):
             pod_id=POD_ID,
             release_id="consultation-v1",
         )
-        previous = dict(aws.endpoint)
         with self.assertRaisesRegex(MODULE.ToolError, "delete fixture failure"):
             self.controller(runpod, aws).delete(
                 pod_id=POD_ID, confirmed=True, apply=True
             )
-        self.assertEqual(aws.endpoint, previous)
+        self.assertEqual(aws.endpoint["status"], "offline")
+        self.assertEqual(aws.refreshes, 1)
+        self.assertTrue(runpod.present)
+        runpod.fail_delete = False
+        self.controller(runpod, aws).delete(pod_id=POD_ID, confirmed=True, apply=True)
+        self.assertFalse(runpod.present)
+
+    def test_create_rejects_stale_active_endpoint_before_cost(self):
+        aws, runpod = FakeAws(), FakeRunpod()
+        aws.endpoint["status"] = "active"
+        with self.assertRaisesRegex(MODULE.ToolError, "offline endpoint"):
+            self.controller(runpod, aws).create(
+                release_id="consultation-v1",
+                gpu_id="NVIDIA RTX 4090",
+                terminate_after=None,
+                apply=True,
+                keys=(SLLM_KEY, STT_KEY),
+            )
+        self.assertFalse(runpod.created)
+        self.assertEqual(aws.presigns, 0)
+
+    def test_delete_refresh_failure_keeps_pod_and_can_be_retried(self):
+        aws, runpod = FakeAws(), FakeRunpod(present=True)
+        aws.fail_refresh_calls = {1}
+        controller = self.controller(runpod, aws)
+        with self.assertRaisesRegex(MODULE.ToolError, "refresh fixture"):
+            controller.delete(pod_id=POD_ID, confirmed=True, apply=True)
+        self.assertEqual(aws.endpoint["status"], "offline")
+        self.assertEqual(runpod.deleted, [])
+        controller.delete(pod_id=POD_ID, confirmed=True, apply=True)
+        self.assertFalse(runpod.present)
+
+    def test_lost_delete_response_does_not_restore_dead_endpoint(self):
+        class LostResponse(FakeRunpod):
+            def delete(self, pod_id):
+                super().delete(pod_id)
+                raise MODULE.ToolError("delete response lost")
+
+        aws, runpod = FakeAws(), LostResponse(present=True)
+        aws.endpoint = MODULE.endpoint_value(
+            previous=aws.endpoint,
+            status="active",
+            pod_id=POD_ID,
+            release_id="consultation-v1",
+        )
+        controller = self.controller(runpod, aws)
+        with self.assertRaisesRegex(MODULE.ToolError, "response lost"):
+            controller.delete(pod_id=POD_ID, confirmed=True, apply=True)
+        self.assertFalse(runpod.present)
+        self.assertTrue(all(value["status"] == "offline" for value in aws.writes))
+        controller.reconcile(
+            keys=(SLLM_KEY, STT_KEY), apply=True, endpoint_offline_confirmed=True
+        )
+        self.assertEqual(aws.smokes, 1)
+
+    def test_reconcile_retries_failed_offline_refresh_without_restoring_active(self):
+        aws, runpod = FakeAws(), FakeRunpod()
+        aws.endpoint = MODULE.endpoint_value(
+            previous=aws.endpoint,
+            status="active",
+            pod_id=POD_ID,
+            release_id="consultation-v1",
+        )
+        aws.fail_refresh_calls = {1}
+        controller = self.controller(runpod, aws)
+        with self.assertRaisesRegex(MODULE.ToolError, "refresh fixture"):
+            controller.reconcile(
+                keys=(SLLM_KEY, STT_KEY), apply=True, endpoint_offline_confirmed=True
+            )
+        self.assertEqual(aws.endpoint["status"], "offline")
+        controller.reconcile(
+            keys=(SLLM_KEY, STT_KEY), apply=True, endpoint_offline_confirmed=True
+        )
         self.assertEqual(aws.refreshes, 2)
+        self.assertEqual(aws.smokes, 1)
 
     def test_reconcile_active_missing_pod_is_dry_run_by_default(self) -> None:
         runpod = FakeRunpod()

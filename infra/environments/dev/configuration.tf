@@ -25,13 +25,9 @@ locals {
       name        = "/${local.name_prefix}/runpod/operator-api-key"
       description = "Container for the RunPod read-write operator API key populated outside Terraform"
     }
-    monitor_api_key = {
-      name        = "/${local.name_prefix}/runpod/monitor-api-key"
-      description = "Container for the RunPod read-only monitoring API key populated outside Terraform"
-    }
     ghcr_registry = {
       name        = "/${local.name_prefix}/runpod/ghcr-registry"
-      description = "Container for GHCR username and read-only PAT JSON populated outside Terraform"
+      description = "Read-only GHCR credentials for AWS GPU hosts; RunPod registry credentials remain Console-managed"
     }
   }
 
@@ -86,14 +82,12 @@ locals {
   }
 
   runpod_control_set_bootstrap = {
-    schema_version                = 1
-    status                        = "uninitialized"
-    generation                    = 0
-    registry_auth_id              = null
-    template_id                   = null
-    image                         = null
-    ai_provider_secret_version_id = null
-    updated_at                    = "1970-01-01T00:00:00Z"
+    schema_version   = 2
+    status           = "uninitialized"
+    registry_auth_id = null
+    template_id      = null
+    image            = null
+    updated_at       = "1970-01-01T00:00:00Z"
   }
 
   application_parameters = merge([
@@ -171,7 +165,7 @@ resource "aws_ssm_parameter" "ai_vllm_endpoint_set" {
 
 resource "aws_ssm_parameter" "runpod_control_set" {
   name        = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
-  description = "Non-sensitive RunPod bootstrap generation, immutable resource IDs, image digest, and secret synchronization state"
+  description = "Non-sensitive registration of Console-managed RunPod resource IDs and image digest"
   type        = "String"
   value       = jsonencode(local.runpod_control_set_bootstrap)
   tier        = "Standard"

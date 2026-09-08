@@ -26,8 +26,10 @@ updated: 2026-08-31
 | [contracts/observability.md](contracts/observability.md) | 오류 로그·metric·alarm·모듈별 오류 대응 경계를 확인하거나 바꿀 때 |
 | [privacy/policy.md](privacy/policy.md) | 개인정보를 수집·저장·전송·기록할 가능성이 있을 때 |
 | [decisions/index.md](decisions/index.md) | 아키텍처·정책 변경 전에 승인된 결정을 확인할 때 |
+| [RunPod 운영 책임 축소](decisions/ADR-0029-runpod-manual-observation.md) | 자체 감시 제거와 offline 복구·운영자 시작/종료 확인 기준을 확인할 때 |
 | [open-questions.md](open-questions.md) | 미확정 사항에 의존하거나 새 질문이 생겼을 때 |
 | [log.md](log.md) | 최근 위키 변경의 요약이 필요할 때 |
+| [Local·dev GPU 운영](decisions/ADR-0030-local-dev-dual-cloud-serving.md) | 개인 OpenAI와 공유 AWS·RunPod 선택·전환 경계를 확인할 때 |
 
 외부 및 사람용 원문의 등록 현황은 `../sources/manifest.yaml`에서 확인한다.
 

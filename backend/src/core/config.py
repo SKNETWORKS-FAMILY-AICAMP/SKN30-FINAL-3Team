@@ -7,12 +7,15 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dotenv import dotenv_values
 from pydantic import BaseModel, Field, SecretStr, model_validator
 
 from core.errors import ConfigurationError
+
+if TYPE_CHECKING:
+    from brokerage_ai import AiConfig
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_WORKER_READY_FILE = Path(gettempdir()) / "brokerage-worker-ready"
@@ -261,6 +264,26 @@ def _dotenv_mapping(path: Path) -> dict[str, str]:
     }
 
 
+def _environment_values(
+    environment: AppEnvironment | str,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Resolve Backend-owned inputs without modifying the process environment."""
+    values: dict[str, str] = {}
+    if environment == AppEnvironment.LOCAL:
+        values.update(_dotenv_mapping(BACKEND_ROOT / ".env.local"))
+        values.update(_dotenv_mapping(BACKEND_ROOT / ".env"))
+    values.update(os.environ if environ is None else environ)
+    return values
+
+
+def load_ai_config(profile: str, environ: Mapping[str, str] | None = None) -> AiConfig:
+    """Use the same input precedence; AI owns parsing, defaults and validation."""
+    from brokerage_ai import bind_ai_config
+
+    return bind_ai_config(_environment_values(profile, environ), profile)
+
+
 def load_config(
     environment: AppEnvironment | str | None = None,
     environ: Mapping[str, str] | None = None,
@@ -274,11 +297,7 @@ def load_config(
     except ValueError as exc:
         raise ConfigurationError("APP_ENV must be local, test, dev, or prod") from exc
 
-    values: dict[str, str] = {}
-    if selected_environment is AppEnvironment.LOCAL:
-        values.update(_dotenv_mapping(BACKEND_ROOT / ".env.local"))
-        values.update(_dotenv_mapping(BACKEND_ROOT / ".env"))
-    values.update(process_values)
+    values = _environment_values(selected_environment, process_values)
 
     config = bind_config(values)
     if config.app.environment is not selected_environment:

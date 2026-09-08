@@ -1,5 +1,8 @@
 # Infra
 
+현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
+
+
 Terraform을 AWS 인프라 변경의 정본으로 사용한다. 현재 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없으므로 Billing 자원을 만들지 않는다. 기존 선택적 Budget 입력은 현재 state 호환을 위해 남아 있지만 `create_budget=false`만 허용하며, 2026-09-23까지 누적 300,000원은 자동 집행 없는 운영 참고 상한이다. workload 자원은 plan과 별도 승인 없이 만들지 않는다.
 
 `environments/dev`는 prod를 대신하는 운영 환경이 아니라 공유 애플리케이션 dev 환경이다. CloudFront 주소는 공개되어 있으며 합성·비식별 데이터만 허용한다.
@@ -25,7 +28,7 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 - `scripts/manage_dev_power.py`: 지정 Infra 운영자의 dev RDS·ASG start/stop/status 관리
 - `runpod/`: 공유 F2 private image, dependency lock, 불변 Team Template 명세와 운영 runbook
 - `scripts/manage_runpod.py`: AWS 제어 문서를 사용하는 공유 Pod doctor/create/status/delete와 기본 dry-run reconcile 관리
-- `scripts/manage_runpod_control.py`: digest 기반 RunPod bootstrap과 Secrets Manager 상태·회전 관리
+- `scripts/manage_runpod_control.py`: Console RunPod 자원의 검증·SSM 등록과 Secrets Manager 상태·회전 관리
 - `scripts/manage_sllm_artifact.py`: 전달받은 SLLM bundle 검증과 private S3 불변 게시
 
 Terraform은 1.15.x, AWS Provider는 `~> 6.53` 호환 범위를 사용한다. 실제 두 번째 환경이나 반복 자원이 생기기 전에는 module과 workspace를 추가하지 않는다.
@@ -87,15 +90,17 @@ just setup-existing 2026-09-23
 ### 운영 비밀값 준비
 
 Setup, `just verify-account`와 Terraform plan/apply는 비밀값 없이 실행한다. Terraform은 AI,
-delivery·Alarm Discord, RunPod 운영·감시 API key와 GHCR credential의 Secret 컨테이너만 만들고
+delivery·Alarm Discord, RunPod 운영 API key와 GHCR credential의 Secret 컨테이너만 만들고
 값·version은 관리하지 않는다.
 
-Terraform 적용 뒤 `just secret-status`로 AWSCURRENT 존재만 확인하고, 최초
-`just runpod-bootstrap <image@digest>`에서 누락값을 TTY 비표시로 입력한다. AI Secret은 기존 renderer 호환 평면
-`AI_*_API_KEY` JSON이고 F2 key 두 개는 도구가 생성한다. OpenAI key는 선택값이며 Bedrock은
-EC2 Instance Role SigV4를 사용하므로 key를 생성·저장하지 않는다. 회전은
-`just secret-rotate <target>`을 사용한다. 실제 값, hash와 PAT는 tfvars, 명령 인자,
-plan/state, 로그나 Discord에 넣지 않는다.
+Terraform 적용 뒤 `just secret-status`로 AWSCURRENT 존재를 확인하고
+`just secret-rotate <target>`에서 최초 값 또는 회전할 값을 TTY 비표시로 입력한다.
+RunPod 자원은 Console에서 만들고 `runpod-register-plan → runpod-register`로 검증·등록한다.
+AI Secret은 기존 renderer 호환 평면 `AI_*_API_KEY` JSON이며 F2 key 두 개는 RunPod Console과
+같은 값을 입력한다. GHCR credential은 Console에서만 관리하며 기존 AWS 컨테이너는 사용하지 않는다.
+OpenAI key는 선택값이며 Bedrock은 EC2 Instance Role SigV4를 사용하므로 key를 생성·저장하지 않는다.
+실제 값과 PAT는 tfvars, 명령 인자, plan/state, 로그나 Discord에 넣지 않는다.
+구체적인 Console 설정·등록·일상 운영은 [RunPod runbook](runpod/README.md)을 따른다.
 
 ### Terraform 변경
 

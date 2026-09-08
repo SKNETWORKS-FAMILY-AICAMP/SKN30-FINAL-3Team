@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
 from datetime import UTC, datetime
@@ -12,15 +13,18 @@ from brokerage_ai.f2 import (
     F2Pipeline,
     F2PipelineError,
     F2PipelineRequest,
+    F2PipelineResult,
     LedgerType,
 )
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
 from api.schemas.f2 import F2AnalysisResponse
 from core.config import Config
 from core.errors import (
+    F2BusyError,
     F2ProcessingError,
     F2UnavailableError,
     PrivacyConsentRequiredError,
@@ -30,7 +34,38 @@ from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser
 from domain.session import get_app_config
 
-router = APIRouter(prefix="/f2", tags=["voice-analysis"])
+
+def _release_slot(request: Request, task: asyncio.Task[F2PipelineResult] | None) -> None:
+    # A disconnected caller may no longer await the result; never log its private payload.
+    if task is not None and not task.cancelled():
+        task.exception()
+    request.app.state.f2_analysis_task = None
+    request.app.state.f2_analysis_busy = False
+
+
+class F2AnalysisRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def admitted(request: Request):
+            # Claim before multipart parsing: concurrent uploads must not fill the /tmp disk.
+            # One API process/event loop, with no await between checking and claiming.
+            if request.app.state.f2_analysis_busy:
+                raise F2BusyError()
+            request.app.state.f2_analysis_busy = True
+            try:
+                return await handler(request)
+            finally:
+                task = request.app.state.f2_analysis_task
+                if task is not None and not task.done():
+                    task.add_done_callback(lambda done: _release_slot(request, done))
+                else:
+                    _release_slot(request, task)
+
+        return admitted
+
+
+router = APIRouter(prefix="/f2", tags=["voice-analysis"], route_class=F2AnalysisRoute)
 
 SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".m4a"}
 SUPPORTED_CONTENT_TYPES = {
@@ -83,8 +118,16 @@ async def _copy_limited(upload: UploadFile, destination: Any, limit: int) -> Non
     destination.flush()
 
 
+async def _run_and_cleanup(pipeline: F2Pipeline, analysis: F2PipelineRequest) -> F2PipelineResult:
+    try:
+        return await pipeline.run(analysis)
+    finally:
+        analysis.audio_path.unlink(missing_ok=True)
+
+
 @router.post("/analyses", response_model=F2AnalysisResponse)
 async def analyze_voice_memo(
+    request: Request,
     audio: Annotated[UploadFile, File()],
     privacy_confirmed: Annotated[bool, Form()],
     current_fields: Annotated[str, Form()] = "{}",
@@ -108,18 +151,25 @@ async def analyze_voice_memo(
     suffix = _validate_audio(audio)
     parsed_fields = _parse_current_fields(current_fields)
     temp_path: Path | None = None
+    task: asyncio.Task[F2PipelineResult] | None = None
     try:
         with tempfile.NamedTemporaryFile(prefix="f2-audio-", suffix=suffix, delete=False) as temp:
             temp_path = Path(temp.name)
             await _copy_limited(audio, temp, config.f2.max_audio_bytes)
 
-        result = await pipeline.run(
-            F2PipelineRequest(
-                audio_path=temp_path,
-                current_ledger_type=current_ledger_type or ledger_type,
-                current_fields=parsed_fields,
+        task = asyncio.create_task(
+            _run_and_cleanup(
+                pipeline,
+                F2PipelineRequest(
+                    audio_path=temp_path,
+                    current_ledger_type=current_ledger_type or ledger_type,
+                    current_fields=parsed_fields,
+                ),
             )
         )
+        request.app.state.f2_analysis_task = task
+        # STT runs in a thread. Caller cancellation must not delete its file or free its slot.
+        result = await asyncio.shield(task)
         return F2AnalysisResponse.from_result(
             result,
             privacy_confirmed_at=datetime.now(UTC),
@@ -133,6 +183,8 @@ async def analyze_voice_memo(
     except F2PipelineError as error:
         raise F2ProcessingError() from error
     finally:
-        await audio.close()
-        if temp_path is not None:
-            temp_path.unlink(missing_ok=True)
+        try:
+            if task is None and temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+        finally:
+            await audio.close()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from dataclasses import asdict
 
@@ -61,6 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="허용된 Provider·모델·endpoint 설정 프로필",
     )
+    subcommands.add_parser("smoke-general", help="합성 입력으로 범용 GPU의 포지션 카드·판정 검증")
+    activate = subcommands.add_parser(
+        "activate-general-qwen", help="장부·실행 이력 보존, 범용 모델 설정만 전환"
+    )
+    activate.add_argument("--brokerage-id", type=int, required=True)
+    activate.add_argument("--apply", action="store_true")
+    activate.add_argument("--shared-dev", action="store_true")
+    activate.add_argument("--workloads-stopped-confirmed", action="store_true")
     return parser
 
 
@@ -68,6 +77,32 @@ def main() -> None:
     arguments = build_parser().parse_args()
     config = get_config()
 
+    if arguments.command in {"smoke-general", "activate-general-qwen"}:
+        from brokerage_ai.smoke import smoke_general
+
+        from core.config import load_ai_config
+        from general_model import activate_general, general_route
+
+        try:
+            if arguments.command == "smoke-general":
+                asyncio.run(
+                    smoke_general(load_ai_config(config.app.environment.value), general_route())
+                )
+                print("general synthetic workflows: OK")
+            else:
+                activate_general(
+                    config,
+                    arguments.brokerage_id,
+                    apply=arguments.apply,
+                    shared_dev=arguments.shared_dev,
+                    workloads_stopped=arguments.workloads_stopped_confirmed,
+                )
+        except Exception:
+            raise SystemExit(
+                "General model operation failed; check endpoint readiness, credentials "
+                "and queued runs. Sensitive details withheld."
+            ) from None
+        return
     if arguments.command == "seed-f3-synthetic":
         try:
             result = seed_f3_synthetic(

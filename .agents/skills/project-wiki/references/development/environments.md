@@ -23,11 +23,16 @@ updated: 2026-09-04
 [ADR-0017](../decisions/ADR-0017-shared-dev-development-session.md)을 따른다. 별도 staging 환경은
 필요성과 비용이 확인되기 전에는 추가하지 않는다.
 
-범용 구조화 생성의 환경별 기본 경로는 [ADR-0027](../decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md)를
-따른다. local은 개발자 개인 OpenAI key로 `gpt-5.6-luna`를 호출하고, 공유 dev는 EC2 Instance
-Role SigV4로 Bedrock `global.openai.gpt-5.6-luna`를 호출한다. 공유 dev 전환은 doctor 통과 뒤
-명시적 Bedrock seed를 적용하고 합성 smoke로 검증한다. 실패 시 OpenAI key·runtime이
-준비된 환경에서만 OpenAI seed를 명시 재적용하며 prod Provider는 아직 확정하지 않는다.
+범용 모델의 local·dev 정책은 [ADR-0030](../decisions/ADR-0030-local-dev-dual-cloud-serving.md)을
+따른다. local은 개인 OpenAI key와 기존 모델을 기본으로 유지한다. 공유 dev는 검증 후
+Qwen을 활성화하고 f2/general별 AWS·RunPod를 명시 선택한다. Backend는 자신의 dotenv만
+읽으며 AI에는 값을 주입한다. 개인 설정과 로컬 DB 모델 선택은 공유 dev 설정을 변경하지 않는다.
+연결·검증 명령은 [LLM 운영 절차](../../../../../infra/serving/README.md)를 따른다.
+
+Backend 실행에 필요한 AI 키를 과거에 `ai/.env`에만 두었다면 해당 입력을
+`backend/.env` 또는 Backend 프로세스 환경변수로 제공해야 한다. AI 단독 실행은 계속
+`ai/.env`를 사용한다. 다른 모듈의 개인 파일을 자동으로 읽거나 복사하지 않는다.
+이미 Backend에 입력을 제공하는 개발자는 설정 파일이나 실행 명령을 바꿀 필요가 없다.
 
 ## 설정과 비밀값
 

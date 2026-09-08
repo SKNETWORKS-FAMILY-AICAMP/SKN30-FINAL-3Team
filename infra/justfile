@@ -22,7 +22,7 @@ check:
     terraform fmt -check -recursive .
     terraform -chdir=bootstrap validate
     terraform -chdir=environments/dev validate
-    uvx ruff check scripts/manage_bedrock.py scripts/manage_db_access.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py delivery/lambda/runpod_monitor.py tests
+    uvx ruff check serving scripts/manage_serving.py scripts/connect_serving.py deploy/scripts/serving_contract.py scripts/manage_bedrock.py scripts/manage_db_access.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py tests
     uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
     uv run --python 3.12 --with 'aiohttp==3.14.3' --with 'multidict==6.7.1' python -m unittest discover -s runpod/tests -v
 
@@ -90,17 +90,17 @@ dev-destroy:
 
 # RDS, ASG와 SSM 연결 상태를 변경 없이 확인한다.
 dev-status:
-    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
 
-# RDS를 먼저 시작하고 ASG를 1로 복구한 뒤 SSM Online까지 기다린다.
-[confirm("공유 개발 RDS와 EC2를 시작합니까?")]
+# 선택 GPU 준비·연결 후 RDS·ASG·앱을 복구하고 합성 추론을 검증한다.
+[confirm("선택한 GPU와 공유 개발 RDS·앱을 시작하고 사용 요금을 발생시킵니까?")]
 dev-start:
-    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
 
 # 활성 작업 확인 후 ASG를 0으로 내리고 RDS를 정지한다.
 [confirm("배포, migration, API 요청과 Worker 작업이 모두 끝났습니까?")]
 dev-stop:
-    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
 
 # RunPod Team Workspace, Template, registry 인증과 AWS CLI를 읽기 전용으로 점검한다.
 runpod-doctor:
@@ -110,14 +110,14 @@ runpod-doctor:
 bedrock-doctor:
     uv run --script scripts/manage_bedrock.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}"
 
-# AWS·RunPod 자원을 변경하지 않고 bootstrap 작업과 충돌을 계산한다.
-runpod-bootstrap-plan image:
-    uv run --script scripts/manage_runpod_control.py bootstrap-plan {{ quote(image) }}
+# Console에서 만든 Secret·registry·Template을 비용과 변경 없이 검증한다.
+runpod-register-plan image template_id registry_id:
+    uv run --script scripts/manage_runpod_control.py register-plan {{ quote(image) }} {{ quote(template_id) }} {{ quote(registry_id) }}
 
-# 누락된 비밀값을 TTY로 받고 registry, Secret, private Template을 멱등하게 구성한다.
-[confirm("AWS Secrets Manager와 RunPod에 검토한 불변 image digest를 bootstrap합니까?")]
-runpod-bootstrap image:
-    uv run --script scripts/manage_runpod_control.py bootstrap {{ quote(image) }}
+# 검증된 기존 RunPod 자원의 ID·digest만 SSM에 등록한다.
+[confirm("검증된 Console 자원의 ID와 image digest를 SSM에 등록합니까?")]
+runpod-register image template_id registry_id:
+    uv run --script scripts/manage_runpod_control.py register {{ quote(image) }} {{ quote(template_id) }} {{ quote(registry_id) }}
 
 # 비밀값을 표시하지 않고 각 Secrets Manager 컨테이너의 AWSCURRENT 존재 여부만 확인한다.
 secret-status:
@@ -185,30 +185,31 @@ runpod-delete pod_id:
 dev-deep-stop-plan:
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     terraform -chdir=environments/dev validate
-    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -var=dev_edge_enabled=false -out=dev-deep-stop.tfplan
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -var=dev_edge_enabled=false -var=dev_gpu_enabled=false -out=dev-deep-stop.tfplan
 
 # 저장된 deep stop plan의 전체 변경·삭제 대상을 표시한다.
 dev-deep-stop-show:
     terraform -chdir=environments/dev show dev-deep-stop.tfplan
 
 # workload를 정지한 뒤 검토·승인된 deep stop plan을 적용한다.
-[confirm("배포·migration·API·Worker 작업이 모두 종료되었고 dev-deep-stop.tfplan의 ALB 삭제와 CloudFront 비활성화를 승인합니까?")]
+[confirm("배포·migration·API·Worker 작업이 모두 종료되었고 dev-deep-stop.tfplan의 ALB·AWS GPU·모델 캐시 삭제와 CloudFront 비활성화를 승인합니까?")]
 dev-deep-stop:
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
-    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" stop --apply --workloads-stopped-confirmed
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-deep-stop.tfplan
 
 # deep suspend 상태에서 예상하지 않은 drift가 없는지 검사한다.
 dev-deep-drift:
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
-    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -detailed-exitcode -var-file=dev.tfvars -var=dev_edge_enabled=false
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -detailed-exitcode -var-file=dev.tfvars -var=dev_edge_enabled=false -var=dev_gpu_enabled=false
 
 # ALB를 재생성하고 CloudFront를 재활성화하는 saved plan을 생성한다.
 dev-deep-start-plan:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" capacity-config
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     terraform -chdir=environments/dev validate
-    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -var=dev_edge_enabled=true -out=dev-deep-start.tfplan
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -var=dev_edge_enabled=true -var=dev_gpu_enabled=true -out=dev-deep-start.tfplan
 
 # 저장된 deep start plan의 전체 변경·생성 대상을 표시한다.
 dev-deep-start-show:
@@ -219,13 +220,13 @@ dev-deep-start-show:
 dev-deep-start:
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-deep-start.tfplan
-    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
 
 # Terraform state의 edge mode와 RDS·ASG·SSM·target 상태를 읽기 전용으로 확인한다.
 dev-deep-status:
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev output -json dev_edge_mode
-    uv run --script scripts/manage_dev_power.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
 
 # Terraform state와 AWS 계정 연결을 읽기 전용으로 검증한다.
 verify-account:
@@ -276,3 +277,44 @@ db-client-info: db-info
 [confirm("API와 Worker가 중지된 maintenance window입니까?")]
 db-rotate:
     uv run --script scripts/manage_db_access.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" rotate-runtime --apply --maintenance-window-confirmed
+
+# Explicit serving selection; configuration never starts billable capacity.
+ai-configure workload cloud gpu_id *options:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" configure {{ quote(workload) }} {{ quote(cloud) }} --gpu-id {{ quote(gpu_id) }} {{ options }}
+
+ai-switch-plan workload cloud:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" switch {{ quote(workload) }} {{ quote(cloud) }}
+
+[confirm("전체 서비스 점검과 대상 GPU 비용을 확인했으며 진행 작업·migration이 종료되었습니까?")]
+ai-switch workload cloud:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" switch {{ quote(workload) }} {{ quote(cloud) }} --apply
+
+ai-smoke workload:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" smoke {{ quote(workload) }}
+
+# Fixed-port sessions only; this command never starts or switches a shared GPU.
+ai-connect workload output:
+    uv run --script scripts/connect_serving.py {{ quote(workload) }} --account-id "{{ account_id }}" --profile "{{ aws_profile }}" --output {{ quote(output) }}
+
+runpod-general-register-plan image template_id registry_id:
+    uv run --script scripts/manage_runpod_control.py --workload general register-plan {{ quote(image) }} {{ quote(template_id) }} {{ quote(registry_id) }}
+
+runpod-general-register image template_id registry_id:
+    uv run --script scripts/manage_runpod_control.py --workload general register {{ quote(image) }} {{ quote(template_id) }} {{ quote(registry_id) }}
+
+ai-general-secret:
+    uv run --script scripts/manage_runpod_control.py --workload general secret-rotate general
+
+ai-ghcr-secret:
+    uv run --script scripts/manage_runpod_control.py secret-rotate ghcr
+
+[confirm("API·Worker 점검 중 해당 사무소의 범용 모델 설정만 Qwen으로 변경합니까? 대기·진행 작업이 없어야 합니다.")]
+ai-activate-general brokerage_id:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" activate-general {{ quote(brokerage_id) }} --apply --workloads-stopped-confirmed
+
+# AWS 전환 전에 기존 GPU를 보존하면서 대상 GPU를 추가하는 saved plan을 준비한다.
+ai-capacity-plan workload:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" capacity-config --candidate {{ quote(workload) }}
+    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
+    terraform -chdir=environments/dev validate
+    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev plan -input=false -var-file=dev.tfvars -out=dev.tfplan

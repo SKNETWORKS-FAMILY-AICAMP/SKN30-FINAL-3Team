@@ -210,6 +210,9 @@ resource "aws_iam_policy" "sllm_release_publisher" {
         Resource = [
           aws_ssm_parameter.ai_vllm_endpoint_set.arn,
           aws_ssm_parameter.runpod_control_set.arn,
+          aws_ssm_parameter.general_runpod_control.arn,
+          aws_ssm_parameter.general_endpoint.arn,
+          aws_ssm_parameter.serving_selection.arn,
         ]
       },
       {

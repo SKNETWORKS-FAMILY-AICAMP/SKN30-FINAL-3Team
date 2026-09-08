@@ -30,9 +30,9 @@ description: "`infra/`의 Terraform 기반 AWS·RunPod 인프라, 계정 bootstr
 - Terraform 기반 계정 bootstrap과 S3 원격 state는 결정됐다.
 - AWS 대상 리전은 별도 결정 전까지 `ap-northeast-2`다.
 - 개발·시연 기간에는 기존 개인 IAM 사용자, OTP MFA, `aws login`과 `TerraformOperatorRole`을 유지하며 Identity Center로 전환하지 않는다.
-- RDS PostgreSQL 15 Single-AZ, EC2·ALB·ASG, 업무용 S3와 DB migration은 dev에 적용됐다. RunPod digest bootstrap·Secrets Manager 값 운영·읽기 전용 감시는 코드 구현 후 외부 apply 승인 전이며 RunPod 자원 자체는 Terraform이 소유하지 않는다.
+- RDS PostgreSQL 15 Single-AZ, EC2·ALB·ASG, 업무용 S3와 DB migration은 dev에 적용됐다. RunPod 자원 자체는 Terraform이 소유하지 않는다. 2026-09-07 GPU 통합 기반 SSM/IAM과 자체 감시 제거를 Terraform으로 적용했고 기존 F2 등록값을 보존했다. AWS GPU 수정 후보와 사설 앱의 F2 HTTP·general FP8 두 capability 합성 검증을 통과했고 앱→GPU 송신 규칙 누락을 수정했다. 수정 이미지 재게시·정식 앱 revision 배포·실제 왕복 검증은 아직이다. 운영자가 시작·종료를 확인하며 최신 운영 방식은 Infra ADR-0020·0021·0022를 따른다.
 - ECS Fargate·Cloud Map, SQS·DLQ와 Route 53·ACM은 조건이 충족될 때만 도입한다. 공유 F2 dev는
-  private S3 SLLM release와 private GHCR·불변 Team Template로 Pod를 생성·삭제하며 Volume과 SSH를
+  private S3 SLLM release와 private GHCR·Console 단일 Team Template로 Pod를 생성·삭제하며 Volume과 SSH를
   사용하지 않는다. 외부 자원은 적용 전이다.
 - GitHub Actions OIDC, NAT Gateway, Multi-AZ RDS와 Terraform 배포 Pipeline은 1차 범위에서 제외한다.
 

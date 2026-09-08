@@ -1,7 +1,35 @@
 version: 1
-updated: "2026-09-04"
+updated: "2026-09-07"
 
 sources:
+  - id: "retain-runpod-deployment-path-2026-09-07"
+    type: "user-provided-direction"
+    location: "Codex task prompt (2026-09-07)"
+    received: "2026-09-07"
+    decision_status: "user-requested; implementation-pending"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+      - ".agents/skills/project-wiki/references/log.md"
+    scope: >-
+      AWS GPU 배포 오류·비용 부담에 대비해 RunPod 배포 경로를 유지한다.
+      기능별 수동 전환은 구현 제안이며 AWS GPU·F3 RunPod 배포와 활성 모델 변경은 미적용이다.
+
+  - id: "gpu-idle-billing-official-docs-2026-09-07"
+    type: "official-documentation"
+    urls:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html"
+      - "https://aws.amazon.com/ebs/pricing/"
+      - "https://aws.amazon.com/vpc/pricing/"
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/capacity-reservations-pricing-billing.html"
+      - "https://docs.runpod.io/pods/pricing"
+      - "https://docs.runpod.io/pods/manage-pods"
+    accessed: "2026-09-07"
+    reflected_in:
+      - "docs/architecture/infra/deployment-and-operations.md"
+    scope: >-
+      요청 없는 실행 상태와 정지·삭제 상태의 GPU·저장소·IPv4·예약 용량 과금 구분.
+      계정의 실제 자원·청구액과 서울 GPU 시간당 견적은 조회하지 않음.
+
   - id: "general-ai-provider-model-profiles-2026-09-03"
     type: "user-provided-direction"
     location: "Codex task prompt (2026-09-03)"
@@ -692,3 +720,12 @@ sources:
       - "docs/requirements/index.md"
       - "references/decisions/ADR-0005-requirements-management.md"
     scope: "통합본의 기능 내용을 검색 의도별 문서로 분할하고 요구사항 관리·검색 경로를 구성함. 기능 요구사항 자체는 변경하지 않음."
+
+  - id: "local-dev-dual-cloud-serving-2026-09-07"
+    type: "user-instruction"
+    location: "Codex 대화: Local·dev를 구분한 AWS·RunPod LLM 운영 통합 구현 계획"
+    received: "2026-09-07"
+    reflected_in:
+      - "references/decisions/ADR-0030-local-dev-dual-cloud-serving.md"
+      - ".agents/skills/infra/references/decisions/ADR-0022-dual-cloud-gpu-lifecycle.md"
+    scope: "f2/general 독립 배치, local OpenAI 유지, 명시적 전환·전원·캐시·SSM 권한과 실제 검증 완료 기준"

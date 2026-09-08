@@ -7,5 +7,5 @@
   "env": {
     "AI_GENERAL_API_KEY": "{{ RUNPOD_SECRET_AI_GENERAL_API_KEY }}"
   },
-  "docker_start_cmd": "python,/opt/general/general_runtime.py"
+  "docker_start_cmd": "python3,/opt/general/general_runtime.py"
 }

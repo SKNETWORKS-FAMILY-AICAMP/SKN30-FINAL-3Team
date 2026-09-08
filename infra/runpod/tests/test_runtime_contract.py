@@ -70,9 +70,41 @@ class SupervisorTests(unittest.TestCase):
             commands = supervisor.build_commands(config, "vllm")
             self.assertIn("/models/sllm", commands["sllm"])
             self.assertIn("/models/stt", commands["stt"])
-        with patch.object(supervisor.Path, "is_file", return_value=False):
-            with self.assertRaises(supervisor.ConfigurationError):
-                supervisor.load_config(base_release(), environment)
+        with (
+            patch.object(supervisor.Path, "is_file", return_value=False),
+            self.assertRaises(supervisor.ConfigurationError),
+        ):
+            supervisor.load_config(base_release(), environment)
+
+    def test_pinned_local_template_disables_thinking_with_supported_cli(self) -> None:
+        from dataclasses import replace
+
+        config = replace(
+            supervisor.load_config(base_release(), valid_environment()),
+            sllm_model_id="/models/sllm",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory, "chat.jinja")
+            with (
+                patch.object(supervisor, "SLLM_CHAT_TEMPLATE", output),
+                patch.object(
+                    supervisor.Path,
+                    "read_text",
+                    return_value=json.dumps(
+                        {
+                            "chat_template": "{{ enable_thinking }}{{ messages }}",
+                        }
+                    ),
+                ),
+            ):
+                supervisor.prepare_chat_template(config)
+                command = supervisor.build_commands(config, "vllm")["sllm"]
+            self.assertEqual(
+                output.read_text(),
+                "{% set enable_thinking = false %}{{ enable_thinking }}{{ messages }}",
+            )
+            self.assertEqual(command[command.index("--chat-template") + 1], str(output))
+            self.assertNotIn("--default-chat-template-kwargs", command)
 
     def test_both_engines_limit_sequences_to_one(self) -> None:
         config = supervisor.load_config(base_release(), valid_environment())
@@ -98,6 +130,7 @@ class SupervisorTests(unittest.TestCase):
 
         with (
             patch.object(supervisor, "bootstrap", return_value=base_release()),
+            patch.object(supervisor, "prepare_chat_template"),
             patch.dict(supervisor.os.environ, valid_environment()),
             patch.object(supervisor.shutil, "which", return_value="vllm"),
             patch.object(supervisor.signal, "signal"),
@@ -112,6 +145,7 @@ class SupervisorTests(unittest.TestCase):
         process = Mock()
         with (
             patch.object(supervisor, "bootstrap", return_value=base_release()),
+            patch.object(supervisor, "prepare_chat_template"),
             patch.dict(supervisor.os.environ, valid_environment()),
             patch.object(supervisor.shutil, "which", return_value="vllm"),
             patch.object(supervisor.signal, "signal"),
@@ -202,6 +236,92 @@ class SupervisorTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_downloaded_bundle_receipt_survives_restart_without_download(self):
+        import io
+        import tarfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            manifest = self._release_manifest(source)
+            (source / "release.json").write_text(json.dumps(manifest))
+            output = io.BytesIO()
+            with tarfile.open(fileobj=output, mode="w:gz") as archive:
+                for path in sorted(source.rglob("*")):
+                    if path.is_file():
+                        archive.add(path, arcname=path.relative_to(source).as_posix())
+            payload = output.getvalue()
+            environment = {
+                "F2_SLLM_RELEASE_ID": "release-v1",
+                "F2_SLLM_BUNDLE_SHA256": hashlib.sha256(payload).hexdigest(),
+                "F2_SLLM_BUNDLE_URL": "https://synthetic.example/bundle",
+            }
+            with (
+                patch.object(bootstrap, "RELEASE_ROOT", root / "cache"),
+                patch.object(
+                    bootstrap.DIRECT_OPENER, "open", return_value=io.BytesIO(payload)
+                ) as download,
+            ):
+                first = bootstrap.bootstrap(environment)
+                environment.pop("F2_SLLM_BUNDLE_URL")
+                self.assertEqual(bootstrap.bootstrap(environment), first)
+                download.assert_called_once()
+
+    def test_cache_rejects_changed_missing_extra_linked_files_and_legacy_receipt(self):
+        for change in (
+            "evaluation",
+            "approval",
+            "adapter",
+            "missing",
+            "extra",
+            "link",
+            "legacy",
+        ):
+            with (
+                self.subTest(change=change),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                destination = root / "release-v1"
+                destination.mkdir()
+                manifest = self._release_manifest(destination)
+                raw = json.dumps(manifest).encode()
+                (destination / "release.json").write_bytes(raw)
+                receipt = {
+                    "bundle_sha256": "b" * 64,
+                    "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                    "tree_sha256": bootstrap._release_tree_sha256(destination),
+                }
+                if change == "legacy":
+                    receipt.pop("tree_sha256")
+                (destination / "verified-bundle.json").write_text(json.dumps(receipt))
+                if change in {"evaluation", "approval", "adapter"}:
+                    path = {
+                        "evaluation": "evaluation-summary.json",
+                        "approval": "promotion-approval.json",
+                        "adapter": "adapter/adapter_model.safetensors",
+                    }[change]
+                    (destination / path).write_bytes(b"modified")
+                elif change == "missing":
+                    (destination / "evaluation-summary.json").unlink()
+                elif change == "extra":
+                    (destination / "extra.json").write_text("{}")
+                elif change == "link":
+                    (destination / "extra.json").symlink_to(
+                        destination / "release.json"
+                    )
+                with (
+                    patch.object(bootstrap, "RELEASE_ROOT", root),
+                    self.assertRaises(bootstrap.BootstrapError),
+                ):
+                    bootstrap.bootstrap(
+                        {
+                            "F2_SLLM_RELEASE_ID": "release-v1",
+                            "F2_SLLM_BUNDLE_SHA256": "b" * 64,
+                        }
+                    )
+
     def test_verified_cache_needs_no_download_url(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -215,6 +335,7 @@ class BootstrapTests(unittest.TestCase):
                     {
                         "bundle_sha256": "b" * 64,
                         "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                        "tree_sha256": bootstrap._release_tree_sha256(destination),
                     }
                 )
             )
@@ -410,7 +531,7 @@ class BootstrapTests(unittest.TestCase):
             ):
                 bootstrap._validate(manifest, "release-v1", destination)
 
-    def test_manifest_requires_matching_approved_promotion(self) -> None:
+    def test_runtime_does_not_reinterpret_publisher_evaluation_policy(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory)
             manifest = self._release_manifest(destination)
@@ -425,8 +546,16 @@ class BootstrapTests(unittest.TestCase):
             assert isinstance(evaluation, dict)
             evaluation["approval_sha256"] = hashlib.sha256(approval_bytes).hexdigest()
 
+            result = bootstrap._validate(manifest, "release-v1", destination)
+            self.assertEqual(result.base_model_id, "Qwen/Qwen3-4B")
+
+    def test_changed_adapter_bytes_are_still_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            manifest = self._release_manifest(destination)
+            (destination / "adapter/adapter_model.safetensors").write_bytes(b"changed")
             with self.assertRaisesRegex(
-                bootstrap.BootstrapError, "promotion approval does not match"
+                bootstrap.BootstrapError, "metadata does not match"
             ):
                 bootstrap._validate(manifest, "release-v1", destination)
 
@@ -443,6 +572,7 @@ class BootstrapTests(unittest.TestCase):
                     {
                         "bundle_sha256": "b" * 64,
                         "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                        "tree_sha256": bootstrap._release_tree_sha256(destination),
                     }
                 )
             )

@@ -94,22 +94,15 @@ F3 이벤트는 DB 종료 상태 commit 뒤 한 번 기록을 **시도하는 bes
 - Alarm notifier는 기존 delivery webhook을 재사용하지 않는다. 새 Discord webhook URL을 별도
   Secrets Manager 컨테이너에 TTY 운영 명령으로 넣고 회전 fixture로 검증한다.
 
-## RunPod 운영 metric과 알람
+## RunPod 운영 확인
 
-- 기본 30분 주기의 읽기 전용 Lambda가 기존 `${project}/dev` namespace에 heartbeat, RunPod API
-  도달, 공유 Pod 존재·RUNNING, active endpoint와 Pod ID 일치, 인증된 SLLM/STT `/v1/models`, Pod
-  실행 시간·시간당 비용과 offline orphan 경과 시간을 dimension 없이 기록한다.
-- 감시 Lambda error와 heartbeat 2주기 누락, RunPod API 2회 실패, endpoint 불일치, SLLM·STT
-  각각 2회 health 실패, offline orphan 60분, 기본 8시간 연속 실행을 Alarm 전용 SNS·Discord로
-  전달한다. 주기는 5~60분의 5분 단위, 실행 경고는 1~24시간에서 Terraform 변수로 조정한다.
-- offline이거나 endpoint가 불일치하면 health 실패로 중복 판단하지 않는다. 제어면 장애에서는
-  heartbeat와 도달 실패 metric만 남기고 확인할 수 없는 endpoint 일치, Provider health, orphan,
-  runtime과 비용 metric은 발행하지 않는다. 외부 오류 본문, URL, Pod 응답, key와 hash는 기록하지
-  않는다.
-- 감시 로그의 endpoint 상태는 `active`·`offline`만 기록하고 누락, 타입 오류와 그 밖의 값은 원문
-  대신 고정된 `invalid`로 기록한다.
-- Lambda에는 Secret·Parameter 읽기와 지정 namespace metric 쓰기만 허용한다. endpoint·Pod를
-  변경하지 않으며 `PutParameter`, `SendCommand`, 자동 삭제 권한은 없다.
+사용자는 자체 감시 제거·운영자 시작/종료 확인을 명시적으로 선택했고, 2026-09-07 기반 saved plan 적용 후 제거와 drift 없음을 확인했다. [적용 기록](../../../../../infra/serving/foundation-plan-review.md)은 팀 PR 병합 승인과 구분한다.
+
+[ADR-0029](../decisions/ADR-0029-runpod-manual-observation.md)에 따라 자체 감시 Lambda·주기 실행·
+8개 RunPod 경보와 감시용 key는 제거한다. 기존 Backend·AI 오류 알림과 AWS 자원 경보는 유지한다.
+운영자가 시작 시 status·smoke, 종료 시 정확한 Pod 삭제·부재·offline smoke와 Console 사용액을
+확인한다. 방치 시간·상태 불일치 자동 알림은 제공하지 않는다. 외부 응답 본문·key·presigned URL은
+로그와 알림에 기록하지 않는다.
 
 ## 이번 범위에서 제외
 

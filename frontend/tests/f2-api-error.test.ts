@@ -5,6 +5,12 @@ import { apiErrorFromResponse, kindFromStatus } from "../src/shared/api/errors.t
 
 const CASES = [
   {
+    status: 429,
+    code: "F2_BUSY",
+    kind: "rateLimited",
+    expected: /다른 음성메모를 분석 중입니다/,
+  },
+  {
     status: 401,
     code: "UNAUTHENTICATED",
     kind: "unauthorized",
@@ -56,7 +62,7 @@ for (const item of CASES) {
 
 test("계약에 없는 4xx는 서버 오류가 아니라 계약 오류로 분류한다", () => {
   assert.equal(kindFromStatus(418), "contract");
-  assert.equal(kindFromStatus(429), "contract");
+  assert.equal(kindFromStatus(429), "rateLimited");
 
   // 현재 계약에 있는 상태의 기존 분류는 유지한다.
   assert.equal(kindFromStatus(400), "validation");

@@ -46,6 +46,13 @@ class PrivacyConsentRequiredError(ValidationError):
         super().__init__(message, code="PRIVACY_CONSENT_REQUIRED")
 
 
+class F2BusyError(ApplicationError):
+    status_code = 429
+
+    def __init__(self) -> None:
+        super().__init__("F2_BUSY", "another voice analysis is in progress; try again later")
+
+
 class F2UnavailableError(ApplicationError):
     status_code = 503
 

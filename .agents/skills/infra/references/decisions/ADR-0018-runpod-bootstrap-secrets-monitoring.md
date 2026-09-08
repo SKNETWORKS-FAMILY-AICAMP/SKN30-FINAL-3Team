@@ -5,7 +5,10 @@ updated: 2026-09-01
 
 # ADR-0018: RunPod bootstrap, 비밀 회전과 읽기 전용 감시
 
-- 상태: 승인됨·코드 구현, 외부 자원 미적용
+> 자체 감시·감시 key 조항은 후속 [ADR-0021](ADR-0021-runpod-operational-reduction.md)에서 제거한다. 아래는 당시 결정 기록이다.
+
+- 상태: 후속 사용자 승인으로 bootstrap·회전·감시를 부분 대체 구현. 감시 제거는 2026-09-07 적용 확인; 후속 ADR의 팀 병합 검토는 대기. 아래 외부 미적용 기록은 최초 결정 당시 상태다.
+- 후속 변경: bootstrap·비밀 회전은 [ADR-0020](ADR-0020-runpod-console-registration.md)을 따른다. 아래는 당시 결정 기록이다.
 - 결정일: 2026-09-01
 - 부분 대체: [ADR-0013](ADR-0013-dev-environment-materialization.md)의 수동 비밀 tfvars 운영
 - 확장: [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md)의 최초 구축과 운영 관측
