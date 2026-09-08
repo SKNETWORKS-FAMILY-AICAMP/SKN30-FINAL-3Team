@@ -20,7 +20,7 @@ from brokerage_ai.f3 import (
     ContactabilityAssessment,
     ContactabilityStatus,
     Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     NegotiationIntent,
@@ -33,6 +33,7 @@ from brokerage_ai.f3 import (
     PositionCondition,
     PriceAssessment,
     PriceKind,
+    QuoteEvidence,
     TimingAssessment,
     Urgency,
     UrgencyAssessment,
@@ -125,13 +126,12 @@ def _evidence(request: PositionCardGenerationRequest) -> tuple[Evidence, ...]:
     if request.consultation_logs:
         first = request.consultation_logs[0]
         return (
-            Evidence(
-                kind=EvidenceKind.QUOTE,
+            QuoteEvidence(
                 interaction_id=first.interaction_id,
                 quote_text=first.masked_content[:6],
             ),
         )
-    return (Evidence(kind=EvidenceKind.INFERENCE, note="전달된 상담 로그가 없다"),)
+    return (InferenceEvidence(note="전달된 상담 로그가 없다"),)
 
 
 def default_analysis(request: PositionCardGenerationRequest) -> PositionCardAnalysis:
@@ -152,12 +152,12 @@ def default_analysis(request: PositionCardGenerationRequest) -> PositionCardAnal
         flexible=(
             PositionCondition(
                 description="잔금일 조정",
-                evidence=(Evidence(kind=EvidenceKind.INFERENCE, note="정황"),),
+                evidence=(InferenceEvidence(note="정황"),),
             ),
         ),
         contactability=ContactabilityAssessment(
             status=ContactabilityStatus.GOOD,
-            evidence=(Evidence(kind=EvidenceKind.INFERENCE, note="정황"),),
+            evidence=(InferenceEvidence(note="정황"),),
         ),
     )
 

@@ -5,6 +5,7 @@ description = "Framework-neutral AI provider and workflow foundation for the bro
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "av>=18.1.0",
     "botocore>=1.42.0",
     "httpx>=0.28.1",
     "langgraph>=1.2.11",

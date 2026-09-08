@@ -6,9 +6,11 @@ updated: 2026-09-08
 # F4 챗봇 Backend 구조와 검증
 
 기능 범위와 HTTP·저장 계약은 [요구사항](../../../../docs/requirements/chatbot/overview-and-scope.md),
+[AI–Backend 공개 계약](../../project-wiki/references/contracts/chatbot-ai.md),
 [실행 구조](../../../../docs/architecture/chatbot/runtime.md),
 [API·SSE](../../../../docs/architecture/chatbot/api-and-stream.md),
 [저장 설계](../../../../docs/architecture/chatbot/persistence.md)가 정본이다.
+PR #100에는 read adapter·인증·DB 저장·HTTP/SSE가 구현돼 있으며 화면 통합은 후속 PR #101의 범위다.
 이 문서는 Backend 내부 구현과 변경 시 검증할 불변식만 설명한다. 공유 환경 배포 완료를 뜻하지 않는다.
 
 ## 구성과 책임
@@ -20,6 +22,8 @@ updated: 2026-09-08
   단순한 전달 계층과 별도 서비스를 만들지 않고 기존 Backend의 기능별 응집 구조를 따른다.
 - `manager.py`는 `workflow_factory(brokerage_id)`로 workflow를 주입받고 lifespan에서 시작·종료한다.
   AI에 넘기는 것은 공개 `brokerage_ai.chatbot` DTO와 `ChatReadPort` 구현이며 DB 세션을 넘기지 않는다.
+  AI의 workflow v2 조건 근거 검증 통과 후에도 Backend는 정규화·권한·현재 DB 상태를 다시 검사한다.
+  계약 재생성용 고정 규칙 메시지는 AI가 소유하며 Backend에서 프롬프트를 조립하지 않는다.
 - 앱 조립과 모델 선택은 `main.py`, `chatbot_runtime.py`, `chatbot_model.py`가 담당한다.
   `CHATBOT` capability는 기존 판단용 모델 설정과 분리한다. 모델 선택 명령은 local loopback DB에서만
   실행하며 `--apply`가 없으면 검증만 수행한다.
@@ -53,7 +57,10 @@ updated: 2026-09-08
 - 구입장 예산은 저장된 희망 범위와 검색 범위의 겹침이다. 양쪽 금액이 모두 NULL인 의뢰를 포함하지
   않으며 한쪽만 있으면 확인된 금액만으로 겹침을 판단한다. 미입력 경계를 무한대나 0으로 추정하지 않는다.
 - 일정은 기존 Time Keeper union을 재사용한다. 사용자 지정 기간과 종류를 집계·페이지 제한 전에
-  적용하고 종류별 3건 제한을 사용하지 않는다. 기존 Time Keeper 화면의 기본 조회 규칙은 바꾸지 않는다.
+  적용하고 종류별 3건 제한을 사용하지 않는다. 최신 `AgendaWindow`의 명시적 필드로 기간을 전달하며
+  기존 Time Keeper 화면의 기본 조회 규칙은 바꾸지 않는다. 제거된 `LISTING_RECONTACT`·
+  `CLIENT_RECONTACT`는 최초·후속 조회, 저장된 페이지 조건과 과거 장부 결과 참조에서 안내로
+  종료한다. 사용자 캘린더의 자유 종류 문자열이 같은 경우에는 정상 캘린더로 취급한다.
 - 총건수와 결과 페이지는 하나의 `REPEATABLE READ` snapshot에서 조회한다. 다음 페이지는 저장된
   조건으로 다시 조회하며 기준 시각을 갱신한다. 모델에 인물·연락처·상담 원문을 보내지 않는다.
 - 직전 완료된 질문·답변 2쌍만 문맥에 사용한다. 순번 참조는 그 범위에 포함된 저장 메시지의 첫 페이지
@@ -77,3 +84,7 @@ SQL을 적용해 검증한다.
 변경 후 저장소 지정 Ruff 검사·포맷과 Backend Pyright·관련 pytest를 실행한다. 실제 모델·HTTP 성능
 평가는 단위·통합 테스트와 구분하여 기록하며, 평가 명령·환경 설정은 Backend README와 평가 문서에서
 확인한다. Qwen 실제 평가는 사용자 요청으로 보류되었으며 합격한 것으로 표기하지 않는다.
+
+기록된 Luna 모델 측정값은 workflow v2 보완 이전 실행이다. 병합 후 fake·DB 회귀 검사는 변경된
+계약과 저장 경로의 검증이며, 새 실제 모델 호출 없이 수정 후 모델 정확도·성능을 통과한 것으로
+표시하지 않는다. 원본 평가와 검토 요약의 hash·수치는 유지한다.

@@ -146,10 +146,11 @@ export function AppShell() {
   const [complexFilter, setComplexFilter] = useState("전체");
   const [saveFilter, setSaveFilter] = useState("전체");
   const [columnPreset, setColumnPreset] = useState("all");
-  const [buyerPeriodMode, setBuyerPeriodMode] = useState("all");
   const [buyerAssigneeFilter, setBuyerAssigneeFilter] = useState("전체");
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectionResetToken, setSelectionResetToken] = useState(0);
+  /** 동·호 조회로 찾은 행. 팝업을 열지 않고 매물장 그리드에서 스크롤·강조만 한다. */
+  const [jumpFocus, setJumpFocus] = useState({ id: null, token: 0 });
   const [detailRow, setDetailRow] = useState(null);
   const [f2FocusRequest, setF2FocusRequest] = useState(0);
   const [crossMatchOpen, setCrossMatchOpen] = useState(false);
@@ -481,13 +482,21 @@ export function AppShell() {
     if (viewState === "filtered-empty") setViewState("normal");
   };
 
+  /*
+   * 동·호 조회는 상세 팝업을 열지 않는다.
+   *
+   * 매물장 메인 그리드로 이동해 그 행을 강조·스크롤한다. 필터에 가려 있으면 찾은 의미가
+   * 없으므로 필터를 함께 해제한다. 상세를 보려면 사용자가 그 행을 직접 클릭한다(F1-GR-28).
+   */
   const handleJump = () => {
     const query = jumpQuery.replace(/\s/g, "");
+    if (!query) return;
     const match = rows.find((row) => `${row.building}동${row.unit}호`.includes(query) || `${row.building}${row.unit}`.includes(query));
-    if (match) {
-      setDetailRow(match);
-      setToast({ variant: "info", title: `${match.building}동 ${match.unit}호를 열었습니다.` });
-    } else setToast({ variant: "warning", title: "일치하는 동·호를 찾지 못했습니다." });
+    if (!match) { setToast({ variant: "warning", title: "일치하는 동·호를 찾지 못했습니다." }); return; }
+    if (activeNav !== "매물장") setActiveNav("매물장");
+    clearFilters();
+    setJumpFocus({ id: match.id, token: Date.now() });
+    setToast({ variant: "info", title: `${match.building}동 ${match.unit}호를 찾았습니다.` });
   };
 
   const navTo = (item) => {
@@ -679,7 +688,6 @@ export function AppShell() {
         {activeNav === "매물장" ? <div className="f1-control-strip">
           <div className="f1-control-strip__top-row">
             <div className="f1-control-strip__left-group">
-              <div className="ledger-tabs" role="tablist" aria-label="장부 유형">{["아파트", "상가", "주택", "재건축"].map((tab, index) => <button key={tab} id={`ledger-tab-${index}`} role="tab" aria-selected={index === 0} aria-controls="ledger-grid-panel" aria-disabled={index !== 0} disabled={index !== 0} tabIndex={index === 0 ? 0 : -1} title={index !== 0 ? "현재 프로토타입에서 사용할 수 없는 장부 유형입니다" : undefined} className={index === 0 ? "active" : ""} type="button">{tab}</button>)}</div>
               {selectedRows.length ? <>
                 <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
                 <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
@@ -711,14 +719,20 @@ export function AppShell() {
           </div>
         </div> : <div className="f1-control-strip f1-control-strip--buyer">
           <div className="f1-control-strip__left-group">
-            {/* 매물장과 같은 자리·같은 순서에 둔다. 장부를 오갈 때 행 추가를 다시 찾지 않게 한다. */}
-            <Button icon={<AddCircleOIcon />} onClick={handleAddBuyerRow}>행 추가</Button>
-            <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
+            {selectedRows.length ? <>
+              <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
+              <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
+              <Button variant="secondary" isDanger onClick={() => requestDeleteRows(selectedRows, "grid")}>삭제</Button>
+            </> : <>
+              {/* 매물장과 같은 자리·같은 순서에 둔다. 장부를 오갈 때 행 추가를 다시 찾지 않게 한다. */}
+              <Button icon={<AddCircleOIcon />} onClick={handleAddBuyerRow}>행 추가</Button>
+              <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
+            </>}
           </div>
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
 
-        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
+        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} focusRowId={jumpFocus.id} focusToken={jumpFocus.token} />}
         <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>

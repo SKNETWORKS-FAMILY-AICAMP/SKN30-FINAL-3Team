@@ -11,8 +11,6 @@ export interface AgendaQuery {
   withinDays?: number;
   /** 이미 지난 기한을 며칠까지 함께 볼지. 서버 기본값은 7일. */
   overdueDays?: number;
-  /** 마지막 접촉 후 며칠이면 재연락 대상으로 볼지. 서버 기본값은 30일. */
-  recontactDays?: number;
   /** 매물 접수 후 며칠이면 조건 재확인 대상으로 볼지. 서버 기본값은 30일. */
   revalidationDays?: number;
   /** 한 종류에서 실을 최대 건수. 서버 기본값은 3건. */

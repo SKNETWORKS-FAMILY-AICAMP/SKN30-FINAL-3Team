@@ -1,5 +1,5 @@
 /**
- * 밀린 재연락·재확인의 "다시 보지 않기" 저장소.
+ * 밀린 재확인의 "다시 보지 않기" 저장소.
  *
  * 브리핑과 같은 이유로 순수 함수로 뗐다 — 저장소가 막혀도 감춘 상태가 이번 세션에서는
  * 유지되어야 하고, 그 동작은 화면 없이도 확인할 수 있다.
@@ -26,13 +26,13 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
 
 test("확인하지 않은 키는 감춰지지 않는다", () => {
   const store = createDismissedNeglectedStore(memoryStorage());
-  assert.equal(store.isDismissed("CLIENT_RECONTACT-null-null-42-2026-01-01"), false);
+  assert.equal(store.isDismissed("LISTING_REVALIDATION-9-null-null-2026-01-01"), false);
 });
 
 test("확인한 키는 감춰지고 저장소에 남는다", () => {
   const storage = memoryStorage();
   const store = createDismissedNeglectedStore(storage);
-  const key = "CLIENT_RECONTACT-null-null-42-2026-01-01";
+  const key = "LISTING_REVALIDATION-9-null-null-2026-01-01";
 
   store.dismiss(key);
 
@@ -42,7 +42,7 @@ test("확인한 키는 감춰지고 저장소에 남는다", () => {
 
 test("같은 저장소로 다시 만들면 이전 확인 기록을 읽는다", () => {
   const storage = memoryStorage();
-  const key = "LISTING_RECONTACT-9-null-null-2025-08-01";
+  const key = "LISTING_REVALIDATION-9-null-null-2025-08-01";
   createDismissedNeglectedStore(storage).dismiss(key);
 
   const reopened = createDismissedNeglectedStore(storage);
@@ -59,7 +59,7 @@ test("저장소가 막혀 있어도 이번 세션에서는 확인 상태가 유�
     },
   } as unknown as Storage;
   const store = createDismissedNeglectedStore(blocked);
-  const key = "CLIENT_RECONTACT-null-null-7-2026-02-01";
+  const key = "LISTING_REVALIDATION-7-null-null-2026-02-01";
 
   assert.doesNotThrow(() => store.dismiss(key));
   assert.equal(store.isDismissed(key), true);
