@@ -261,6 +261,30 @@ def _validate(
     )
 
 
+def _release_tree_sha256(root: Path) -> str:
+    """Bind every materialized file to the downloaded bundle, except its receipt."""
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise BootstrapError("cached release contains a symlink; rebuild cache")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise BootstrapError(
+                "cached release contains a special file; rebuild cache"
+            )
+        relative = path.relative_to(root).as_posix()
+        if relative == "verified-bundle.json":
+            continue
+        name = relative.encode()
+        with path.open("rb") as stream:
+            content = hashlib.file_digest(stream, "sha256").digest()
+        digest.update(len(name).to_bytes(4, "big"))
+        digest.update(name)
+        digest.update(content)
+    return digest.hexdigest()
+
+
 def bootstrap(environment: dict[str, str] | None = None) -> Release:
     source = dict(os.environ if environment is None else environment)
     release_id = _required(source, "F2_SLLM_RELEASE_ID")
@@ -281,9 +305,10 @@ def bootstrap(environment: dict[str, str] | None = None) -> Release:
             if receipt != {
                 "bundle_sha256": expected_sha256,
                 "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+                "tree_sha256": _release_tree_sha256(destination),
             }:
                 raise BootstrapError(
-                    "cached release does not match the verified bundle; recreate Pod"
+                    "cached release does not match the verified bundle; rebuild cache or recreate Pod"
                 )
             manifest = json.loads(manifest_bytes)
         except (OSError, json.JSONDecodeError) as error:
@@ -305,6 +330,7 @@ def bootstrap(environment: dict[str, str] | None = None) -> Release:
                     "manifest_sha256": hashlib.sha256(
                         (stage / "release.json").read_bytes()
                     ).hexdigest(),
+                    "tree_sha256": _release_tree_sha256(stage),
                 }
             )
         )

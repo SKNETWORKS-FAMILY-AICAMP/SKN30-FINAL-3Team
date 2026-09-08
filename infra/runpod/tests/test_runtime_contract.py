@@ -236,6 +236,92 @@ class SupervisorTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_downloaded_bundle_receipt_survives_restart_without_download(self):
+        import io
+        import tarfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            manifest = self._release_manifest(source)
+            (source / "release.json").write_text(json.dumps(manifest))
+            output = io.BytesIO()
+            with tarfile.open(fileobj=output, mode="w:gz") as archive:
+                for path in sorted(source.rglob("*")):
+                    if path.is_file():
+                        archive.add(path, arcname=path.relative_to(source).as_posix())
+            payload = output.getvalue()
+            environment = {
+                "F2_SLLM_RELEASE_ID": "release-v1",
+                "F2_SLLM_BUNDLE_SHA256": hashlib.sha256(payload).hexdigest(),
+                "F2_SLLM_BUNDLE_URL": "https://synthetic.example/bundle",
+            }
+            with (
+                patch.object(bootstrap, "RELEASE_ROOT", root / "cache"),
+                patch.object(
+                    bootstrap.DIRECT_OPENER, "open", return_value=io.BytesIO(payload)
+                ) as download,
+            ):
+                first = bootstrap.bootstrap(environment)
+                environment.pop("F2_SLLM_BUNDLE_URL")
+                self.assertEqual(bootstrap.bootstrap(environment), first)
+                download.assert_called_once()
+
+    def test_cache_rejects_changed_missing_extra_linked_files_and_legacy_receipt(self):
+        for change in (
+            "evaluation",
+            "approval",
+            "adapter",
+            "missing",
+            "extra",
+            "link",
+            "legacy",
+        ):
+            with (
+                self.subTest(change=change),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                destination = root / "release-v1"
+                destination.mkdir()
+                manifest = self._release_manifest(destination)
+                raw = json.dumps(manifest).encode()
+                (destination / "release.json").write_bytes(raw)
+                receipt = {
+                    "bundle_sha256": "b" * 64,
+                    "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                    "tree_sha256": bootstrap._release_tree_sha256(destination),
+                }
+                if change == "legacy":
+                    receipt.pop("tree_sha256")
+                (destination / "verified-bundle.json").write_text(json.dumps(receipt))
+                if change in {"evaluation", "approval", "adapter"}:
+                    path = {
+                        "evaluation": "evaluation-summary.json",
+                        "approval": "promotion-approval.json",
+                        "adapter": "adapter/adapter_model.safetensors",
+                    }[change]
+                    (destination / path).write_bytes(b"modified")
+                elif change == "missing":
+                    (destination / "evaluation-summary.json").unlink()
+                elif change == "extra":
+                    (destination / "extra.json").write_text("{}")
+                elif change == "link":
+                    (destination / "extra.json").symlink_to(
+                        destination / "release.json"
+                    )
+                with (
+                    patch.object(bootstrap, "RELEASE_ROOT", root),
+                    self.assertRaises(bootstrap.BootstrapError),
+                ):
+                    bootstrap.bootstrap(
+                        {
+                            "F2_SLLM_RELEASE_ID": "release-v1",
+                            "F2_SLLM_BUNDLE_SHA256": "b" * 64,
+                        }
+                    )
+
     def test_verified_cache_needs_no_download_url(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -249,6 +335,7 @@ class BootstrapTests(unittest.TestCase):
                     {
                         "bundle_sha256": "b" * 64,
                         "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                        "tree_sha256": bootstrap._release_tree_sha256(destination),
                     }
                 )
             )
@@ -485,6 +572,7 @@ class BootstrapTests(unittest.TestCase):
                     {
                         "bundle_sha256": "b" * 64,
                         "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+                        "tree_sha256": bootstrap._release_tree_sha256(destination),
                     }
                 )
             )

@@ -189,3 +189,26 @@ revision을 배포한다. 오래된 Backend revision은 Worker도 재시작하�
 [vLLM 0.11.0 엔진 설정](https://docs.vllm.ai/en/v0.11.0/cli/serve.html),
 [Secret 관리](https://docs.runpod.io/pods/templates/secrets),
 [Template ID 조회](https://docs.runpod.io/api-reference/templates/GET/templates/templateId).
+
+## 게시·캐시 검증의 신뢰 경계
+
+품질 판정은 `manage_sllm_artifact.py inspect/publish`에서 수행한다. 평가·승인 문서의 checksum뿐
+아니라 승인 상태·선택 모델·dataset provenance를 검사하고, CLI는 inspect 성공 뒤에만 publish한다.
+등록된 S3 객체는 bundle/manifest SHA256을 양방향으로 결속하며 create는 이를 확인한 후
+bundle SHA256을 runtime에 전달한다. runtime은 다운로드 bytes와 안전한 압축 해제·모델 commit·
+adapter bytes를 검증한다. 평가 정책의 재해석은 하지 않는다.
+
+이 경계는 승인된 게시 도구와 S3 쓰기 권한을 신뢰한다. S3 객체와 metadata를 모두 임의로 쓰거나
+runtime 입력과 캐시 영수증까지 수정할 수 있는 운영자를 암호학적으로 차단하는 구조가 아니다.
+수동 S3 업로드는 지원하지 않는다. `verified`의 품질 승인을 checksum 일치만으로 주장하지 않는다.
+미평가 모델은 기존 명시적 dev release 경로만 사용한다.
+
+캐시 생성 시 전체 release 파일의 경로·내용 SHA256을 영수증에 기록하고, 재사용 전 다시 계산한다.
+평가/승인 문서·adapter의 변경, 파일 누락·추가·symlink 및 구형 영수증은 기동을 거절한다.
+실행 중인 서버의 캐시는 변경하지 않는다. RunPod는 삭제·재생성하고, AWS는 앱 drain/GPU 정지 후
+해당 disposable release 캐시를 재생성해 정본을 재다운로드한다. S3 release 정본은 삭제하지 않는다.
+전체 host/영수증 동시 변조나 검증 뒤 실행 중 변조를 방어하는 attestation은 제공하지 않는다.
+
+Console Secret과 AWS Secret은 운영자가 같은 값을 입력한다. 등록 성공은 Secret 값 일치의 증거가
+아니며, 최초 기동 시 인증 health/smoke 통과 전에는 endpoint를 active로 게시하지 않는다.
+회전은 offline·Pod 부재에서 수행하고 Console과 AWS 양쪽 변경 후 다시 기동·검증한다.

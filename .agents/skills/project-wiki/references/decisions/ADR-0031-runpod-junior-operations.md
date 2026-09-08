@@ -1,6 +1,6 @@
 ---
 status: 구현됨
-updated: 2026-09-07
+updated: 2026-09-08
 ---
 
 # ADR-0031: 주니어가 관리할 수 있는 RunPod 운영 범위
@@ -9,7 +9,8 @@ updated: 2026-09-07
 
 > 후속 [ADR-0029](ADR-0029-runpod-manual-observation.md)가 자체 감시 유지·Secret 목록 조회·이전 endpoint 복원 조항을 대체한다.
 
-- 상태: 사용자 요청·선택 반영, 코드 구현·팀 검토 전·외부 미적용
+- 상태: 사용자 구현 승인·코드 구현·팀 병합 검토 대기. Console 등록과 후속 감시 제거의 적용 기록은 [Infra validation](../../../../../infra/serving/validation.md) 참조; F2 정식 앱 배포는 미완료
+- 승인 경계: 사용자 작업 승인과 작성자 외 팀원의 PR 병합 승인은 별개다. 이 문서는 팀 승인 완료를 주장하지 않는다.
 - 부분 대체: [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md)의 자동 bootstrap·GHCR 비밀값 정본,
   [ADR-0022](ADR-0022-sllm-release-v2-base-only.md)의 Template generation·runtime 검증 책임,
   [ADR-0020](ADR-0020-sllm-release-handoff.md)의 API·Worker 동시 endpoint refresh
@@ -38,7 +39,7 @@ updated: 2026-09-07
 - 품질 평가·승인·학습 provenance는 패키징·게시 단계에서 검사한다. Pod runtime은 신뢰된 S3
   객체에서 받은 bundle checksum, 안전한 압축 해제, release ID·stage, 모델·commit과 adapter bytes를
   검증한다. 평가 문서의 의미를 다시 해석하지 않는다. cache 재사용 시 검증한 bundle과 manifest
-  checksum 영수증을 대조한다. 게시 경로를 우회하는 임의 bundle은 지원하지 않는다.
+  checksum 영수증과 전체 release 파일 트리의 실제 SHA256을 대조한다. 구형 영수증이나 불일치는 기동을 거절하고 캐시 재생성 후 다시 검증한다. 게시 경로를 우회하는 임의 bundle은 지원하지 않는다.
 - F2 실행 소비자는 Backend API다. F2 endpoint refresh는 기존 API 환경파일의 F2 값만 교체하고
   같은 image의 API만 재생성한다. Worker·migration 환경파일과 나머지 API 설정은 보존한다.
   전체 배포 시 Worker에서 F2 URL·key를 제외하고 F2 상태를 offline으로 둔다.

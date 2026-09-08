@@ -96,6 +96,8 @@ F3 이벤트는 DB 종료 상태 commit 뒤 한 번 기록을 **시도하는 bes
 
 ## RunPod 운영 확인
 
+사용자는 자체 감시 제거·운영자 시작/종료 확인을 명시적으로 선택했고, 2026-09-07 기반 saved plan 적용 후 제거와 drift 없음을 확인했다. [적용 기록](../../../../../infra/serving/foundation-plan-review.md)은 팀 PR 병합 승인과 구분한다.
+
 [ADR-0029](../decisions/ADR-0029-runpod-manual-observation.md)에 따라 자체 감시 Lambda·주기 실행·
 8개 RunPod 경보와 감시용 key는 제거한다. 기존 Backend·AI 오류 알림과 AWS 자원 경보는 유지한다.
 운영자가 시작 시 status·smoke, 종료 시 정확한 Pod 삭제·부재·offline smoke와 Console 사용액을

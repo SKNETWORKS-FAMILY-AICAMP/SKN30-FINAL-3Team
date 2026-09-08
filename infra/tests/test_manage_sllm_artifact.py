@@ -376,6 +376,26 @@ class BundleTests(unittest.TestCase):
             with self.assertRaises(MODULE.ToolError):
                 MODULE.inspect_bundle(bundle)
 
+    def test_consistent_checksums_do_not_approve_a_rejected_promotion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle = self.make_bundle(root)
+            approval = root / "promotion-approval.json"
+            value = json.loads(approval.read_text())
+            value["status"] = "rejected"
+            approval.write_text(json.dumps(value))
+            manifest_path = root / "release.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["evaluation"]["approval_sha256"] = MODULE.file_sha256(approval)
+            manifest_path.write_text(json.dumps(manifest))
+            with tarfile.open(bundle, "w:gz") as archive:
+                for path in (manifest_path, approval, root / "evaluation-summary.json"):
+                    archive.add(path, arcname=path.name)
+                for path in sorted((root / "adapter").iterdir()):
+                    archive.add(path, arcname=f"adapter/{path.name}")
+            with self.assertRaisesRegex(MODULE.ToolError, "promotion approval"):
+                MODULE.inspect_bundle(bundle)
+
 
 class FakeExecutor:
     def __init__(self) -> None:

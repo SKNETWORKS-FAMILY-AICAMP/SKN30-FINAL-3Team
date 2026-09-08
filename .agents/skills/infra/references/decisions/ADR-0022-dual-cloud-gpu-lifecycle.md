@@ -1,11 +1,12 @@
 ---
-status: 결정
-updated: 2026-09-07
+status: 구현됨
+updated: 2026-09-08
 ---
 
 # ADR-0022: AWS·RunPod GPU 전원, 캐시와 SSM 경계
 
-- 상태: 사용자 구현·적용 승인 반영·기반 SSM/IAM 적용·AWS 후보 사설 검증 완료·정식 배포/팀 검토 전
+- 상태: 사용자 구현·기반 적용 승인·SSM/IAM 적용 및 AWS 후보 사설 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료
+- 승인 경계: 사용자 작업 승인과 작성자 외 팀원의 PR 병합 승인은 별개다. 이 문서는 팀 승인 완료를 주장하지 않는다.
 - 부분 대체: ADR-0009·0014의 앱/RDS/edge만 다루는 전원 범위,
   ADR-0017·0020의 F2 전용 RunPod 운영. Console 최초 설정과 감시 제거는 유지한다.
 - 공통 정책: [프로젝트 ADR-0030](../../../project-wiki/references/decisions/ADR-0030-local-dev-dual-cloud-serving.md)

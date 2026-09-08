@@ -1,11 +1,12 @@
 ---
 status: 구현됨
-updated: 2026-09-07
+updated: 2026-09-08
 ---
 
 # ADR-0021: 자체 RunPod 운영 책임 축소
 
-- 상태: 사용자 선택 반영·코드 구현·팀 검토 전·외부 미적용
+- 상태: 사용자 감시 제거 명시 선택·기반 제거 적용 승인·2026-09-07 적용 및 drift 확인·팀 병합 검토 대기
+- 승인 경계: 사용자 작업 승인과 작성자 외 팀원의 PR 병합 승인은 별개다. 이 문서는 팀 승인 완료를 주장하지 않는다.
 - 부분 대체: [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)의 자체 감시,
   [ADR-0020](ADR-0020-runpod-console-registration.md)의 Secret metadata 조회
 - 공통 결정: [프로젝트 ADR-0029](../../../project-wiki/references/decisions/ADR-0029-runpod-manual-observation.md)

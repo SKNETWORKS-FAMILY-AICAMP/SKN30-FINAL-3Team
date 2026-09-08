@@ -1,6 +1,6 @@
 ---
 status: 구현됨
-updated: 2026-09-07
+updated: 2026-09-08
 ---
 
 # ADR-0020: Console 자원 검증·등록과 API 전용 F2 refresh
@@ -9,7 +9,8 @@ updated: 2026-09-07
 
 > 후속 [ADR-0021](ADR-0021-runpod-operational-reduction.md)이 자체 감시와 Secret metadata 조회를 제거하고 실패 시 offline 복구를 적용한다.
 
-- 상태: 사용자 선택 반영, 코드 구현·팀 검토 전·외부 미적용
+- 상태: 사용자 Console 방식 선택·코드 구현·등록/원격 후보 검증 확인·팀 병합 검토 대기
+- 승인 경계: 사용자 작업 승인과 작성자 외 팀원의 PR 병합 승인은 별개다. 이 문서는 팀 승인 완료를 주장하지 않는다.
 - 부분 대체: [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)의 bootstrap·비밀 회전,
   [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md)의 API·Worker 동시 재생성
 - 상위 결정: [프로젝트 ADR-0031](../../../project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md)
