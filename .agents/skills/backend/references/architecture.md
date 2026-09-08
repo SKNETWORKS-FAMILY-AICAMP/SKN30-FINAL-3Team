@@ -19,7 +19,7 @@
 
 ## 설계 단위와 의존성
 
-현재 F2의 시연용 예외는 [프로젝트 ADR-0028](../../project-wiki/references/decisions/ADR-0028-runpod-junior-operations.md)을 따른다.
+현재 F2의 시연용 예외는 [프로젝트 ADR-0031](../../project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md)을 따른다.
 API는 한 프로세스로 실행하고 요청 진입부에서 F2 한 건만 허용한다. 실행 중인 task의 강한 참조를
 app state에 두고 클라이언트 취소와 실제 pipeline 종료를 분리한다. 종료 시 임시 파일과 슬롯을
 정리하고 lifespan은 진행 중 작업을 기다린 뒤 runtime을 닫는다. 다중 프로세스·인스턴스나

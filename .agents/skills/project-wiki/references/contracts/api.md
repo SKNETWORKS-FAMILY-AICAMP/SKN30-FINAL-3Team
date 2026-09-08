@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # API 계약 규칙
@@ -126,6 +126,16 @@ Frontend는 HTTP `status`, `code`, `request_id`를 보존해 기능별 안전 �
 
 인물의 개인정보 활용 동의가 없으면 구입장 저장을 거절한다. 동의 사실은 인물 단위로 기록하며 동의 문구, 보존 기간과 철회 절차는 아직 확정하지 않았다.
 
+구입장 생성 요청은 `party_id`와 `new_party` 중 하나를 필수로 받는다. 화면에는 기존 인물을 고르는
+검색이 없으므로 새 손님은 대부분 `new_party`(`name` 필수, `phone` 선택)로 인물까지 함께 만든다.
+매물장이 세대 생성 요청의 `parties`로 임대인·임차인을 함께 만드는 것과 같은 구조다. `new_party`를
+쓸 때는 `privacy_consent`가 true여야 하며, 아니면 `PRIVACY_CONSENT_REQUIRED`로 거절하고 인물도
+만들지 않는다. true이면 서버가 그 시각을 인물의 `privacy_consent_at`으로 기록한다. `party_id`를
+보내는 경로는 이미 동의를 받은 기존 인물에 새 구입장을 잇는 용도로 열려 있지만, 인물 검색 화면이
+없어 현재 클라이언트는 쓰지 않는다. 새 인물의 이름이 비어 있거나 두 필드가 모두 없으면
+`VALIDATION_FAILED`다. `PropertyRequirementUpdateRequest`(PATCH)에는 이 필드가 없다. 구입장의
+인물 연결은 생성 시점에 정해지며 이후 바꾸는 경로는 없다.
+
 ### 상담 로그
 
 | Method | Path | 인증 | 동작 |
@@ -143,15 +153,21 @@ Frontend는 HTTP `status`, `code`, `request_id`를 보존해 기능별 안전 �
 |---|---|---|---|
 | POST | /api/v1/f2/analyses | 세션·CSRF | 음성을 RunPod `stt`로 전사하고 `sllm`으로 분석해 검토용 제안을 동기 반환 |
 
-요청은 `multipart/form-data`이며 `audio`, `ledger_type`, `current_fields`,
+요청은 `multipart/form-data`이며 `audio`, 선택적인 `current_ledger_type`·`current_fields`,
 `privacy_confirmed`를 받는다. `audio`는 비어 있지 않은 WAV·MP3·M4A이고 현재 상한은 25 MiB다.
-`ledger_type`은 `매물장` 또는 `구입장`, `current_fields`는 필드명에서 문자열 또는 null로 가는 JSON
-객체다. `privacy_confirmed`가 true가 아니면 422로 거절한다. Backend는 세션에서 사용자 문맥을
-검증하지만 사용자·사무소 식별자는 모델에 보내지 않는다.
+신규 음성 접수는 현재 장부가 없으므로 `current_ledger_type`과 `current_fields`를 생략한다. 기존 장부
+상세에서 분석할 때만 `current_ledger_type`에 `매물장` 또는 `구입장`을 보내고, `current_fields`에는
+필드명에서 문자열 또는 null로 가는 JSON 객체를 보낸다. 이전 Frontend의 `ledger_type` 입력은
+전환 기간 하위 호환으로 받되 신규 호출에서는 사용하지 않는다. `privacy_confirmed`가 true가 아니면
+422로 거절한다. Backend는 세션에서 사용자 문맥을 검증하지만 사용자·사무소 식별자는 모델에 보내지
+않는다.
 
-응답의 상담 유형은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다. `기타상담`은 공동중개·단순문의와
-불명확하거나 혼합된 상담을 합친 값이며 장부 필드 제안을 반환하지 않는다. 그 밖에 장부 불일치 여부,
-필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
+응답의 상담 유형은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다. `ledger_type`은 상담 유형에서
+결정된 추천 대상 장부로, 매도의뢰는 `매물장`, 매수문의는 `구입장`, 기타상담은 null이다. 모델은
+STT 텍스트를 한 번 분석해 상담 유형과 그 유형에 맞는 필드를 함께 추출하며 현재 장부값으로 분류를
+유도하지 않는다. `기타상담`은 공동중개·단순문의와 불명확하거나 혼합된 상담을 합친 값이며 장부
+필드 제안을 반환하지 않는다. 기존 상세에서 `current_ledger_type`과 추천 `ledger_type`이 다르면
+`ledger_mismatch`를 true로 반환하고 필드 제안을 억제한다. 그 밖에 필드별 현재값·제안값·상태·근거·기본 선택 여부, 불확실성,
 상담 로그 초안과 서버가 확인한 주의 문구 확인 시각을 반환한다. 전사 전문, 모델 진단, 요청자와
 Provider 오류 원문은 반환하지 않는다. 제안 응답만으로 장부를 저장하지 않으며 Frontend가 선택한 값을
 부모 상세의 미저장 draft에 반영한다.

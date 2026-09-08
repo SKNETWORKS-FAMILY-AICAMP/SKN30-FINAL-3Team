@@ -129,9 +129,11 @@ async def _run_and_cleanup(pipeline: F2Pipeline, analysis: F2PipelineRequest) ->
 async def analyze_voice_memo(
     request: Request,
     audio: Annotated[UploadFile, File()],
-    ledger_type: Annotated[LedgerType, Form()],
-    current_fields: Annotated[str, Form()],
     privacy_confirmed: Annotated[bool, Form()],
+    current_fields: Annotated[str, Form()] = "{}",
+    current_ledger_type: Annotated[LedgerType | None, Form()] = None,
+    # 기존 Frontend가 배포된 동안의 하위 호환 입력. 신규 호출은 current_ledger_type을 쓴다.
+    ledger_type: Annotated[LedgerType | None, Form()] = None,
     _user: CurrentUser = Depends(get_current_user),
     _csrf: None = Depends(require_csrf),
     config: Config = Depends(get_app_config),
@@ -139,6 +141,12 @@ async def analyze_voice_memo(
 ) -> F2AnalysisResponse:
     if not privacy_confirmed:
         raise PrivacyConsentRequiredError()
+    if (
+        current_ledger_type is not None
+        and ledger_type is not None
+        and current_ledger_type is not ledger_type
+    ):
+        raise ValidationError("current_ledger_type and ledger_type must match")
 
     suffix = _validate_audio(audio)
     parsed_fields = _parse_current_fields(current_fields)
@@ -154,7 +162,7 @@ async def analyze_voice_memo(
                 pipeline,
                 F2PipelineRequest(
                     audio_path=temp_path,
-                    ledger_type=ledger_type,
+                    current_ledger_type=current_ledger_type or ledger_type,
                     current_fields=parsed_fields,
                 ),
             )

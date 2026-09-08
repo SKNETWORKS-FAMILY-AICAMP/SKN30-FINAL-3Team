@@ -3,7 +3,7 @@ status: 구현됨
 updated: 2026-09-07
 ---
 
-# ADR-0028: 주니어가 관리할 수 있는 RunPod 운영 범위
+# ADR-0031: 주니어가 관리할 수 있는 RunPod 운영 범위
 
 > 2026-09-07 부분 대체: GPU 배치·local/dev 연결·전원 범위는 [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md)를 따른다. 아래 내용은 기존 결정의 기록이다.
 

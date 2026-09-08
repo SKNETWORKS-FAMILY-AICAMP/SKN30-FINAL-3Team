@@ -12,7 +12,7 @@ updated: 2026-09-07
 - 상태: 사용자 선택 반영, 코드 구현·팀 검토 전·외부 미적용
 - 부분 대체: [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)의 bootstrap·비밀 회전,
   [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md)의 API·Worker 동시 재생성
-- 상위 결정: [프로젝트 ADR-0028](../../../project-wiki/references/decisions/ADR-0028-runpod-junior-operations.md)
+- 상위 결정: [프로젝트 ADR-0031](../../../project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md)
 
 ## 구현
 

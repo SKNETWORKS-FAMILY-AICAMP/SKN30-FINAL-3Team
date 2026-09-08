@@ -473,10 +473,41 @@ def require_privacy_consent(session: Session, brokerage_id: int, party_id: int) 
 
 
 def create_property_requirement(
-    session: Session, brokerage_id: int, payload: dict[str, Any]
+    session: Session, brokerage_id: int, user_id: int, payload: dict[str, Any]
 ) -> int:
-    party_id = int(payload["party_id"])
-    require_privacy_consent(session, brokerage_id, party_id)
+    """구입장을 만든다.
+
+    화면에는 기존 인물을 고르는 검색이 없으므로 대부분의 호출은 `new_party`로 새 손님을
+    함께 만든다. `party_id`를 보내면 이미 동의를 받은 기존 인물에 새 구입장을 잇는
+    경로도 열어 두되(F1-UD-22 인물 연결의 후속 준비), 지금 화면은 이 경로를 쓰지 않는다.
+    """
+    new_party = payload.pop("new_party", None)
+    privacy_consent = payload.pop("privacy_consent", False)
+    party_id = payload.get("party_id")
+
+    if party_id is not None:
+        party_id = int(party_id)
+        require_privacy_consent(session, brokerage_id, party_id)
+    elif new_party is not None:
+        name = str(new_party.get("name", "")).strip()
+        if name == "":
+            raise ValidationError("new_party.name must not be empty")
+        if not privacy_consent:
+            raise PrivacyConsentRequiredError()
+        party = Party(
+            brokerage_id=brokerage_id,
+            party_type=DEFAULT_PARTY_TYPE,
+            name=name,
+            privacy_consent_at=datetime.now(UTC),
+            privacy_consent_by=user_id,
+        )
+        session.add(party)
+        session.flush()
+        upsert_primary_contact(session, brokerage_id, party.id or 0, new_party.get("phone"))
+        party_id = party.id
+        payload["party_id"] = party_id
+    else:
+        raise ValidationError("party_id or new_party is required")
 
     desired_complex_ids = payload.pop("desired_complex_ids", []) or []
     validate_complex_ids(session, brokerage_id, desired_complex_ids)

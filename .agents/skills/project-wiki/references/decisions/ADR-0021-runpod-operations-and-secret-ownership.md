@@ -6,7 +6,7 @@ updated: 2026-09-01
 # ADR-0021: RunPod 운영 제어와 비밀값 정본
 
 - 상태: 부분 대체됨·코드 구현, 외부 자원 미적용
-- 후속 변경: 자동 bootstrap·GHCR 비밀 소유권은 [ADR-0028](ADR-0028-runpod-junior-operations.md)을 따른다. 아래는 당시 결정 기록이다.
+- 후속 변경: 자동 bootstrap·GHCR 비밀 소유권은 [ADR-0031](ADR-0031-runpod-junior-operations.md)을 따른다. 아래는 당시 결정 기록이다.
 - 결정일: 2026-09-01
 - 부분 대체: [ADR-0015](ADR-0015-environment-configuration-ownership.md)의 Terraform 수동 비밀값 소유 방식
 - 유지: [ADR-0020](ADR-0020-sllm-release-handoff.md)의 create/delete와 active/offline 계약

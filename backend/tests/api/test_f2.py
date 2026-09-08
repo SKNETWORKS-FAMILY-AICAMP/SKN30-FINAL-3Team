@@ -29,11 +29,17 @@ from main import create_app
 
 
 class FakePipeline:
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        error: Exception | None = None,
+        *,
+        consultation_type: ConsultationType = ConsultationType.SELL_REQUEST,
+    ) -> None:
         self.request: F2PipelineRequest | None = None
         self.audio_bytes = b""
         self.temp_path: Path | None = None
         self.error = error
+        self.consultation_type = consultation_type
 
     async def run(self, request: F2PipelineRequest) -> F2PipelineResult:
         self.request = request
@@ -41,12 +47,23 @@ class FakePipeline:
         self.audio_bytes = request.audio_path.read_bytes()
         if self.error is not None:
             raise self.error
+        recommended_ledger = (
+            LedgerType.PROPERTY
+            if self.consultation_type is ConsultationType.SELL_REQUEST
+            else LedgerType.BUYER
+            if self.consultation_type is ConsultationType.BUY_REQUEST
+            else None
+        )
         return F2PipelineResult(
             transcript="한강아파트를 12억에 매도합니다.",
             transcription_model="openai/whisper-large-v3-turbo",
-            ledger_type=request.ledger_type,
-            consultation_type=ConsultationType.SELL_REQUEST,
-            ledger_mismatch=False,
+            ledger_type=recommended_ledger,
+            consultation_type=self.consultation_type,
+            ledger_mismatch=(
+                request.current_ledger_type is not None
+                and recommended_ledger is not None
+                and request.current_ledger_type is not recommended_ledger
+            ),
             proposals=(
                 FieldProposal(
                     field_name="매매가",
@@ -87,7 +104,7 @@ def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
             "/api/v1/f2/analyses",
             files={"audio": ("memo.wav", b"audio-content", "audio/wav")},
             data={
-                "ledger_type": "매물장",
+                "current_ledger_type": "매물장",
                 "current_fields": '{"매매가": null}',
                 "privacy_confirmed": "true",
             },
@@ -96,7 +113,7 @@ def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
     assert response.status_code == 200, response.text
     assert pipeline.audio_bytes == b"audio-content"
     assert pipeline.request is not None
-    assert pipeline.request.ledger_type is LedgerType.PROPERTY
+    assert pipeline.request.current_ledger_type is LedgerType.PROPERTY
     assert pipeline.request.current_fields == {"매매가": None}
     assert pipeline.temp_path is not None and not pipeline.temp_path.exists()
     assert response.json()["proposals"][0] == {
@@ -108,6 +125,25 @@ def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
         "selected_by_default": True,
     }
     assert "transcript" not in response.json()
+    assert response.json()["ledger_type"] == "매물장"
+
+
+def test_new_intake_omits_current_ledger_and_returns_recommended_buyer_ledger(config) -> None:
+    pipeline = FakePipeline(consultation_type=ConsultationType.BUY_REQUEST)
+    with client_with_pipeline(config, pipeline) as client:
+        response = client.post(
+            "/api/v1/f2/analyses",
+            files={"audio": ("memo.wav", b"audio-content", "audio/wav")},
+            data={"privacy_confirmed": "true"},
+        )
+
+    assert response.status_code == 200, response.text
+    assert pipeline.request is not None
+    assert pipeline.request.current_ledger_type is None
+    assert pipeline.request.current_fields == {}
+    assert response.json()["consultation_type"] == "매수문의"
+    assert response.json()["ledger_type"] == "구입장"
+    assert response.json()["ledger_mismatch"] is False
 
 
 def test_requires_privacy_confirmation(config) -> None:

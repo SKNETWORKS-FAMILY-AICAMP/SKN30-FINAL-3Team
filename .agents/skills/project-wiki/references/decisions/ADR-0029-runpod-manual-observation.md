@@ -7,7 +7,7 @@ updated: 2026-09-07
 
 - 상태: 사용자 선택 반영·코드 구현·팀 검토 전·외부 미적용
 - 부분 대체: [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md)의 자체 감시,
-  [ADR-0028](ADR-0028-runpod-junior-operations.md)의 감시 유지·이전 endpoint 복원
+  [ADR-0031](ADR-0031-runpod-junior-operations.md)의 감시 유지·이전 endpoint 복원
 
 ## 결정
 

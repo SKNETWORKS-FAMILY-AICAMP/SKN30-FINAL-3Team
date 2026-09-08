@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -54,3 +55,44 @@ def test_rejects_one_revision_for_multiple_models(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(ValueError, match="모델 하나"):
         module.validate_requested_model_revision("a" * 40, 2)
+
+
+def test_full_prompt_does_not_expose_current_ledger(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = load_evaluate_module(monkeypatch)
+
+    prompt = module.build_user_prompt(
+        {"transcript": "한강아파트를 사고 싶어요.", "ledger_type": "매물장"},
+        "full",
+    )
+
+    assert prompt == "STT 상담 텍스트:\n한강아파트를 사고 싶어요."
+
+
+def test_full_evaluation_excludes_legacy_mismatch_rows(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_evaluate_module(monkeypatch)
+    path = tmp_path / "test.jsonl"
+    rows = [
+        {
+            "sample_id": "matched",
+            "transcript": "매수 문의",
+            "ledger_type": "구입장",
+            "expected": {"ledger_mismatch": False},
+        },
+        {
+            "sample_id": "mismatch",
+            "transcript": "매수 문의",
+            "ledger_type": "매물장",
+            "expected": {"ledger_mismatch": True},
+        },
+    ]
+    path.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    loaded = module.load_dataset(path, None, "full", ["매도의뢰", "매수문의", "기타상담"])
+
+    assert [row["sample_id"] for row in loaded] == ["matched"]

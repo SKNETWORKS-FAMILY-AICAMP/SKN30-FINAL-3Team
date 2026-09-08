@@ -12,7 +12,7 @@ updated: 2026-08-17
 >
 > **시연 기준 · 2026-09-07:** 사용자 약 10명 부트캠프 프로젝트에서는 단일 API 프로세스에서 F2를
 > 한 건씩 받으며 혼잡 시 429 `F2_BUSY`로 수동 재시도를 안내한다. 요청 취소 뒤에도 실행 중인
-> 분석이 끝날 때까지 임시 파일을 유지한다. [ADR-0028](../../../.agents/skills/project-wiki/references/decisions/ADR-0028-runpod-junior-operations.md)을
+> 분석이 끝날 때까지 임시 파일을 유지한다. [ADR-0031](../../../.agents/skills/project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md)을
 > 현재 구현 기준으로 삼으며 아래 제안 구조는 향후 필요가 입증될 때 재검토한다.
 
 ## 문서 안내

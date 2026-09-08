@@ -7,7 +7,7 @@ updated: 2026-09-03
 
 - 상태: 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용
 - 결정일: 2026-09-02
-- 후속 변경: Template generation·runtime 검증 책임·API refresh 범위는 [ADR-0028](ADR-0028-runpod-junior-operations.md)을 따른다. v1/v2 release 계약은 유지한다.
+- 후속 변경: Template generation·runtime 검증 책임·API refresh 범위는 [ADR-0031](ADR-0031-runpod-junior-operations.md)을 따른다. v1/v2 release 계약은 유지한다.
 - 부분 대체: [ADR-0020](ADR-0020-sllm-release-handoff.md)의 LoRA 전용 release·승인·검증 계약
 - 유지: ADR-0020의 private S3 정본, Secure Cloud Pod create/delete, active/offline과 Backend F2 503 계약
 - 후속 예외: 미평가 개발 실행은 [ADR-0023](ADR-0023-sllm-dev-unevaluated-release.md)의 명시적 `dev` 경로만 허용

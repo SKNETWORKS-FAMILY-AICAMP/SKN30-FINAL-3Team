@@ -1,9 +1,10 @@
 /**
  * 구입장 훅.
  *
- * 알려진 제약: 구입장 생성은 `party_id`를 필수로 요구하는데 계약에 **인물 생성 엔드포인트가 없다**.
- * 따라서 기존 인물이 연결되지 않은 신규 손님은 실제 API로 저장할 수 없다.
- * 여기서는 저장을 조용히 실패시키지 않고 사용자에게 보이는 오류로 명시한다.
+ * 구입장 생성은 `party_id`를 필수로 요구하지만 화면에는 기존 인물을 고르는 검색이 없다.
+ * 새 손님은 `toRequirementCreatePayload`가 이름·전화·동의를 `new_party`에 실어 요청 한 번으로
+ * 인물까지 만든다. 이름이나 동의가 빠져 요청 자체를 만들 수 없을 때는 저장을 조용히 실패시키지
+ * 않고 사용자에게 보이는 오류로 명시한다.
  */
 
 import { useCallback, useMemo } from "react";
@@ -91,7 +92,7 @@ export function useBuyerLedger(
           if (create == null) {
             const reason =
               row.partyId == null
-                ? "손님(인물)을 먼저 등록해야 저장할 수 있습니다. 인물 등록 API가 아직 없습니다."
+                ? "이름·별칭과 개인정보 활용 동의를 확인해 주세요."
                 : "거래 구분을 확인해 주세요.";
             // 화면이 만든 문구다. 그대로 보여도 되므로 userMessage로 표시한다.
             throw new ApiError({ kind: "validation", message: reason, userMessage: reason });

@@ -136,12 +136,15 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
     if (!DEMAND_TYPES.includes(draft.category)) {
       blockers.push(`거래 구분: ${DEMAND_TYPES.join(" · ")} 중 하나를 골라 주세요.`);
     }
-    /* 계약상 구입장은 인물이 있어야 만들 수 있는데 인물 등록 API가 아직 없다. 저장 전에 알린다. */
-    if (draft.serverId == null && draft.partyId == null) {
-      blockers.push("손님 인물 연결: 새 손님은 아직 서버에 등록할 수 없습니다. 인물 등록 기능이 준비될 때까지 이 행은 화면에만 남습니다.");
+    /*
+     * 구입장은 인물이 있어야 만들 수 있다. 기존 인물을 고르는 검색이 없으므로 새 손님은
+     * 이름·별칭으로 인물을 함께 만든다(F1-DM-08). 이름이 없으면 요청 자체를 만들 수 없다.
+     */
+    if (draft.serverId == null && draft.partyId == null && !draft.buyer?.trim()) {
+      blockers.push("이름·별칭: 손님의 이름 또는 별칭을 입력해 주세요. 새 손님은 이름이 있어야 등록할 수 있습니다.");
     }
     return blockers;
-  }, [draft.category, draft.consent, draft.partyId, draft.serverId]);
+  }, [draft.buyer, draft.category, draft.consent, draft.partyId, draft.serverId]);
 
   /* 저장은 되지만 [저장 완료]로 남지 않는 칸. 무엇을 더 채우면 되는지 함께 알려준다. */
   const completionGaps = useMemo(() => [
