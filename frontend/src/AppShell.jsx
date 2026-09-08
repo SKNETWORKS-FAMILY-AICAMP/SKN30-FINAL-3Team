@@ -679,7 +679,6 @@ export function AppShell() {
         {activeNav === "매물장" ? <div className="f1-control-strip">
           <div className="f1-control-strip__top-row">
             <div className="f1-control-strip__left-group">
-              <div className="ledger-tabs" role="tablist" aria-label="장부 유형">{["아파트", "상가", "주택", "재건축"].map((tab, index) => <button key={tab} id={`ledger-tab-${index}`} role="tab" aria-selected={index === 0} aria-controls="ledger-grid-panel" aria-disabled={index !== 0} disabled={index !== 0} tabIndex={index === 0 ? 0 : -1} title={index !== 0 ? "현재 프로토타입에서 사용할 수 없는 장부 유형입니다" : undefined} className={index === 0 ? "active" : ""} type="button">{tab}</button>)}</div>
               {selectedRows.length ? <>
                 <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
                 <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
