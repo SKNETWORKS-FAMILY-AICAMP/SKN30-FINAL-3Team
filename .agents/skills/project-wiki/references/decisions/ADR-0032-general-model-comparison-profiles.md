@@ -18,7 +18,9 @@ Infra는 `qwen3-14b-awq`, `qwen3-32b-awq`, `qwen38-27b-fp8` 및 기존 `qwen38-2
 모델 변경은 재기동·재로딩을 요구한다. Infra는 기대 모델을 준비 확인·endpoint metadata·앱 smoke에
 전달하며, 다른 모델이 실행 중인 endpoint에 대한 활성화를 거부한다. 이미지에는 가중치를 넣지 않고
 기동 시 다운로드·실제 bytes 해시 검증을 수행한다. 평가기는 인증된 서버 metadata를 전후 대조하고
-공식 기반 이미지와 실제 배포 이미지 digest를 구분한다.
+공식 기반 이미지와 실제 배포 이미지 digest를 구분한다. HTTP 평가기는 RunPod 제어면의
+Pod ID·배포 이미지 digest를 endpoint와 전후 대조하고 누락·불일치를 거절한다. 입력 키와
+지원 endpoint 제한, AI 단독 평가의 별도 Infra 증거는 [재현 절차](../../../../../infra/serving/comparison-reproduction.md)를 따른다.
 
 이번 비교는 세 모델을 동일한 8K·동시 추론 1건·L40S 48GB 조건에서 순차 평가한다.
 사용자가 추론용 양자화 재검토 후 공식 `Qwen/Qwen3.8-27B-FP8`을 최종 선택하여

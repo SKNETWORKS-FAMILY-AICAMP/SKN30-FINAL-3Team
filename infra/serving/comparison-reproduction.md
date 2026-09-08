@@ -100,6 +100,17 @@ uv run --locked --project backend --env-file backend/.env.gpu-general \
   --output backend/eval/validation/chatbot-http-qwen38-27b-fp8-new.json
 ```
 
+HTTP 재평가는 ignored 환경파일에 운영자가 `RUNPOD_API_KEY`를 명시적으로 주입해야 한다.
+모델 서비스 키와 별개이며, 보고서에는 키·Pod ID·전체 URL·응답 원문을 저장하지 않는다.
+평가 전후에 직접 HTTPS `<pod-id>-8000.proxy.runpod.net/v1` endpoint에서 유도한 Pod ID로
+[RunPod 제어면 GET API](https://docs.runpod.io/api-reference/pods/GET/pods/podId)를 조회한다.
+반환 ID·`image`의 전체 digest·RUNNING 상태·8000/http 포트를 확인하고 검증한 이미지와 출처를
+`endpoint_metadata_before/after`에 기록한다. 누락·불일치·조회 실패는 평가를 중단한다.
+이는 제어면의 배포 식별 검증이며 컨테이너 내부 파일에 대한 암호학적 attestation은 아니다.
+AWS·custom proxy는 실행 이미지와 endpoint를 연결할 검증 어댑터가 없으므로 HTTP 평가에서 거절한다.
+AI 단독 평가의 `/ops/status` 검증은 기존처럼 모델·기반 이미지 대상이며 실제 배포 식별은
+Infra 대조 증거가 별도로 필요하다. 기존 JSON은 이 HTTP 자동 검사 도입 전 기록으로 보존한다.
+
 HTTP 명령은 별도 loopback PostgreSQL의 `TEST_DB_URL`과 CREATE DATABASE 권한이 필요하다.
 기존 사용자 DB를 초기화하지 않는다. 매 실행의 임시 DB는 평가기가 제거하며, 평가용 Pod·컨테이너는
 운영자가 정확한 소유 ID를 확인해 종료하고 삭제 증거를 기록한다. 종료 후 개인 endpoint 파일도 제거한다.

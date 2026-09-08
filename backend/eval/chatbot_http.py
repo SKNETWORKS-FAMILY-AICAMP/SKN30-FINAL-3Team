@@ -30,7 +30,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from chatbot_model import resolve_profile  # noqa: E402
 from core.config import bind_config, load_ai_config  # noqa: E402
-from main import create_app  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 QUERIES = [
@@ -139,7 +138,50 @@ def p95(values: list[float]) -> float:
     return sorted(values)[math.ceil(len(values) * 0.95) - 1]
 
 
-async def verify_model_metadata(model_route: tuple, provenance: dict) -> None:
+async def verify_deployment_image(base_url: str, declared: str, *, transport=None) -> dict:
+    """Read RunPod control-plane identity, never an image claimed by the model process."""
+    base = urlsplit(base_url)
+    pod = re.fullmatch(r"([a-z0-9]+)-8000\.proxy\.runpod\.net", base.hostname or "")
+    if (
+        base.scheme != "https"
+        or base.port not in (None, 443)
+        or pod is None
+        or base.username
+        or base.password
+        or base.query
+        or base.fragment
+        or base.path.rstrip("/") != "/v1"
+    ):
+        raise ValueError("Deployment verification requires a direct HTTPS RunPod proxy endpoint")
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", declared or ""):
+        raise ValueError("Deployment image must be digest pinned")
+    key = os.environ.get("RUNPOD_API_KEY", "")
+    if not key or key.strip() != key:
+        raise ValueError("RUNPOD_API_KEY is required for deployment verification")
+    try:
+        async with httpx.AsyncClient(
+            timeout=15, follow_redirects=False, transport=transport
+        ) as client:
+            response = await client.get(
+                f"https://rest.runpod.io/v1/pods/{pod[1]}",
+                headers={"Authorization": "Bearer " + key},
+            )
+            response.raise_for_status()
+            actual = response.json()
+        if (
+            not isinstance(actual, dict)
+            or actual.get("id") != pod[1]
+            or actual.get("image") != declared
+            or actual.get("desiredStatus") != "RUNNING"
+            or "8000/http" not in (actual.get("ports") or [])
+        ):
+            raise ValueError("Deployment identity missing or mismatched")
+    except (httpx.HTTPError, ValueError):
+        raise ValueError("RunPod deployment image verification failed") from None
+    return {"source": "runpod-control-plane", "deployment_image": declared}
+
+
+async def verify_model_metadata(model_route: tuple, provenance: dict) -> dict | None:
     if model_route[0] == "openai":
         return
     config = load_ai_config("local")
@@ -177,12 +219,16 @@ async def verify_model_metadata(model_route: tuple, provenance: dict) -> None:
         actual = response.json().get("model")
     if not isinstance(actual, dict) or any(actual.get(k) != v for k, v in expected.items()):
         raise ValueError("endpoint metadata differs from HTTP evaluation profile")
+    deployment = await verify_deployment_image(
+        str(endpoint.base_url), provenance.get("deployment_image", "")
+    )
+    return {**expected, **deployment}
 
 
 async def measure(
     url: str, brokerage: int, rounds: int, model_route: tuple, provenance: dict
 ) -> dict:
-    await verify_model_metadata(model_route, provenance)
+    metadata_before = await verify_model_metadata(model_route, provenance)
     config = bind_config(
         {
             "APP_ENV": "local",
@@ -196,6 +242,8 @@ async def measure(
             "LOG_LEVEL": "WARNING",
         }
     )
+    from main import create_app
+
     app = create_app(config)
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -271,8 +319,10 @@ async def measure(
             measured = rows[1:]
             first_p95 = p95([r["first_progress_ms"] for r in measured])
             total_p95 = p95([r["elapsed_ms"] for r in measured])
-            await verify_model_metadata(model_route, provenance)
+            metadata_after = await verify_model_metadata(model_route, provenance)
             return {
+                "endpoint_metadata_before": metadata_before,
+                "endpoint_metadata_after": metadata_after,
                 "provider": model_route[0],
                 "model": model_route[1],
                 "revision": model_route[2],

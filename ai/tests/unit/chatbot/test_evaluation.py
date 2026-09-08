@@ -293,3 +293,108 @@ def test_claimed_actual_artifact_hash_must_match_expected_weights():
     }
     with pytest.raises(ValueError, match="weights manifest"):
         EVAL.validate_self_hosted_provenance(provenance)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failed_stage", ["provenance", "final_provenance", "warmup", "cases"])
+async def test_endpoint_failure_and_task_cancellation_preserve_checkpoint(
+    tmp_path, monkeypatch, failed_stage
+):
+    import asyncio
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    from brokerage_ai.chatbot import ChatIntent
+
+    reached = asyncio.Event()
+    calls = 0
+    checks = 0
+    exited = False
+    failure = RuntimeError("sensitive endpoint details")
+    fixture = json.loads((ROOT / "eval/chatbot/cases.json").read_text())
+    expected = {case["question"]: case["expected"] for case in fixture["cases"]}
+
+    @asynccontextmanager
+    async def runtime(_):
+        nonlocal exited
+        try:
+            yield SimpleNamespace(
+                providers=SimpleNamespace(get_llm=lambda *_: SimpleNamespace(kind="vllm"))
+            )
+        finally:
+            exited = True
+
+    async def endpoint(*_):
+        nonlocal checks
+        checks += 1
+        if (failed_stage == "provenance" and checks == 1) or (
+            failed_stage == "final_provenance" and checks == 2
+        ):
+            raise failure
+        return {"model": "synthetic-model"}
+
+    class Workflow:
+        def __init__(self, **_):
+            pass
+
+        async def run(self, value, **_):
+            nonlocal calls
+            calls += 1
+            if (failed_stage == "warmup" and calls == 1) or (
+                failed_stage == "cases" and calls == 3
+            ):
+                reached.set()
+                await asyncio.Event().wait()
+            return SimpleNamespace(
+                intent=ChatIntent.model_validate(
+                    expected.get(value.question, {"tool": "help", "filters": {}})
+                ),
+                model_calls=1,
+                diagnostics=None,
+            )
+
+    monkeypatch.setattr(EVAL, "load_ai_config", lambda _: object())
+    monkeypatch.setattr(EVAL, "create_ai_runtime", runtime)
+    monkeypatch.setattr(EVAL, "verify_endpoint", endpoint)
+    monkeypatch.setattr(EVAL, "ChatbotWorkflow", Workflow)
+    args = arguments(
+        tmp_path,
+        case_ids="basic-01,basic-02",
+        provider="vllm",
+        model="synthetic-model",
+        endpoint_alias="general-dev-gpu",
+        runtime_label="0.28.0",
+        artifact_revision="a" * 40,
+        artifact_sha256="b" * 64,
+        runtime_image="vllm/vllm-openai@sha256:" + "c" * 64,
+        deployment_image="ghcr.io/example/general-serving@sha256:" + "d" * 64,
+    )
+    if failed_stage in {"warmup", "cases"}:
+        task = asyncio.create_task(EVAL.evaluate(args))
+        await asyncio.wait_for(reached.wait(), timeout=1)
+        task.cancel("sensitive cancellation reason")
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        with pytest.raises(RuntimeError) as captured:
+            await EVAL.evaluate(args)
+        assert captured.value is failure
+    report_text = Path(args.output).read_text()
+    report = json.loads(report_text)
+    interrupted = failed_stage in {"warmup", "cases"}
+    assert report["status"] == ("INTERRUPTED" if interrupted else "FAILED")
+    assert report["error_type"] == ("CancelledError" if interrupted else "RuntimeError")
+    assert report["stage"] == failed_stage
+    expected_rows = {"provenance": 0, "warmup": 0, "cases": 1, "final_provenance": 2}
+    assert len(report["rows"]) == expected_rows[failed_stage]
+    assert [row["id"] for row in report["rows"]] == ["basic-01", "basic-02"][
+        : expected_rows[failed_stage]
+    ]
+    assert all(row["passed"] for row in report["rows"])
+    assert (report["warmup_ms"] is None) == (failed_stage in {"provenance", "warmup"})
+    assert report["provenance"]["scorer_version"] == EVAL.SCORER_VERSION
+    assert report["summary"] == EVAL.summarize(report["rows"])
+    assert "final_endpoint_attestation" not in report["provenance"]
+    assert exited == (failed_stage != "provenance")
+    assert "sensitive" not in report_text
+    assert not Path(args.output + ".tmp").exists()
