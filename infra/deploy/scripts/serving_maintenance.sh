@@ -24,13 +24,15 @@ case "${1:-}" in
   activate-general)
     [[ "${2:-}" =~ ^[1-9][0-9]*$ ]]
     [[ -z "$(compose ps --status running --quiet api worker)" ]]
-    compose run --rm --no-deps -T worker python src/manage.py activate-general-qwen \
-      --brokerage-id "$2" --model "${3:-unsloth/Qwen3.8-27B-unsloth-bnb-4bit}" --shared-dev --apply --workloads-stopped-confirmed
+    case "${3:-}" in POSITION_CARD|BROKERAGE_JUDGMENT|CHATBOT) ;; *) exit 2 ;; esac
+    python3 "${REVISION_DIR}/scripts/render_env.py" --api-output "${API_ENV_FILE}" --worker-output "${WORKER_ENV_FILE}" --migration-output "${MIGRATION_ENV_FILE}"
+    compose run --rm --no-deps -T worker python src/model_selection.py \
+      --brokerage-id "$2" --capability "$3" --shared-dev --apply --workloads-stopped
     ;;
   start)
     python3 "${REVISION_DIR}/scripts/render_env.py" --api-output "${API_ENV_FILE}" --worker-output "${WORKER_ENV_FILE}" --migration-output "${MIGRATION_ENV_FILE}"
     compose up --detach --no-deps --force-recreate --pull never api worker
     "${REVISION_DIR}/scripts/validate_service.sh"
     ;;
-  *) echo 'Usage: serving_maintenance.sh stop|start' >&2; exit 2 ;;
+  *) echo 'Usage: serving_maintenance.sh stop|start|activate-general BROKERAGE_ID CAPABILITY' >&2; exit 2 ;;
 esac

@@ -77,3 +77,5 @@ npm run test:release # dist/client release 구조 검사
 - release artifact는 Vite가 생성한 `dist/client`이며 OpenAI Sites worker·server bundle은 만들지 않습니다.
 
 프로토타입 가정값은 제품 정책이나 운영 제한으로 간주하지 않습니다. 운영 기능을 추가할 때는 API 계약, 개인정보 처리 기준, 인증·권한과 실제 저장 방식을 별도로 확인해야 합니다.
+
+환경변수의 파일 역할·개인 override와 변경 절차는 [환경변수 관리](../docs/development/environment-variables.md)를 따릅니다.

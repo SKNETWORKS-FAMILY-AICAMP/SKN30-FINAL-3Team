@@ -1,8 +1,7 @@
 """F3 교차 판정 Worker 프로세스.
 
 API와 같은 image를 사용하지만 실행 역할은 분리한다. 활성 Worker는 RDS에서 실행을 선점하고
-저장된 상태에 해당하는 application 유스케이스를 호출한다. 비활성 Worker는 기존처럼 DB
-readiness만 확인하고 어떤 실행도 선점하지 않는다.
+저장된 상태에 해당하는 application 유스케이스를 호출한다. Worker를 실행하면 작업을 처리한다.
 
 프로세스 수명 동안 하나의 asyncio event loop를 사용한다. SIGTERM·SIGINT가 오면 처리 중인
 단계까지만 마치고 다음 실행을 선점하지 않는다.
@@ -29,6 +28,7 @@ import f3_runtime
 from core.config import Config, get_config, load_ai_config
 from core.errors import ConfigurationError
 from core.logging import configure_logging
+from core.worker_health import READY_FILE
 from domain.agent_execution import pipeline, service
 from domain.agent_execution.models import (
     AgentRun,
@@ -38,40 +38,24 @@ from domain.engine import create_database_engine
 logger = structlog.get_logger()
 IDLE_WAIT_SECONDS = 2.0
 WORKER_ID_MAX_LENGTH = 64
-SYNTHETIC_PROTOTYPE_SETTING = "F3_ALLOW_SYNTHETIC_PROTOTYPE"
 
 
-def boolean_setting(source: Mapping[str, str], name: str, *, default: bool = False) -> bool:
-    raw = source.get(name, str(default)).strip().lower()
-    if raw in {"0", "false", "no", "off"}:
-        return False
-    if raw in {"1", "true", "yes", "on"}:
-        return True
-    raise ConfigurationError(f"{name} must be a boolean")
-
-
-def worker_enabled(source: Mapping[str, str]) -> bool:
-    return boolean_setting(source, "WORKER_ENABLED")
-
-
-def require_synthetic_prototype_opt_in(source: Mapping[str, str]) -> None:
+def require_synthetic_prototype_opt_in(config: Config) -> None:
     """활성 Worker가 합성 데이터임을 운영자가 명시하지 않으면 기동을 막는다.
 
     코드만으로 DB 행이 실제 인물과 무관한 합성 데이터인지 증명할 수 없다. 따라서 현재 유일하게
     구현된 ``SYNTHETIC_PROTOTYPE`` 경로는 배포 환경의 별도 opt-in을 요구한다. 실사용 데이터용
     ``MASKED`` 조립이 구현되기 전까지 이 설정을 켜지 않은 Worker는 어떤 실행도 claim하지 않는다.
     """
-    if not boolean_setting(source, SYNTHETIC_PROTOTYPE_SETTING):
+    if not config.f3.allow_synthetic_prototype:
         raise ConfigurationError(
-            "WORKER_ENABLED=true requires F3_ALLOW_SYNTHETIC_PROTOTYPE=true "
+            "Worker requires F3_ALLOW_SYNTHETIC_PROTOTYPE=true "
             "for a reviewed synthetic-only dataset"
         )
 
 
-def build_worker_id(configured: str | None = None) -> str:
+def build_worker_id() -> str:
     """재시작과 병렬 인스턴스 사이에 겹치지 않는 64자 이하 lease owner를 만든다."""
-    if configured and configured.strip():
-        return configured.strip()[:WORKER_ID_MAX_LENGTH]
     host = socket.gethostname().split(".")[0][:24]
     return f"{host}-{os.getpid()}-{uuid4().hex[:8]}"[:WORKER_ID_MAX_LENGTH]
 
@@ -85,30 +69,11 @@ def database_is_ready(config: Config) -> None:
         engine.dispose()
 
 
-def run_disabled_worker(
-    *,
-    stop_event: threading.Event,
-    ready_file: Path,
-    readiness_probe: Callable[[], None],
-) -> None:
-    readiness_probe()
-    ready_file.parent.mkdir(parents=True, exist_ok=True)
-    ready_file.write_text("disabled\n", encoding="utf-8")
-    logger.info("worker_ready", enabled=False)
-    try:
-        stop_event.wait()
-    finally:
-        ready_file.unlink(missing_ok=True)
-        logger.info("worker_stopped", enabled=False)
-
-
 def require_ai_provider(profile: str, environ: Mapping[str, str] | None = None) -> AiConfig:
     """실행을 선점하기 전에 F3가 사용할 LLM 설정이 하나 이상 있는지 확인한다."""
     config = load_ai_config(profile, environ)
     if config.openai is None and not config.llm_endpoints:
-        raise ConfigurationError(
-            "WORKER_ENABLED=true requires OpenAI or a configured general LLM endpoint"
-        )
+        raise ConfigurationError("Worker requires OpenAI or a configured general LLM endpoint")
     return config
 
 
@@ -164,7 +129,7 @@ def run_enabled_worker(
     values = os.environ if environ is None else environ
     # DB나 Provider에 접근하기 전에 막는다. 이 검증을 뒤로 보내면 잘못 구성된 Worker가
     # readiness를 통과한 뒤 실행을 claim하거나 외부 client를 조립할 여지가 생긴다.
-    require_synthetic_prototype_opt_in(values)
+    require_synthetic_prototype_opt_in(config)
     database_is_ready(config)
     ai_config = require_ai_provider(config.app.environment.value, values)
 
@@ -172,7 +137,7 @@ def run_enabled_worker(
     runtime = create_ai_runtime(ai_config)
     engine = create_database_engine(config)
     ready_file.parent.mkdir(parents=True, exist_ok=True)
-    ready_file.write_text("enabled\n", encoding="utf-8")
+    ready_file.write_text(str(os.getpid()), encoding="utf-8")
     logger.info("worker_ready", enabled=True, worker_id=worker_id)
 
     try:
@@ -202,6 +167,7 @@ def run_enabled_worker(
 
 
 def main() -> None:
+    READY_FILE.unlink(missing_ok=True)
     config = get_config()
     configure_logging(config.log)
     stop_event = threading.Event()
@@ -213,19 +179,11 @@ def main() -> None:
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
 
-    if not config.worker.enabled:
-        run_disabled_worker(
-            stop_event=stop_event,
-            ready_file=config.worker.ready_file,
-            readiness_probe=lambda: database_is_ready(config),
-        )
-        return
-
     run_enabled_worker(
         config=config,
         stop_event=stop_event,
-        ready_file=config.worker.ready_file,
-        worker_id=build_worker_id(config.worker.worker_id),
+        ready_file=READY_FILE,
+        worker_id=build_worker_id(),
     )
 
 

@@ -65,7 +65,7 @@ def activate_chatbot(
     ai_config = load_ai_config(config.app.environment.value)
     provider, model, revision, alias = resolve_profile(profile, profiles_file)
     if provider == "openai" and ai_config.openai is None:
-        raise ValueError("configure AI_OPENAI_API_KEY first")
+        raise ValueError("configure AI_GENERAL_API_KEY first")
     if alias is not None and not any(e.alias == alias for e in ai_config.llm_endpoints):
         raise ValueError("configure the general-dev-gpu endpoint first")
     engine = create_database_engine(config)

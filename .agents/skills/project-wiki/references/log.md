@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # 위키 변경 로그
 
+- 2026-09-09: PR #113 sticky review를 대조해 ADR-0034의 사용자 구현 승인 출처·Worker/F2/endpoint 부분 대체 범위와 팀 병합 승인 상태를 구분했다. CodeDeploy 그룹 간 AND의 AWS 근거를 연결하고 최신 dev PR #114를 통합했다. 실제 서비스 기동·클라우드 적용은 수행하지 않았다.
+
 - 2026-09-09: PR #114 리뷰에서 합성 테스트·삭제된 마스킹 사례의 secret-like 오탐 근거를 확인하고 감지 규칙을 유지했다. 앵커 fixture 합성 표기를 명확히 하고 새 보고서 출처를 비식별 ID로 변경했다. 변경 fixture의 DB 검사 23개와 수정 후 브라우저 전체 17개 통과를 검증 기록에 반영했다.
 
 - 2026-09-09: 로컬 기능 점검을 근거로 Frontend 검색·상담 로그·F3 요청·캘린더 접근성 및 OpenAI 전송 스키마·챗봇 동의어 회귀를 보강했다. Frontend 빠른 테스트 자동 발견, 대형 파일 분리·Infra 중복 정리, 인증·F2 입력·평가 산식·HTTP/DB 연결 검사를 반영하고 모듈 정본과 검증 범위를 연결했다. AI ADR-0006은 사용자 개선 구현 승인·팀 검토 대기로 구분하며 외부 모델 재평가·공유 dev 배포 완료를 뜻하지 않는다.
@@ -166,3 +168,15 @@ updated: 2026-09-09
 - 2026-09-09: 최신 dev 병합 후 F3 Repository·모델 조립·단계 선택을 분리하고 후보 생성 부분 실패 시 성공 카드 보존을 수정했다. [Backend 구현 정본](../../backend/references/f3-execution.md)에 범위·확장 제약을 기록하고 후보 병렬 생성 설명을 코드에 맞췄다.
 
 - 2026-09-09: PR #112 리뷰를 재현해 매물 직접 연결 상담의 당사자 경계를 보완하고 상담 scope를 v3로 갱신했다. 무효 앵커와 파생 결과의 공개를 차단하고 헤더 참조의 snapshot 우회를 막았다.
+
+- 2026-09-09: 개발자용 설정·클라우드 점검과 기동 후 합성 검증 명령을 추가했다. 적용 상태를 Infra 인벤토리로 모으고 Secret 값 소유권 설명을 후속 결정과 일치시켰다. 신규 consultation-v3를 기존 모델과 구분했으며 실제 기동은 사용자 수행, S3 전송은 승인 대기다. 개인 dotenv 경계·기본 모델은 유지한다.
+
+- 2026-09-09: 사용자 승인으로 환경변수 입력을 리팩토링했다. Worker F3 opt-in을 config에 합치고 공개·개인 파일의 주석과 선택 입력, F2 offline 기본값·embedding 기본 주소 제거, 소비 코드 기반 진단·문서 누락 검사를 ADR-0033과 개발자 환경변수 안내에 기록했다. 실제 기동·공유 배포는 미실행이다.
+
+- 2026-09-09: ADR-0034 — 모듈별 입력 단일 소유, provider/model enum, Worker/OpenAPI 내부화와 명시 모델 버전 적용 명령 구현. 클라우드 적용·실제 기동은 미실행.
+
+- 2026-09-09: 사용자 명시 승인 후 consultation-v3를 private S3에 게시하고 원격 본문·cross-hash를 검증했다. bootstrap 승인 plan 적용 결과 실제 2개 변경·생성/삭제 0개, AWS 정책 대조·drift 없음 확인. 앱·DB·GPU 기동과 모델 활성화는 미실행.
+
+- 2026-09-09: 로컬 OpenAI/shared dev vLLM 기본을 사용자 확정했다. 개인 키 충돌의 0600 백업 이전, shared provider/model 일치 검사, capability별 모델 선택, 최초 배포의 CodeDeploy maintenance 전환을 추가했다. F2 consultation-v3와 general 공식 FP8의 offline 선택만 저장했으며 실제 기동·DB 모델 활성화는 미실행이다.
+
+- 2026-09-09: PR #113 후속 리뷰를 재현해 최초 전환 saved plan의 실제 maintenance/대상 검증과 재귀 입력 fingerprint를 보완하고 공개 source override를 주석 처리했다. URL 검사·launcher import 지적은 공개 binder 및 깨끗한 설치 환경으로 대조했다. 검토 결과는 Infra change-review에 기록했으며 기존 saved plan은 재생성해야 한다.

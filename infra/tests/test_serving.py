@@ -31,7 +31,7 @@ class Contracts(unittest.TestCase):
         ):
             value = serving.f2_record({"revision": 1}, deployment, "dev-example")
             result = render_env.parse_ai_vllm_endpoint_set(json.dumps(value))
-            self.assertEqual(result["AI_F2_PROVIDER_STATUS"], "active")
+            self.assertEqual(result["_f2_status"], "active")
             self.assertNotEqual(
                 result["AI_VLLM_SLLM_BASE_URL"], result["AI_VLLM_STT_BASE_URL"]
             )
@@ -39,7 +39,7 @@ class Contracts(unittest.TestCase):
                 render_env.parse_ai_vllm_endpoint_set(
                     json.dumps(serving.f2_record(value, None, None))
                 ),
-                {"AI_F2_PROVIDER_STATUS": "offline"},
+                {"_f2_status": "offline"},
             )
 
     def test_aws_does_not_accept_other_host_or_port(self):
@@ -75,12 +75,19 @@ class Contracts(unittest.TestCase):
             "http://127.0.0.1:8000/v1",
             endpoint_urls("runpod", "abc12345", "general")[0],
         ):
-            value = local_environment("general", [url], ["a" * 43])
-            entries = json.loads(value["AI_LLM_ENDPOINTS"])
-            self.assertEqual(entries[0]["alias"], "general-dev-gpu")
-            self.assertEqual(entries[0]["api_key_env"], GENERAL_KEY)
+            value = local_environment("general", [url], ["a" * 43], "qwen38-27b-fp8")
+            self.assertEqual(value["AI_GENERAL_PROVIDER"], "vllm")
+            self.assertEqual(value["AI_GENERAL_MODEL"], "Qwen/Qwen3.8-27B-FP8")
+            self.assertEqual(value["AI_GENERAL_BASE_URL"], url)
+            self.assertEqual(value[GENERAL_KEY], "a" * 43)
             self.assertNotIn("MODEL_PROFILE", value)
             self.assertNotIn("AI_OPENAI_API_KEY", value)
+
+    def test_connect_rejects_unknown_general_profile(self):
+        with self.assertRaises(ValueError):
+            local_environment(
+                "general", ["http://127.0.0.1:18000/v1"], ["k" * 43], "unknown"
+            )
 
     def test_general_registration_contract(self):
         source = json.loads((ROOT / "serving/general-template.json").read_text())
@@ -103,9 +110,12 @@ class Contracts(unittest.TestCase):
                         "cloud": "runpod",
                         "resource_id": "abc12345",
                         "base_url": "https://abc12345-8000.proxy.runpod.net/v1",
+                        "model_profile": "qwen38-27b-fp8",
+                        "model": "Qwen/Qwen3.8-27B-FP8",
                     }
                 ),
-                "AI_LLM_ENDPOINTS": "[]",
+                "AI_GENERAL_PROVIDER": "vllm",
+                "AI_GENERAL_MODEL": "Qwen/Qwen3.8-27B-FP8",
             },
         }
         api, worker, _ = render_env.build_process_environments(
@@ -114,9 +124,9 @@ class Contracts(unittest.TestCase):
             migration_url="migration",
             ai_provider_keys={GENERAL_KEY: "g" * 43},
         )
-        self.assertEqual(api[GENERAL_KEY], "g" * 43)
+        self.assertNotIn(GENERAL_KEY, api)
         self.assertEqual(worker[GENERAL_KEY], "g" * 43)
-        self.assertNotIn("g" * 43, worker["AI_LLM_ENDPOINTS"])
+        self.assertNotIn("g" * 43, worker["AI_GENERAL_BASE_URL"])
 
 
 class Cutover(unittest.TestCase):

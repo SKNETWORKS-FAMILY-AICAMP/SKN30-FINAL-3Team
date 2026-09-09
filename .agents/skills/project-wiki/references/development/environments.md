@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-09
 ---
 
 # 개발환경 원칙
@@ -29,26 +29,33 @@ Qwen을 활성화하고 f2/general별 AWS·RunPod를 명시 선택한다. Backen
 읽으며 AI에는 값을 주입한다. 개인 설정과 로컬 DB 모델 선택은 공유 dev 설정을 변경하지 않는다.
 연결·검증 명령은 [LLM 운영 절차](../../../../../infra/serving/README.md)를 따른다.
 
-Backend 실행에 필요한 AI 키를 과거에 `ai/.env`에만 두었다면 해당 입력을
-`backend/.env` 또는 Backend 프로세스 환경변수로 제공해야 한다. AI 단독 실행은 계속
-`ai/.env`를 사용한다. 다른 모듈의 개인 파일을 자동으로 읽거나 복사하지 않는다.
-이미 Backend에 입력을 제공하는 개발자는 설정 파일이나 실행 명령을 바꿀 필요가 없다.
+AI 설정은 `ai/.env.local`/`ai/.env`만 소유한다. 로컬 API/Worker는 Infra launcher가
+Backend·AI 입력을 각각 검증해 주입한다. 기존 Backend 개인 파일의 AI 입력은 명시적으로 이전한다.
+[ADR-0034](../decisions/ADR-0034-module-owned-environment.md)와
+[설정/실행 안내](../../../../../docs/development/environment-variables.md)를 따른다.
 
 ## 설정과 비밀값
 
-- 공통 정책의 정본은 [ADR-0015](../decisions/ADR-0015-environment-configuration-ownership.md)다.
+- 공통 정책은 [ADR-0015](../decisions/ADR-0015-environment-configuration-ownership.md)와
+  [입력 관리 보완 ADR-0033](../decisions/ADR-0033-environment-input-maintenance.md)을 따른다.
+  변수별 설명은 각 모듈 `.env.local`/`.env.example`, 사람용 작성 절차는
+  [환경변수 관리](../../../../../docs/development/environment-variables.md)가 소유한다.
+- Backend F3 합성 opt-in도 같은 config 로더를 사용한다. 로컬 F2는 offline으로 시작하며
+  연결 준비 후 SLLM/STT URL 쌍과 키를 지정한다. 미사용 embedding URL 기본값은 두지 않는다.
 - 각 모듈의 Git 추적 `.env.local`에는 팀 공통 비민감 로컬 기본값만 둔다.
 - 개발자는 비밀 또는 개인 입력 이름만 있는 `.env.example`을 Git에서 제외한 `.env`로 복사하고,
-  비밀값과 의도적인 개인 override만 채운다.
+  비밀값과 의도적인 개인 override만 채운다. 선택 공개 override는 예시에서 주석 처리해 빈 값 덮어쓰기를 막는다.
 - 로컬 우선순위는 `process env > .env > .env.local > 코드 기본값`이다. Backend·AI의 dev·test·prod는
   저장소 dotenv 파일을 읽지 않는다. Frontend build는 공개 `.env.local`을 읽고 CI·release의
   process env가 배포별 값을 덮는다. `.env.prod`와 모드별 dotenv 파일은 사용하지 않는다.
 - 비밀값은 승인된 비밀 저장소에서 관리하고 Infra가 CI·운영 프로세스 환경변수로 주입한다.
 - Backend를 포함한 애플리케이션 모듈은 비밀 저장소에 직접 접근하지 않고 주입된 환경변수만 읽는다.
 - API 키, DB 접속 URL·비밀번호, 클라우드 자격 증명과 개인정보를 Git 또는 공개 `.env` 파일에 기록하지 않는다.
-- 배포별 비민감 Backend·AI 설정은 Terraform map과 Parameter Store, 수동 AI key·Discord webhook은
-  ignored tfvars와 Secrets Manager가 소유한다. Terraform input은 ephemeral, secret version 값은
-  write-only로 전달하고 회전 version 번호만 plan·state에 남긴다.
+- dev 공개 설정은 Terraform map과 Parameter Store가 소유한다. AI·Discord·RunPod·GHCR 비밀값은
+  Secrets Manager와 TTY 운영 명령이 소유하며 tfvars에 넣지 않는다. Terraform은 컨테이너만 관리한다.
+  후속 소유권은 Infra ADR-0020·0022를 따른다.
+- `just -f infra/justfile env-doctor` / `env-fix`로 로컬 이름·권한을 점검·정리한다.
+  개인 파일을 다른 모듈·워크트리로 복사하지 않는다. [설정 관리 위치](../../../../../infra/operations/configuration.md)를 따른다.
 - Frontend 공개 build 값은 로컬 `.env.local`과 Terraform Frontend build map이 소유하며 CodeBuild
   process env가 release build에 주입한다. `VITE_*`에는 비밀값을 넣지 않는다.
 - 로컬·dev·prod에서 같은 애플리케이션 인터페이스를 유지하되 개발 세션 route는 local·dev에만 둔다.

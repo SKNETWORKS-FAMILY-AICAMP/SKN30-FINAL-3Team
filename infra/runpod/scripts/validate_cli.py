@@ -3,13 +3,20 @@
 No GPU initialization, model download, credential loading, or server startup.
 """
 
+from unittest.mock import patch
+
 from supervisor import RuntimeConfig, build_commands
 
 
 def main() -> None:
     from vllm.entrypoints.openai.cli_args import make_arg_parser
+    from vllm.platforms import current_platform
     from vllm.utils import FlexibleArgumentParser
 
+    # The CUDA image is built on a host without GPU drivers. This only supplies
+    # a device type while constructing parser defaults; no engine is created.
+    with patch.object(current_platform, "device_type", "cpu"):
+        parser = make_arg_parser(FlexibleArgumentParser())
     for mode in ("base", "lora"):
         config = RuntimeConfig(
             release_mode=mode,
@@ -25,7 +32,6 @@ def main() -> None:
             stt_api_key="",
         )
         for command in build_commands(config, "vllm").values():
-            parser = make_arg_parser(FlexibleArgumentParser())
             parser.parse_args(command[2:])
     print("vLLM runtime command parsing: OK")
 

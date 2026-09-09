@@ -5,6 +5,8 @@ updated: 2026-09-08
 
 # ADR-0030: local·dev를 구분한 F2·범용 GPU 운영
 
+> 환경변수 입력·주입 계약은 [ADR-0034](ADR-0034-module-owned-environment.md)에서 부분 대체한다.
+
 > 2026-09-08 범용 단일 모델 선택 부분은 [ADR-0032](ADR-0032-general-model-comparison-profiles.md)가 부분 대체한다.
 
 

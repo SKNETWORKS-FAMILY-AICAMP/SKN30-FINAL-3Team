@@ -41,6 +41,10 @@ updated: 2026-09-07
 
 | [ADR-0032](ADR-0032-general-model-comparison-profiles.md) | 사용자 구현·평가 승인·코드 구현·팀 검토 대기 | 범용 3모델 고정 프로필·실제 가중치 검증·명시 선택과 동일 조건 비교 |
 
+| [ADR-0033](ADR-0033-environment-input-maintenance.md) | 사용자 구현 승인·구현됨·팀 검토 전 | env 파일 역할·주석·Worker config 통일·F2 명시 연결·진단 기준 |
+
+| [ADR-0034](ADR-0034-module-owned-environment.md) | 사용자 명시 구현 승인·코드 구현·팀 병합 검토 전·기동 미실행 | 모듈 소유 입력·enum 선택·로컬 주입·Worker/F2/endpoint 입력의 명시적 부분 대체 |
+
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 
 LangGraph의 AI 모듈 내부 채택 범위는 [AI ADR-0002](../../../ai/references/decisions/ADR-0002-langgraph-adoption.md)에서 관리한다. Terraform의 루트·state 세부 기준은 [Infra ADR-0001](../../../infra/references/decisions/ADR-0001-terraform-layout-and-state.md)에서 관리한다. 개발·시연 자원과 전달 세부 기준은 [Infra ADR-0002](../../../infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)에서 관리한다.

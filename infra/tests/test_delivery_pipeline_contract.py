@@ -11,7 +11,12 @@ DELIVERY_ROOT = REPOSITORY_ROOT / "infra/delivery"
 
 
 def read(relative_path: str) -> str:
-    return (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+    text = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+    if relative_path == "infra/environments/dev/delivery.tf":
+        text += (
+            REPOSITORY_ROOT / "infra/environments/dev/delivery-build.tf"
+        ).read_text(encoding="utf-8")
+    return text
 
 
 class DeliveryPipelineContractTests(unittest.TestCase):
@@ -415,6 +420,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         )
         self.assertIn(
             "dev-destroy-show:\n"
+            "    python3 scripts/plan_guard.py check environments/dev/dev-destroy.tfplan\n"
             "    terraform -chdir=environments/dev show dev-destroy.tfplan",
             justfile,
         )

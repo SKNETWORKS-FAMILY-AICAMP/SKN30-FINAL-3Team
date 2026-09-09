@@ -831,6 +831,15 @@ sources:
       - "references/decisions/ADR-0005-requirements-management.md"
     scope: "통합본의 기능 내용을 검색 의도별 문서로 분할하고 요구사항 관리·검색 경로를 구성함. 기능 요구사항 자체는 변경하지 않음."
 
+  - id: "module-owned-environment-approval-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 인프라 개선 대화: 모듈별 불필요 환경변수 제거안에 대한 '개선안을 진행해주세요'와 provider/model enum 구현 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0034-module-owned-environment.md"
+      - "docs/development/environment-variables.md"
+    scope: "사용자가 지목한 WORKER_ENABLED·AI_F2_PROVIDER_STATUS·AI_LLM_ENDPOINTS 등의 정리와 모듈 소유 입력·enum 구현 승인. 로컬 OpenAI/dev vLLM 선택. 팀 PR 병합 승인·서비스 기동 승인과 구분"
+
   - id: "local-dev-dual-cloud-serving-2026-09-07"
     type: "user-instruction"
     location: "Codex 대화: Local·dev를 구분한 AWS·RunPod LLM 운영 통합 구현 계획"

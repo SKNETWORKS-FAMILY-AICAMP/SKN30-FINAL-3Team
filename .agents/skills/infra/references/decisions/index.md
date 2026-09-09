@@ -7,6 +7,7 @@ updated: 2026-09-07
 
 | ADR | 상태 | 결정 |
 |---|---|---|
+| [ADR-0023](ADR-0023-developer-operations-entrypoints.md) | 사용자 요청·코드 구현·팀 검토 전·기동 미실행 | 개발자 진단·검증 진입점, stale plan 차단과 state version 보호 코드 |
 | [ADR-0001](ADR-0001-terraform-layout-and-state.md) | 승인됨 | 계정 bootstrap과 환경별 root, S3 native state 잠금 사용 |
 | [ADR-0002](ADR-0002-dev-demo-aws-runpod-architecture.md) | 부분 대체됨 | NAT 없는 EC2·RDS·S3 유지; 전달은 ADR-0011, RunPod 운영은 프로젝트 ADR-0020이 대체 |
 | [ADR-0003](ADR-0003-dev-storage-database-and-configuration.md) | 부분 대체됨 | 개발 환경 RDS·업무용 S3·설정 저장소와 보존 기준 |

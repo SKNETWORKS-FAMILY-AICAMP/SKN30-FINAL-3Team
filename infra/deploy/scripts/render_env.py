@@ -35,7 +35,7 @@ F2_AI_PROVIDER_KEYS = (
 )
 F2_ENV_NAMES = frozenset(
     {
-        "AI_F2_PROVIDER_STATUS",
+        "_f2_status",
         "AI_VLLM_SLLM_BASE_URL",
         "AI_VLLM_STT_BASE_URL",
         *F2_AI_PROVIDER_KEYS,
@@ -44,7 +44,7 @@ F2_ENV_NAMES = frozenset(
 F2_API_KEY = re.compile(r"^[A-Za-z0-9_-]{43,128}$")
 AI_VLLM_ENDPOINT_SET_NAME = "AI_VLLM_ENDPOINT_SET"
 AI_VLLM_BASE_URL_NAMES = frozenset(
-    {"AI_VLLM_SLLM_BASE_URL", "AI_VLLM_STT_BASE_URL", "AI_F2_PROVIDER_STATUS"}
+    {"AI_VLLM_SLLM_BASE_URL", "AI_VLLM_STT_BASE_URL", "_f2_status"}
 )
 AI_VLLM_ENDPOINT_SET_FIELDS = frozenset(
     {
@@ -214,7 +214,7 @@ def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
             raise SystemExit(
                 "offline AI vLLM endpoint set must have null Pod, release and URLs"
             )
-        return {"AI_F2_PROVIDER_STATUS": "offline"}
+        return {"_f2_status": "offline"}
 
     if cloud == "aws":
         if (
@@ -225,7 +225,7 @@ def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
             raise SystemExit("AWS endpoint requires a release and no Pod ID")
         try:
             return {
-                "AI_F2_PROVIDER_STATUS": "active",
+                "_f2_status": "active",
                 "AI_VLLM_SLLM_BASE_URL": aws_base_url(
                     payload["sllm_base_url"],
                     instance_id=instance_id,
@@ -250,7 +250,7 @@ def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
     if not isinstance(release_id, str) or not SLLM_RELEASE_ID.fullmatch(release_id):
         raise SystemExit("active AI vLLM endpoint set sllm_release_id is invalid")
     return {
-        "AI_F2_PROVIDER_STATUS": "active",
+        "_f2_status": "active",
         "AI_VLLM_SLLM_BASE_URL": validate_runpod_base_url(
             payload["sllm_base_url"], pod_id=pod_id, port=8001
         ),
@@ -280,8 +280,6 @@ def expand_ai_vllm_endpoint_set(
         general = json_object(general_raw, label="general endpoint")
         if general.get("status") not in {"active", "offline"}:
             raise SystemExit("invalid general endpoint status")
-        entries = json.loads(ai.get("AI_LLM_ENDPOINTS", "[]"))
-        entries = [entry for entry in entries if entry.get("alias") != GENERAL_ALIAS]
         if general["status"] == "active":
             try:
                 expected_url = endpoint_urls(
@@ -306,8 +304,19 @@ def expand_ai_vllm_endpoint_set(
                 validate_general_endpoint(entry)
             except ValueError as error:
                 raise SystemExit(str(error)) from None
-            entries.append(entry)
-        ai["AI_LLM_ENDPOINTS"] = json.dumps(entries)
+            if ai.get("AI_GENERAL_PROVIDER") == "vllm":
+                if (
+                    not general.get("model_profile")
+                    or not ai.get("AI_GENERAL_MODEL")
+                    or general.get("model") != ai["AI_GENERAL_MODEL"]
+                ):
+                    raise SystemExit(
+                        "general endpoint model must match AI_GENERAL_MODEL; "
+                        "review the selected serving profile and Terraform settings"
+                    )
+                if ai.get("AI_GENERAL_BASE_URL"):
+                    raise SystemExit("general endpoint collides with explicit base URL")
+                ai["AI_GENERAL_BASE_URL"] = str(general["base_url"])
     return expanded
 
 
@@ -465,7 +474,7 @@ def build_process_environments(
         )
 
     f2_keys: dict[str, str] = {}
-    if ai.get("AI_F2_PROVIDER_STATUS") == "active":
+    if ai.get("_f2_status") == "active":
         missing = [name for name in F2_AI_PROVIDER_KEYS if name not in ai_provider_keys]
         if missing:
             raise SystemExit(
@@ -475,25 +484,36 @@ def build_process_environments(
         f2_keys = {name: ai_provider_keys[name] for name in F2_AI_PROVIDER_KEYS}
 
     general_keys = {}
-    if any(
-        entry.get("alias") == GENERAL_ALIAS
-        for entry in json.loads(ai.get("AI_LLM_ENDPOINTS", "[]"))
+    provider = ai.get("AI_GENERAL_PROVIDER", "openai")
+    key_name = "AI_OPENAI_API_KEY" if provider == "openai" else GENERAL_KEY
+    if provider == "openai" or (
+        provider in {"vllm", "llama_cpp"} and ai.get("AI_GENERAL_BASE_URL")
     ):
-        if not ai_provider_keys.get(GENERAL_KEY):
-            raise SystemExit("active general endpoint requires AI_GENERAL_API_KEY")
-        general_keys[GENERAL_KEY] = ai_provider_keys[GENERAL_KEY]
+        # Preserve the existing Secrets Manager key; normalize only at injection.
+        key = ai_provider_keys.get(key_name)
+        if key:
+            general_keys[GENERAL_KEY] = key
+        elif ai.get("AI_GENERAL_BASE_URL"):
+            raise SystemExit("active general endpoint requires a provider API key")
+    ai.pop("_f2_status", None)
+    if any(name.startswith("AI_") for name in backend) or any(
+        not name.startswith("AI_") for name in ai
+    ):
+        raise SystemExit("public configuration violates module ownership")
     api = {**backend, **ai, **f2_keys, **general_keys, "DB_URL": runtime_url}
     worker = {
         name: value
-        for name, value in {
-            **backend,
-            **ai,
-            "DB_URL": runtime_url,
-            **ai_provider_keys,
-        }.items()
-        if name not in F2_ENV_NAMES
+        for name, value in api.items()
+        if name not in F2_ENV_NAMES and not name.startswith(("AI_F2_", "AI_VLLM_"))
     }
-    worker["AI_F2_PROVIDER_STATUS"] = "offline"
+    if backend.get("CHATBOT_ENABLED", "").strip().lower() not in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }:
+        api.pop(GENERAL_KEY, None)
+        api.pop("AI_GENERAL_BASE_URL", None)
     migration = {"DB_MIGRATION_URL": migration_url}
     return api, worker, migration
 
@@ -542,13 +562,14 @@ def refresh_f2_environment(
             )
         values[name] = value
     endpoint = parse_ai_vllm_endpoint_set(endpoint_raw)
-    if endpoint["AI_F2_PROVIDER_STATUS"] == "active":
+    if endpoint["_f2_status"] == "active":
         if not all(name in keys for name in F2_AI_PROVIDER_KEYS):
             raise SystemExit("active F2 endpoint requires both API keys")
         endpoint.update({name: keys[name] for name in F2_AI_PROVIDER_KEYS})
     preserved = {
         name: value for name, value in values.items() if name not in F2_ENV_NAMES
     }
+    endpoint.pop("_f2_status", None)
     write_env(path, {**preserved, **endpoint})
 
 
@@ -598,7 +619,7 @@ def main() -> None:
         endpoint = parse_ai_vllm_endpoint_set(endpoint_raw)
         keys = (
             read_ai_keys(ai_secret_id, region)
-            if endpoint["AI_F2_PROVIDER_STATUS"] == "active"
+            if endpoint["_f2_status"] == "active"
             else {}
         )
         refresh_f2_environment(args.api_output, endpoint_raw, keys)

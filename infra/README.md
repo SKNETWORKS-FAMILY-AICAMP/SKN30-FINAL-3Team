@@ -1,5 +1,7 @@
 # Infra
 
+개발자 시작점은 [운영 안내](operations/README.md)입니다. `env-doctor → doctor → release-ready`로 준비하고, 기동 후 `dev-verify`로 확인합니다. 적용 여부의 정본은 [인벤토리](../.agents/skills/infra/references/resource-inventory.md)이며 날짜별 과거 검증과 구분합니다.
+
 현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
 
 
@@ -18,7 +20,7 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 ## 구조와 소유 범위
 
 - `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결, state bucket
-- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 기존 dev 자원은 적용됐고 deep lifecycle과 이번 환경설정·delivery 변경은 plan·apply 전
+- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 적용 여부는 인벤토리를 참조하고 현재 전원은 doctor로 조회
 - `justfile`: 반복되는 검증, plan/apply와 DB 운영 명령의 진입점
 - `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
@@ -97,7 +99,7 @@ Terraform 적용 뒤 `just secret-status`로 AWSCURRENT 존재를 확인하고
 `just secret-rotate <target>`에서 최초 값 또는 회전할 값을 TTY 비표시로 입력한다.
 RunPod 자원은 Console에서 만들고 `runpod-register-plan → runpod-register`로 검증·등록한다.
 AI Secret은 기존 renderer 호환 평면 `AI_*_API_KEY` JSON이며 F2 key 두 개는 RunPod Console과
-같은 값을 입력한다. GHCR credential은 Console에서만 관리하며 기존 AWS 컨테이너는 사용하지 않는다.
+같은 값을 입력한다. RunPod GHCR credential은 Console registry가, AWS GPU용 credential은 기존 AWS GHCR Secret이 소유한다.
 OpenAI key는 선택값이며 Bedrock은 EC2 Instance Role SigV4를 사용하므로 key를 생성·저장하지 않는다.
 실제 값과 PAT는 tfvars, 명령 인자, plan/state, 로그나 Discord에 넣지 않는다.
 구체적인 Console 설정·등록·일상 운영은 [RunPod runbook](runpod/README.md)을 따른다.
@@ -178,7 +180,7 @@ just dev-start
 3. EC2 `InService`와 SSM `Online` 상태를 기다린다.
 4. ALB target 상태를 결과에 포함한다.
 
-ASG 축소는 EC2 정지가 아니라 종료이며 다음 시작에는 Launch Template으로 새 인스턴스를 만든다. 로컬 root volume은 보존되지 않는다. 현재 delivery 구현 전에는 새 인스턴스에 애플리케이션이 자동 배포되지 않으므로 ALB target 상태는 정보로만 출력한다.
+ASG 축소는 EC2 정지가 아니라 종료이며 다음 시작에는 Launch Template으로 새 인스턴스를 만든다. 로컬 root volume은 보존되지 않는다. 새 코드의 최초 배포에는 dev-prepare-app 후 통합 Pipeline을 사용한다. 기존 dev-start의 마지막 성공 revision 복원은 최신 코드 배포를 대신하지 않는다.
 
 RDS 정지는 임시 개발 비용 절감 기능이다. 데이터, endpoint와 설정은 유지되지만 스토리지와 백업, ALB, public IPv4 등 잔여 비용은 계속 발생한다. RDS는 7일 연속 정지 후 자동으로 시작되므로 장기 휴무에는 상태를 다시 확인한다. 자세한 제한은 [AWS RDS 정지 문서](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html)를 따른다.
 

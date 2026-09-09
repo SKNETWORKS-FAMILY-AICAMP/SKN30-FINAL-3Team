@@ -13,44 +13,30 @@ uv sync --frozen
 
 ## 환경 설정
 
-팀 공통 endpoint와 timeout은 Git에서 추적하는 [`.env.local`](.env.local)에 있습니다. 모델 API 비밀값과 개인별 재정의는 예제를 복사해 Git에서 제외되는 `.env`에 둡니다.
+AI 설정은 이 모듈의 `.env.local`(공개 기본값), `.env.example`(개인 입력/고급 예시),
+`.env`(개인 비밀·override)가 소유합니다. Backend 파일에 중복 선언하지 않습니다.
+로컬 API·Worker 실행은 Infra launcher가 AI 입력을 명시 주입합니다.
 
 ```bash
+# 최초에만 복사한 뒤 키를 입력합니다.
 cp .env.example .env
+chmod 600 .env
 ```
 
-`AiProfile.LOCAL`은 `.env.local`, 개인 `.env`, 실행 프로세스 환경변수 순서로 병합합니다.
-`AiProfile.DEV`, `AiProfile.TEST`, `AiProfile.PROD`는 dotenv 파일을 읽지 않고 CI·배포가 주입한
-프로세스 환경변수만 사용합니다. Backend의 F2 API와 Worker는 `APP_ENV`와 같은 이름의 AI profile을
-사용하므로 공유 AWS 개발 배포에서는 `dev` 설정으로 조립됩니다. 실제 비밀값은 `.env.example`,
-`.env.local` 또는 다른 추적 파일에 기록하지 않습니다.
+`AI_GENERAL_PROVIDER`와 `AI_GENERAL_MODEL`의 허용값·조합은
+[model_catalog.py](src/brokerage_ai/core/model_catalog.py)의 enum과 `.env.local` 주석을 따릅니다.
+연결 registry는 내부에서 구성합니다. Bedrock은 region과 AWS role을 사용하고,
+OpenAI/vllm/llama_cpp는 선택한 연결에 `AI_GENERAL_API_KEY`를 사용합니다.
+등록되지 않은 route는 다른 provider로 우회하지 않습니다.
 
-### 범용 생성 endpoint
+F2는 SLLM/STT URL이 모두 없으면 미구성(503), 일부만 있으면 설정 오류입니다.
+서버 alias `sllm`/`stt`, 언어 `ko`도 enum입니다. 실제 파인튜닝 버전은 Infra release로 구분합니다.
+미사용 embedding 주소의 암묵적 기본값은 없습니다.
 
-F3와 향후 범용 생성 기능은 `AI_LLM_ENDPOINTS`의 공개 주소록으로 실제 endpoint를 찾습니다.
-DB의 provider·model·endpoint alias와 주소록의 `(provider, alias)`가 정확히 일치해야 하며,
-등록되지 않은 route는 OpenAI나 F2 vLLM로 fallback하지 않습니다.
-
-llama.cpp와 vLLM은 별도 API key 환경변수를 참조합니다. JSON에는 key 원문을 넣지 않습니다.
-
-```dotenv
-AI_LLM_ENDPOINTS=[{"alias":"general-dev-gpu","provider":"llama_cpp","base_url":"https://gpu-endpoint/v1","api_key_env":"AI_GENERAL_DEV_GPU_API_KEY"}]
-AI_GENERAL_DEV_GPU_API_KEY=<private-api-key>
-```
-
-Bedrock은 임의 URL과 API key를 받지 않습니다. AWS 리전에서 공식 Bedrock Runtime URL을 만들고
-botocore 기본 credential chain의 Instance Role 임시 자격 증명으로 요청마다 SigV4 서명합니다.
-
-```dotenv
-AI_LLM_ENDPOINTS=[{"alias":"general-dev-bedrock","provider":"bedrock","aws_region":"ap-northeast-2"}]
-```
-
-Bedrock adapter는 OpenAI-compatible Responses API를 비스트리밍으로 호출하고 `store=false`를
-고정합니다. 서버측 Structured Outputs 대신 JSON Schema를 지시한 뒤 Pydantic으로 결과를 다시
-검증합니다. OpenAI와 F2 RunPod 설정은 기존 전용 변수로 유지합니다. 공유 dev는 Infra apply와
-Instance Role 기반 doctor가 성공한 뒤 운영자가 `dev-bedrock-gpt56-luna` seed를 명시
-적용하고 합성 smoke로 검증합니다. 코드 배포만으로 활성 모델이나 fallback이 바뀌지
-않습니다.
+`load_ai_config(local)`은 AI 파일을 읽고, test/dev/prod는 process env만 사용합니다.
+`bind_ai_config`는 주입된 값을 검증하며 파일·AWS·DB를 읽지 않습니다.
+우선순위·개인 파일 이전·DB 모델 버전 반영과 실행 명령은
+[환경변수 관리](../docs/development/environment-variables.md)를 따릅니다.
 
 ## F2 음성메모 파이프라인
 
