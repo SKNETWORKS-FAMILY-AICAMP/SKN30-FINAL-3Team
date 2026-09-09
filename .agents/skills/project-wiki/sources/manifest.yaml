@@ -824,3 +824,26 @@ sources:
       - "references/decisions/ADR-0030-local-dev-dual-cloud-serving.md"
       - ".agents/skills/infra/references/decisions/ADR-0022-dual-cloud-gpu-lifecycle.md"
     scope: "f2/general 독립 배치, local OpenAI 유지, 명시적 전환·전원·캐시·SSM 권한과 실제 검증 완료 기준"
+
+  - id: "f3-position-card-review-2026-09-09"
+    type: "user-instruction"
+    location: "docs/requirements/sources/f3-position-card-review-2026-09-09.md"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/requirements/f3/position-card-delivery.md"
+      - "docs/architecture/f3/position-card-review.md"
+      - "docs/architecture/f3/position-card-events.md"
+      - "docs/architecture/f3/position-card-infrastructure.md"
+      - "references/open-questions.md"
+    scope: "F3 구현 현황·저장 부하·이벤트 분리·DB 결과 재사용 검토와 신규 독립 카드 요구안·local/dev 자원 제안. 구현·기술 채택 승인 아님"
+
+  - id: "f3-worker-auto-judgment-review-2026-09-09"
+    type: "user-instruction"
+    location: "docs/requirements/sources/f3-worker-auto-judgment-review-2026-09-09.md"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/architecture/f3/worker-deployment-review.md"
+      - "docs/architecture/f3/conditional-auto-judgment.md"
+      - "docs/requirements/f3/judgment-results-list.md"
+      - "references/open-questions.md"
+    scope: "별도 프로세스·서버 확장성 검토, GPU 상시 운영 조건과 사용자 대기를 반영한 조건부 자동 판정·결과 목록 우선 제안. 독립 배포·정책·기능 구현 승인 아님"

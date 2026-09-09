@@ -20,8 +20,9 @@
 
 ## 병렬화
 
-후보를 **순차로** 처리한다. SQLModel `Session` 은 여러 async task 가 공유할 수 없고, 카드
-하나가 곧 transaction 하나라 세션을 나누면 커넥션 수와 fencing 이 함께 복잡해진다.
+입력 준비와 카드 저장은 순차로 처리하고, DB transaction을 닫은 뒤 cache miss의 모델
+호출만 병렬로 실행한다. SQLModel `Session`을 async task 사이에서 공유하지 않는다.
+모델 호출 일부가 실패해도 성공 카드는 개별 재검증 후 저장하며, 전체 확보 전에는 진행하지 않는다.
 """
 
 from __future__ import annotations
@@ -354,7 +355,7 @@ async def generate_and_store_candidate_cards(
     input_tokens = output_tokens = latency_ms = 0
     for index, (candidate_ordinal, candidate_id, prepared) in enumerate(prepared_cards):
         if prepared.request is not None and index not in produced:
-            break  # 이 후보가 실패했다. 뒤 후보도 저장하지 않는다 — 순서를 유지한다.
+            continue  # 생성 실패만 건너뛴다. 후행 성공 카드도 저장해야 재시도에서 재사용된다.
         result = produced.get(index)
         try:
             if result is not None:

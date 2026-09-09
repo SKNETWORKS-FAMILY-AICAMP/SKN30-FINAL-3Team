@@ -9,6 +9,7 @@ updated: 2026-09-09
 
 | 문서 | 읽는 조건 |
 |---|---|
+| [F3 실행·카드·자동 판정 검토](../../../../docs/architecture/f3/position-card-review.md) | F3 현재 구현·Worker 확장성·조건부 자동 판정·결과 목록의 검토안을 확인할 때 |
 | [프로젝트 개요](project-overview.md) | 목표·범위·제약을 확인할 때 |
 | [요구사항 인덱스](../../../../docs/requirements/index.md) | 기능 범위·사용자 동작·수용 기준·요구사항 ID를 확인할 때 |
 | [모듈 경계](architecture/overview.md) | 모듈 책임이나 의존 관계를 변경할 때 |

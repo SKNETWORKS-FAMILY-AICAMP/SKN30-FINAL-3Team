@@ -29,7 +29,7 @@ updated: 2026-09-04
 - AI 호출 전후 transaction 분리와 lease·attempt·입력 버전·상담 범위·source identity 재검증
 - 검증된 카드·거래 유형별 가격·근거 인용과 quote offset 저장
 - cache hit 재사용과 저장 경합 단일화, `ANCHOR_READY` 상태 전이
-- 결정적 SQL 후보 snapshot의 상위 5건에 대한 반대편 카드 순차 생성·캐시 재사용
+- 결정적 SQL 후보 snapshot의 상위 5건에 대한 반대편 카드 병렬 생성·순차 검증/저장·캐시 재사용
 - 후보 카드 ID snapshot 기록과 전건 성공 후 `CANDIDATE_CARDS_READY` 상태 전이
 - 중개 판정 계약 `brokerage-judgment:v1`, 등급·행동·근거 어휘와 프레임워크 중립 Protocol
 - 앵커 1장과 후보 1~5장을 한 번에 보내는 Provider 중립 구조화 출력 생성기

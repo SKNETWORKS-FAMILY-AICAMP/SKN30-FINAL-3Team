@@ -1,9 +1,13 @@
 ---
 status: 구현됨
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 # 요구사항 변경 이력
+
+- 2026-09-09 (`F3-AUTO-LIST-REVIEW-20260909`): 후속 사용자 요청의 GPU 상시 운영·사용자 대기 비용을 반영해 [조건부 자동 판정과 결과 목록](f3/judgment-results-list.md)을 1차 권고안으로 작성했다. 카드 독립 조회안은 보조 대안으로 보존한다. 실제 사용성·부하 검증 전이며 ADR-0018·공개 계약·화면 구현은 변경하지 않았다.
+
+- 2026-09-09 (`F3-CARD-REVIEW-20260909`): 사용자 요청에 따라 [독립 카드 API·화면 요구사항 검토안](f3/position-card-delivery.md)을 작성했다. 생성/조회 분리·최신성·완료 판정 재사용을 제안으로 정의했으며 기존 ADR-0018·공개 계약·구현은 변경하지 않았다.
 
 - 2026-09-08 (`CHATBOT-IMPLEMENT-20260908`): 사용자 구현 요청에 따라 F4 챗봇 1차와 DB 저장·복원을 구현했다. 정확도·안전성·warm 성능은 필수로, 팀원 사용성 평가는 후속으로 정했다. 후속 지시에 따라 Qwen 기동·실제 평가는 보류하고 Luna로 검증한다. 공유 dev DB 변경·배포는 제외한다. [범위 출처](sources/chatbot-implementation-scope-2026-09-08.md)와 [검증 결과](../architecture/chatbot/implementation-and-validation.md)를 연결한다.
 
