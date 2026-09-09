@@ -5,6 +5,7 @@ import { once } from "node:events";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
+import { mkdir } from "node:fs/promises";
 
 // Synthetic HTTP+real SSE fixture. Browser uses the production transport/controller/components.
 let vite, browser, backend, baseUrl;
@@ -15,7 +16,7 @@ const streams = new Set();
 let db;
 function reset() {
   for (const stream of streams) stream.end(); streams.clear();
-  db = { enabled: true, conversation: null, messages: [], request: null, submissions: [], mutations: [], failDelete: false, failStatus: false, delayHistory: false, pendingHistory: [], disabledDiscovery: false };
+  db = { enabled: true, conversation: null, messages: [], request: null, submissions: [], mutations: [], failDelete: false, failStatus: false, delayHistory: false, pendingHistory: [], disabledDiscovery: false, historyPageSize: 0 };
 }
 function conversation(active = null) { return { id: cid, active_request: active, active_filters: {}, state_version: 1, created_at: date, updated_at: date }; }
 function request(id = randomUUID()) { return { id, conversation_id: cid, status: "RUNNING", stage: "interpreting", revision: 1, failure_code: null, answer: null, created_at: date, completed_at: null }; }
@@ -28,7 +29,8 @@ function event(type, value = db.request) {
 }
 function emit(type, value = db.request) { for (const stream of streams) stream.write(event(type, value)); }
 function complete() {
-  const answer = { id: 2, request_id: db.request.id, sequence_no: 2, role: "assistant", content: result().text, result_payload: result(), created_at: date };
+  const sequence = (db.messages.at(-1)?.sequence_no ?? 0) + 1;
+  const answer = { id: sequence, request_id: db.request.id, sequence_no: sequence, role: "assistant", content: result().text, result_payload: result(), created_at: date };
   db.request = { ...db.request, status: "COMPLETED", stage: "completed", revision: 4, completed_at: date, answer };
   db.messages.push(answer); db.conversation = { ...conversation(), state_version: 2, active_filters: result().filters };
   emit("completed");
@@ -46,7 +48,10 @@ async function handle(request, response) {
   if (path === "/conversation") return json(response, { enabled: db.enabled, conversation: db.conversation });
   if (path === "/conversations" && method === "POST") { db.conversation ??= conversation(); return json(response, db.conversation); }
   if (path.endsWith("/messages")) {
-    const body = { items: db.messages, next_cursor: null };
+    const before = Number(url.searchParams.get("before") ?? Infinity);
+    const eligible = db.messages.filter((message) => message.sequence_no < before);
+    const items = db.historyPageSize ? eligible.slice(-db.historyPageSize) : eligible;
+    const body = { items, next_cursor: eligible.length > items.length ? items[0].sequence_no : null };
     if (db.delayHistory) { db.pendingHistory.push(() => json(response, body)); return; }
     return json(response, body);
   }
@@ -91,7 +96,9 @@ before(async () => {
     const read = (chunk) => { output += String(chunk).replace(/\u001b\[[0-9;]*m/g, ""); const match = output.match(/http:\/\/127\.0\.0\.1:\d+\//); if (match) { clearTimeout(timeout); resolve(match[0]); } };
     vite.stdout.on("data", read); vite.stderr.on("data", read); vite.once("exit", () => { clearTimeout(timeout); reject(new Error(output)); });
   });
-  browser = await chromium.launch();
+  browser = process.env.CHATBOT_BROWSER_WS_ENDPOINT
+    ? await chromium.connect(process.env.CHATBOT_BROWSER_WS_ENDPOINT)
+    : await chromium.launch();
 });
 after(async () => { await browser?.close(); vite?.kill(); for (const socket of sockets) socket.destroy(); await new Promise((resolve) => backend?.close(resolve)); });
 async function open(page) {
@@ -251,4 +258,144 @@ test("another tab advancing recent context or replacing the conversation clears 
   await page.getByRole("button", { name: /^업무 챗봇 열기/ }).click();
   await page.getByText("이런 걸 물어보세요", { exact: true }).waitFor();
   assert.equal(await page.locator(".chatbot__message").count(), 0); await page.close();
+});
+
+
+
+
+async function screenshot(page, name) {
+  const directory = process.env.CHATBOT_SCREENSHOT_DIR;
+  if (!directory) return;
+  await mkdir(directory, { recursive: true });
+  await page.screenshot({ path: `${directory}/${name}.png` });
+}
+
+test("drafts remain editable while running; retry preserves a separate draft and Enter respects IME", async () => {
+  reset(); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await open(page);
+  await screenshot(page, "chatbot-windows-welcome");
+  const input = page.getByLabel("질문", { exact: true });
+  await input.fill("매물 질문");
+  await input.dispatchEvent("keydown", { key: "Enter", code: "Enter", isComposing: true, bubbles: true });
+  assert.equal(db.submissions.length, 0);
+  await input.press("Shift+Enter");
+  await input.press("B");
+  assert.match(await input.inputValue(), /\nB$/);
+  await input.press("Enter");
+  await page.getByText("검색 조건 해석 중", { exact: true }).waitFor();
+  await page.waitForFunction(() => document.activeElement?.id === "chatbot-question" && !document.querySelector("#chatbot-question").disabled);
+  await input.fill("이번 달 만기 일정 보기");
+  await input.press("Enter");
+  assert.equal(db.submissions.length, 1);
+  assert.equal(await page.getByRole("button", { name: "전송", exact: true }).isDisabled(), true);
+  await screenshot(page, "chatbot-windows-running");
+  await page.getByRole("button", { name: "요청 중지", exact: true }).click();
+  await page.getByText("요청을 중지했어요.", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "이 질문 다시 시도", exact: true }).click();
+  await page.getByText("검색 조건 해석 중", { exact: true }).waitFor();
+  await page.waitForFunction(() => !document.querySelector("#chatbot-question").disabled);
+  assert.equal(await input.inputValue(), "이번 달 만기 일정 보기");
+  assert.equal(db.submissions[1].question, db.submissions[0].question);
+  complete();
+  await page.getByText("전체 11건", { exact: false }).waitFor();
+  assert.equal(await input.inputValue(), "이번 달 만기 일정 보기");
+  assert.equal(await page.getByRole("button", { name: "전송", exact: true }).isEnabled(), true);
+  await screenshot(page, "chatbot-windows-results");
+  await page.close();
+});
+
+test("older history preserves the visible message and incoming answers never pull a reader down", async () => {
+  reset(); db.historyPageSize = 20;
+  db.request = request(); db.conversation = conversation(db.request);
+  db.messages = Array.from({ length: 40 }, (_, index) => ({ id: index + 1, sequence_no: index + 1, request_id: db.request.id, role: index % 2 ? "assistant" : "user", content: `합성 대화 ${index + 1}\n조건을 확인하고 장부에서 원하는 대상을 찾아보세요.`, result_payload: null, created_at: date }));
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }); await open(page);
+  await page.locator('[data-message-id="40"]').waitFor();
+  const history = page.getByLabel("대화 이력", { exact: true });
+  await history.evaluate((element) => { element.scrollTop = 0; });
+  await page.getByRole("button", { name: "최신 대화로 이동" }).waitFor();
+  const position = async () => page.locator('[data-message-id="21"]').evaluate((element) => element.getBoundingClientRect().top - element.closest(".chatbot__history").getBoundingClientRect().top);
+  const before = await position();
+  await page.getByRole("button", { name: "이전 대화 이력 보기" }).click();
+  await page.locator('[data-message-id="1"]').waitFor();
+  assert.ok(Math.abs((await position()) - before) < 3, "prepending history must preserve the same visible message");
+  await waitForOpenStream(); complete();
+  await page.getByText("전체 11건", { exact: false }).waitFor();
+  assert.ok(Math.abs((await position()) - before) < 3, "a new answer must not move a reader of old messages");
+  await screenshot(page, "chatbot-windows-history");
+  await page.getByRole("button", { name: "최신 대화로 이동" }).click();
+  await page.waitForFunction(() => {
+    const element = document.querySelector(".chatbot__history");
+    return element.scrollHeight - element.scrollTop - element.clientHeight < 2;
+  });
+  assert.equal(await inputFocus(page), true);
+  await page.close();
+});
+async function inputFocus(page) { return page.evaluate(() => document.activeElement?.id === "chatbot-question"); }
+
+test("small viewports retain an accessible composer and readable conversation", async () => {
+  for (const viewport of [{ width: 360, height: 740 }, { width: 720, height: 500 }]) {
+    reset(); const page = await browser.newPage({ viewport, reducedMotion: "reduce" });
+    await open(page);
+    const input = page.getByLabel("질문", { exact: true });
+    const bounds = await input.boundingBox();
+    const history = await page.getByLabel("대화 이력", { exact: true }).boundingBox();
+    assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= viewport.height);
+    assert.ok(history.height >= 80);
+    assert.equal(await page.getByLabel("대화 이력", { exact: true }).evaluate((element) => element.scrollTop), 0, "welcome opens at the introduction");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await screenshot(page, `chatbot-windows-${viewport.width}`);
+    await input.press("Escape");
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label")?.startsWith("업무 챗봇 열기"));
+    await page.close();
+  }
+});
+
+test("chat opens as a full-height right overlay without shifting the main content", async () => {
+  for (const viewport of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }, { width: 360, height: 740 }]) {
+    reset(); const page = await browser.newPage({ viewport });
+    await page.goto(`${baseUrl}tests/fixtures/chatbot.html`);
+    const mainTitle = page.getByRole("heading", { level: 1 });
+    const before = await mainTitle.boundingBox();
+    await page.getByRole("button", { name: /^업무 챗봇 열기/ }).click();
+    const panel = page.getByRole("region", { name: "업무 챗봇", exact: true });
+    const box = await panel.boundingBox();
+    assert.equal(box.y, 0);
+    assert.equal(box.height, viewport.height);
+    assert.equal(box.x + box.width, viewport.width);
+    const expectedWidth = viewport.width < 768 ? viewport.width : Math.min(768, Math.max(576, viewport.width * 0.45)) * 0.8;
+    assert.ok(Math.abs(box.width - expectedWidth) < 1, "desktop panel is 20% narrower; mobile remains full width");
+    assert.deepEqual(await mainTitle.boundingBox(), before, "opening chat must not resize or move the main layout");
+    assert.equal(await page.locator(".chatbot__trigger").isVisible(), false);
+    await screenshot(page, `chatbot-sidebar-${viewport.width}`);
+    await page.getByRole("button", { name: "업무 챗봇 접기", exact: true }).click();
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label")?.startsWith("업무 챗봇 열기"));
+    assert.deepEqual(await mainTitle.boundingBox(), before);
+    await page.close();
+  }
+});
+
+test("header help contains storage guidance and the compact composer grows then resets", async () => {
+  reset(); const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+  await open(page);
+  const input = page.getByLabel("질문", { exact: true });
+  const initial = await input.boundingBox();
+  assert.ok((await page.locator(".chatbot__footer").boundingBox()).height < 150);
+  await page.getByRole("button", { name: "대화 도움말" }).click();
+  await page.getByText("질문과 답변은 저장되며", { exact: false }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByText("질문과 답변은 저장되며", { exact: false }).waitFor({ state: "hidden" });
+  assert.equal(await page.locator("#chatbot-panel").isVisible(), true);
+  await input.fill("첫 줄\n둘째 줄\n셋째 줄\n넷째 줄");
+  assert.ok((await input.boundingBox()).height > initial.height);
+  await input.fill("");
+  assert.equal((await input.boundingBox()).height, initial.height);
+  await send(page); complete();
+  await page.getByText("전체 11건", { exact: false }).waitFor();
+  await page.getByRole("button", { name: "대화 도움말" }).click();
+  await page.locator(".chatbot__help-content").getByText("답변을 저장했어요.", { exact: true }).waitFor();
+  await screenshot(page, "chatbot-composer-help");
+  await page.getByRole("button", { name: "도움말 닫기" }).click();
+  assert.equal(await page.locator("#chatbot-panel").isVisible(), true);
+  await screenshot(page, "chatbot-compact-composer");
+  await page.close();
 });
