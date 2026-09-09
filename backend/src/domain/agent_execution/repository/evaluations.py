@@ -130,27 +130,17 @@ def finalize_match_evaluation(
 def find_anchor_card_for_run(
     session: Session, brokerage_id: int, run_id: int
 ) -> NegotiationPositionAnalysis | None:
-    """실행이 확보한 앵커 카드 한 건을 사무소 범위에서 조회한다."""
+    """실행이 확보한 활성 앵커만 조회한다. 헤더가 있으면 그 참조가 정본이다."""
     header = find_match_evaluation_for_run(session, brokerage_id, run_id)
     if header is not None:
-        found = (
-            session.execute(
-                select(NegotiationPositionAnalysis).where(
-                    col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
-                    col(NegotiationPositionAnalysis.id) == header.anchor_position_analysis_id,
-                )
-            )
-            .scalars()
-            .first()
+        position_analysis_id = header.anchor_position_analysis_id
+    else:
+        # 후보 단계 전에는 헤더가 없으므로 실행 snapshot의 카드 ID를 쓴다.
+        # 헤더 카드가 무효일 때 다른 snapshot 카드로 판정 근거를 바꾸지 않는다.
+        run = find_root_cross_judgment_run(session, brokerage_id, run_id)
+        position_analysis_id = (
+            run.redacted_output_snapshot.get("position_analysis_id") if run is not None else None
         )
-        if found is not None:
-            return found
-
-    # 후보 단계 전에는 match_evaluation 헤더가 없으므로 실행 snapshot의 카드 ID를 쓴다.
-    run = find_root_cross_judgment_run(session, brokerage_id, run_id)
-    position_analysis_id = (
-        run.redacted_output_snapshot.get("position_analysis_id") if run is not None else None
-    )
     if not isinstance(position_analysis_id, int):
         return None
     return (
@@ -158,6 +148,7 @@ def find_anchor_card_for_run(
             select(NegotiationPositionAnalysis).where(
                 col(NegotiationPositionAnalysis.brokerage_id) == brokerage_id,
                 col(NegotiationPositionAnalysis.id) == position_analysis_id,
+                col(NegotiationPositionAnalysis.invalidated_at).is_(None),
             )
         )
         .scalars()

@@ -482,3 +482,58 @@ def test_result_requires_authentication_but_not_csrf(config: Config) -> None:
         # X-CSRF-Token 없이도 상태를 변경하지 않는 GET은 허용된다.
         response = client.get(f"/api/v1/f3/runs/{run_id}/result")
         assert response.status_code == 200
+
+
+@requires_database
+@pytest.mark.parametrize("completed", [False, True], ids=["snapshot", "header"])
+def test_invalidated_anchor_hides_card_and_dependent_results(
+    config: Config, completed: bool
+) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        card_id = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        if completed:
+            _store_completed_judgment(session, brokerage_id, user_id, run["run_id"], card_id)
+        before = client.get(f"/api/v1/f3/runs/{run['run_id']}/result").json()
+        assert before["anchor_card"] is not None
+        session.execute(
+            text("UPDATE negotiation_position_analysis SET invalidated_at = now() WHERE id = :id"),
+            {"id": card_id},
+        )
+        session.commit()
+
+        response = client.get(f"/api/v1/f3/runs/{run['run_id']}/result")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == before["status"]
+        assert body["anchor_card"] is None
+        assert body["candidate_selection"] == {
+            "criteria": None,
+            "total_count": 0,
+            "carded_count": 0,
+            "remaining_count": 0,
+        }
+        assert body["candidates"] == []
+        assert body["candidates_total"] == 0
+
+
+@requires_database
+def test_invalid_header_card_cannot_fall_back_to_another_snapshot_card(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        header_card = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        snapshot_card = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        assert snapshot_card != header_card
+        _store_completed_judgment(session, brokerage_id, user_id, run["run_id"], header_card)
+        session.execute(
+            text("UPDATE negotiation_position_analysis SET invalidated_at = now() WHERE id = :id"),
+            {"id": header_card},
+        )
+        session.commit()
+
+        response = client.get(f"/api/v1/f3/runs/{run['run_id']}/result")
+
+        assert response.status_code == 200
+        assert response.json()["anchor_card"] is None
+        assert response.json()["candidates"] == []

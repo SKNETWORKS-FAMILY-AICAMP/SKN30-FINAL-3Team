@@ -152,7 +152,10 @@ def load_run_result(
         return _empty_result(run, limit, offset)
 
     card = repository.find_anchor_card_for_run(session, brokerage_id, run_id)
-    anchor_card = _card_view(session, card) if card is not None else None
+    if card is None:
+        # 무효 앵커에 의존하는 판정과 근거도 현재 결과로 공개하지 않는다.
+        return _empty_result(run, limit, offset)
+    anchor_card = _card_view(session, card)
 
     header = repository.find_match_evaluation_for_run(session, brokerage_id, run_id)
     if header is None:

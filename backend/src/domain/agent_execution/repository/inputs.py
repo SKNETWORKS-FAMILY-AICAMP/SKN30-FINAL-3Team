@@ -54,7 +54,7 @@ class InteractionSummary(NamedTuple):
 
 
 # 로그 포함 정책이 바뀌면 올린다. scope identity 에 들어가 캐시와 fencing 이 함께 갱신된다.
-INTERACTION_SCOPE_CONTRACT_VERSION = "interaction-scope:v2"
+INTERACTION_SCOPE_CONTRACT_VERSION = "interaction-scope:v3"
 
 
 @dataclass(frozen=True)
@@ -152,9 +152,13 @@ def _scope_conditions(scope: InteractionScope) -> list[Any]:
     else:
         if scope.unit_id is None and scope.listing_id is None:
             return []
-        # 매물 건에 명시적으로 달린 로그는 그 매물에 대한 기록이다.
+        # 직접 연결은 대상만 확정한다. 명시된 당사자는 허용 범위에 속해야 한다.
+        # 당사자 미기재 직접 로그는 구입장 경로와 같이 허용한다.
         explicit_listing = (
-            col(ClientInteraction.listing_id) == scope.listing_id
+            and_(
+                col(ClientInteraction.listing_id) == scope.listing_id,
+                or_(col(ClientInteraction.party_id).is_(None), is_allowed_party),
+            )
             if scope.listing_id is not None
             else literal(False)
         )
