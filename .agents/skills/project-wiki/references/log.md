@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # 위키 변경 로그
 
+- 2026-09-09: Infra의 실패 후 offline endpoint/동일 Pod 재사용 계약을 구체화하고, F2 앱 smoke에 현재 Backend ledger_type 응답 계약 및 스키마 일치 회귀를 반영했다.
+
 - 2026-09-09: 기존 ADR-0008의 app_owner migration 계약을 delivery Compose에 반영하고, API·Worker에는 역할 전환을 주입하지 않는 회귀 검증을 추가했다.
 
 - 2026-09-09: 승인된 공유 dev 기동 중 maintenance의 API 정지와 CodeDeploy ALB health 대기 충돌을 확인했다. Infra ADR-0024·운영 정본에 maintenance WITHOUT_TRAFFIC_CONTROL과 automatic 기존 트래픽 제어의 경계를 명시하고, Terraform 적용·drift 및 같은 앱 산출물의 CodeDeploy 재시도 성공을 확인했다. 전체 앱 기동 검증과는 구분한다.

@@ -71,6 +71,9 @@ revision·해시·환경을 재검증한 뒤 정확한 revision만 CodeDeploy로
 실패하면 해당 시도의 endpoint를 offline으로 처리하고 이번 생성 RunPod는 삭제, 이번 시작 AWS GPU는
 정지한다. RDS·maintenance 호스트·AWS EBS 등 남은 자원과 정리 명령을 표시한다. 무관한 기존 자원을
 삭제하지 않으며 실패를 성공으로 기록하거나 DB 버전을 자동 되돌리지 않는다.
+실패로 endpoint만 offline이 된 보존 Pod는 Template/등록 변경이 없고 실제 Pod의 이미지·이름·
+Template·실행 상태와 release 또는 model profile/CUDA 설정이 정확히 일치할 때 읽기 전용으로
+재사용한다. 모델 준비·앱 합성 검증을 다시 통과하기 전에는 기동 성공으로 기록하지 않는다.
 
 일반/deep 종료는 SSM 선택을 유지한다. deep 종료가 지운 GPU·캐시는 다음 공통 시작에서 같은 선택으로
 재구성한다. `ai-switch`는 정지 후 선택 저장의 호환 명령이며 실행 중 전환을 하지 않는다.

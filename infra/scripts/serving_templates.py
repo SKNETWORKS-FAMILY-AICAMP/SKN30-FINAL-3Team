@@ -248,7 +248,7 @@ class TemplateReconciler:
         workload: str, spec: dict, endpoint: dict, pods: list, template_id: str
     ) -> bool:
         if (
-            endpoint.get("status") != "active"
+            endpoint.get("status") not in {"active", "offline"}
             or endpoint.get("cloud", "runpod") != "runpod"
             or len(pods) != 1
         ):
@@ -262,13 +262,29 @@ class TemplateReconciler:
         )
         if not (
             pod["id"]
-            and pod["id"] == endpoint_id
+            and (endpoint.get("status") == "offline" or pod["id"] == endpoint_id)
             and pod["name"] == expected_name
             and pod["template_id"] == template_id
             and pod["image"] == spec["image"]
             and pod["status"] == "RUNNING"
         ):
             return False
+        if endpoint.get("status") == "offline":
+            # Failed-start cleanup removes routing but preserves pre-existing Pods.
+            # Resume only the exact selected deployment; preparation probes it again.
+            env = pod.get("env")
+            if not isinstance(env, dict):
+                return False
+            if workload == "f2":
+                return (
+                    bool(spec.get("release_id"))
+                    and env.get("F2_SLLM_RELEASE_ID") == spec["release_id"]
+                )
+            return (
+                bool(spec.get("model_profile"))
+                and env.get("GENERAL_MODEL_PROFILE") == spec["model_profile"]
+                and env.get("VLLM_ENABLE_CUDA_COMPATIBILITY") == "0"
+            )
         if workload == "f2" and spec.get("release_id"):
             return endpoint.get("sllm_release_id") == spec["release_id"]
         if workload == "general" and spec.get("model_profile"):

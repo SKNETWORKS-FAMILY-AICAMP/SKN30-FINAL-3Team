@@ -18,6 +18,7 @@ from typing import Any
 
 EXPECTED_RESPONSE_FIELDS = {
     "consultation_type",
+    "ledger_type",
     "ledger_mismatch",
     "proposals",
     "uncertainties",
@@ -141,7 +142,9 @@ def _load_audio(path: Path) -> bytes:
     return audio
 
 
-def run(base_url: str, audio_path: Path, expected_provider_status: str = "active") -> None:
+def run(
+    base_url: str, audio_path: Path, expected_provider_status: str = "active"
+) -> None:
     base_url = base_url.rstrip("/")
     try:
         parsed_base_url = urllib.parse.urlsplit(base_url)
@@ -203,6 +206,8 @@ def run(base_url: str, audio_path: Path, expected_provider_status: str = "active
         or not result["consultation_type"]
     ):
         raise SmokeFailure("F2 analysis response is missing a consultation type")
+    if result["ledger_type"] not in (None, "매물장", "구입장"):
+        raise SmokeFailure("F2 analysis response has an invalid ledger type")
     if not isinstance(result["ledger_mismatch"], bool):
         raise SmokeFailure("F2 analysis response has an invalid ledger mismatch flag")
     if not isinstance(result["proposals"], list) or not isinstance(
