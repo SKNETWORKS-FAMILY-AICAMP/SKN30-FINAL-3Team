@@ -145,14 +145,14 @@ async function openDetailAndRecordScroll(page) {
 }
 
 test("동작 감소를 켜면 섹션 스크롤에 애니메이션을 쓰지 않는다", { timeout: 120_000 }, async () => {
-  const reduced = await browser.newPage();
+  const reduced = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await reduced.emulateMedia({ reducedMotion: "reduce" });
   const reducedBehaviors = await openDetailAndRecordScroll(reduced);
   assert.deepEqual([...new Set(reducedBehaviors)], ["auto"]);
   await reduced.close();
 
   // 설정을 켜지 않은 환경에서는 종전대로 부드럽게 움직인다.
-  const normal = await browser.newPage();
+  const normal = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await normal.emulateMedia({ reducedMotion: "no-preference" });
   const normalBehaviors = await openDetailAndRecordScroll(normal);
   assert.deepEqual([...new Set(normalBehaviors)], ["smooth"]);
@@ -166,7 +166,7 @@ test("동작 감소를 켜면 섹션 스크롤에 애니메이션을 쓰지 않�
  * 저장과 상세 진입은 판정을 시작하지 않는다(F3-CR-03·04).
  */
 test("상세 진입은 판정을 시작하지 않고 두 버튼이 각각 실행한다", { timeout: 120_000 }, async () => {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
 
@@ -183,7 +183,7 @@ test("상세 진입은 판정을 시작하지 않고 두 버튼이 각각 실행
   await page.close();
 
   // 레일 버튼도 같은 실행을 요청한다. 여닫기가 아니므로 aria-expanded를 갖지 않는다.
-  const rail = await browser.newPage();
+  const rail = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const railLinks = await openPropertyLedger(rail);
   await railLinks.nth(1).click();
   assert.equal(await rail.locator("#cross-match-panel").count(), 0);
@@ -208,7 +208,7 @@ async function openListingCrossMatch(page) {
 }
 
 test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 120_000 }, async () => {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
 
@@ -254,7 +254,7 @@ test("판정이 단계를 넘겨 후보와 등급까지 그린다", { timeout: 1
 });
 
 test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 잠긴다", { timeout: 120_000 }, async () => {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const failures = [];
   page.on("pageerror", (error) => failures.push(String(error)));
   await openListingCrossMatch(page);
@@ -297,7 +297,7 @@ test("판정된 후보에는 관심없음을 남기고 미판정 후보에는 �
 });
 
 test("장부에 없는 후보는 식별자만 보여준다", { timeout: 120_000 }, async () => {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await openListingCrossMatch(page);
   await page
     .locator(".cross-match-panel__grade-heading h4")
@@ -311,4 +311,152 @@ test("장부에 없는 후보는 식별자만 보여준다", { timeout: 120_000 
   assert.ok((await page.getByText("장부 행을 찾지 못했습니다").count()) > 0);
 
   await page.close();
+});
+
+/** Instrument the selected synthetic transport without connecting to a real API or model. */
+async function recordWrites(page) {
+  await page.evaluate(async () => {
+    const { ledgerTransport } = await import("/src/features/ledger/api/ledgerTransport.ts");
+    const { f3Transport } = await import("/src/features/f3/api/f3Transport.ts");
+    window.__writes = { interactions: 0, runs: 0 };
+    const interaction = ledgerTransport.createClientInteraction.bind(ledgerTransport);
+    ledgerTransport.createClientInteraction = async (...args) => {
+      window.__writes.interactions += 1;
+      return interaction(...args);
+    };
+    const createRun = f3Transport.createRun.bind(f3Transport);
+    f3Transport.createRun = async (...args) => {
+      window.__writes.runs += 1;
+      return createRun(...args);
+    };
+  });
+}
+
+async function saveDetail(page) {
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  // Synthetic rows do not necessarily start with the UI duplicate check completed.
+  const temporary = page.getByRole("button", { name: "임시저장", exact: true });
+  const settled = page.getByText("모든 변경 저장됨", { exact: true }).first();
+  await Promise.race([temporary.waitFor(), settled.waitFor()]);
+  if (await temporary.isVisible()) await temporary.click();
+  await settled.waitFor();
+}
+
+test("비고 저장은 상담 로그를 복제하거나 열린 F3를 재실행하지 않는다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  try {
+    const links = await openPropertyLedger(page);
+    await links.nth(1).click();
+    await page.locator("#detail-log").waitFor();
+    await recordWrites(page);
+    await page.locator("#detail-log").fill("합성 회귀 상담 내용");
+    await saveDetail(page);
+    assert.equal(await page.evaluate(() => window.__writes.interactions), 1);
+    await runCrossJudgment(page);
+    await page.waitForFunction(() => window.__writes.runs === 1);
+    await page.locator("#detail-memo").fill("LOCAL_REGRESSION_UNIQUE_MEMO");
+    await saveDetail(page);
+    assert.deepEqual(await page.evaluate(() => window.__writes), { interactions: 1, runs: 1 });
+    assert.equal(await page.locator("#cross-match-panel").count(), 0);
+    await runCrossJudgment(page);
+    await page.waitForFunction(() => window.__writes.runs === 2);
+    await page.getByRole("button", { name: "상세 닫기", exact: true }).click();
+    await page.getByRole("textbox", { name: "통합 검색" }).fill("LOCAL_REGRESSION_UNIQUE_MEMO");
+    await page.waitForFunction(() => document.querySelector(".grid-statusbar")?.textContent?.startsWith("1건 표시"));
+    await page.locator(".ledger-grid__detail-link").first().waitFor();
+    assert.equal(await page.locator('.ledger-grid__ag-grid .ag-row [col-id="unit"]').count(), 1);
+
+    // A completed append followed by a failed refresh must stay single when retried from the grid.
+    await page.locator(".ledger-grid__detail-link").first().click();
+    await page.locator("#detail-log").fill("후속 조회 실패 회귀 상담");
+    await page.locator("#detail-duplicate-check").check();
+    await page.evaluate(async () => {
+      const { ledgerTransport } = await import("/src/features/ledger/api/ledgerTransport.ts");
+      const create = ledgerTransport.createClientInteraction.bind(ledgerTransport);
+      const get = ledgerTransport.getPropertyUnit.bind(ledgerTransport);
+      let failRefresh = false;
+      ledgerTransport.createClientInteraction = async (...args) => {
+        const result = await create(...args);
+        failRefresh = true;
+        return result;
+      };
+      ledgerTransport.getPropertyUnit = async (...args) => {
+        if (failRefresh) { failRefresh = false; throw new Error("synthetic refresh failure"); }
+        return get(...args);
+      };
+    });
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await page.locator(".detail-workspace__save-error").waitFor();
+    assert.match(await page.locator(".detail-workspace__save-error").innerText(), /synthetic refresh failure/);
+    assert.equal(await page.evaluate(() => window.__writes.interactions), 2);
+    await page.getByRole("button", { name: "상세 닫기", exact: true }).click();
+    await page.getByRole("button", { name: "저장 안 함", exact: true }).click();
+    await page.getByRole("button", { name: /변경 저장/ }).click();
+    await page.waitForFunction(() => [...document.querySelectorAll("button")].some((button) => button.textContent === "변경 저장" && button.disabled));
+    assert.equal(await page.evaluate(() => window.__writes.interactions), 2);
+  } finally { await page.close(); }
+});
+
+test("구입장 검색 결과와 건수가 일치하고 비고 저장이 상담을 복제하지 않는다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  try {
+    await openPropertyLedger(page);
+    await page.getByRole("button", { name: "구입장", exact: true }).click();
+    await page.locator('.buyer-ledger-grid .ag-row [col-id="buyer"]').first().waitFor();
+    await page.getByRole("textbox", { name: "통합 검색" }).fill("DOES_NOT_EXIST_290913");
+    await page.waitForFunction(() => document.querySelector(".grid-statusbar")?.textContent?.startsWith("0건 표시"));
+    assert.equal(await page.locator('.buyer-ledger-grid .ag-row [col-id="buyer"]').count(), 0);
+    await page.getByRole("textbox", { name: "통합 검색" }).fill("인천사모님");
+    await page.locator('.buyer-ledger-grid .ag-row [col-id="buyer"]').first().click();
+    await page.locator("#buyer-content").waitFor();
+    await recordWrites(page);
+    await page.locator("#buyer-content").fill("합성 구입장 회귀 상담");
+    await page.locator("#buyer-consent").check();
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await page.getByText("모든 변경 저장됨", { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.__writes.interactions), 1);
+    await page.locator("#buyer-memo").fill("구입장 비고만 변경");
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await page.getByText("모든 변경 저장됨", { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.__writes.interactions), 1);
+  } finally { await page.close(); }
+});
+
+test("캘린더 추가·수정 dialog는 접근성 트리에 하나만 열리고 Escape로 돌아간다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  try {
+    await openPropertyLedger(page);
+    await page.getByRole("button", { name: "캘린더를 엽니다" }).click();
+    await page.getByRole("dialog", { name: "캘린더", exact: true }).waitFor();
+    await page.getByRole("button", { name: /일정 추가$/ }).first().click();
+    const form = page.getByRole("dialog", { name: "일정 추가", exact: true });
+    await form.waitFor();
+    assert.equal(await page.getByRole("dialog").count(), 1);
+    await form.getByRole("textbox", { name: "제목" }).fill("합성 접근성 일정");
+    await form.getByRole("button", { name: "저장", exact: true }).click();
+    await page.getByRole("dialog", { name: "캘린더", exact: true }).waitFor();
+    await page.getByRole("button", { name: /합성 접근성 일정/ }).click();
+    await page.getByRole("dialog", { name: "일정 수정", exact: true }).waitFor();
+    assert.equal(await page.getByRole("dialog").count(), 1);
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog", { name: "캘린더", exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog", { name: "캘린더", exact: true }).waitFor({ state: "hidden" });
+    // Closing hides the dialog before the animation-frame focus restoration runs.
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "캘린더를 엽니다");
+  } finally { await page.close(); }
+});
+
+test("열린 패널의 외부 버전 갱신은 명시적 재판정 전까지 실행을 접수하지 않는다", { timeout: 60_000 }, async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(`${baseUrl}tests/fixtures/f3-lifecycle.html`);
+    await page.getByRole("button", { name: "판정 열기" }).click();
+    await page.waitForFunction(() => document.querySelector("#lifecycle-count")?.textContent === "1");
+    await page.getByRole("button", { name: "외부 버전 갱신" }).click();
+    await page.waitForFunction(() => document.querySelector("#lifecycle-state")?.textContent === "superseded");
+    assert.equal(await page.locator("#lifecycle-count").innerText(), "1");
+    await page.getByRole("button", { name: "명시적 재판정" }).click();
+    await page.waitForFunction(() => document.querySelector("#lifecycle-count")?.textContent === "2");
+  } finally { await page.close(); }
 });

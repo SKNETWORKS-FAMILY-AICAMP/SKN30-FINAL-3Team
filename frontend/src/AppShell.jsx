@@ -210,16 +210,8 @@ export function AppShell() {
     setCrossMatchOpen(false);
   }, [detailRow?.id]);
 
-  const filteredCount = useMemo(() => {
-    if (viewState === "filtered-empty") return 0;
-    const query = searchQuery.trim().toLowerCase();
-    return rows.filter((row) => {
-      const textMatch = !query || [row.complex, row.building, row.unit, row.owner, row.phone, row.log]
-        .some((value) => String(value || "").toLowerCase().includes(query));
-      return textMatch && (complexFilter === "전체" || row.complex === complexFilter)
-        && (saveFilter === "전체" || row.saveState === saveFilter);
-    }).length;
-  }, [rows, searchQuery, complexFilter, saveFilter, viewState]);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [buyerFilteredCount, setBuyerFilteredCount] = useState(0);
 
   const updateRow = (nextRow) => {
     const ledger = nextRow?.ledgerType === "buyer" || nextRow?.rowKind === "buyer" ? buyerLedger : propertyLedger;
@@ -584,7 +576,10 @@ export function AppShell() {
       : `${savedRow.building || "미입력"}동 ${savedRow.unit || "미입력"}호`;
 
     // 낙관적 반영 후 서버에 보낸다. 실패하면 행의 sync 상태가 남고 사용자에게 알린다.
-    updateRow(savedRow);
+    setCrossMatchOpen(false);
+    const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
+    // Keep the detail draft stable until this save settles; changing its prop can reset saving state.
+    ledger.patchRow(savedRow.id, () => savedRow);
     /*
      * 저장은 패널을 열지 않는다.
      *
@@ -594,7 +589,6 @@ export function AppShell() {
      * 결과를 볼 시점은 상세의 [교차 판정] 섹션에서 사용자가 정한다(F3-CR-03·04).
      * 그때 보내는 실행 요청은 저장이 접수한, 같은 입력 버전의 활성 실행을 재사용한다.
      */
-    const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
     return ledger.saveRow(savedRow).then(
       (persisted) => {
@@ -765,8 +759,8 @@ export function AppShell() {
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
 
-        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} focusRowId={jumpFocus.id} focusToken={jumpFocus.token} />}
-        <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
+        {activeNav === "구입장" ? <BuyerLedgerGrid searchQuery={searchQuery} onDisplayedCountChange={setBuyerFilteredCount} rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} /> : <LedgerGrid onDisplayedCountChange={setFilteredCount} rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} focusRowId={jumpFocus.id} focusToken={jumpFocus.token} />}
+        <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerFilteredCount.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>
 

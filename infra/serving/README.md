@@ -173,6 +173,10 @@ AWS 누적 30만원·기존 종료일, RunPod 2개월 $300의 기존 한도를 �
 
 ## 비교 검토와 게시 이미지 재사용
 
+로컬 `infra/justfile`의 `check`는 `tests/`, `runpod/tests/`, `serving/tests/`를
+각각 실행한다. 범용 HTTP 인증·관리 경로 차단 검사는 `serving/tests/test_runtime.py`에서
+한 번만 관리하며, 이미지 게시 전 검사도 같은 파일을 실행한다.
+
 [검토 재현 절차](comparison-reproduction.md)에서 저장된 근거 검사와 원본 요약 재생성,
 동일 조건 재평가 명령을 확인한다. [게시 이미지 catalog](published-images.json)는 태그·digest별
 AWQ·BnB·공식 FP8의 실제 GPU 검증 범위를 구분한다. 최신 이미지를 모든 모델의 검증 완료로 간주하지 않는다.

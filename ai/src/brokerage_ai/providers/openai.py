@@ -23,6 +23,7 @@ from brokerage_ai.core.types import (
     StructuredGenerationResult,
     TokenUsage,
 )
+from brokerage_ai.providers.openai_schema import structured_output_schema
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
 
@@ -47,7 +48,14 @@ class OpenAIAdapter:
                 {"role": message.role.value, "content": message.content}
                 for message in request.messages
             ],
-            "text_format": output_schema,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": output_schema.__name__,
+                    "schema": structured_output_schema(output_schema),
+                    "strict": True,
+                }
+            },
             "store": False,
         }
         if request.temperature is not None:
@@ -57,9 +65,16 @@ class OpenAIAdapter:
 
         started_at = perf_counter()
         try:
-            response = await self._client.responses.parse(**parameters)
+            response = await self._client.responses.create(**parameters)
         except OpenAIError as exc:
             raise translate_openai_error(exc) from None
+
+        if self._contains_refusal(response.output):
+            raise ProviderRefusalError()
+        if response.status != "completed" or not response.output_text:
+            raise ProviderOutputInvalidError(_incomplete_reason(response))
+        try:
+            parsed = output_schema.model_validate_json(response.output_text)
         except ValidationError as exc:
             # 모델이 계약을 어긴 출력을 냈다. 설정 오류가 아니라 다시 부르면 달라질 수 있는
             # 실패다. 원인을 `from None`으로 버리지 않는다. 버리면 무엇이 어긋났는지 알 방법이
@@ -68,16 +83,6 @@ class OpenAIAdapter:
         except ValueError as exc:
             raise ProviderOutputInvalidError() from exc
         latency_ms = (perf_counter() - started_at) * 1000
-
-        parsed = response.output_parsed
-        if parsed is None:
-            if self._contains_refusal(response.output):
-                raise ProviderRefusalError()
-            # 잘린 응답(`max_output_tokens` 초과)이 여기로 온다. 다시 부르면 통과할 수 있다.
-            raise ProviderOutputInvalidError(_incomplete_reason(response))
-        if not isinstance(parsed, output_schema):
-            # 선언한 schema와 다른 타입이 돌아왔다. 다시 불러도 같으므로 재시도하지 않는다.
-            raise ProviderResponseError()
 
         usage = response.usage
         token_usage = (

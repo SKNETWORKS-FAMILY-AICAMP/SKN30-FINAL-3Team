@@ -151,7 +151,7 @@ export function CalendarEventModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} variant="small" aria-label={event == null ? "일정 추가" : "일정 수정"}>
+    <Modal elementToFocus="#calendar-event-title" isOpen={isOpen} onClose={onClose} variant="small" aria-label={event == null ? "일정 추가" : "일정 수정"}>
       <ModalHeader title={event == null ? "일정 추가" : "일정 수정"} />
       <ModalBody>
         <Form data-screen-id="F4-MOD-011" data-requirement-ids="F4-CAL-01~05">

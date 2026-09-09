@@ -1,7 +1,22 @@
 version: 1
-updated: "2026-09-08"
+updated: "2026-09-09"
 
 sources:
+  - id: "local-functional-regression-report-2026-09-09"
+    type: "user-provided-document"
+    location: "user-provided:local-functional-regression-report-2026-09-09"
+    title: "로컬 기능 검증 — F2 제외"
+    baseline_commit: "4b5d002"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/validation/test-reliability-2026-09-09.md"
+      - "frontend/TESTING.md"
+      - ".agents/skills/ai/references/decisions/ADR-0006-openai-structured-output-schema.md"
+      - "references/contracts/chatbot-ai.md"
+      - ".agents/skills/ai/references/chatbot.md"
+      - ".agents/skills/frontend/references/index.md"
+    scope: "기준 4b5d002 로컬 기능 보고서의 OpenAI F3 스키마 거부, 상담 로그 중복, 저장 후 F3 자동 재접수, 만기 동의어, 장부 검색·건수와 캘린더 접근성 결함을 회귀 검증·수정 근거로 사용. 기존 실제 모델 결과·공유 환경 검증 완료를 이번 수정 후 결과로 재사용하지 않음."
+
   - id: "chatbot-implementation-scope-2026-09-08"
     type: "user-provided-direction"
     location: "docs/requirements/sources/chatbot-implementation-scope-2026-09-08.md"
