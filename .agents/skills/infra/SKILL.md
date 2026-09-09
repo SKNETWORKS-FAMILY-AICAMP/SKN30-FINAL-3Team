@@ -13,6 +13,7 @@ description: "`infra/`의 Terraform·AWS·RunPod 자원, 계정·state·IAM, 배
 
 | 변경 | 읽을 정본 |
 |---|---|
+| 개발자 설정·진단·사용자 기동 검증 | [개발자 운영](../../../infra/operations/README.md) |
 | Terraform root·state·변수·출력·검증 | [Terraform 기준](references/terraform-standards.md) |
 | AWS 계정 연결·bootstrap·IAM·비용 | [계정 bootstrap](references/aws-account-bootstrap.md) |
 | 자원 도입·배치·적용 상태 | [자원 인벤토리](references/resource-inventory.md)와 해당 결정·검증 기록 |

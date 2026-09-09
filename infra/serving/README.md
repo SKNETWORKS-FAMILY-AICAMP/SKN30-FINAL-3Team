@@ -118,39 +118,45 @@ GPU를 선택할 때만 아래 명령으로 **새 ignored 파일**을 만든다.
 변경하지 않는다. 기존 파일은 덮어쓰지 않으므로 재연결 시 이전 개인 파일을 제거하거나 새 이름을 쓴다.
 
 ```bash
-just -f infra/justfile ai-connect general ../backend/.env.gpu-general
-just -f infra/justfile ai-connect f2 ../backend/.env.gpu-f2
+just -f infra/justfile ai-connect general ../ai/.env.gpu-general
+just -f infra/justfile ai-connect f2 ../ai/.env.gpu-f2
 ```
 
-just recipe는 `infra/`에서 실행된다. Backend용과 AI 단독용 파일은 각각 해당 모듈 안에 만든다.
+just recipe는 `infra/`에서 실행된다. 출력은 Git에서 제외한 AI 개인 파일에만 보관하고,
+필요한 항목을 `ai/.env`에 옮긴다. general 출력에는 활성 GPU profile과 일치하는
+`AI_GENERAL_PROVIDER=vllm`과 `AI_GENERAL_MODEL`이 포함된다. Backend에는 AI 입력을 중복 작성하지 않는다.
+기존 Bedrock 설정에서 전환한다면 `AI_GENERAL_AWS_REGION`을 제거한다.
 키는 운영자가 승인한 값을 TTY에 입력한다. AWS는 터널 명령을 계속 열어 두고
-general 18000, F2 18001·18002의 loopback만 사용한다. 공유 GPU가 꺼졌다면 운영자에게 시작을
-요청한다. 권한 부족·포트 충돌·교체된 인스턴스는 명령을 실패시키며 재연결이 필요하다.
-팀원에게 `team-gpu-tunnel`과 기존 AWS 로그인 권한만 제공한다. 운영자 Role을 공유하지 않는다.
+18000, 18001, 18002의 loopback만 사용한다. 공유 GPU가 꺼져 있으면 운영자가 먼저 시작한다.
+권한 부족·포트 충돌·교체된 인스턴스는 명령을 실패시키며 재연결이 필요하다.
 
-```bash
-# 별도 터미널, 저장소 루트에서 명시적으로 해당 프로세스에 주입
-uv run --locked --project backend --env-file backend/.env.gpu-general python backend/src/manage.py smoke-general
-uv run --locked --project ai --env-file ai/.env.gpu-general python -m brokerage_ai.smoke
-```
-
-Backend 실행에도 같은 `--env-file`을 명시한다. F2의 합성 전체 경로는 연결 파일을 주입해
-Backend를 시작한 뒤 기존 `infra/deploy/scripts/smoke_f2.py`의 loopback API·합성 audio로 검사한다.
-local DB에서 general을 실제 선택하려면 해당 로컬 사무소에 `activate-general-qwen`을 명시 실행한다.
+저장소 루트에서 `just -f infra/justfile local-config`로 enum·소유권·연결 조합을 확인한다.
+모델 DB 반영은 `local-model <사무소 ID> <capability>`로 미리 보고,
+API/Worker를 중지한 뒤 `--apply --workloads-stopped`를 추가한다.
+기동은 `local-api`, `local-worker`를 각 터미널에서 사용한다.
+전체 절차와 개인 설정 이전은 [환경변수 관리](../../docs/development/environment-variables.md)를 따른다.
 local 프로세스가 SSM 터널로 공유 DB를 가리키는 설정은 사용하지 않는다.
 
-## 최초 dev Qwen 활성화
+## 공유 dev 모델 명시 반영
 
-GPU 연결과 두 capability smoke가 통과한 뒤 대상 사무소별로 실행한다.
+Terraform `general_model_selection`은 앱의 provider/model을 소유하고 `ai-configure general`은
+GPU profile을 소유한다. 둘을 같은 모델로 맞춘다. 기본값은 공식 `qwen38-27b-fp8`이며,
+Bedrock을 선택할 때는 `provider=bedrock`, `model=global.openai.gpt-5.6-luna`,
+`aws_region=ap-northeast-2`를 함께 지정한다. 다른 provider에서는 region을 생략한다.
+변경한 공개 SSM 입력과 새 앱 revision을 함께 배포한다. 파일 변경만으로 기존 DB 선택은 바뀌지 않는다.
+
+모델 반영은 가동 중인 maintenance host에서 API/Worker를 이미 drain하고 중지한 뒤 실행한다.
 
 ```bash
-just -f infra/justfile ai-smoke general
-just -f infra/justfile ai-activate-general BROKERAGE_ID
+just -f infra/justfile ai-activate-general BROKERAGE_ID POSITION_CARD
+just -f infra/justfile ai-activate-general BROKERAGE_ID BROKERAGE_JUDGMENT
 ```
 
-앱을 drain한 상태에서 모델 설정만 변경한다. 대기·진행 작업이 있으면 중단한다.
-업무 데이터·기존 profile·실행 이력을 보존하며 `dev-seed-f3`를 실행하지 않는다.
-클라우드만 전환할 때는 이 명령을 다시 실행하지 않는다.
+capability 허용값은 `POSITION_CARD`, `BROKERAGE_JUDGMENT`, `CHATBOT`이다.
+새 renderer의 주입값을 읽어 capability 하나에 새 버전을 추가한다. 대기·진행 요청이 있으면 중단한다.
+명령은 자동 재기동·추론 없이 maintenance를 유지한다. 이전 모델로의 fallback이나 seed 초기화가 없다.
+업무 데이터·다른 capability·기존 실행 snapshot을 보존한다. 재기동과 `dev-verify`는 사용자가 수행한다.
+클라우드만 전환할 때는 같은 모델 선택을 다시 반영하지 않는다.
 
 ## 비용과 완료 기준
 

@@ -95,7 +95,7 @@ data "aws_iam_policy_document" "terraform_state" {
       identifiers = ["*"]
     }
 
-    actions   = ["s3:ListBucket"]
+    actions   = ["s3:ListBucket", "s3:ListBucketVersions"]
     resources = [aws_s3_bucket.terraform_state.arn]
 
     condition {
@@ -119,7 +119,9 @@ data "aws_iam_policy_document" "terraform_state" {
 
     actions = [
       "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
       "s3:GetObject",
+      "s3:GetObjectVersion",
       "s3:PutObject",
     ]
     resources = [for key in local.state_keys : "${aws_s3_bucket.terraform_state.arn}/${key}"]

@@ -9,11 +9,13 @@ updated: 2026-09-09
 
 | 문서 | 읽는 조건 |
 |---|---|
+| [개발자 인프라 운영](../../../../infra/operations/README.md) | 설정·공유 dev 상태·배포 준비·기동 검증 명령을 찾을 때 |
 | [F3 실행·카드·자동 판정 검토](../../../../docs/architecture/f3/position-card-review.md) | F3 현재 구현·Worker 확장성·조건부 자동 판정·결과 목록의 검토안을 확인할 때 |
 | [프로젝트 개요](project-overview.md) | 목표·범위·제약을 확인할 때 |
 | [요구사항 인덱스](../../../../docs/requirements/index.md) | 기능 범위·사용자 동작·수용 기준·요구사항 ID를 확인할 때 |
 | [모듈 경계](architecture/overview.md) | 모듈 책임이나 의존 관계를 변경할 때 |
 | [런타임 구조](architecture/runtime.md) | 프레임워크·런타임·배포 선택을 검토할 때 |
+| [환경변수 작성·정리](../../../../docs/development/environment-variables.md) | .env·.env.local·.env.example 역할, 기능별 설정과 변수 변경 절차를 확인할 때 |
 | [개발환경](development/environments.md) | 로컬·CI·공유 dev·prod 환경이나 의존성을 변경할 때 |
 | [HTTP 계약 라우터](contracts/api.md) | HTTP 계약을 구현·해석·변경할 때. 공통 규칙과 해당 기능 계약을 선택 |
 | [F3 AI 계약 라우터](contracts/f3-ai.md) | 포지션 카드·중개 판정의 Backend–AI 계약을 확인할 때. 공통 경계와 해당 작업 계약을 선택 |

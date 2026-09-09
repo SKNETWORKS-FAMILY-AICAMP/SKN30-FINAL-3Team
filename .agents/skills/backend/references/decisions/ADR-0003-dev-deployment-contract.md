@@ -5,6 +5,8 @@ updated: 2026-09-03
 
 # ADR-0003: 개발환경 Backend·Worker 배포 계약
 
+> 환경 입력·Worker 실행 계약은 [프로젝트 ADR-0034](../../../project-wiki/references/decisions/ADR-0034-module-owned-environment.md)에서 부분 대체한다.
+
 - 상태: 승인됨
 - 결정일: 2026-08-20
 - 상위 결정: [프로젝트 ADR-0011](../../../project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md)

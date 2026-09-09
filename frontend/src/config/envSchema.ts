@@ -1,4 +1,6 @@
-export type LedgerSource = "mock" | "api";
+// Runtime enum object also works with Node native TypeScript type stripping.
+export const DataSource = { MOCK: "mock", API: "api" } as const;
+export type LedgerSource = (typeof DataSource)[keyof typeof DataSource];
 
 export interface AppEnv {
   /** 동일 origin의 /api 하위 기본 경로. */
@@ -11,7 +13,7 @@ export interface AppEnv {
    * F3 교차 판정 출처.
    *
    * 장부와 따로 두는 이유는 두 기능의 가용성이 실제로 갈리기 때문이다. Backend는 살아 있어도
-   * `WORKER_ENABLED=false`이면 F3 실행이 `QUEUED`에 머물러 완료 화면을 볼 수 없다. 그때
+   * Worker가 실행되지 않으면 F3 실행이 `QUEUED`에 머물러 완료 화면을 볼 수 없다. 그때
    * 장부는 `api`, F3만 `mock`으로 두고 화면을 확인한다. 지정하지 않으면 장부를 따라간다.
    */
   f3Source: LedgerSource;
@@ -52,7 +54,7 @@ function readRequiredString(source: EnvSource, key: string): string {
 
 function readLedgerSource(source: EnvSource): LedgerSource {
   const value = readRequiredString(source, "VITE_LEDGER_SOURCE");
-  if (value !== "mock" && value !== "api") {
+  if (value !== DataSource.MOCK && value !== DataSource.API) {
     throw new Error('VITE_LEDGER_SOURCE must be either "mock" or "api"');
   }
   return value;
@@ -68,7 +70,7 @@ function readSourceWithFallback(source: EnvSource, key: string, fallback: Ledger
     return fallback;
   }
   const value = readRequiredString(source, key);
-  if (value !== "mock" && value !== "api") {
+  if (value !== DataSource.MOCK && value !== DataSource.API) {
     throw new Error(`${key} must be either "mock" or "api"`);
   }
   return value;

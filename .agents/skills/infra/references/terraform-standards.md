@@ -9,7 +9,7 @@ updated: 2026-08-17
 
 - Terraform `1.15.x`와 HashiCorp AWS Provider `~> 6.53` 호환 범위를 사용한다.
 - `infra/bootstrap`은 계정 기본 설정과 state bucket을 소유한다.
-- `infra/environments/dev`는 공유 개발 환경 root이며 현재는 data source만 가진다.
+- `infra/environments/dev`는 공유 개발 환경 root다. 적용 여부는 [인벤토리](resource-inventory.md)를 따른다.
 - 두 번째 환경이나 반복되는 자원이 생기기 전에는 공통 module과 workspace를 만들지 않는다.
 
 ## State
@@ -19,6 +19,8 @@ updated: 2026-08-17
 - state bucket에는 versioning, SSE-S3, public access block, TLS-only 정책과 `prevent_destroy`를 적용한다.
 - 실제 backend bucket 이름은 `terraform init -backend-config`로 전달한다. 자격 증명은 backend 설정에 넣지 않는다.
 - local state, plan, 실제 tfvars와 `.terraform/`은 Git에 저장하지 않는다.
+- just의 saved plan은 600 권한·입력 fingerprint·24시간 유효기간으로 관리한다. 입력 변경·만료 시 새 plan을 검토한다.
+- GPU 프로필은 ignored `gpu-profiles.auto.tfvars.json`, 생성 대상은 `serving-capacity.auto.tfvars.json`이다. 검증용 auto 입력을 중복으로 남기지 않는다.
 
 ## 계정·변수·출력
 

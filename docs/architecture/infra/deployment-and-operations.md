@@ -1,6 +1,6 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·Alarm 전용 전달 및 Bedrock POC 코드 구현/AWS 미적용·S3 dev release 게시 완료·RunPod 미적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
+implementation: 적용 여부는 Infra resource-inventory.md 정본 참조; 실제 기동은 운영자 검증
 updated: 2026-09-07
 ---
 
@@ -13,7 +13,7 @@ updated: 2026-09-07
 
 - **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md) · [프로젝트 ADR-0031](../../../.agents/skills/project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md) · [Infra ADR-0020](../../../.agents/skills/infra/references/decisions/ADR-0020-runpod-console-registration.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
-- **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐고 S3 dev release는 게시됐다. RunPod Pod와 이번 Terraform 변경은 미적용이다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
+- **현재 적용 여부:** [Infra 인벤토리](../../../.agents/skills/infra/references/resource-inventory.md)를 정본으로 사용한다. 일상 절차는 [개발자 운영](../../../infra/operations/README.md), 실제 전원은 `just doctor`로 확인한다.
 
 ## Pipeline 구성
 
@@ -153,7 +153,7 @@ endpoint를 자동 복원하지 않고 offline으로 정리·재시도한다. �
 
 **사용자 요구(2026-09-07):** AWS GPU 배포 실패나 비용 부담 시 전환할 수 있도록 RunPod 배포
 경로를 유지한다. AWS 이전을 이유로 기존 RunPod Template·등록·생성·삭제·smoke 경로를 제거하지
-않는다. 현재 RunPod 도구는 F2용이며 F3 Qwen 배포와 AWS GPU 배포·상호 전환은 아직 구현되지 않았다.
+않는다. F2/general과 AWS/RunPod 통합 도구는 구현됐으며 정식 배포·왕복 검증 상태는 인벤토리를 따른다.
 이 요구만으로 ADR-0027의 현재 활성 모델을 변경하거나 GPU 자원을 생성하지 않는다.
 
 **구현 제안:** F2·F3별로 AWS 또는 RunPod 중 한 경로를 활성화하고 운영자가 명시적으로 전환한다.

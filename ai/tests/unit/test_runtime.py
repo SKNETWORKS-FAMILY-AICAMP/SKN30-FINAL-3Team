@@ -1,4 +1,3 @@
-import json
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -7,7 +6,7 @@ import pytest
 from botocore.credentials import Credentials, ReadOnlyCredentials
 from openai import AsyncOpenAI
 
-from brokerage_ai.core.config import AiProfile, bind_ai_config
+from brokerage_ai.core.config import AiProfile, BedrockLlmEndpointConfig, bind_ai_config
 from brokerage_ai.core.types import ProviderKind
 from brokerage_ai.runtime import ClientFactory, HttpClientFactory, create_ai_runtime
 
@@ -36,7 +35,6 @@ async def test_runtime_reuses_client_for_equal_vllm_endpoints_and_closes_once() 
     config = bind_ai_config(
         {
             "AI_REQUEST_TIMEOUT_SECONDS": "12.5",
-            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
             "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
             "AI_VLLM_EMBEDDING_BASE_URL": "http://localhost:8000/v1",
@@ -68,7 +66,7 @@ async def test_runtime_context_manager_closes_clients() -> None:
         created.append(client)
         return cast(AsyncOpenAI, client)
 
-    config = bind_ai_config({"AI_OPENAI_API_KEY": "test-key"}, AiProfile.TEST)
+    config = bind_ai_config({"AI_GENERAL_API_KEY": "test-key"}, AiProfile.TEST)
 
     async with create_ai_runtime(
         config, client_factory=cast(ClientFactory, client_factory)
@@ -87,22 +85,15 @@ async def test_runtime_keeps_default_and_aliased_vllm_routes_separate() -> None:
         created.append(client)
         return cast(AsyncOpenAI, client)
 
-    address_book = [
-        {
-            "alias": "general-dev-gpu",
-            "provider": "vllm",
-            "base_url": "https://pod.example/v1",
-            "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
-        }
-    ]
     config = bind_ai_config(
         {
-            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "https://pod.example/v1",
             "AI_VLLM_SLLM_API_KEY": "shared-key",
             "AI_VLLM_STT_BASE_URL": "https://pod.example/stt/v1",
-            "AI_LLM_ENDPOINTS": json.dumps(address_book),
-            "AI_GENERAL_DEV_GPU_API_KEY": "shared-key",
+            "AI_GENERAL_PROVIDER": "vllm",
+            "AI_GENERAL_MODEL": "Qwen/Qwen3.8-27B-FP8",
+            "AI_GENERAL_BASE_URL": "https://pod.example/v1",
+            "AI_GENERAL_API_KEY": "shared-key",
         },
         AiProfile.DEV,
     )
@@ -131,22 +122,24 @@ async def test_runtime_reuses_and_closes_bedrock_http_client_once() -> None:
     config = bind_ai_config(
         {
             "AI_REQUEST_TIMEOUT_SECONDS": "15",
-            "AI_LLM_ENDPOINTS": json.dumps(
-                [
-                    {
-                        "alias": "general-dev-bedrock",
-                        "provider": "bedrock",
-                        "aws_region": "ap-northeast-2",
-                    },
-                    {
-                        "alias": "general-staging-bedrock",
-                        "provider": "bedrock",
-                        "aws_region": "us-east-1",
-                    },
-                ]
-            ),
+            "AI_GENERAL_PROVIDER": "bedrock",
+            "AI_GENERAL_MODEL": "global.openai.gpt-5.6-luna",
+            "AI_GENERAL_AWS_REGION": "ap-northeast-2",
         },
         AiProfile.DEV,
+    )
+
+    config = config.model_copy(
+        update={
+            "llm_endpoints": (
+                *config.llm_endpoints,
+                BedrockLlmEndpointConfig(
+                    alias="general-staging-bedrock",
+                    provider=ProviderKind.BEDROCK,
+                    aws_region="us-east-1",
+                ),
+            )
+        }
     )
 
     runtime = create_ai_runtime(

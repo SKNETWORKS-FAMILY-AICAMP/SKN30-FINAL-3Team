@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
@@ -29,6 +28,7 @@ sys.path.insert(0, str(INFRA / "deploy" / "scripts"))
 sys.path.insert(0, str(INFRA / "serving"))
 from model_profiles import load_profile
 from probe import probe, read_status
+from serving_cli import parser
 from serving_contract import (
     DEFAULT_GENERAL_PROFILE,
     GENERAL_CUDA_VERSIONS,
@@ -37,6 +37,7 @@ from serving_contract import (
     WORKLOADS,
     endpoint_urls,
 )
+from serving_deployment import require_general_selection, require_maintenance_deployment
 
 ToolError = power.ToolError
 emit = power.emit
@@ -615,9 +616,7 @@ class Serving:
         self.stop_resources(workload, keep=deployment)
         emit("ai-switch-complete", workload=workload, cloud=cloud)
 
-    def start(self) -> None:
-        selection = self.selection()
-        self.no_deployment()
+    def prepare_endpoints(self, selection: dict) -> dict:
         deployments = {}
         if self.app_id():
             self.app("stop")
@@ -626,6 +625,26 @@ class Serving:
             if spec:
                 deployments[name] = self.prepare(name, spec)
                 self.activate(name, spec, deployments[name])
+        return deployments
+
+    def prepare_deployment(self) -> None:
+        selection = self.selection()
+        self.no_deployment()
+        require_maintenance_deployment(self.session, self.settings)
+        require_general_selection(self.ssm, self.prefix, selection)
+        deployments = self.prepare_endpoints(selection)
+        self.power.start()
+        emit(
+            "deployment-host-ready",
+            workloads=list(deployments),
+            next="app-deploy",
+            application_verified=False,
+        )
+
+    def start(self) -> None:
+        selection = self.selection()
+        self.no_deployment()
+        deployments = self.prepare_endpoints(selection)
         try:
             self.power.start()
             self.restore_application()
@@ -859,39 +878,6 @@ def validate_selection(workload: str, spec: dict) -> None:
         raise ToolError("F2 requires its published release ID and model bucket")
 
 
-def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("--account-id", default=os.environ.get("TARGET_ACCOUNT_ID", ""))
-    result.add_argument("--profile", default="skn30-session")
-    result.add_argument("--project", default="skn30-final-3team")
-    commands = result.add_subparsers(dest="command", required=True)
-    for action in ("start", "stop", "status"):
-        p = commands.add_parser(action)
-        if action != "status":
-            p.add_argument("--apply", action="store_true")
-            p.add_argument("--workloads-stopped-confirmed", action="store_true")
-    activation = commands.add_parser("activate-general")
-    activation.add_argument("brokerage_id", type=int)
-    activation.add_argument("--model-profile")
-    activation.add_argument("--apply", action="store_true")
-    activation.add_argument("--workloads-stopped-confirmed", action="store_true")
-    capacity = commands.add_parser("capacity-config")
-    capacity.add_argument("--candidate", choices=WORKLOADS)
-    for action in ("switch", "configure", "smoke"):
-        p = commands.add_parser(action)
-        p.add_argument("workload", choices=WORKLOADS)
-        if action != "smoke":
-            p.add_argument("cloud", choices=("aws", "runpod"))
-            p.add_argument("--apply", action="store_true")
-        if action == "configure":
-            p.add_argument("--gpu-id", required=True)
-            p.add_argument("--model-profile")
-            p.add_argument("--release-id")
-            p.add_argument("--bucket")
-            p.add_argument("--allow-dev-release", action="store_true")
-    return result
-
-
 def main() -> int:
     args = parser().parse_args()
     settings = power.Settings(
@@ -909,7 +895,10 @@ def main() -> int:
             raise ToolError("explicit account ID and valid project name are required")
         session = power.assume_operator(power.base_session(settings), settings)
         controller = Serving(session, settings)
-        if args.command in {"start", "stop"}:
+        if args.command == "prepare-deployment":
+            power.require_apply(args.apply, args.command)
+            controller.prepare_deployment()
+        elif args.command in {"start", "stop"}:
             power.require_apply(args.apply, args.command)
             if args.command == "stop":
                 power.require_stop_confirmation(args.workloads_stopped_confirmed)
@@ -921,35 +910,24 @@ def main() -> int:
             power.require_stop_confirmation(args.workloads_stopped_confirmed)
             if args.brokerage_id < 1:
                 raise ToolError("positive brokerage ID required")
-            endpoint = controller.endpoint("general")
-            if endpoint.get("status") != "active":
-                raise ToolError("activate-general requires an active general endpoint")
-            selected_profile = args.model_profile or endpoint.get(
-                "model_profile", DEFAULT_GENERAL_PROFILE
-            )
-            model = general_profile({"model_profile": selected_profile})["model"]
-            if model != general_profile(endpoint)["model"]:
-                raise ToolError(
-                    "activation model must match the active general endpoint"
-                )
             controller.no_deployment()
-            controller.app("stop")
             instance = controller.app_id()
             if not instance:
-                raise ToolError("app instance unavailable")
+                raise ToolError(
+                    "app instance unavailable; model selection requires an existing maintenance host"
+                )
+            # The remote command verifies workloads are already stopped and uses the
+            # freshly rendered AI selection. Never restart or infer as a side effect.
             controller.command(
                 instance,
-                f"/opt/brokerage/revision/scripts/serving_maintenance.sh activate-general {args.brokerage_id} {shlex.quote(model)}",
+                f"/opt/brokerage/revision/scripts/serving_maintenance.sh activate-general {args.brokerage_id} {shlex.quote(args.capability)}",
                 timeout=360,
             )
-            try:
-                controller.app("start")
-                controller.application_smoke("general")
-            except (ToolError, ClientError, BotoCoreError):
-                controller.app("stop")
-                raise ToolError(
-                    "model activation verification failed; maintenance retained; repair GPU and rerun ai-switch"
-                ) from None
+            emit(
+                "model-selection-complete",
+                capability=args.capability,
+                workloads="stopped",
+            )
         elif args.command == "configure":
             selection = controller.selection()
             if controller.endpoint(args.workload).get("status") != "offline":

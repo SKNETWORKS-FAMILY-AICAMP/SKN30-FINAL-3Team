@@ -21,33 +21,30 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy" / "scripts"))
-from serving_contract import GENERAL_ALIAS, GENERAL_KEY, PORTS, endpoint_urls
+from serving_contract import DEFAULT_GENERAL_PROFILE, GENERAL_KEY, PORTS, endpoint_urls
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "serving"))
+from model_profiles import load_profile
 
 LOCAL_PORTS = {8000: 18000, 8001: 18001, 8002: 18002}
 
 
 def local_environment(
-    workload: str, urls: list[str], keys: list[str]
+    workload: str, urls: list[str], keys: list[str], model_profile: str | None = None
 ) -> dict[str, str]:
     if workload == "f2":
         return {
-            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": urls[0],
             "AI_VLLM_STT_BASE_URL": urls[1],
             "AI_VLLM_SLLM_API_KEY": keys[0],
             "AI_VLLM_STT_API_KEY": keys[1],
         }
     return {
-        "AI_LLM_ENDPOINTS": json.dumps(
-            [
-                {
-                    "alias": GENERAL_ALIAS,
-                    "provider": "vllm",
-                    "base_url": urls[0],
-                    "api_key_env": GENERAL_KEY,
-                }
-            ]
-        ),
+        "AI_GENERAL_PROVIDER": "vllm",
+        "AI_GENERAL_MODEL": load_profile(model_profile or DEFAULT_GENERAL_PROFILE)[
+            "model"
+        ],
+        "AI_GENERAL_BASE_URL": urls[0],
         GENERAL_KEY: keys[0],
     }
 
@@ -127,7 +124,9 @@ def main() -> int:
         ]
         if not all(re.fullmatch(r"[A-Za-z0-9_-]{43,128}", key) for key in keys):
             raise ValueError("invalid service key")
-        values = local_environment(args.workload, urls, keys)
+        values = local_environment(
+            args.workload, urls, keys, endpoint.get("model_profile")
+        )
         # Do not write into a tracked/default env file or overwrite a developer's settings.
         destination = args.output.resolve()
         ignored = (
@@ -151,7 +150,7 @@ def main() -> int:
                 + "\n"
             )
         print(
-            "Private local overrides created. Load them only in your local Backend or AI process; no dev routing changed."
+            "Private AI overrides created. Merge into ai/.env; the general model matches the deployed profile. Run local-config before use. No dev routing changed."
         )
         if cloud == "aws":
             for port in PORTS[args.workload]:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import math
 import os
 import re
 from collections.abc import Mapping
@@ -21,6 +21,13 @@ from pydantic import (
 )
 
 from brokerage_ai.core.errors import ConfigurationError
+from brokerage_ai.core.model_catalog import (
+    F2SllmModel,
+    F2SttModel,
+    GeneralModel,
+    GeneralSelection,
+    SttLanguage,
+)
 from brokerage_ai.core.types import ProviderKind
 
 AI_ROOT = Path(__file__).resolve().parents[3]
@@ -112,51 +119,6 @@ class BedrockLlmEndpointConfig(BaseModel):
 LlmEndpointConfig = SelfHostedLlmEndpointConfig | BedrockLlmEndpointConfig
 
 
-class _SelfHostedLlmEndpointDefinition(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    alias: str = Field(min_length=1, max_length=160)
-    provider: Literal[ProviderKind.VLLM, ProviderKind.LLAMA_CPP]
-    base_url: AnyHttpUrl
-    api_key_env: str = Field(min_length=1)
-
-    @field_validator("alias")
-    @classmethod
-    def alias_must_not_be_blank(cls, value: str) -> str:
-        return _normalized_alias(value)
-
-    @field_validator("base_url")
-    @classmethod
-    def base_url_must_not_contain_secrets(cls, value: AnyHttpUrl) -> AnyHttpUrl:
-        return _safe_self_hosted_base_url(value)
-
-    @field_validator("api_key_env")
-    @classmethod
-    def api_key_env_must_be_safe(cls, value: str) -> str:
-        normalized = value.strip()
-        if re.fullmatch(r"AI_[A-Z0-9_]+_API_KEY", normalized) is None:
-            raise ValueError("api_key_env must be an AI_*_API_KEY environment variable")
-        return normalized
-
-
-class _BedrockLlmEndpointDefinition(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    alias: str = Field(min_length=1, max_length=160)
-    provider: Literal[ProviderKind.BEDROCK]
-    aws_region: str = Field(min_length=1)
-
-    @field_validator("alias")
-    @classmethod
-    def alias_must_not_be_blank(cls, value: str) -> str:
-        return _normalized_alias(value)
-
-    @field_validator("aws_region")
-    @classmethod
-    def aws_region_must_be_valid(cls, value: str) -> str:
-        return _normalized_aws_region(value)
-
-
 class OpenAIConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -176,15 +138,16 @@ class F2Config(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider_status: F2ProviderStatus = F2ProviderStatus.OFFLINE
-    sllm_model: str = Field(default="sllm", min_length=1)
-    stt_model: str = Field(default="stt", min_length=1)
-    stt_language: str = Field(default="ko", min_length=1)
+    sllm_model: F2SllmModel = F2SllmModel.SLLM
+    stt_model: F2SttModel = F2SttModel.STT
+    stt_language: SttLanguage = SttLanguage.KOREAN
 
 
 class AiConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     profile: AiProfile
+    general: GeneralSelection = Field(default_factory=GeneralSelection)
     request_timeout_seconds: float = Field(default=60, gt=0)
     openai: OpenAIConfig | None = None
     vllm: VllmConfig = Field(default_factory=VllmConfig)
@@ -209,7 +172,7 @@ def _positive_float(source: Mapping[str, str], name: str, default: float) -> flo
         value = float(raw)
     except ValueError as exc:
         raise ConfigurationError(f"{name} must be a positive number") from exc
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         raise ConfigurationError(f"{name} must be a positive number")
     return value
 
@@ -232,141 +195,120 @@ def _vllm_endpoint(
     )
 
 
-def _required_f2_endpoint(
-    source: Mapping[str, str],
-    *,
-    base_url_name: str,
-    api_key_name: str,
-) -> ProviderEndpointConfig:
-    endpoint = _vllm_endpoint(
-        source,
-        base_url_name=base_url_name,
-        api_key_name=api_key_name,
-    )
-    if endpoint is None:
-        raise ConfigurationError(
-            f"{base_url_name} is required when AI_F2_PROVIDER_STATUS is active"
-        )
-    return endpoint
-
-
-def _llm_endpoints(source: Mapping[str, str]) -> tuple[LlmEndpointConfig, ...]:
-    raw = _optional(source, "AI_LLM_ENDPOINTS")
-    if raw is None:
-        return ()
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        raise ConfigurationError("AI_LLM_ENDPOINTS must be a JSON array") from None
-    if not isinstance(payload, list):
-        raise ConfigurationError("AI_LLM_ENDPOINTS must be a JSON array")
-
-    endpoints: list[LlmEndpointConfig] = []
-    aliases: set[str] = set()
-    for item in payload:
-        try:
-            if not isinstance(item, dict):
-                raise ValueError
-            provider = item.get("provider")
-            if provider == ProviderKind.BEDROCK.value:
-                definition = _BedrockLlmEndpointDefinition.model_validate(item)
-            elif provider in {ProviderKind.VLLM.value, ProviderKind.LLAMA_CPP.value}:
-                definition = _SelfHostedLlmEndpointDefinition.model_validate(item)
-            else:
-                raise ValueError
-        except (ValidationError, ValueError):
-            raise ConfigurationError("invalid AI_LLM_ENDPOINTS configuration") from None
-        if definition.alias in aliases:
-            raise ConfigurationError(
-                f"AI_LLM_ENDPOINTS contains duplicate alias: {definition.alias}"
-            )
-        aliases.add(definition.alias)
-        if isinstance(definition, _BedrockLlmEndpointDefinition):
-            endpoints.append(
-                BedrockLlmEndpointConfig(
-                    alias=definition.alias,
-                    provider=definition.provider,
-                    aws_region=definition.aws_region,
-                )
-            )
-            continue
-        api_key = _optional(source, definition.api_key_env)
-        if api_key is None:
-            raise ConfigurationError(f"{definition.api_key_env} is required by AI_LLM_ENDPOINTS")
-        endpoints.append(
-            SelfHostedLlmEndpointConfig(
-                alias=definition.alias,
-                provider=definition.provider,
-                base_url=definition.base_url,
-                api_key=SecretStr(api_key),
-            )
-        )
-    return tuple(endpoints)
-
-
 def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiConfig:
     try:
         selected_profile = AiProfile(profile)
     except ValueError as exc:
         raise ConfigurationError("AI profile must be local, test, dev, or prod") from exc
 
-    openai_api_key = _optional(source, "AI_OPENAI_API_KEY")
-    openai_config: OpenAIConfig | None = None
+    removed = {
+        "AI_LLM_ENDPOINTS",
+        "AI_F2_PROVIDER_STATUS",
+        "AI_OPENAI_API_KEY",
+        "AI_OPENAI_BASE_URL",
+    } & source.keys()
+    if removed:
+        raise ConfigurationError(
+            "Removed AI inputs: "
+            + ", ".join(sorted(removed))
+            + "; migrate using docs/development/environment-variables.md"
+        )
     try:
-        raw_f2_status = _optional(source, "AI_F2_PROVIDER_STATUS")
-        if raw_f2_status is None:
-            f2_status = F2ProviderStatus.OFFLINE
-        else:
-            try:
-                f2_status = F2ProviderStatus(raw_f2_status)
-            except ValueError as exc:
-                raise ConfigurationError("AI_F2_PROVIDER_STATUS must be active or offline") from exc
-        if openai_api_key is not None:
-            openai_config = OpenAIConfig(
-                base_url=_http_url(
-                    _optional(source, "AI_OPENAI_BASE_URL") or "https://api.openai.com/v1"
+        general = GeneralSelection(
+            provider=ProviderKind(
+                _optional(source, "AI_GENERAL_PROVIDER") or ProviderKind.OPENAI.value
+            ),
+            model=GeneralModel(
+                _optional(source, "AI_GENERAL_MODEL") or GeneralModel.OPENAI_LUNA.value
+            ),
+        )
+        key = _optional(source, "AI_GENERAL_API_KEY")
+        base_url = _optional(source, "AI_GENERAL_BASE_URL")
+        region = _optional(source, "AI_GENERAL_AWS_REGION")
+        openai_config = None
+        endpoints: tuple[LlmEndpointConfig, ...] = ()
+        if general.provider is ProviderKind.OPENAI:
+            if region:
+                raise ConfigurationError("AI_GENERAL_AWS_REGION is only valid for bedrock")
+            if key:
+                openai_config = OpenAIConfig(
+                    base_url=_safe_self_hosted_base_url(
+                        _http_url(base_url or "https://api.openai.com/v1")
+                    ),
+                    api_key=SecretStr(key),
+                )
+        elif general.provider is ProviderKind.BEDROCK:
+            if key or base_url:
+                raise ConfigurationError(
+                    "bedrock uses an AWS role and region, not API key/base URL"
+                )
+            if not region:
+                raise ConfigurationError("AI_GENERAL_AWS_REGION is required for bedrock")
+            endpoints = (
+                BedrockLlmEndpointConfig(
+                    alias="general-dev-bedrock", provider=ProviderKind.BEDROCK, aws_region=region
                 ),
-                api_key=SecretStr(openai_api_key),
             )
+        else:
+            if region:
+                raise ConfigurationError("AI_GENERAL_AWS_REGION is only valid for bedrock")
+            if bool(base_url) != bool(key):
+                raise ConfigurationError(
+                    "AI_GENERAL_BASE_URL and AI_GENERAL_API_KEY "
+                    "are required together for self-hosted providers"
+                )
+            endpoints = (
+                (
+                    SelfHostedLlmEndpointConfig(
+                        alias="general-dev-gpu",
+                        provider=general.provider,
+                        base_url=_http_url(base_url),
+                        api_key=SecretStr(key or ""),
+                    ),
+                )
+                if base_url
+                else ()
+            )
+        sllm = _vllm_endpoint(
+            source, base_url_name="AI_VLLM_SLLM_BASE_URL", api_key_name="AI_VLLM_SLLM_API_KEY"
+        )
+        stt = _vllm_endpoint(
+            source, base_url_name="AI_VLLM_STT_BASE_URL", api_key_name="AI_VLLM_STT_API_KEY"
+        )
+        if (sllm is None) != (stt is None):
+            raise ConfigurationError("F2 requires both SLLM and STT URLs, or neither")
         return AiConfig(
             profile=selected_profile,
+            general=general,
             request_timeout_seconds=_positive_float(source, "AI_REQUEST_TIMEOUT_SECONDS", 60),
             openai=openai_config,
             vllm=VllmConfig(
-                sllm=(
-                    _required_f2_endpoint(
-                        source,
-                        base_url_name="AI_VLLM_SLLM_BASE_URL",
-                        api_key_name="AI_VLLM_SLLM_API_KEY",
-                    )
-                    if f2_status is F2ProviderStatus.ACTIVE
-                    else None
-                ),
+                sllm=sllm,
+                stt=stt,
                 embedding=_vllm_endpoint(
                     source,
                     base_url_name="AI_VLLM_EMBEDDING_BASE_URL",
                     api_key_name="AI_VLLM_EMBEDDING_API_KEY",
                 ),
-                stt=(
-                    _required_f2_endpoint(
-                        source,
-                        base_url_name="AI_VLLM_STT_BASE_URL",
-                        api_key_name="AI_VLLM_STT_API_KEY",
-                    )
-                    if f2_status is F2ProviderStatus.ACTIVE
-                    else None
+            ),
+            llm_endpoints=endpoints,
+            f2=F2Config(
+                provider_status=F2ProviderStatus.ACTIVE
+                if sllm is not None
+                else F2ProviderStatus.OFFLINE,
+                sllm_model=F2SllmModel(
+                    _optional(source, "AI_F2_SLLM_MODEL") or F2SllmModel.SLLM.value
+                ),
+                stt_model=F2SttModel(_optional(source, "AI_F2_STT_MODEL") or F2SttModel.STT.value),
+                stt_language=SttLanguage(
+                    _optional(source, "AI_F2_STT_LANGUAGE") or SttLanguage.KOREAN.value
                 ),
             ),
-            llm_endpoints=_llm_endpoints(source),
-            f2=F2Config(
-                provider_status=f2_status,
-                sllm_model=_optional(source, "AI_F2_SLLM_MODEL") or "sllm",
-                stt_model=_optional(source, "AI_F2_STT_MODEL") or "stt",
-                stt_language=_optional(source, "AI_F2_STT_LANGUAGE") or "ko",
-            ),
         )
-    except ValidationError:
-        raise ConfigurationError("invalid AI provider configuration") from None
+    except (ValidationError, ValueError):
+        raise ConfigurationError(
+            "invalid AI selection or provider configuration; see model_catalog.py allowed values"
+        ) from None
 
 
 def _dotenv_mapping(path: Path) -> dict[str, str]:

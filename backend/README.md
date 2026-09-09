@@ -156,30 +156,17 @@ F3 seed의 reset 범위, 케이스와 공유 dev 적용법은
 [F3 합성 seed 안내](../docs/db/seed/README.md)를 따릅니다. 이 seed는 실행 결과를 미리 만들지
 않으며, `agent_run`과 판정 결과는 활성 Worker가 직접 생성해야 합니다.
 
-`local-openai` F3 모델 설정은 OpenAI `gpt-5.6-luna`이므로 AI 개인 설정도 준비합니다.
-`dev-bedrock-gpt56-luna`는 공유 dev POC용이며 Infra Bedrock doctor 통과 뒤 명시적으로
-활성하고 합성 smoke로 검증합니다. 실패 시 OpenAI key·runtime이 배포된 환경에서만
-`local-openai`를 명시 재적용합니다.
-두 Qwen dev 프로필은 GPU runtime 배포 전까지 비활성 비교 경로로 보존합니다.
-
-```bash
-cp ../ai/.env.example ../ai/.env
-```
-
-```dotenv
-AI_OPENAI_API_KEY=<private-api-key>
-```
-
-다른 Provider나 모델은 [F3 합성 seed 안내](../docs/db/seed/README.md)의 allowlist
-프로필과 [`ai/.env.example`](../ai/.env.example)을 함께 확인합니다.
+범용 Provider·모델·키는 `ai/.env`에서 선택합니다. 기본은 OpenAI `gpt-5.6-luna`이며
+`AI_GENERAL_API_KEY`에 개인 키를 입력합니다. Backend 개인 파일에는 AI 변수를 쓰지 않습니다.
+지원 enum, capability별 명시 모델 반영, F2 연결은
+[환경변수 관리](../docs/development/environment-variables.md)를 따릅니다.
 
 ## 6. API와 Worker 실행
 
 ### 터미널 1: API
 
 ```bash
-cd backend
-uv run python src/server.py
+just -f infra/justfile local-api
 ```
 
 - API: `http://127.0.0.1:8000`
@@ -189,26 +176,21 @@ uv run python src/server.py
 
 ### 터미널 2: F3 Worker
 
-검토된 F3 합성 seed만 처리하는 로컬 Worker는 두 설정을 명시해 실행합니다.
+`backend/.env`에 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 지정한 뒤 저장소 루트에서 실행합니다.
+이는 검토된 합성 데이터 전용 허용이며 실사용 데이터 허용이 아닙니다.
 
 ```bash
-cd backend
-WORKER_ENABLED=true \
-F3_ALLOW_SYNTHETIC_PROTOTYPE=true \
-uv run python src/worker.py
+just -f infra/justfile local-worker
 ```
 
-활성 Worker는 DB, 합성 데이터 opt-in과 AI Provider 설정을 검증한 뒤 DB polling을 시작합니다.
-API에서 접수한 F3 실행이 없으면 대기합니다. 종료할 때는 `Ctrl+C`를 사용합니다.
-
-`WORKER_ENABLED=false`인 기본 설정으로 `src/worker.py`를 실행하면 DB readiness만 확인하고 작업을
-선점하지 않습니다. 따라서 API만 실행했거나 비활성 Worker만 실행한 상태에서는 F3 실행이
-`QUEUED`에 머뭅니다.
-
-`F3_ALLOW_SYNTHETIC_PROTOTYPE=true`는 검토된 합성 데이터 전용 opt-in입니다. 실사용 데이터를
-처리해도 된다는 설정이 아닙니다.
+Worker 실행 자체가 작업 처리를 시작합니다. 필요 없으면 실행하지 않고 종료는 Ctrl+C로 합니다.
+로컬 launcher가 모듈별 환경을 검증하고 주입하며 Worker는 합성 opt-in·DB·Provider를 검증합니다.
+Worker가 없으면 F3 요청은 QUEUED에 머뭅니다. 별도 비활성 Worker는 없습니다.
 
 ## 설정 환경
+
+파일 역할·변수 추가 및 정리 기준은 [환경변수 관리](../docs/development/environment-variables.md)를 따릅니다.
+F2 로컬 기본값은 offline입니다. 연결 준비 후 `ai/.env.example`의 SLLM/STT URL 쌍을 함께 설정합니다.
 
 - `APP_ENV=local`: `.env.local`을 읽고 개인 `.env`, 실행 프로세스 환경변수 순서로 덮어씁니다.
 - `APP_ENV=dev`: 공유 AWS 개발 애플리케이션 환경입니다. `DB_TARGET=development`만 허용하고
@@ -221,7 +203,5 @@ API에서 접수한 F3 실행이 없으면 대기합니다. 종료할 때는 `Ct
 - 공유 `dev`는 세션 유휴 만료를 30분, 절대 만료를 720분으로 주입하며 세션·CSRF Cookie에
   `Secure`, `HttpOnly`, `SameSite=Lax`를 적용합니다. 실제 개인정보·계정·비밀번호를 넣지 않습니다.
 - API entrypoint는 검증된 `APP_HOST`와 `APP_PORT`로 Uvicorn listener를 시작합니다.
-- Worker 설정도 같은 병합 결과에서 검증되므로 개인 `.env`의 `WORKER_*` 값이 전역 환경변수 변경
-  없이 적용됩니다. 활성 Worker의 합성 opt-in은 위 실행 명령처럼 프로세스 환경변수로 명시합니다.
-- 활성 Worker의 Provider 설정은 `local`에서만 `ai/.env.local`, `ai/.env`, 프로세스 환경변수 순서로
-  병합합니다. `dev`, `test`, `prod`에서는 AI 설정도 프로세스 환경변수만 사용합니다.
+- 로컬 API/Worker는 Infra launcher가 `backend/.env*`와 `ai/.env*`를 각각 주입합니다.
+  dev/test/prod는 주입된 process env만 사용합니다.

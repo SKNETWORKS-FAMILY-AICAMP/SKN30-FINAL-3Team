@@ -58,7 +58,7 @@ services:
         awslogs-stream: "${INSTANCE_ID:?INSTANCE_ID is required}/worker"
         awslogs-create-group: "false"
     healthcheck:
-      test: ["CMD-SHELL", "test -f \"$${WORKER_READY_FILE:-/tmp/brokerage-worker-ready}\""]
+      test: ["CMD", "python", "-c", "from core.worker_health import is_ready; raise SystemExit(0 if is_ready() else 1)"]
       interval: 15s
       timeout: 3s
       retries: 4

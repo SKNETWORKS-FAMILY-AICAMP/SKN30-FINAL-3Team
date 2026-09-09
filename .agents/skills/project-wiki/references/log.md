@@ -162,3 +162,13 @@ updated: 2026-09-09
 - 2026-09-09: 최신 dev 병합 후 F3 Repository·모델 조립·단계 선택을 분리하고 후보 생성 부분 실패 시 성공 카드 보존을 수정했다. [Backend 구현 정본](../../backend/references/f3-execution.md)에 범위·확장 제약을 기록하고 후보 병렬 생성 설명을 코드에 맞췄다.
 
 - 2026-09-09: PR #112 리뷰를 재현해 매물 직접 연결 상담의 당사자 경계를 보완하고 상담 scope를 v3로 갱신했다. 무효 앵커와 파생 결과의 공개를 차단하고 헤더 참조의 snapshot 우회를 막았다.
+
+- 2026-09-09: 개발자용 설정·클라우드 점검과 기동 후 합성 검증 명령을 추가했다. 적용 상태를 Infra 인벤토리로 모으고 Secret 값 소유권 설명을 후속 결정과 일치시켰다. 신규 consultation-v3를 기존 모델과 구분했으며 실제 기동은 사용자 수행, S3 전송은 승인 대기다. 개인 dotenv 경계·기본 모델은 유지한다.
+
+- 2026-09-09: 사용자 승인으로 환경변수 입력을 리팩토링했다. Worker F3 opt-in을 config에 합치고 공개·개인 파일의 주석과 선택 입력, F2 offline 기본값·embedding 기본 주소 제거, 소비 코드 기반 진단·문서 누락 검사를 ADR-0033과 개발자 환경변수 안내에 기록했다. 실제 기동·공유 배포는 미실행이다.
+
+- 2026-09-09: ADR-0034 — 모듈별 입력 단일 소유, provider/model enum, Worker/OpenAPI 내부화와 명시 모델 버전 적용 명령 구현. 클라우드 적용·실제 기동은 미실행.
+
+- 2026-09-09: 사용자 명시 승인 후 consultation-v3를 private S3에 게시하고 원격 본문·cross-hash를 검증했다. bootstrap 승인 plan 적용 결과 실제 2개 변경·생성/삭제 0개, AWS 정책 대조·drift 없음 확인. 앱·DB·GPU 기동과 모델 활성화는 미실행.
+
+- 2026-09-09: 로컬 OpenAI/shared dev vLLM 기본을 사용자 확정했다. 개인 키 충돌의 0600 백업 이전, shared provider/model 일치 검사, capability별 모델 선택, 최초 배포의 CodeDeploy maintenance 전환을 추가했다. F2 consultation-v3와 general 공식 FP8의 offline 선택만 저장했으며 실제 기동·DB 모델 활성화는 미실행이다.
