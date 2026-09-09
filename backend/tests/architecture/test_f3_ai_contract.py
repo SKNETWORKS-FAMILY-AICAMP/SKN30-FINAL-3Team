@@ -1,7 +1,7 @@
 """Backend 와 AI 의 F3 포지션 카드 어휘가 실제로 같은 값인지 확인한다.
 
 두 모듈이 각자 enum 을 들고 있으므로 한쪽만 바꾸면 cache key 와 저장값이 조용히 갈라진다.
-문서가 아니라 여기서 막는다. 정본은 project-wiki 의 contracts/f3-ai.md 다.
+문서가 아니라 여기서 막는다. 정본은 project-wiki 의 contracts/f3-ai-position-card.md 다.
 
 이 파일은 AI 계약 모듈을 import 하는 것 자체가 DB 연결이나 Provider client 를 만들지
 않는다는 것도 확인한다. Backend 는 이 계약을 SDK 없이 쓸 수 있어야 한다.
@@ -58,7 +58,7 @@ def test_input_privacy_modes_make_the_prototype_exception_explicit() -> None:
 def test_f3_ai_project_decisions_are_registered() -> None:
     """공개 계약의 정본·해결 질문·개인정보 결정을 함께 등록하게 한다."""
     references = REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references"
-    contract_path = references / "contracts" / "f3-ai.md"
+    contract_path = references / "contracts" / "f3-ai-position-card.md"
     assert contract_path.is_file()
 
     contract = contract_path.read_text(encoding="utf-8")
@@ -73,7 +73,9 @@ def test_f3_ai_project_decisions_are_registered() -> None:
     assert "status: 결정" in contract
     assert "| `LISTING` |" in contract
     assert "| `REQUIREMENT` |" in contract
-    assert "[contracts/f3-ai.md](contracts/f3-ai.md)" in index
+    assert "](contracts/f3-ai.md)" in index
+    router = (references / "contracts" / "f3-ai.md").read_text(encoding="utf-8")
+    assert "](f3-ai-position-card.md)" in router
     assert "`contracts/f3-ai.md`" in log
     assert "OQ-012" not in open_questions
     assert "SYNTHETIC_PROTOTYPE" in privacy_policy
@@ -83,21 +85,24 @@ def test_f3_ai_project_decisions_are_registered() -> None:
 def test_anchor_card_storage_is_registered_in_the_current_project_contracts() -> None:
     """코드가 진행됐는데 위키가 계속 미구현이라고 남는 회귀를 막는다."""
     references = REPOSITORY_ROOT / ".agents" / "skills" / "project-wiki" / "references"
-    contract = (references / "contracts" / "f3-ai.md").read_text(encoding="utf-8")
-    api_contract = (references / "contracts" / "api.md").read_text(encoding="utf-8")
+    common_contract = (references / "contracts" / "f3-ai-common.md").read_text(encoding="utf-8")
+    implementation = (references / "contracts" / "f3-ai-implementation.md").read_text(
+        encoding="utf-8"
+    )
+    api_contract = (references / "contracts" / "api-f3.md").read_text(encoding="utf-8")
     log = (references / "log.md").read_text(encoding="utf-8")
     online_runtime = (
         REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"
     ).read_text(encoding="utf-8")
 
-    assert "| Cache key 버전 | `position-card:v3`" in contract
-    assert "카드·거래 유형별 가격·근거 인용과 quote offset 저장" in contract
+    assert "| Cache key 버전 | `position-card:v3`" in common_contract
+    assert "카드·거래 유형별 가격·근거 인용과 quote offset 저장" in implementation
     assert "| `ANCHOR_READY` | 업무 처리 | 앵커 카드 검증·저장 완료 | 구현됨 |" in api_contract
     assert "`position-card:v3`" in online_runtime
     assert "`backend/src/domain/agent_execution/pipeline.py`" in online_runtime
     assert "| Worker polling loop | 없음" not in online_runtime
     assert "| `SUPERSEDED` | 종료 | 실행 중 입력 데이터가 변경됨 | 구현됨 |" in api_contract
-    assert "- Worker polling과 `WORKER_ENABLED=true`" not in contract
+    assert "- Worker polling과 `WORKER_ENABLED=true`" not in implementation
     assert "F3 앵커 포지션 카드의 합성 F1 snapshot 조립" in log
 
 

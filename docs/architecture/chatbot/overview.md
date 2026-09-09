@@ -81,6 +81,7 @@ local 비용은 실제 입력·출력·repair 토큰으로, dev는 GPU 가동 �
 | [화면](../../screen/chatbot.md) | 진입·첫 화면·결과·오류·F2 전환 |
 | [실행 구조](runtime.md)·[통신안](api-and-stream.md) | AI–Backend 책임·도구·SSE·복구 설계 |
 | [저장 설계](persistence.md) | 대화·메시지·요청 관계, 소유권·중복·상태 전이·삭제 경합 |
+| [구현·검증](implementation-and-validation.md) | 코드 구현·모델 평가·화면 검증·배포 범위의 현재 근거 |
 | [공공 API 조사](public-market-data.md) | 공식 출처·가능 범위·연동 조건 |
 | [project-wiki 질문](../../../.agents/skills/project-wiki/references/open-questions.md) | 후속 시세 기능 착수 시 정할 지역·단지·표본 등 |
 
