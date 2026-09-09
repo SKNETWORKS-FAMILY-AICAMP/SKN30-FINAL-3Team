@@ -566,6 +566,13 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             )
             compose = json.loads(result.stdout)
 
+        self.assertEqual(
+            compose["services"]["migrate"]["environment"]["PGOPTIONS"],
+            "-c role=app_owner",
+        )
+        self.assertNotIn("PGOPTIONS", compose["services"]["api"]["environment"])
+        self.assertNotIn("PGOPTIONS", compose["services"]["worker"]["environment"])
+
         # Compose config escapes a literal runtime '$' as '$$'; losing raw mode
         # would interpolate '$literal' before this canonical representation.
         self.assertEqual(

@@ -77,6 +77,8 @@ just ai-select --workload f2 --cloud aws --hardware-profile aws-g6-2xlarge --rel
    Frontend 배포도 maintenance에서는 Backend readiness를 선행 조건으로 요구하지 않는다.
    배포 모드와 pre-build 절차는 Terraform의 CodeBuild 설정이 함께 주입하며 automatic은 기존
    readiness 검사를 유지한다. 정적 파일 업로드와 index-last 복구 계약은 동일하다.
+   migration 컨테이너만 `PGOPTIONS=-c role=app_owner`를 사용해 새 테이블에 기존
+   `app_rw` default privileges가 적용되도록 한다. API·Worker에는 이 역할 전환을 주입하지 않는다.
 6. `just dev-start --hours 2`에서 같은 계획을 확인한다. RDS의 중개사 ID·capability별 현재 모델을
    보고 바꿀 대상만 `7:CHATBOT,7:POSITION_CARD`처럼 명시한다. 전후 비교를 확인한 뒤 모델 준비가
    통과하면 선택 대상에만 새 DB 버전을 추가한다. 마지막에 API·Worker와 앱 경유 합성 검증을 실행한다.
