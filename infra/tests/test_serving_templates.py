@@ -237,6 +237,60 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(self.api.patches, [])
         self.assertEqual(self.aws.writes, [])
 
+    def test_offline_matching_pod_resumes_without_mutating_template(self):
+        self.prepared_pod()
+        self.aws.endpoint_value = {"status": "offline"}
+        self.api.pod_values[0]["env"] = {"F2_SLLM_RELEASE_ID": "consultation-v3"}
+        plan = self.reconciler.plan("f2", self.spec)
+        self.assertTrue(plan["read_only_resume"])
+        with patch.object(module.control, "Registrar") as registrar:
+            self.reconciler.apply(plan, self.spec)
+        registrar.assert_not_called()
+        self.assertEqual(self.api.patches, [])
+        self.assertEqual(self.aws.writes, [])
+
+    def test_offline_pod_with_missing_or_different_release_is_rejected(self):
+        for env in (None, {}, {"F2_SLLM_RELEASE_ID": "other"}):
+            self.prepared_pod()
+            self.aws.endpoint_value = {"status": "offline"}
+            self.api.pod_values[0]["env"] = env
+            with self.assertRaises(module.control.ToolError):
+                self.reconciler.plan("f2", self.spec)
+
+    def test_offline_general_requires_exact_profile_and_cuda_mode(self):
+        spec = {"image": IMAGE, "model_profile": "qwen38-27b-fp8"}
+        pod = {
+            "id": "prepared-pod",
+            "name": "skn30-general-serving-dev",
+            "template_id": "existing-template",
+            "image": IMAGE,
+            "status": "RUNNING",
+        }
+        for env, expected in (
+            (
+                {
+                    "GENERAL_MODEL_PROFILE": "qwen38-27b-fp8",
+                    "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
+                },
+                True,
+            ),
+            (
+                {
+                    "GENERAL_MODEL_PROFILE": "other",
+                    "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
+                },
+                False,
+            ),
+            ({"GENERAL_MODEL_PROFILE": "qwen38-27b-fp8"}, False),
+        ):
+            pod["env"] = env
+            self.assertEqual(
+                self.reconciler._can_resume(
+                    "general", spec, {"status": "offline"}, [pod], "existing-template"
+                ),
+                expected,
+            )
+
     def test_active_resume_refuses_template_drift_or_wrong_pod(self):
         self.prepared_pod()
         self.api.value["dockerStartCmd"] = [

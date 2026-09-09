@@ -149,3 +149,13 @@ GPU 메모리 비율이나 검증 구간 밖의 절대 최대치가 아니다. �
 현재 자원은 [인벤토리](../../.agents/skills/infra/references/resource-inventory.md),
 과거 적용·검토는 [change-review.md](change-review.md), 모델별 검증 근거는
 [서빙 검증](../serving/validation.md)을 확인한다. 진단 INFO/offline·등록 성공·품질 평가는 서로 다른 상태다.
+
+### 실패 뒤 같은 Pod로 재시도
+
+실패 정리로 endpoint가 offline이 되었어도 동일한 관리 Pod가 보존될 수 있다.
+Template·등록 문서에 변경이 없고 Pod 이름·Template·이미지·실행 상태와 F2 release 또는
+general profile/CUDA 설정이 선택과 일치하면 읽기 전용으로 재사용한다. 모델 준비와 앱
+검증은 다시 수행하며 불일치 Pod를 자동으로 바꾸거나 Template을 수정하지 않는다.
+
+F2 앱 경유 smoke는 Backend 공개 응답의 `ledger_type`을 포함한 필드와 허용값을 확인한다.
+Backend 응답 필드 목록과 smoke의 일치는 별도 회귀 검사로 검증한다.
