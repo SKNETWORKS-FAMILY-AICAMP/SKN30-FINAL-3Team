@@ -53,6 +53,10 @@ class RevisionTests(unittest.TestCase):
         self.group = {
             "lastSuccessfulDeployment": {"deploymentId": "d-ATTESTED1"},
             "autoScalingGroups": [],
+            "deploymentStyle": {
+                "deploymentType": "IN_PLACE",
+                "deploymentOption": "WITHOUT_TRAFFIC_CONTROL",
+            },
             "ec2TagSet": {
                 "ec2TagSetList": [
                     [{"Key": key, "Value": value, "Type": "KEY_AND_VALUE"}]
