@@ -257,7 +257,7 @@ async def test_requirement_generation_calls_the_provider_exactly_once() -> None:
     assert result.target.negotiation_side is NegotiationSide.REQUIREMENT
 
 
-async def test_generation_is_deterministic_at_temperature_zero() -> None:
+async def test_generation_requests_temperature_zero() -> None:
     provider = FakeProvider()
 
     await generator(provider).generate_position_card(listing_request())

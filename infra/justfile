@@ -92,6 +92,7 @@ check:
     uvx ruff check scripts/env_doctor.py scripts/operations.py scripts/plan_guard.py scripts/release_tools.py serving scripts/manage_serving.py scripts/serving_cli.py scripts/serving_deployment.py scripts/connect_serving.py deploy/scripts/serving_contract.py scripts/manage_bedrock.py scripts/manage_db_access.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py tests
     uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
     uv run --python 3.12 --with 'aiohttp==3.14.3' --with 'multidict==6.7.1' python -m unittest discover -s runpod/tests -v
+    uv run --python 3.12 --with 'aiohttp==3.14.3' --with 'multidict==6.7.1' python -m unittest discover -s serving/tests -v
 
 # 모든 Terraform 파일을 포맷한다.
 fmt:

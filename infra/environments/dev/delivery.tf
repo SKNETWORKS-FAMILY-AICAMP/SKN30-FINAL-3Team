@@ -87,6 +87,8 @@ resource "aws_codedeploy_deployment_group" "backend" {
   autoscaling_groups     = var.app_deployment_mode == "automatic" ? [aws_autoscaling_group.app.name] : []
 
   # Separate tag groups are ANDed. ASG propagated Name overrides the launch-template Name.
+  # Tags within one group are ORed: do not combine these three groups.
+  # https://docs.aws.amazon.com/codedeploy/latest/APIReference/API_EC2TagSet.html
   dynamic "ec2_tag_set" {
     for_each = var.app_deployment_mode == "maintenance" ? {
       Project     = var.project_name

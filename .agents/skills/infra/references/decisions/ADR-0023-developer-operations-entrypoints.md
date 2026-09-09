@@ -28,6 +28,8 @@ updated: 2026-09-09
   새 Pipeline revision 성공 후 `automatic` 연결 복구 plan을 검토한다. Terraform 운영 입력으로만 관리한다.
   기본값 `automatic`은 유지한다. 최초 전환 파일은 seal/check 양쪽에서 실제 saved plan의 입력과
   예정 배포 대상을 검사하며, 잘못된 plan을 이름만 바꿔 사용하는 것을 차단한다.
+  태그는 각각 하나의 `ec2_tag_set`에 넣는다. [AWS EC2TagSet 계약](https://docs.aws.amazon.com/codedeploy/latest/APIReference/API_EC2TagSet.html)은
+  그룹 간 AND이며 그룹 내부는 OR다. 세 태그를 하나의 그룹으로 합치면 대상이 넓어지므로 금지한다.
 - 최초 `dev-prepare-app`은 GPU 직접 검증·endpoint 게시 후 앱 호스트를 준비하고 최신 Pipeline 배포를 기다린다.
   실제 기동과 직접 추론이 포함되므로 사용자가 검증 창에서 실행한다.
 - 원격 모델 변경은 사무소·capability 하나씩, API/Worker 중지 및 대기 요청 부재에서만 실행한다.

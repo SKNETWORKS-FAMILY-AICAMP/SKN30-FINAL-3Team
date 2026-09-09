@@ -16,7 +16,7 @@ import {
 } from "@patternfly/react-core";
 import { MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
-import { describeForUser } from "./ledger/index.ts";
+import { carrySavedIdentity, describeForUser } from "./ledger/index.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import "./DetailWorkspace.css";
 

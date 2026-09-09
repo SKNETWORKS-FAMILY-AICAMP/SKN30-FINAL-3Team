@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AllCommunityModule, ModuleRegistry, themeQuartz } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import "./BuyerLedgerGrid.css";
@@ -19,9 +19,18 @@ const columns = [
   { headerName: "만기일", field: "expiry", width: 112 }, { headerName: "분류", field: "classification", width: 100 }, { headerName: "비고", field: "memo", width: 168, tooltipField: "memo" },
 ];
 
-export function BuyerLedgerGrid({ rows = [], onRowsChange, onOpenDetail, onSelectionChange, selectedRowIds = [], selectionResetToken = 0, assigneeFilter = "전체", onAssigneeFilterChange, readOnly = false }) {
+export function BuyerLedgerGrid({ searchQuery = "", onDisplayedCountChange, rows = [], onRowsChange, onOpenDetail, onSelectionChange, selectedRowIds = [], selectionResetToken = 0, assigneeFilter = "전체", onAssigneeFilterChange, readOnly = false }) {
   const gridApiRef = useRef(null);
-  const filteredRows = useMemo(() => (Array.isArray(rows) ? rows : []).filter((row) => assigneeFilter === "전체" || row.assignee === assigneeFilter), [rows, assigneeFilter]);
+  const [displayedCount, setDisplayedCount] = useState(0);
+  const filteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase("ko-KR");
+    const compact = (text) => text.replace(/[\s-]/g, "");
+    return (Array.isArray(rows) ? rows : []).filter((row) => {
+      const text = columns.map(({ field }) => String(row[field] ?? "")).join(" ").toLocaleLowerCase("ko-KR");
+      return (assigneeFilter === "전체" || row.assignee === assigneeFilter)
+        && (!query || text.includes(query) || compact(text).includes(compact(query)));
+    });
+  }, [rows, assigneeFilter, searchQuery]);
   const assignees = useMemo(() => ["전체", ...new Set((rows || []).map((row) => row.assignee).filter(Boolean))], [rows]);
   const defaultColDef = useMemo(() => ({ editable: () => !readOnly, sortable: true, filter: "agTextColumnFilter", resizable: true, minWidth: 72, suppressKeyboardEvent: ({ event }) => Boolean(event?.isComposing && ["Enter", "Tab"].includes(event.key)) }), [readOnly]);
   const selectionColumnDef = useMemo(() => ({ headerName: "선택", pinned: "left", lockPinned: true, lockPosition: "left", maxWidth: 44, minWidth: 44, resizable: false, sortable: false, suppressHeaderMenuButton: true, suppressMovable: true, width: 44 }), []);
@@ -38,8 +47,8 @@ export function BuyerLedgerGrid({ rows = [], onRowsChange, onOpenDetail, onSelec
     if (nodes.length > 0) api.setNodesSelected({ nodes, newValue: true });
   };
   return <section className="buyer-ledger-grid" data-screen-id="F1-PG-020" data-requirement-ids="F1-DM-01~07, F1-DM-08~16, F1-DM-06" aria-label="구입장 그리드">
-    <div className="buyer-ledger-grid__toolbar"><label>담당자 <select value={assigneeFilter} onChange={(event) => onAssigneeFilterChange?.(event.target.value)}>{assignees.map((assignee) => <option key={assignee}>{assignee}</option>)}</select></label><span className="buyer-ledger-grid__count" role="status">{filteredRows.length.toLocaleString()}건</span></div>
-    <div className="buyer-ledger-grid__table"><AgGridReact theme={buyerTheme} rowData={filteredRows} columnDefs={columns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.id)} rowHeight={40} headerHeight={40} ensureDomOrder animateRows={false} rowSelection={rowSelection} selectionColumnDef={selectionColumnDef} onGridReady={handleGridReady} onSelectionChanged={handleSelectionChanged} onFirstDataRendered={handleFirstDataRendered} onCellValueChanged={handleChange} onRowClicked={({ data }) => onOpenDetail?.({ ...data, ledgerType: "buyer", rowKind: "buyer" })} /></div>
+    <div className="buyer-ledger-grid__toolbar"><label>담당자 <select value={assigneeFilter} onChange={(event) => onAssigneeFilterChange?.(event.target.value)}>{assignees.map((assignee) => <option key={assignee}>{assignee}</option>)}</select></label><span className="buyer-ledger-grid__count" role="status">{displayedCount.toLocaleString()}건</span></div>
+    <div className="buyer-ledger-grid__table"><AgGridReact theme={buyerTheme} rowData={filteredRows} columnDefs={columns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.id)} rowHeight={40} headerHeight={40} ensureDomOrder animateRows={false} rowSelection={rowSelection} selectionColumnDef={selectionColumnDef} onModelUpdated={({ api }) => { const count = api.getDisplayedRowCount(); setDisplayedCount(count); onDisplayedCountChange?.(count); }} onGridReady={handleGridReady} onSelectionChanged={handleSelectionChanged} onFirstDataRendered={handleFirstDataRendered} onCellValueChanged={handleChange} onRowClicked={({ data }) => onOpenDetail?.({ ...data, ledgerType: "buyer", rowKind: "buyer" })} /></div>
   </section>;
 }
 export default BuyerLedgerGrid;

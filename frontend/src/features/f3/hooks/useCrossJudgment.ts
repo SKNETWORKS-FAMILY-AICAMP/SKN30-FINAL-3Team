@@ -121,13 +121,27 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
 
   // 늦게 도착한 이전 앵커의 응답이 현재 패널을 덮지 않게 하는 세대 번호.
   const generation = useRef(0);
+  // Opening/retrying authorizes this input version, not future background updates.
+  const requestedKey = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     setOffset(0);
   }, [key]);
 
   useEffect(() => {
-    if (key == null || anchorType == null || anchorId == null || !enabled) {
+    if (!enabled) {
+      requestedKey.current = undefined;
+      setSnapshot(IDLE);
+      return;
+    }
+    if (requestedKey.current === undefined) requestedKey.current = key;
+    if (requestedKey.current !== key) {
+      // Reload/save may update the row while this panel stays open. The existing
+      // superseded state offers an explicit retry without submitting another run.
+      setSnapshot({ ...IDLE, state: "superseded" });
+      return;
+    }
+    if (key == null || anchorType == null || anchorId == null) {
       setSnapshot(IDLE);
       return;
     }
@@ -270,6 +284,7 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
   }, [key, anchorType, anchorId, enabled, attempt, limit, offset]);
 
   const retry = useCallback(() => {
+    requestedKey.current = key;
     if (key != null) runRegistry.delete(key);
     setAttempt((current) => current + 1);
   }, [key]);

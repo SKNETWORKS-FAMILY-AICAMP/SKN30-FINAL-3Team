@@ -191,10 +191,10 @@ def test_general_activation_preserves_ledgers_and_old_profiles(
         seed = seed_f3_synthetic(config, confirm_reset=True, model_profile="local-openai")
         ai_config = bind_ai_config(
             {
-                "AI_F2_PROVIDER_STATUS": "offline",
+                "AI_GENERAL_PROVIDER": "vllm",
+                "AI_GENERAL_MODEL": general_model.MODEL,
                 "AI_GENERAL_API_KEY": "test-only",
-                "AI_LLM_ENDPOINTS": '[{"alias":"general-dev-gpu","provider":"vllm",'
-                '"base_url":"http://127.0.0.1:18000/v1","api_key_env":"AI_GENERAL_API_KEY"}]',
+                "AI_GENERAL_BASE_URL": "http://127.0.0.1:18000/v1",
             },
             "local",
         )

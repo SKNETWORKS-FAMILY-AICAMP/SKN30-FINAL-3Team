@@ -163,3 +163,33 @@ PR은 [#113](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/pull/
   Terraform JSON은 CLI boolean을 문자열 `"true"`로 보존할 수 있어 정확한 `true` 두 표현만 허용한다.
 - metadata schema와 입력 범위가 바뀌었으므로 **기존 saved plan은 재생성·재검토해야 한다**.
   이전 metadata를 재봉인해 우회하지 않는다. 이번 검토에서는 새 plan 생성·apply·서비스 기동을 하지 않았다.
+
+## PR #113 sticky review 재검토와 최신 dev 통합
+
+[sticky comment](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/pull/113#issuecomment-5595333949)의
+검토 SHA `862a857`에 대한 HIGH 7건을 코드·사용자 요청·공식 계약으로 대조했다.
+최신 `dev` `5950681`(PR #114)을 작업 브랜치에 병합했으며 텍스트 충돌은 없었다.
+자동 병합된 Infra 테스트/just 명령과 dev의 OpenAI 전송 스키마·Frontend 회귀 변경을 함께 보존했다.
+
+| Sticky 항목 | 판정 | 근거와 처리 |
+|---|---|---|
+| 1. AI endpoint 주소록 계약 미승인 제거 | 구현 승인과 팀 병합 상태 구분 필요 | 사용자 명시 정리안 구현 승인에 따른 JSON 입력 제거다. 내부 alias exact routing과 fallback 금지는 유지한다. 다중 provider 동시 연결 제한도 ADR-0034에 명시되어 있다. 승인 출처와 대체 범위를 ADR에 보완했다. |
+| 2. 안전 URL 검사 우회 | 오탐 | binder가 생성하는 `SelfHostedLlmEndpointConfig`의 field validator가 안전 URL 함수를 실행한다. 공개 binder에서 vLLM/llama.cpp를 포함한 거부·비밀 비출력 테스트가 통과한다. |
+| 3. 비활성 Worker 계약 제거 | 사용자 승인된 전환 | 실행 여부는 프로세스 시작/중지로 관리한다. 구성·합성 데이터 opt-in 검증은 DB 선점 전에 유지된다. 팀의 PR 병합 승인이 이미 완료됐다는 뜻은 아니다. |
+| 4·6·7. F2 상태 입력 제거 | 같은 계약 변경에 대한 중복 지적 | Infra endpoint 문서 검증과 URL 쌍에서 상태를 계산한다. offline은 runtime 미초기화와 `F2_UNAVAILABLE` 503, 부분 구성은 거부한다. Backend ADR-0005의 대체 범위와 보존 동작을 ADR-0034에 명확히 기록했다. |
+| 5. CodeDeploy 그룹 간 OR | 오탐·권고 적용 시 대상 확대 | AWS는 그룹 간 AND, 그룹 내부 OR다. 현재 3그룹×각1태그가 Project/Environment/Name 모두를 요구한다. 한 그룹으로 합치지 않으며 saved plan/runtime guard도 그 형태를 거부한다. |
+
+CodeDeploy 근거: [AWS EC2TagSet API](https://docs.aws.amazon.com/codedeploy/latest/APIReference/API_EC2TagSet.html),
+[AWS 태그 예시 3](https://docs.aws.amazon.com/codedeploy/latest/userguide/instances-tagging.html#instances-tagging-examples-multiple-tag-groups-single-tags),
+[잠긴 Terraform AWS provider v6.60.0의 그룹 변환](https://github.com/hashicorp/terraform-provider-aws/blob/v6.60.0/internal/service/deploy/deployment_group.go#L834-L843).
+
+교차 점검에서 별도로 발견한 `test_synthetic_seed_postgresql.py`의 구형 환경변수 fixture를
+현재 provider/model/base URL 입력으로 수정했다. 실제 fixture를 추출한 오프라인 바인딩으로
+F2 offline·범용 alias·모델 일치를 확인했다. DB 통합 실행은 수행하지 않았다.
+
+- 병합 후 검증: AI 전체 483, Backend 단위·경계 321, Infra 268, 범용 serving 23,
+  Frontend 빠른 테스트 217개 통과(총 1,312개). dev에서 중복 Infra 테스트 3개를 정리하고
+  `serving/tests`를 just check에 포함한 변경도 유지했다.
+- AI/Backend Ruff·Pyright, Frontend 타입·빌드, Terraform fmt, 위키 링크 검사 통과.
+  Frontend의 기존 500 kB chunk 경고는 남아 있다.
+- 사용자 구현 승인과 작성자 외 팀원 PR 승인은 구분한다. PR 병합·dev plan 적용·실제 기동은 미실행이다.

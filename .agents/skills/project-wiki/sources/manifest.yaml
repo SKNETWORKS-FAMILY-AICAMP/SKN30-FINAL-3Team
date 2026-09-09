@@ -1,7 +1,22 @@
 version: 1
-updated: "2026-09-08"
+updated: "2026-09-09"
 
 sources:
+  - id: "local-functional-regression-report-2026-09-09"
+    type: "user-provided-document"
+    location: "user-provided:local-functional-regression-report-2026-09-09"
+    title: "로컬 기능 검증 — F2 제외"
+    baseline_commit: "4b5d002"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/validation/test-reliability-2026-09-09.md"
+      - "frontend/TESTING.md"
+      - ".agents/skills/ai/references/decisions/ADR-0006-openai-structured-output-schema.md"
+      - "references/contracts/chatbot-ai.md"
+      - ".agents/skills/ai/references/chatbot.md"
+      - ".agents/skills/frontend/references/index.md"
+    scope: "기준 4b5d002 로컬 기능 보고서의 OpenAI F3 스키마 거부, 상담 로그 중복, 저장 후 F3 자동 재접수, 만기 동의어, 장부 검색·건수와 캘린더 접근성 결함을 회귀 검증·수정 근거로 사용. 기존 실제 모델 결과·공유 환경 검증 완료를 이번 수정 후 결과로 재사용하지 않음."
+
   - id: "chatbot-implementation-scope-2026-09-08"
     type: "user-provided-direction"
     location: "docs/requirements/sources/chatbot-implementation-scope-2026-09-08.md"
@@ -815,6 +830,15 @@ sources:
       - "docs/requirements/index.md"
       - "references/decisions/ADR-0005-requirements-management.md"
     scope: "통합본의 기능 내용을 검색 의도별 문서로 분할하고 요구사항 관리·검색 경로를 구성함. 기능 요구사항 자체는 변경하지 않음."
+
+  - id: "module-owned-environment-approval-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 인프라 개선 대화: 모듈별 불필요 환경변수 제거안에 대한 '개선안을 진행해주세요'와 provider/model enum 구현 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0034-module-owned-environment.md"
+      - "docs/development/environment-variables.md"
+    scope: "사용자가 지목한 WORKER_ENABLED·AI_F2_PROVIDER_STATUS·AI_LLM_ENDPOINTS 등의 정리와 모듈 소유 입력·enum 구현 승인. 로컬 OpenAI/dev vLLM 선택. 팀 PR 병합 승인·서비스 기동 승인과 구분"
 
   - id: "local-dev-dual-cloud-serving-2026-09-07"
     type: "user-instruction"

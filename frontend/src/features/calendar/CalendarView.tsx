@@ -10,7 +10,7 @@
  * 같은 일정이 두 번 보인다.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Modal, ModalBody, ModalHeader } from "@patternfly/react-core";
 import { CalendarAltIcon, AngleLeftIcon, AngleRightIcon } from "@patternfly/react-icons";
 import { useAgenda } from "../timeKeeper/index.ts";
@@ -62,6 +62,8 @@ export function CalendarView({ requestedEvent = null, onOpenChange }: {
   onOpenChange?: (open: boolean) => void;
 } = {}) {
   const [isOpen, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [calendarFocus, setCalendarFocus] = useState<string>();
   const [monthStart, setMonthStart] = useState(() => startOfMonth(new Date()));
   const [modalTarget, setModalTarget] = useState<
     { kind: "create"; date: string } | { kind: "edit"; event: CalendarEventDto } | null
@@ -70,6 +72,7 @@ export function CalendarView({ requestedEvent = null, onOpenChange }: {
   useEffect(() => {
     if (requestedEvent == null) return;
     setMonthStart(startOfMonth(new Date(`${requestedEvent.event_date}T12:00:00`)));
+    setCalendarFocus(`#calendar-add-${requestedEvent.event_date}`);
     setModalTarget({ kind: "edit", event: requestedEvent });
     setOpen(true);
   }, [requestedEvent]);
@@ -92,12 +95,14 @@ export function CalendarView({ requestedEvent = null, onOpenChange }: {
     [days, calendarEvents.events, agenda.items],
   );
 
-  const openCalendar = () => setOpen(true);
+  const openCalendar = () => { setCalendarFocus(undefined); setOpen(true); };
+  const closeCalendar = () => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); };
   const closeModal = () => setModalTarget(null);
 
   return (
     <>
       <Button
+        ref={trigger}
         variant="plain"
         aria-label="캘린더를 엽니다"
         aria-haspopup="dialog"
@@ -105,7 +110,8 @@ export function CalendarView({ requestedEvent = null, onOpenChange }: {
         icon={<CalendarAltIcon />}
       />
 
-      <Modal variant="large" isOpen={isOpen} onClose={() => setOpen(false)} aria-label="캘린더">
+      {/* One active modal keeps PatternFly sibling hiding and its focus trap consistent. */}
+      <Modal variant="large" elementToFocus={calendarFocus} isOpen={isOpen && modalTarget == null} onClose={closeCalendar} aria-label="캘린더">
         <ModalHeader title="캘린더" />
         <ModalBody>
           <div className="calendar" data-screen-id="F4-MOD-011" data-requirement-ids="F4-CAL-01~05">
@@ -171,9 +177,10 @@ export function CalendarView({ requestedEvent = null, onOpenChange }: {
                       </span>
                       <button
                         type="button"
+                        id={`calendar-add-${cell.date}`}
                         className="calendar__add"
                         aria-label={`${cell.date} 일정 추가`}
-                        onClick={() => setModalTarget({ kind: "create", date: cell.date })}
+                        onClick={() => { setCalendarFocus(`#calendar-add-${cell.date}`); setModalTarget({ kind: "create", date: cell.date }); }}
                       >
                         +
                       </button>
@@ -194,7 +201,7 @@ export function CalendarView({ requestedEvent = null, onOpenChange }: {
                             type="button"
                             className="calendar__item-button"
                             title={eventChipLabel(event)}
-                            onClick={() => setModalTarget({ kind: "edit", event })}
+                            onClick={() => { setCalendarFocus(`#calendar-add-${cell.date}`); setModalTarget({ kind: "edit", event }); }}
                           >
                             {eventChipLabel(event)}
                           </button>

@@ -43,7 +43,7 @@ updated: 2026-09-07
 
 | [ADR-0033](ADR-0033-environment-input-maintenance.md) | 사용자 구현 승인·구현됨·팀 검토 전 | env 파일 역할·주석·Worker config 통일·F2 명시 연결·진단 기준 |
 
-| [ADR-0034](ADR-0034-module-owned-environment.md) | 사용자 구현 요청·코드 구현·기동 미실행 | 모듈 소유 입력·enum 선택·로컬 주입·불필요 변수 제거 |
+| [ADR-0034](ADR-0034-module-owned-environment.md) | 사용자 명시 구현 승인·코드 구현·팀 병합 검토 전·기동 미실행 | 모듈 소유 입력·enum 선택·로컬 주입·Worker/F2/endpoint 입력의 명시적 부분 대체 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

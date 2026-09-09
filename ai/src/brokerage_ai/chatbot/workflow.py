@@ -65,10 +65,12 @@ unit and comparator VERBATIM from question (e.g. '5억 이하', '1억 이상 3�
 Do not calculate won, sqm or dates. area_expression copies number/unit/comparator;
 area_basis exclusive=전용, supply=공급. Bare '30평' needs clarification area_basis.
 date_expression copies '오늘', '이번 주', '이번 달', '내일', or explicit date/range.
-Agenda categories: TENANCY_EXPIRY=세대 임대차 만료, CLIENT_TENANCY_EXPIRY=고객 임대차 만료,
-REQUEST_EXPIRY=구입장 만료, MOVE_IN=입주, LISTING_RECONTACT=매물 재연락,
+Agenda categories: TENANCY_EXPIRY=세대/매물 임대차 만료/만기,
+CLIENT_TENANCY_EXPIRY=고객 임대차 만료/만기, REQUEST_EXPIRY=구입장 만료/만기,
+MOVE_IN=입주, LISTING_RECONTACT=매물 재연락,
 CLIENT_RECONTACT=고객 재연락, LISTING_REVALIDATION=매물 재확인, CALENDAR=캘린더.
 No categories means all kinds. sort: recent, price_asc, price_desc, date_asc.
+Bare 만기/만료 without a target needs clarification ambiguous_condition; never guess its category.
 status copies a status word from the question; Backend validates allowed values.
 open_result requires reference_ordinal 1..10 and reference_count > 0. Never return IDs.
 All other tools require reference_ordinal=null. clarification requires a fixed code;
@@ -153,9 +155,9 @@ _ENUM_EVIDENCE = {
         "date_asc": r"날짜순|일자순|시간순|빠른순|(?:날짜|일자|시간).{0,4}오름차순",
     },
     "categories": {
-        "TENANCY_EXPIRY": r"(?:세대|매물)임대차만료",
-        "CLIENT_TENANCY_EXPIRY": r"고객임대차만료",
-        "REQUEST_EXPIRY": r"구입장만료",
+        "TENANCY_EXPIRY": r"(?:세대|매물)임대차(?:만료|만기)",
+        "CLIENT_TENANCY_EXPIRY": r"고객임대차(?:만료|만기)",
+        "REQUEST_EXPIRY": r"구입장(?:만료|만기)",
         "MOVE_IN": r"입주",
         "LISTING_RECONTACT": r"매물재연락",
         "CLIENT_RECONTACT": r"고객재연락",

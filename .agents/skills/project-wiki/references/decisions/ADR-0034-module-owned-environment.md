@@ -5,9 +5,33 @@ updated: 2026-09-09
 
 # ADR-0034: 모듈 소유 설정과 enum 선택
 
-상태: 사용자 구현 요청에 따른 코드 변경, 팀 병합 검토 전. 실제 기동·추론과 클라우드 적용은 사용자 수행.
+상태: 사용자 명시 구현 승인에 따른 코드 변경, 팀 병합 검토 전. 실제 기동·추론과 클라우드 적용은 사용자 수행.
 ADR-0015·0030·0033의 Backend dotenv에 AI 입력을 중복 작성하던 방식과 F2 수동 상태 변수를 대체한다.
-Backend ADR-0003의 비활성 Worker 계약과 AI ADR-0004의 사용자 JSON 주소록 입력도 부분 대체한다.
+Backend ADR-0003의 비활성 Worker 계약, Backend ADR-0005의 F2 수동 상태 입력과
+AI ADR-0004의 사용자 JSON 주소록 입력도 부분 대체한다.
+
+## 구현 승인과 병합 상태
+
+사용자는 불필요 변수 제거·모듈 책임 분리안을 요청하며 `WORKER_ENABLED`,
+`AI_F2_PROVIDER_STATUS`, `AI_LLM_ENDPOINTS`를 직접 지목한 뒤
+“개선안을 진행해주세요”와 provider/model 선택값의 enum 제한을 명시했다.
+따라서 이 PR의 구현 범위에는 아래 계약의 부분 대체가 포함된다.
+이는 사용자 요청 없이 에이전트가 작성한 미확정 후보가 아니다.
+출처는 [manifest](../../sources/manifest.yaml)의 `module-owned-environment-approval-2026-09-09`다.
+
+팀 병합 검토 전이라는 표시는 작성자 외 승인과 필수 검사를 아직 대체하지 않았다는 뜻이다.
+코드와 이 ADR을 같은 PR에서 검토하며, `dev`에 병합되기 전 공유 환경의 승인된 계약이나
+실제 배포 상태가 이미 바뀌었다고 간주하지 않는다.
+
+## 부분 대체 범위
+
+| 기존 계약 | 이 PR의 변경 | 보존하는 동작 |
+|---|---|---|
+| AI ADR-0004 | 사람이 작성하는 다중 endpoint JSON 입력을 provider/model 선택에서 만든 내부 registry로 교체 | `(provider, endpoint_alias)` exact match·자동 fallback 금지·안전 URL 검사 |
+| Backend ADR-0003 | 비활성 대기 Worker 환경변수를 제거하고 실행 여부를 프로세스 시작/중지로 관리 | 고정 readiness probe·기동 전 구성 검증·DB 작업 선점 |
+| Backend ADR-0005 | `active/offline` 수동 입력을 URL 쌍 및 검증된 Infra endpoint 문서에서 계산 | 미구성 F2의 `F2_UNAVAILABLE` 503·부분 구성 거부·다른 기능 유지 |
+
+## 모듈 소유 설정
 
 - Backend는 HTTP/DB/인증/업무 제한, AI는 모델/provider/연결/키를 소유한다.
   Infra 로컬 launcher가 각 모듈 파일을 읽고 실행 역할에 필요한 값만 주입한다.
