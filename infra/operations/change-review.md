@@ -141,3 +141,25 @@ ALB·listener·alarm 복구와 CloudFront 활성화가 포함되며 실행 전 �
 CloudFront disabled, 운영 키 범위 RunPod 0. F2/general 선택은 RunPod이며 endpoint offline이다.
 Secret의 AWSCURRENT·필수 구조는 통과했고, 두 과거 image 등록과 구 Pipeline revision 교체는 남았다.
 PR은 [#113](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/pull/113)이다.
+
+
+## PR #113 후속 리뷰 판정
+
+검토 기준 revision은 `d0226fd`이며 리뷰 5건을 호출 경로와 실제 입력으로 대조했다.
+
+| 항목 | 판정 | 근거와 처리 |
+|---|---|---|
+| 1. self-hosted 안전 URL 검사 우회 | 재현되지 않음 | `_http_url` 뒤 `SelfHostedLlmEndpointConfig`의 Pydantic field validator가 `_safe_self_hosted_base_url`을 호출한다. 공개 binder를 통해 OpenAI/vLLM/llama.cpp의 userinfo/query/fragment 거부와 오류 비밀값 비출력을 회귀 테스트로 확장했다. 런타임 코드는 변경하지 않았다. |
+| 2. 최초 전환 maintenance 누락 | 기존 보호에 추가 보완 | 기존 first-deploy recipe는 maintenance를 명시하고 runtime도 실제 ASG 연결을 검사했다. saved plan 자체의 모드/대상 검사는 없었으므로 seal/check 모두 실제 Terraform JSON을 검증하도록 추가했다. 일상 ASG 동작을 유지하기 위해 automatic 기본값은 보존했다. |
+| 3. launcher의 AI import 순서 | 재현되지 않음 | `brokerage-ai`는 Backend의 명시적 로컬 경로 의존성이다. backend/src 경로 추가는 Backend 모듈용이며 AI 설치와 별개다. 개인 파일·PYTHONPATH·기존 가상환경 없는 archive checkout에서 locked uv 설치 후 config가 통과했다. API/Worker도 execve만 대체해 import/config/주입을 확인했고 서비스를 시작하지 않았다. |
+| 4. 하위 입력 fingerprint 누락 | 확인·수정 | bootstrap/dev 하위 파일을 재귀 수집하고 정책·템플릿·Dockerfile·justfile을 포함한다. 변경/추가/삭제, symlink 거부와 기존 metadata 무효화를 검증했다. |
+| 5. 선택 source의 빈 공개 할당 | 작성 기준 보완 | 현재 parser는 빈 값도 장부 source로 상속하므로 런타임 장애는 재현되지 않았다. 공개 파일의 빈 할당은 주석 처리하고 실제 Node env-file 로딩에서 변수 부재·상속을 검증했다. |
+
+제외된 Worker/F2 계약 관련 3건은 ADR-0034의 명시적 부분 대체 범위와 일치하므로 제외 판단을 유지한다.
+
+- 검증: AI 설정 63개, Infra 전체 271개, Frontend 환경 22개 통과. Frontend 타입·빌드, AI Ruff,
+  Infra Ruff, 문서 검사 통과. 기존 Frontend chunk 크기 경고는 동일하다.
+- 실제 기존 최초 전환 plan도 메모리로만 읽어 maintenance/정확한 배포 대상 검증을 통과했다.
+  Terraform JSON은 CLI boolean을 문자열 `"true"`로 보존할 수 있어 정확한 `true` 두 표현만 허용한다.
+- metadata schema와 입력 범위가 바뀌었으므로 **기존 saved plan은 재생성·재검토해야 한다**.
+  이전 metadata를 재봉인해 우회하지 않는다. 이번 검토에서는 새 plan 생성·apply·서비스 기동을 하지 않았다.

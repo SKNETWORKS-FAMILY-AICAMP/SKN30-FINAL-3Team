@@ -172,3 +172,5 @@ updated: 2026-09-09
 - 2026-09-09: 사용자 명시 승인 후 consultation-v3를 private S3에 게시하고 원격 본문·cross-hash를 검증했다. bootstrap 승인 plan 적용 결과 실제 2개 변경·생성/삭제 0개, AWS 정책 대조·drift 없음 확인. 앱·DB·GPU 기동과 모델 활성화는 미실행.
 
 - 2026-09-09: 로컬 OpenAI/shared dev vLLM 기본을 사용자 확정했다. 개인 키 충돌의 0600 백업 이전, shared provider/model 일치 검사, capability별 모델 선택, 최초 배포의 CodeDeploy maintenance 전환을 추가했다. F2 consultation-v3와 general 공식 FP8의 offline 선택만 저장했으며 실제 기동·DB 모델 활성화는 미실행이다.
+
+- 2026-09-09: PR #113 후속 리뷰를 재현해 최초 전환 saved plan의 실제 maintenance/대상 검증과 재귀 입력 fingerprint를 보완하고 공개 source override를 주석 처리했다. URL 검사·launcher import 지적은 공개 binder 및 깨끗한 설치 환경으로 대조했다. 검토 결과는 Infra change-review에 기록했으며 기존 saved plan은 재생성해야 한다.

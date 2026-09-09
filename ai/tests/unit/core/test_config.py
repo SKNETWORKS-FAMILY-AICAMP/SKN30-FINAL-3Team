@@ -108,6 +108,14 @@ def test_self_hosted_requires_url_key_pair_and_builds_registry(provider, model):
 
 
 @pytest.mark.parametrize(
+    "provider,model",
+    [
+        ("openai", "gpt-5.6-luna"),
+        ("vllm", "Qwen/Qwen3.8-27B-FP8"),
+        ("llama_cpp", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M"),
+    ],
+)
+@pytest.mark.parametrize(
     "url",
     [
         "ftp://localhost",
@@ -116,9 +124,19 @@ def test_self_hosted_requires_url_key_pair_and_builds_registry(provider, model):
         "https://localhost/v1#secret",
     ],
 )
-def test_general_url_rejects_unsafe_components(url):
-    with pytest.raises(ConfigurationError):
-        bind_ai_config({"AI_GENERAL_BASE_URL": url, "AI_GENERAL_API_KEY": "secret"}, "test")
+def test_general_url_rejects_unsafe_components(provider, model, url):
+    with pytest.raises(ConfigurationError) as error:
+        bind_ai_config(
+            {
+                "AI_GENERAL_PROVIDER": provider,
+                "AI_GENERAL_MODEL": model,
+                "AI_GENERAL_BASE_URL": url,
+                "AI_GENERAL_API_KEY": "private-key-sentinel",
+            },
+            "test",
+        )
+    assert url not in str(error.value)
+    assert "private-key-sentinel" not in str(error.value)
 
 
 def test_bedrock_role_region_contract():

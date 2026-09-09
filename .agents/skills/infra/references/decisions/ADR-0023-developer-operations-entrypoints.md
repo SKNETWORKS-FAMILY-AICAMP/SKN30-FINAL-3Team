@@ -16,6 +16,9 @@ updated: 2026-09-09
 - 개인 파일 정리는 해당 checkout의 ignored `.env`만 대상으로 한다. 중복 이름·symlink·추적 파일은 수정하지 않는다.
 - saved plan은 600 권한·입력 fingerprint·plan hash·24시간 유효기간을 기록한다.
   변경·만료 시 재계획·재검토한다. seal은 apply 승인을 뜻하지 않는다.
+  PR 검토 후 root 하위 재귀 입력과 Dockerfile·정책·템플릿 추적, symlink 거부를 보강했다.
+  수집 범위와 제외 규칙은 [Terraform 기준](../terraform-standards.md)이 정본이다.
+  metadata schema 2 이전 plan은 재생성하고 다시 검토한다.
 - state bucket 비운영자 Deny를 ListBucketVersions/GetObjectVersion/DeleteObjectVersion까지 확대한다.
   2026-09-09 사용자 명시 승인 후 bootstrap 적용·AWS 조회·drift 없음 검증을 완료했다.
 - shared dev provider/model/region은 Terraform의 검증된 `general_model_selection` 객체로 관리한다.
@@ -23,6 +26,8 @@ updated: 2026-09-09
 - 최초 전환 plan은 `app_deployment_mode=maintenance`로 CodeDeploy/ASG 자동 연결을 해제하고
   앱의 Project/Environment/Name 태그를 모두 일치시키는 배포 대상을 사용한다. 구 revision 자동 배포를 방지하며
   새 Pipeline revision 성공 후 `automatic` 연결 복구 plan을 검토한다. Terraform 운영 입력으로만 관리한다.
+  기본값 `automatic`은 유지한다. 최초 전환 파일은 seal/check 양쪽에서 실제 saved plan의 입력과
+  예정 배포 대상을 검사하며, 잘못된 plan을 이름만 바꿔 사용하는 것을 차단한다.
 - 최초 `dev-prepare-app`은 GPU 직접 검증·endpoint 게시 후 앱 호스트를 준비하고 최신 Pipeline 배포를 기다린다.
   실제 기동과 직접 추론이 포함되므로 사용자가 검증 창에서 실행한다.
 - 원격 모델 변경은 사무소·capability 하나씩, API/Worker 중지 및 대기 요청 부재에서만 실행한다.

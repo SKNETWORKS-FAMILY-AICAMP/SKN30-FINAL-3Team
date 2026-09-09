@@ -27,6 +27,8 @@ local 우선순위는 **process env > 모듈 .env > 모듈 .env.local > 코드 �
 Backend·AI의 test/dev/prod는 dotenv를 읽지 않고 주입된 환경만 사용한다.
 
 로컬 API·Worker는 `infra/local/run.py`가 Backend와 AI 파일을 각각 읽어 명시적으로 주입한다.
+`just local-*`의 `uv run --locked --project backend`가 Backend 의존성과 로컬 경로의 AI 패키지를 함께 준비한다.
+launcher의 `backend/src` 경로 설정은 Backend 실행 모듈을 찾는 용도다.
 Backend 앱은 AI 개인 파일을 직접 읽지 않는다. `backend/.env*`에 AI 변수가 있거나
 `ai/.env*`에 Backend 변수가 있으면 실행 전에 거부한다. AI 단독 `load_ai_config(local)`은 AI 파일만 읽는다.
 Worker에는 F2·embedding 연결/키를 주입하지 않는다. 챗봇을 끈 API에는 범용 키를 주입하지 않는다. 공유 배포 migration에는 DB migration URL만 주입한다.
