@@ -230,6 +230,8 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 후보의 `candidate_id`는 반대편 장부 레코드 식별자다. `LISTING` 앵커의 후보는 `property_requirement.id`,
 `REQUIREMENT` 앵커의 후보는 `property_listing.id`다. 이 경로는 후보의 성명, 연락처와 표시 이름을 싣지
 않으므로 화면은 자기 사무소의 F1 조회 결과로 표시 이름을 만든다.
+이 제한은 기존 `GET /f3/runs/{run_id}/result` 응답에 적용한다. 별도 저장 결과 조회 API의
+권한 내 화면용 표시명은 [저장 결과 조회 계약](api-f3-judgments.md)을 따른다.
 
 후보의 `judgment_id`는 저장된 중개 판정의 식별자이며 관심없음 피드백의 `target_id`로 쓴다. 판정 전
 후보와 카드화되지 않은 후보는 `null`이다. 실행 내부 식별자가 아니라 사무소 범위 피드백 대상 식별자이며,

@@ -34,7 +34,11 @@ updated: 2026-09-09
 generated_at/meaningful_changed_at, summary, 대표 후보 최대3건을 반환한다.
 `is_synthetic_fixture`는 해당 결과가 결정적 시드 예시인지 나타내는 boolean(기본 false)이다.
 true이면 화면에 시드 예시·실제 모델 추론 아님을 표시한다. 내부 provenance snapshot은 노출하지 않는다. 전체 DTO 필드는
-[공개 schema](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/e785db47492b1680d7cbf0c76bfe3eca45c5c73b/backend/src/api/schemas/f3_judgments.py)가 정의한다.
+[공개 schema](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/1dbf51e/backend/src/api/schemas/f3_judgments.py)가 정의한다.
+표시명은 Backend가 현재 사무소 권한 범위에서 원장을 조회해 만든 화면용 정보다.
+기존 `/runs/{run_id}/result`의 표시명 미포함 정책과 다른 전용 조회 계약이며,
+Backend→AI DTO의 비식별 `target_label`과도 별개다. 화면용 표시명을 AI 입력·로그로 넘기지 않는다.
+실제 개인정보의 dev/prod 사용을 승인하는 조항은 아니며 합성·비식별 운영 범위는 유지한다.
 원장 상세/상담 전문을 목록으로 전수 전달하지 않는다. 이름·단지·현재 조건·담당자는 묶어서 조회한다.
 
 CURRENT/STALE/NONE과 IDLE/QUEUED/RUNNING/FAILED는 독립 축이다. 이전 강함은 최신 추천 건수에서 제외한다.
@@ -47,6 +51,12 @@ cursor는 필터와 revision에 결합된다. 목록이 변경된 뒤 이전 cur
 선택 `cursor`, `limit`과 `candidate_id`를 받는다. candidate_id는 해당 결과의 반대편 장부 ID다.
 `selected_candidate`를 페이지와 독립 반환하며 미판정의 판정/미생성 카드는 null이다.
 result_id는 과거 완료 snapshot, current_result_id는 대상 최신 포인터다. 과거 결과를 최신으로 승격하지 않는다.
+
+현재 조건의 종료·미지원만으로 저장 snapshot의 후보를 제거하지 않는다. 후보별
+`current_eligibility=ELIGIBLE|INELIGIBLE|INSUFFICIENT_INPUT`를 별도 반환하고 화면에서 과거 등급과
+현재 분석 가능 여부를 구분한다. 종료로 낡아진 결과를 CURRENT 추천 건수에 넣지 않는다.
+삭제·권한 밖 후보와 삭제된 부모의 정보는 계속 비공개이며 이 경우 공개 후보 수와 페이지는
+현재 권한으로 볼 수 있는 부분집합 기준이다. 비공개 자료를 과거 snapshot에서 복원하지 않는다.
 
 본문은 기존 합성 공개 조건과 유효 앵커 카드 검사를 공유한다. 후보도 현재 존재·권한·유효 카드와 로그 측면을 확인한다.
 카드·근거에 prompt·진단·모델 원문을 포함하지 않는다. 무효/범위 밖 상담 참조는 근거에서 제거한다.

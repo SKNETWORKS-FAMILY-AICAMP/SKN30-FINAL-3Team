@@ -37,3 +37,8 @@ updated: 2026-08-12
 Worker는 원천 상태로 영향 대상을 재구성하고 대상별 desired revision/due_at을 저장한 transaction에서 소비 행을 제거한다. 재처리는 revision·입력 identity와 기존 실행 재사용으로 멱등하게 처리하며 역참조에 없던 새 후보도 포함하도록 사무소 양쪽 장부를 보수적으로 검증한다. 모델 작업 실패·재시도는 `agent_run`이 소유하고 outbox가 추론 완료를 기다리지 않는다.
 
 SQS·DLQ 전환은 후속이며 현재 외부 이벤트 전달 보장은 제공하지 않는다. 구체적인 상태와 복구는 [구현 기록](../../../../../docs/architecture/f3/implementation-and-validation.md)을 따른다.
+
+`match_change_outbox.brokerage_id`는 PK다. `LIMIT`은 사무소 병합 행 개수의 상한이며
+사무소 내 개별 변경 이벤트 개수가 아니다. 소비자는 `FOR UPDATE SKIP LOCKED`로 선택한
+행을 transaction 종료까지 잠그고 해당 사무소·revision만 삭제한다. 같은 사무소의 동시
+upsert는 이 잠금을 기다리므로 소비 후 커밋되는 변경은 새 outbox로 남는다.
