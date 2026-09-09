@@ -17,6 +17,26 @@ def parser() -> argparse.ArgumentParser:
         if action != "status":
             p.add_argument("--apply", action="store_true")
             p.add_argument("--workloads-stopped-confirmed", action="store_true")
+        if action in {"start", "prepare-deployment"}:
+            p.add_argument("--hours", type=float, default=2)
+            p.add_argument(
+                "--hourly-usd", action="append", default=[], metavar="WORKLOAD=RATE"
+            )
+    selection = commands.add_parser("select")
+    selection.add_argument("--workload", choices=WORKLOADS)
+    selection.add_argument("--cloud", choices=("aws", "runpod"))
+    from selection_catalog import GeneralModelProfile, HardwareProfile
+
+    selection.add_argument(
+        "--hardware-profile", choices=[p.value for p in HardwareProfile]
+    )
+    selection.add_argument(
+        "--model-profile", choices=[p.value for p in GeneralModelProfile]
+    )
+    selection.add_argument("--release")
+    selection.add_argument("--bucket")
+    selection.add_argument("--allow-dev-release", action="store_true")
+    selection.add_argument("--apply", action="store_true")
     activation = commands.add_parser("activate-general")
     activation.add_argument("brokerage_id", type=int)
     activation.add_argument(
@@ -28,10 +48,10 @@ def parser() -> argparse.ArgumentParser:
     activation.add_argument("--workloads-stopped-confirmed", action="store_true")
     capacity = commands.add_parser("capacity-config")
     capacity.add_argument("--candidate", choices=WORKLOADS)
-    for action in ("switch", "configure", "smoke"):
+    for action in ("switch", "configure", "smoke", "verify"):
         p = commands.add_parser(action)
         p.add_argument("workload", choices=WORKLOADS)
-        if action != "smoke":
+        if action not in {"smoke", "verify"}:
             p.add_argument("cloud", choices=("aws", "runpod"))
             p.add_argument("--apply", action="store_true")
         if action == "configure":

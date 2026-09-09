@@ -37,6 +37,13 @@ resource "aws_ssm_parameter" "serving_selection" {
   value = jsonencode({ f2 = null, general = null })
   lifecycle { ignore_changes = [value] }
 }
+# Runtime result is separate from desired selection. Operators own its value.
+resource "aws_ssm_parameter" "serving_applied" {
+  name  = "/${local.name_prefix}/serving/APPLIED"
+  type  = "String"
+  value = jsonencode({ schema_version = 1, status = "not-applied" })
+  lifecycle { ignore_changes = [value] }
+}
 resource "aws_ssm_parameter" "general_endpoint" {
   name  = "/${local.name_prefix}/ai/AI_GENERAL_ENDPOINT_SET"
   type  = "String"
@@ -114,6 +121,7 @@ resource "aws_instance" "gpu" {
   user_data_replace_on_change = true
   user_data_base64 = base64gzip(templatefile("${path.module}/../../serving/user-data.sh.tftpl", {
     host_script     = base64encode(file("${path.module}/../../serving/gpu_host.py"))
+    metrics_script  = base64encode(file("${path.module}/../../serving/gpu_metrics.py"))
     probe_script    = base64encode(file("${path.module}/../../serving/probe.py"))
     download_script = base64encode(file("${path.module}/../../serving/download_models.py"))
     profiles_script = base64encode(file("${path.module}/../../serving/model_profiles.py"))

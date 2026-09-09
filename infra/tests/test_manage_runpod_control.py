@@ -12,9 +12,14 @@ ROOT = Path(__file__).resolve().parents[2]
 PATH = ROOT / "infra/scripts/manage_runpod_control.py"
 SPEC = importlib.util.spec_from_file_location("manage_runpod_control", PATH)
 assert SPEC is not None and SPEC.loader is not None
-MODULE = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = MODULE
-SPEC.loader.exec_module(MODULE)
+# Reuse the shared module: replacing it during discovery splits exception classes
+# between the lifecycle helpers and their caller.
+if SPEC.name in sys.modules:
+    MODULE = sys.modules[SPEC.name]
+else:
+    MODULE = importlib.util.module_from_spec(SPEC)
+    sys.modules[SPEC.name] = MODULE
+    SPEC.loader.exec_module(MODULE)
 
 IMAGE = (
     "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:" + "a" * 64

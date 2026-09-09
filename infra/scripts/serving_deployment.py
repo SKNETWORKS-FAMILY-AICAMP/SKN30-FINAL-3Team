@@ -2,7 +2,6 @@
 
 from manage_dev_power import Settings, ToolError
 from model_profiles import load_profile
-from serving_contract import DEFAULT_GENERAL_PROFILE
 
 
 def require_maintenance_deployment(session, settings: Settings) -> None:
@@ -45,10 +44,7 @@ def require_general_selection(ssm, prefix: str, selection: dict) -> None:
     if public["PROVIDER"] == "vllm":
         if (
             not general
-            or load_profile(general.get("model_profile", DEFAULT_GENERAL_PROFILE))[
-                "model"
-            ]
-            != public["MODEL"]
+            or load_profile(general["model_profile"])["model"] != public["MODEL"]
         ):
             raise ToolError(
                 "configure a general GPU profile matching the Terraform provider/model before preparing deployment"

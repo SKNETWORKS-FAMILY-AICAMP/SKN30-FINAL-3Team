@@ -6,11 +6,11 @@ import ipaddress
 import re
 from urllib.parse import urlsplit
 
-DEFAULT_GENERAL_PROFILE = "qwen38-27b-bnb"
+DEFAULT_GENERAL_PROFILE = "qwen38-27b-fp8"
 # The pinned vLLM 0.28 image requires CUDA 13-capable hosts.
 GENERAL_CUDA_VERSIONS = ("13.0",)
-GENERAL_MODEL = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
-GENERAL_REVISION = "8aa5f05d26b7205477066e1449e0af13f762a299"
+GENERAL_MODEL = "Qwen/Qwen3.8-27B-FP8"
+GENERAL_REVISION = "017b9c7af6b5689d5dd426a76e0bc077eb5ca20a"
 GENERAL_ALIAS = "general-dev-gpu"
 GENERAL_KEY = "AI_GENERAL_API_KEY"
 WORKLOADS = ("f2", "general")

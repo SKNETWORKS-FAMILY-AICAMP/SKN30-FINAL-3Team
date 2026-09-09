@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # 위키 변경 로그
 
+- 2026-09-09: 사용자 확정 계획에 따라 공유 dev ai-select/SSM v2·적용 결과·통합 시작 계획·기존 RunPod Template API 조정·maintenance 배포·이전 검증 revision의 정확한 복원·명시 DB 대상 적용을 구현했다. Backend 단위 및 격리 PostgreSQL의 snapshot/원자성/이력 보존 검증과 운영 정본·ADR-0036/Infra ADR-0024를 연결했다. 공유 클라우드 적용·새 이미지 게시·GPU 기동/추론은 수행하지 않았고 사용자 검증으로 남긴다.
+
 - 2026-09-09: PR #113 sticky review를 대조해 ADR-0034의 사용자 구현 승인 출처·Worker/F2/endpoint 부분 대체 범위와 팀 병합 승인 상태를 구분했다. CodeDeploy 그룹 간 AND의 AWS 근거를 연결하고 최신 dev PR #114를 통합했다. 실제 서비스 기동·클라우드 적용은 수행하지 않았다.
 - 2026-09-09: 최신 dev5950681의 별도 워크트리에서 F3 확장의 화면 위치·신규 조회 3개/기존 실행 확장·내부 책임을 [기능안](../../../../docs/requirements/f3/judgment-results-list.md)으로 구체화했다. 공인중개사 역할·계약 일관성·챗봇 후속 검토를 반영했으며 실제 사용자 검증·정책 승인·구현은 미수행이다.
 

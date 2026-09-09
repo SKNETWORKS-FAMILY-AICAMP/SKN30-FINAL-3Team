@@ -126,7 +126,7 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         )
         start_recipe = section(
             justfile,
-            "dev-deep-start:",
+            "dev-deep-start *options:",
             "# Terraform state의 edge mode",
         )
 
@@ -138,10 +138,8 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         self.assertLess(
             stop_recipe.index(" stop --apply"), stop_recipe.index(" apply ")
         )
-        self.assertIn("apply dev-deep-start.tfplan", start_recipe)
-        self.assertLess(
-            start_recipe.index(" apply "), start_recipe.index(" start --apply")
-        )
+        self.assertIn("just dev-start {{ options }}", start_recipe)
+        self.assertNotIn("terraform", start_recipe)
         self.assertNotIn("aws elbv2 delete-load-balancer", justfile)
         self.assertNotIn("aws elbv2 create-load-balancer", justfile)
 

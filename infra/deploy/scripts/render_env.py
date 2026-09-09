@@ -25,7 +25,12 @@ MIGRATION_USER = "app_migrator"
 ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 PUBLIC_NAMESPACES = frozenset({"backend", "ai"})
 IGNORED_OPERATIONAL_PARAMETER_PATHS = frozenset(
-    {"runpod/RUNPOD_CONTROL_SET", "runpod/GENERAL_CONTROL_SET", "serving/SELECTION"}
+    {
+        "runpod/RUNPOD_CONTROL_SET",
+        "runpod/GENERAL_CONTROL_SET",
+        "serving/SELECTION",
+        "serving/APPLIED",
+    }
 )
 INJECTED_NAMES = frozenset({"DB_URL", "DB_MIGRATION_URL"})
 SENSITIVE_SUFFIXES = ("_API_KEY", "_PASSWORD", "_PRIVATE_KEY", "_SECRET", "_TOKEN")

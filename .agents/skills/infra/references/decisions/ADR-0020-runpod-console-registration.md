@@ -5,6 +5,8 @@ updated: 2026-09-08
 
 # ADR-0020: Console 자원 검증·등록과 API 전용 F2 refresh
 
+> 2026-09-09 부분 대체: 기존 Template의 검토된 API 수정·재검증·SSM 등록은 [ADR-0024](ADR-0024-shared-serving-selection-lifecycle.md)가 소유한다. 최초 Console 자원 준비·Secret/registry 경계는 유지한다.
+
 > 2026-09-07 부분 대체: GPU 배치·local/dev 연결·전원 범위는 [ADR-0022](ADR-0022-dual-cloud-gpu-lifecycle.md)를 따른다. 아래 내용은 기존 결정의 기록이다.
 
 > 후속 [ADR-0021](ADR-0021-runpod-operational-reduction.md)이 자체 감시와 Secret metadata 조회를 제거하고 실패 시 offline 복구를 적용한다.

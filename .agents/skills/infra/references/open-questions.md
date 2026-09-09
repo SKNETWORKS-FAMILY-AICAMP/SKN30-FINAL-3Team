@@ -16,5 +16,5 @@ updated: 2026-09-01
 
 ## GPU 배포 수용 검증
 
-- 고정한 범용 vLLM의 Qwen BnB 48GB 호환성과 DLAMI의 Compose·NVIDIA toolkit을 실제 기동에서 검증한다. 영향: 배포 승격 조건. 담당: Infra·AI 운영자.
-- 기동 시간·VRAM·OOM·한국어 구조화 출력·왕복 전환은 [검증 기록](../../../../infra/serving/validation.md)에 남긴다. 실제 통과 전 dev DB 기본값을 변경하지 않는다.
+- 현재 선택은 FP8 기본 후보이며 정확한 image/profile·48GB 조합과 DLAMI의 Compose·NVIDIA toolkit은 사용자 기동에서 검증한다. F2 consultation-v3/A5000 24GB도 검증 대기다. 선택 절차는 [ADR-0024](decisions/ADR-0024-shared-serving-selection-lifecycle.md)를 따른다. 담당: Infra·AI 운영자.
+- 기동 시간·VRAM·OOM·한국어 구조화 출력·왕복 전환은 [검증 기록](../../../../infra/serving/validation.md)에 남긴다. 모델 준비 확인 뒤 사용자가 확인한 DB 대상만 변경하며 품질·왕복 검증 완료로 간주하지 않는다.

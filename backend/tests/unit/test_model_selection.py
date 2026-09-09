@@ -18,6 +18,7 @@ def session_with_results(*values):
         result.scalar_one.return_value = value
         result.scalar_one_or_none.return_value = value
         result.one_or_none.return_value = value
+        result.all.return_value = [value] if isinstance(value, tuple) else []
         results.append(result)
     session.execute.side_effect = results
     return session

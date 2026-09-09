@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # ADR-0034: 모듈 소유 설정과 enum 선택
 
+> 2026-09-09 부분 대체: 공유 dev의 단일 대상 수동 모델 적용 경로는 [ADR-0036](ADR-0036-shared-dev-serving-selection.md)의 명시 목록·검토 snapshot·원자적 배치 적용으로 확장한다. 환경변수 소유권·enum·이력 보존·local 단일 대상 명령은 유지한다.
+
 상태: 사용자 명시 구현 승인에 따른 코드 변경, 팀 병합 검토 전. 실제 기동·추론과 클라우드 적용은 사용자 수행.
 ADR-0015·0030·0033의 Backend dotenv에 AI 입력을 중복 작성하던 방식과 F2 수동 상태 변수를 대체한다.
 Backend ADR-0003의 비활성 Worker 계약, Backend ADR-0005의 F2 수동 상태 입력과

@@ -90,6 +90,7 @@ def main() -> None:
     finally:
         run("docker", "logout", "ghcr.io")
     environment = {
+        "SERVING_IMAGE": image,
         "HF_HOME": "/cache/huggingface",
         "VLLM_NO_USAGE_STATS": "1",
         "XDG_CACHE_HOME": "/cache",
@@ -100,7 +101,9 @@ def main() -> None:
     }
     mounts = [f"{DATA}/models:/models:ro", f"{DATA}/cache:/cache"]
     if workload == "general":
-        profile_name = selected.get("model_profile", "qwen38-27b-bnb")
+        profile_name = selected.get("model_profile")
+        if not profile_name:
+            raise ValueError("general model_profile must be explicitly selected")
         profile = load_profile(profile_name)
         models = [
             {

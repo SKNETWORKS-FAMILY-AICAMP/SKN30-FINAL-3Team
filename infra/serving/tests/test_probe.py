@@ -15,15 +15,15 @@ import probe
 
 class GeneralProbeTests(unittest.TestCase):
     def test_aws_path_uses_public_served_name_for_status_and_inference(self):
-        command = general_runtime.build_command("/models/general")
+        command = general_runtime.build_command("/models/general", "qwen38-27b-fp8")
         self.assertEqual(command[2], "/models/general")
         served = command[command.index("--served-model-name") + 1]
         self.assertEqual(served, general_runtime.MODEL)
         # Terraform supplies this same ID to the AWS host config.
         terraform = (
-            Path(__file__).resolve().parents[2] / "environments/dev/serving.tf"
+            Path(__file__).resolve().parents[2] / "environments/dev/general-model.tf"
         ).read_text()
-        self.assertIn(f'model = "{served}"', terraform)
+        self.assertRegex(terraform, rf'model\s*=\s*"{served}"')
         requests = []
 
         def respond(request, timeout):

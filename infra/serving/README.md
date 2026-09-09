@@ -1,188 +1,102 @@
-# Local·dev LLM 운영
+# Local·dev LLM 서빙 구성
 
-상태: 코드·자동 검증과 기반 Terraform 적용 완료. **RunPod에서 F2 수정 후보와 general Unsloth FP8 후보의 직접 추론 검증을 통과했다. AWS GPU 후보와 사설 앱의 F2 HTTP·F3 두 capability도 통과했다. 수정 이미지 재게시·정식 앱 배포·왕복 검증은 남아 있다.**
-공통 결정은 [프로젝트 ADR-0030](../../.agents/skills/project-wiki/references/decisions/ADR-0030-local-dev-dual-cloud-serving.md),
-전원·권한은 [Infra ADR-0022](../../.agents/skills/infra/references/decisions/ADR-0022-dual-cloud-gpu-lifecycle.md),
-측정·적용 현황은 [validation.md](validation.md), AWS 사설 앱 결과는
-[검증 기록](aws-private-validation-2026-09-07.md)을 따른다.
+명령 실행 순서·비용 확인·실패 복구는 [개발자 운영](../operations/README.md), 저장·Secret 책임은
+[설정 관리](../operations/configuration.md)가 정본이다. 이 문서는 모델·하드웨어·이미지와 로컬 연결을 다룬다.
+공유 dev 통합 선택 정책은 [프로젝트 ADR-0036](../../.agents/skills/project-wiki/references/decisions/ADR-0036-shared-dev-serving-selection.md),
+인프라 구현 경계는 [Infra ADR-0024](../../.agents/skills/infra/references/decisions/ADR-0024-shared-serving-selection-lifecycle.md)를 따른다.
 
-| 구분 | local | 공유 dev |
-|---|---|---|
-| 앱 실행 | 개발자 PC | 기존 AWS 앱 EC2 |
-| 범용 기본값 | 개인 OpenAI·기존 모델 | 명시적 모델 활성화 필요; FP8 후보 합성 검증 통과 |
-| GPU 선택 | 개인 프로세스에 명시 주입 | 운영자가 f2/general별 AWS·RunPod 선택 |
-| AWS 접속 | 고정 target port SSM 터널 | 앱 SG에서 GPU 사설 주소 |
-| RunPod 접속 | 승인된 키·해당 Pod HTTPS proxy | Secrets Manager 키·해당 Pod HTTPS proxy |
-| 전원·배포 | Infra 운영자만 | 아래 dev 명령 |
+## 지원 조합과 GPU 검증 근거
 
-F2는 기존 SLLM·Whisper를 유지하며 OpenAI로 대체하지 않는다. general은 F3와 향후 기능이 공유한다.
-자동 fallback·상시 예비 GPU·자체 감시를 두지 않는다. 시연 중 로컬 사용 시간은 운영자와 조정한다.
+F2와 general은 별도 모델 서버이며 각 작업의 클라우드를 독립 선택한다. 공유 dev의 통합 메뉴는
+vLLM만 제공한다. 기존 OpenAI·Bedrock 수동 경로를 제거하지 않으며 local 개인 OpenAI는 유지한다.
+CPU 전환·자동 fallback·상시 예비 GPU·자체 감시는 이번 범위에 없다.
 
-## 최초 준비
+| 작업 | RunPod 기본 profile | AWS 기본 profile | 모델 |
+|---|---|---|---|
+| F2 | `runpod-a5000-24gb` · RTX A5000 24GB | `aws-g6-2xlarge` · g6.2xlarge/L4 24GB | consultation-v3 · Qwen3-4B LoRA + Whisper-large-v3-turbo |
+| general | `runpod-l40s-48gb` · L40S 48GB | `aws-g6e-2xlarge` · g6e.2xlarge/L40S 48GB | `qwen38-27b-fp8` |
 
-1. 기존 [계정 preflight](../README.md)·예산을 확인한다. 현재 작업 브랜치의 Backend 배포에는
-   `serving_maintenance.sh`, `smoke_general.sh`, 새 renderer와 AI 코드가 모두 포함되어야 한다.
-   기존 앱 revision에는 이 파일이 없을 수 있다. 새로운 배포가 검증되기 전 통합 전원 명령을 쓰지 않는다.
-2. 새 Parameter Store 문서와 IAM 변경은 dev saved plan을 검토·승인해 적용한다.
-   GPU 생성 기본값은 빈 집합이다. deep suspend 중이라면 plan에 edge/GPU false를 명시해 현재 중지를 보존한다.
-   기존 RunPod 감시 제거 변경과 앱 Launch Template 변경도 같은 plan에 포함될 수 있으므로 전체를 검토한다.
-3. F2 이미지는 기존 `Publish RunPod Image`, general 이미지는 `Publish General Serving Image`
-   수동 workflow로 게시한다. 두 cloud에 동일한 **완성 이미지 digest**를 사용한다.
-   `general.Dockerfile`의 공식 vLLM base digest는 게시할 프로젝트 이미지 digest와 다르다.
-   F2 AWS local-model 경로·상태 조회를 사용하려면 이 변경을 포함한 F2 이미지가 필요하다.
-4. RunPod Console에서 작업별 Secret·registry·Template을 처음 생성한다. F2 절차는
-   [기존 문서](../runpod/README.md)를 유지한다. general은 workflow artifact의
-   `template.json`과 `AI_GENERAL_API_KEY` Secret 참조를 사용한다. 두 키의 값은 승인된 채널로만 전달한다.
-   Volume·Network Volume·SSH 없이 각각 HTTP 8001/8002와 8000만 노출한다.
-5. 기존 등록 도구로 검증·등록한다. `image`, `template_id`, `registry_id`는 자신의 실제 값으로
-   **로컬 명령 인자**에만 전달한다. 키는 인자·터미널 출력으로 전달하지 않는다.
+하드웨어 선택값은 [hardware-profiles.json](hardware-profiles.json)의 공통 enum과 일치해야 한다.
+F2는 `runpod-rtx4090-24gb`도 지원한다. general 모델 선택값은 `qwen3-14b-awq`, `qwen3-32b-awq`,
+`qwen38-27b-bnb`, `qwen38-27b-fp8`이며 선택 메뉴의 기본 후보는 FP8다. 배포에는 확정 profile이
+필요하고 값 누락을 BnB 등 다른 모델로 대체하지 않는다. 등록·지원과 실제 추론·품질 검증을 구분한다.
 
-```bash
-just -f infra/justfile runpod-general-register-plan IMAGE_DIGEST TEMPLATE_ID REGISTRY_ID
-just -f infra/justfile runpod-general-register IMAGE_DIGEST TEMPLATE_ID REGISTRY_ID
-just -f infra/justfile ai-general-secret
-just -f infra/justfile ai-ghcr-secret
-```
+F2 24GB 구성은 과거 release·후보 이미지의 RTX 4090 및 AWS L4 성공 근거가 있다.
+**consultation-v3 + RTX A5000 + 현재 게시 이미지의 정확한 조합은 사용자 기동 검증 대기다.**
+동일 VRAM이라고 다른 GPU의 성능·기동 결과를 승계하지 않는다. F2는 Qwen 문맥 4,096,
+각 엔진 동시 처리 1건, GPU 메모리 설정 Qwen 65%·Whisper 20%를 유지한다. 남는 비율은 실제
+최대 사용량 보장이 아니며 모델 로딩·CUDA·캐시·요청 중 메모리를 사용자 검증에서 확인한다.
 
-키 명령은 private TTY로 입력받는다. `ai-general-secret`은 AWS AI provider Secret에 general 키를
-추가한다. RunPod Console Secret에는 같은 값을 설정한다. `ai-ghcr-secret`은 AWS GPU 호스트용
-읽기 전용 GHCR 사용자·token을 기존 Secret 컨테이너에 넣는다. F2·OpenAI 키를 삭제하지 않는다.
+general 48GB는 현재 지원 정책의 최소 용량이다. [게시 이미지 catalog](published-images.json)의
+image/profile별 `cpu_only`, `startup_only`, `evaluated` 근거를 확인한다. 작은 모델이 목록에
+있다는 이유로 임의 저용량 GPU를 허용하거나 더 큰 GPU로 자동 변경하지 않는다. 가용량 부족 시
+실패를 표시하고 운영자가 다시 선택한다. AWS의 AMI·toolkit·Compose·SSM 호환성도 첫 기동에서 확인한다.
 
-이미지 게시 전 Docker build 안에서 해당 이미지에 설치된 vLLM parser로 실제 시작 인자를
-검증한다. 범용은 `python3`을 사용하며 F2의 vLLM 0.11과 범용의 고정 0.28 옵션을 섞지 않는다.
-F2 기본 이미지의 선택적 HF transfer는 비활성화한다. RunPod의 `RUNNING`만으로 준비를
-판단하지 말고 추론·fatal 로그를 확인한다. 컨테이너 재시작 중에도 Pod 과금이 이어질 수 있다.
+## 모델 파일과 이미지
 
-## GPU 구성과 선택
+- F2 LoRA·manifest·메타데이터는 private S3 release에서 읽는다. `consultation-v3`와 기존 dev release는
+  [F2 release catalog](../runpod/releases.json)에서 별도로 관리하며 덮어쓰지 않는다.
+- RunPod 기동 시 manifest·bundle hash를 확인하고 1시간짜리 S3 presigned URL을 Pod에 주입한다.
+  세션 자격 증명이 먼저 만료되면 URL도 먼저 만료될 수 있다. 장기 AWS 키나 전체 URL을 로그에 남기지 않는다.
+  Console에서 Template만 수동 실행하면 동적 release 입력이 없으므로 통합 시작 명령을 사용한다.
+- Qwen base와 Whisper 가중치는 S3 LoRA bundle에 포함되지 않는다. 고정한 Hugging Face revision에서
+  내려받으며 모델 로딩·네트워크·캐시 공간이 필요하다. SHA-256 검사와 안전한 압축 해제를 통과한
+  adapter만 사용한다. 다운로드·해시 검증·엔진 로딩 실패를 구분해 확인한다.
+- F2 선택 이미지는 하드웨어 catalog, general 이미지는 게시 이미지 catalog가 고정 digest로 관리한다.
+  AWS와 RunPod가 같은 선택 이미지를 소비하며 AWS가 RunPod control 문서에서 이미지를 가져오지 않는다.
+- 현재 F2 `ca2cfefb…`와 general `801473c8…` pin은 새 identity/VRAM 계측 이전 이미지다.
+  이 이미지로 강화된 검증을 실행하면 계측을 확인할 수 없어 실패한다. `image-publish f2 dev`와
+  `image-publish general dev`의 artifact를 검토한 뒤 F2 `hardware-profiles.json:f2_image`,
+  general `published-images.json`·기본 image ID를 갱신하고 정지 상태의 `ai-select`로 새 pin을 저장한다.
+  이번 구현은 이미지 게시를 실행하지 않았다. 코드·테스트 완료는 실제 기동 완료를 뜻하지 않는다. `python3`·vLLM 버전별 시작 인자를
+  이미지 빌드에서 검증하며 F2와 general 옵션을 혼용하지 않는다.
 
-`dev.tfvars`의 `gpu_profiles`에 검토한 Ubuntu 24.04 NVIDIA DLAMI, 완성 이미지 digest,
-root EBS 크기를 넣는다. 형태는 [gpu.example.tfvars](gpu.example.tfvars)를 참조한다.
-AMI의 Docker Compose·toolkit·AWS CLI·SSM을 첫 기동에서 검증해야 한다.
-F2 기본 대상은 24GB, general은 48GB다. RunPod도 이에 맞는 명시 GPU ID를 선택한다.
+## 전원·배포의 내부 경계
 
-```bash
-# offline 상태에서만 저장한다. 이 단계는 GPU를 생성하거나 켜지 않는다.
-just -f infra/justfile ai-configure f2 runpod 'NVIDIA RTX A5000' --release-id RELEASE_ID --bucket MODEL_BUCKET --apply
-just -f infra/justfile ai-configure general runpod 'NVIDIA L40S' --apply
-# 미평가 dev F2 release를 의도적으로 사용하는 경우에만 --allow-dev-release를 추가한다.
-```
+AWS 자원은 Terraform dev root가 소유한다. 검토한 AMI·EBS 프로필을 보존하면서 시작 계획이
+선택 image·capacity·앱 provider/model을 같은 입력으로 만든다. RunPod는 최초 Console 자원을
+보존하고 기존 Template 차이만 검토·API 수정·재조회 후 SSM 등록한다. Secret 참조·registry 권한은
+기존 경계를 유지하고 자동 생성·회전하지 않는다.
 
-이미 active인 F2는 기존 선택을 덮어쓰지 않는다. 점검 중 기존 `runpod-delete`로 offline을
-만든 뒤 첫 통합 선택을 등록한다. 이후에는 통합 전환 명령을 사용한다.
+`dev-start`와 `dev-prepare-app`은 같은 선택·Terraform·Template·비용 계획을 쓴다.
+CodeDeploy maintenance 모드와 호스트 marker가 구/새 revision의 API·Worker 자동 기동을 막는다.
+`app-deploy`는 별도이며, 앱·Worker는 DB 대상 확인·모델 준비·호환성 검사가 통과한 마지막 단계에 시작한다.
+DB 조회·적용은 [Backend 모델 선택 계약](../../.agents/skills/backend/references/model-selection.md)을 호출한다.
 
-AWS 배포를 추가할 때는 다음 순서를 따른다.
+일반/deep 종료로 앱 호스트가 교체되면 이전 `dev-start`의 실제 호스트·앱 합성 검증을 통과한
+정확한 CodeDeploy S3 revision을 maintenance에서 복원할 수 있다. SSM `APPLIED`의 배포 ID·revision
+해시로 대조하고, 검증하지 않은 최신 revision이나 새 Pipeline을 자동 실행하지 않는다.
+기록이 없는 최초 환경은 명시적 `dev-prepare-app → app-deploy → dev-start`가 필요하다.
 
-```bash
-just -f infra/justfile ai-capacity-plan general
-just -f infra/justfile dev-show
-# saved plan 검토·승인 후
-just -f infra/justfile dev-apply
-just -f infra/justfile ai-switch-plan general aws
-just -f infra/justfile ai-switch general aws
-```
-
-`ai-capacity-plan`은 현재 AWS 인스턴스를 보존하고 대상 작업을 추가하는
-`serving-capacity.auto.tfvars.json`을 로컬에 만든다. 일반·전환·deep plan이 모두 이 입력을 사용한다.
-`dev.tfvars`나 `TF_VAR_*`에 `gpu_provisioned_workloads`를 중복 지정하지 않는다.
-이 파일이 없으면 생성 대상 기본값은 빈 집합이므로 다른 운영자 PC에서는 먼저
-`ai-capacity-plan`으로 입력을 복원하고 삭제 대상이 없는지 확인한다.
-Terraform apply 순간부터 생성된 GPU는 준비 중이어도 과금된다. 생성을 나중으로 예약하지 않는다.
-
-## 일상 운영과 전환
-
-- `dev-status`: 앱·RDS, 선택 장소, 관리 GPU 상태, 모델 ready, 할당 EBS와 남은 디스크를 확인한다.
-  정지 호스트·준비 실패·구형 F2 이미지의 남은 디스크는 `null`이며 0을 의미하지 않는다.
-  상태 조회는 모델 목록을 확인하고, 추론 검증은 `ai-smoke f2|general`로 실행한다.
-- `dev-start`: 선택 GPU 로딩·직접 추론 → endpoint → RDS·앱 복구 → 합성 smoke.
-  앱 EC2가 교체되면 마지막 성공 CodeDeploy revision을 복구한다. 새 버전 배포를 대신하지 않는다.
-- `dev-stop`: 배포·migration 충돌 확인 → API/Worker SIGTERM·최대 300초 drain → 모든 관리 GPU
-  종료 시도 → 앱 ASG 0·RDS stop. 실패한 GPU는 `dev-status` 후 `dev-stop`으로 재시도한다.
-- `ai-switch-plan f2|general aws|runpod`: 대상·선택·GPU 종류·비용 항목을 확인한다. GPU를 만들지 않는다.
-- `ai-switch f2|general aws|runpod`: 대상 준비 → 직접 추론 → 앱 drain → 연결 → 앱 합성 smoke
-  → 이전 AWS stop 또는 RunPod delete. F2의 주소 쌍과 general alias를 보존한다.
-
-한 운영자만 명령을 실행한다. 배포·migration과 동시에 실행하지 않는다. 준비 실패나 사용자가
-중단한 경우 후보 GPU가 남을 수 있으므로 `dev-status`에서 확인한다. 전체 중단을 허용하면
-`dev-stop`으로 함께 정리한다. 전환 실패 후에는 앱을 점검 상태로 두고 `ai-switch`를 다시 실행해
-선택한 대상으로 복구한다. `dev-start`는 마지막 성공 선택으로 복구한다. 자동으로 OpenAI로 가지 않는다.
-
-`dev-deep-stop-plan → dev-deep-stop-show → 승인 → dev-deep-stop`은 일반 stop 후 edge와 AWS GPU
-root/model/compile 캐시를 제거한다. `dev-deep-start-plan → dev-deep-start-show → 승인 → dev-deep-start`는
-선택이 AWS인 작업만 재생성한다. DB·모델 release 정본·이미지·Template·등록·선택은 보존한다.
-캐시 snapshot은 만들지 않는다. 이후 새 주소 등록과 캐시 재다운로드가 필요하다.
+일반 stop은 AWS GPU를 정지하고 RunPod Pod를 삭제한다. AWS EBS 캐시는 보존되어 비용이 남는다.
+deep stop은 검토한 범위에서 GPU·캐시·edge를 제거하며 모델 release·DB·선택·등록은 보존한다.
+다음 시작은 같은 선택에서 주소·캐시를 재구성한다. 선택 자체를 마지막 성공값으로 자동 되돌리지 않는다.
 
 ## Local 연결
 
-개인 OpenAI 설정과 기존 모델은 그대로 둔다. F2는 기존 로컬 endpoint 설정을 사용할 수 있다.
-GPU를 선택할 때만 아래 명령으로 **새 ignored 파일**을 만든다. 명령은 공유 dev 설정과 DB를
-변경하지 않는다. 기존 파일은 덮어쓰지 않으므로 재연결 시 이전 개인 파일을 제거하거나 새 이름을 쓴다.
+개인 OpenAI 설정은 공유 dev 선택과 별개다. GPU에 연결할 때만 새 ignored 파일을 명시적으로 생성한다.
 
 ```bash
 just -f infra/justfile ai-connect general ../ai/.env.gpu-general
 just -f infra/justfile ai-connect f2 ../ai/.env.gpu-f2
 ```
 
-just recipe는 `infra/`에서 실행된다. 출력은 Git에서 제외한 AI 개인 파일에만 보관하고,
-필요한 항목을 `ai/.env`에 옮긴다. general 출력에는 활성 GPU profile과 일치하는
-`AI_GENERAL_PROVIDER=vllm`과 `AI_GENERAL_MODEL`이 포함된다. Backend에는 AI 입력을 중복 작성하지 않는다.
-기존 Bedrock 설정에서 전환한다면 `AI_GENERAL_AWS_REGION`을 제거한다.
-키는 운영자가 승인한 값을 TTY에 입력한다. AWS는 터널 명령을 계속 열어 두고
-18000, 18001, 18002의 loopback만 사용한다. 공유 GPU가 꺼져 있으면 운영자가 먼저 시작한다.
-권한 부족·포트 충돌·교체된 인스턴스는 명령을 실패시키며 재연결이 필요하다.
+출력 파일은 기존 파일을 덮어쓰지 않는다. 필요한 값을 `ai/.env`에 반영하며 Backend에 AI 변수를
+중복 작성하지 않는다. general 파일에는 실제 활성 profile에 맞는 provider/model이 포함된다.
+AWS는 고정 loopback 포트 18000/18001/18002의 SSM 터널을 유지하고 RunPod는 해당 Pod HTTPS proxy를
+사용한다. 키는 승인된 값을 TTY로 전달하며 공유 GPU 자동 기동·공유 DB 모델 변경은 하지 않는다.
 
-저장소 루트에서 `just -f infra/justfile local-config`로 enum·소유권·연결 조합을 확인한다.
-모델 DB 반영은 `local-model <사무소 ID> <capability>`로 미리 보고,
-API/Worker를 중지한 뒤 `--apply --workloads-stopped`를 추가한다.
-기동은 `local-api`, `local-worker`를 각 터미널에서 사용한다.
-전체 절차와 개인 설정 이전은 [환경변수 관리](../../docs/development/environment-variables.md)를 따른다.
-local 프로세스가 SSM 터널로 공유 DB를 가리키는 설정은 사용하지 않는다.
+`local-config`로 설정을 확인하고 `local-model <사무소 ID> <capability>`로 로컬 DB 전후 입력을 확인한다.
+API·Worker 중지 후에만 `--apply --workloads-stopped`를 사용한다. 기동은 `local-api`, `local-worker`다.
+개인 파일·주석 기준은 [환경변수 관리](../../docs/development/environment-variables.md)를 따른다.
 
-## 공유 dev 모델 명시 반영
+## 검증 기록
 
-Terraform `general_model_selection`은 앱의 provider/model을 소유하고 `ai-configure general`은
-GPU profile을 소유한다. 둘을 같은 모델로 맞춘다. 기본값은 공식 `qwen38-27b-fp8`이며,
-Bedrock을 선택할 때는 `provider=bedrock`, `model=global.openai.gpt-5.6-luna`,
-`aws_region=ap-northeast-2`를 함께 지정한다. 다른 provider에서는 region을 생략한다.
-변경한 공개 SSM 입력과 새 앱 revision을 함께 배포한다. 파일 변경만으로 기존 DB 선택은 바뀌지 않는다.
+`dev-verify`의 성공은 해당 실행의 연결·합성 요청 근거다. 품질 평가나 다른 image/release/cloud의
+검증 성공을 뜻하지 않는다. 계측 누락은 0으로 표시하지 않으며 새 이미지 게시·적용 필요 여부를 확인한다.
+일반 재기동·deep 재생성·양방향 전환은 운영 절차로 직접 실행하고 각각 검증한다.
 
-모델 반영은 가동 중인 maintenance host에서 API/Worker를 이미 drain하고 중지한 뒤 실행한다.
-
-```bash
-just -f infra/justfile ai-activate-general BROKERAGE_ID POSITION_CARD
-just -f infra/justfile ai-activate-general BROKERAGE_ID BROKERAGE_JUDGMENT
-```
-
-capability 허용값은 `POSITION_CARD`, `BROKERAGE_JUDGMENT`, `CHATBOT`이다.
-새 renderer의 주입값을 읽어 capability 하나에 새 버전을 추가한다. 대기·진행 요청이 있으면 중단한다.
-명령은 자동 재기동·추론 없이 maintenance를 유지한다. 이전 모델로의 fallback이나 seed 초기화가 없다.
-업무 데이터·다른 capability·기존 실행 snapshot을 보존한다. 재기동과 `dev-verify`는 사용자가 수행한다.
-클라우드만 전환할 때는 같은 모델 선택을 다시 반영하지 않는다.
-
-## 비용과 완료 기준
-
-2026-09-07 AWS Price List 조회: 서울 Linux Shared On-Demand는 F2 $1.20208/h,
-general $2.75652/h, 합계 $3.95860/h다. 4시간 동시 실행의 GPU 비용은 약 $15.83이며
-EBS·public IPv4·기존 앱·세금·환율은 별도다. 실시간 GPU 용량을 보장하는 견적이 아니다.
-
-| 상태 | AWS GPU | RunPod |
-|---|---|---|
-| 실행·무요청 | GPU + EBS + 자동 public IPv4 | GPU + container disk |
-| 일반 stop | EBS 보존·과금 | Pod 삭제. 별도 Volume이 남았다면 과금 |
-| deep-stop | GPU와 캐시 EBS 제거 | Pod 삭제. 독립 Network Volume은 별도 확인 |
-
-AWS 누적 30만원·기존 종료일, RunPod 2개월 $300의 기존 한도를 바꾸지 않는다.
-생성 직전 잔여 예산·예상 사용 시간·서울 AZ·할당량·RunPod 가격을 확인한다.
-[EBS 요금](https://aws.amazon.com/ebs/pricing/),
-[EC2 stop/start](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html),
-[RunPod 요금](https://docs.runpod.io/pods/pricing)을 기준으로 잔존 비용을 확인한다.
-[validation.md](validation.md)의 실제 환경 행을 모두 통과해야 운영 완료다.
-
-## 비교 검토와 게시 이미지 재사용
-
-로컬 `infra/justfile`의 `check`는 `tests/`, `runpod/tests/`, `serving/tests/`를
-각각 실행한다. 범용 HTTP 인증·관리 경로 차단 검사는 `serving/tests/test_runtime.py`에서
-한 번만 관리하며, 이미지 게시 전 검사도 같은 파일을 실행한다.
-
-[검토 재현 절차](comparison-reproduction.md)에서 저장된 근거 검사와 원본 요약 재생성,
-동일 조건 재평가 명령을 확인한다. [게시 이미지 catalog](published-images.json)는 태그·digest별
-AWQ·BnB·공식 FP8의 실제 GPU 검증 범위를 구분한다. 최신 이미지를 모든 모델의 검증 완료로 간주하지 않는다.
+[validation.md](validation.md)는 기존 GPU 검증 진입점,
+[RunPod 기록](remote-validation-2026-09-07.md)과 [AWS 사설 검증](aws-private-validation-2026-09-07.md)은
+그 시점의 후보 근거다. 이 기록을 이번 release의 성공으로 수정하지 않는다.
+[비교 재현](comparison-reproduction.md)은 저장 근거 검사·동일 조건 평가의 별도 절차다.

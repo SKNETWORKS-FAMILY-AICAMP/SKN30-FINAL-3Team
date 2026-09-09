@@ -17,16 +17,16 @@ sys.path[:0] = [
 import download_models
 import gpu_host
 import manage_serving as serving
+from selection_catalog import published_image
 
 
 class GeneralSelection(unittest.TestCase):
     def test_legacy_defaults_and_explicit_profiles(self):
         legacy = {"cloud": "runpod", "gpu_id": "NVIDIA L40S"}
-        serving.validate_selection("general", legacy)
-        self.assertEqual(
-            serving.general_profile(legacy)["model"],
-            "unsloth/Qwen3.8-27B-unsloth-bnb-4bit",
-        )
+        with self.assertRaises(serving.ToolError):
+            serving.validate_selection("general", legacy)
+        with self.assertRaises(serving.ToolError):
+            serving.general_profile(legacy)
         for name in (
             "qwen3-14b-awq",
             "qwen3-32b-awq",
@@ -36,7 +36,7 @@ class GeneralSelection(unittest.TestCase):
             spec = {**legacy, "model_profile": name}
             serving.validate_selection("general", spec)
             self.assertEqual(serving.general_metadata(spec)["model_profile"], name)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(serving.ToolError):
             serving.validate_selection(
                 "general", {**legacy, "model_profile": "arbitrary/model"}
             )
@@ -96,12 +96,15 @@ class GeneralSelection(unittest.TestCase):
         )
         controller.selection.assert_not_called()
 
-    def runpod_controller(self):
+    def runpod_controller(self, workload="general"):
+        image = published_image(
+            workload, "qwen3-14b-awq" if workload == "general" else None
+        )
         controller = serving.Serving.__new__(serving.Serving)
         controller.read = Mock(
             return_value={
                 "status": "ready",
-                "image": "image",
+                "image": image,
                 "template_id": "template",
                 "registry_auth_id": "registry",
             }
@@ -113,12 +116,12 @@ class GeneralSelection(unittest.TestCase):
         return controller
 
     def test_f2_create_does_not_enable_general_cuda_compatibility(self):
-        controller = self.runpod_controller()
+        controller = self.runpod_controller("f2")
         controller.release = Mock(return_value=({}, "checksum", "synthetic-url"))
         spec = {
             "cloud": "runpod",
-            "gpu_id": "NVIDIA L40S",
-            "release_id": "synthetic-release",
+            "gpu_id": "NVIDIA RTX A5000",
+            "release_id": "consultation-v3",
             "bucket": "synthetic-bucket",
         }
         with patch.object(serving.control, "validate_template"):
@@ -167,7 +170,7 @@ class GeneralSelection(unittest.TestCase):
                     environment["VLLM_ENABLE_CUDA_COMPATIBILITY"] = compatibility
                 controller.runpod.return_value.pod.return_value = {
                     "id": "abc12345",
-                    "imageName": "image",
+                    "imageName": published_image("general", "qwen3-14b-awq"),
                     "templateId": "template",
                     "desiredStatus": "RUNNING",
                     "env": environment,
@@ -207,6 +210,7 @@ class GeneralSelection(unittest.TestCase):
             {
                 "GENERAL_MODEL_PROFILE": "qwen3-32b-awq",
                 "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
+                "SERVING_IMAGE": published_image("general", "qwen3-32b-awq"),
             },
         )
         controller.runpod.return_value.request.reset_mock()
@@ -214,7 +218,7 @@ class GeneralSelection(unittest.TestCase):
             {"name": serving.POD_NAME["general"], "id": "abc12345"}
         ]
         controller.runpod.return_value.pod.return_value = {
-            "imageName": "image",
+            "imageName": published_image("general", "qwen3-14b-awq"),
             "templateId": "template",
             "env": {"GENERAL_MODEL_PROFILE": "qwen3-14b-awq"},
         }
