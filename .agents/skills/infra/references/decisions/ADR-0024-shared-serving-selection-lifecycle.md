@@ -36,6 +36,11 @@ AWS-only 작업에는 RunPod Template 등록을 요구하지 않는다. Terrafor
 신규 Template 생성이나 Secret 생성·회전은 자동화하지 않는다. image 선택은 공통 카탈로그가 소유하고
 RunPod 등록은 RunPod 자원 연결만 소유한다. 기존 호환 등록 명령도 유지한다.
 
+Template 계획은 API 인증에 필요한 AWS operator key만 기존 클라이언트에서 읽는다. fingerprint를
+만들기 위한 AWS provider key·Secret version 추가 조회는 하지 않는다. 실제 SSM 등록은 기존
+Registrar의 AWS runtime key 형식 검증을 유지한다. 이는 RunPod Secret 값·목록·metadata 조회가
+아니며, Template에는 참조 문자열만 검사하고 실제 값 일치는 기동 후 인증 health로 확인한다.
+
 F2는 private S3 manifest/LoRA 검증 후 제한 시간 presigned URL을 Pod에 주입한다. base Qwen과
 Whisper는 고정 Hugging Face revision을 사용한다. URL·장기 AWS 키를 로그나 저장 문서에 넣지 않는다.
 이번 계측 코드 사용에는 새 image 게시·카탈로그 digest 갱신이 필요하며 과거 후보 검증은 승계하지 않는다.

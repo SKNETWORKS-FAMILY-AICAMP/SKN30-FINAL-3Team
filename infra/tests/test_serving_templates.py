@@ -138,19 +138,59 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(len(self.api.patches), 1)
         self.assertEqual(len(self.aws.writes), 1)
 
-    def test_stale_template_registration_or_secret_blocks_before_patch(self):
-        for target in ("template", "registration", "secret"):
+    def test_stale_template_or_registration_blocks_before_patch(self):
+        for target in ("template", "registration"):
             with self.subTest(target=target):
                 plan = self.reconciler.plan("f2", self.spec)
                 if target == "template":
                     self.api.value["containerDiskInGb"] += 1
-                elif target == "registration":
-                    self.aws.record["updated_at"] = "changed"
                 else:
-                    self.aws.version = "secret-version-2"
+                    self.aws.record["updated_at"] = "changed"
                 with self.assertRaisesRegex(module.control.ToolError, "stale"):
                     self.reconciler.apply(plan, self.spec)
         self.assertEqual(self.api.patches, [])
+        self.assertEqual(self.aws.writes, [])
+
+    def test_plan_only_reads_operator_key_once_for_api_authentication(self):
+        def authenticated_api():
+            self.aws.secret_value(self.aws.settings.secrets["operator"])
+            return self.api
+
+        with (
+            patch.object(
+                self.reconciler.serving, "runpod", side_effect=authenticated_api
+            ),
+            patch.object(
+                self.aws, "secret_value", wraps=self.aws.secret_value
+            ) as secret_read,
+            patch.object(module.control, "load_ai_secret") as provider_read,
+        ):
+            plan = self.reconciler.plan("f2", self.spec)
+        provider_read.assert_not_called()
+        secret_read.assert_called_once_with(self.aws.settings.secrets["operator"])
+        self.assertNotIn("secret_version", json.dumps(plan))
+        self.assertEqual(self.api.patches, [])
+        self.assertEqual(self.aws.writes, [])
+
+    def test_aws_secret_version_is_not_a_template_input(self):
+        plan = self.reconciler.plan("f2", self.spec)
+        self.aws.version = "secret-version-2"
+        self.assertEqual(self.reconciler.plan("f2", self.spec), plan)
+
+    def test_registration_still_checks_aws_provider_key_structure(self):
+        plan = self.reconciler.plan("f2", self.spec)
+        original = self.aws.secret_value
+
+        def missing_provider_keys(name):
+            if name == self.aws.settings.secrets["ai"]:
+                return "{}", "version-missing-keys"
+            return original(name)
+
+        with (
+            patch.object(self.aws, "secret_value", side_effect=missing_provider_keys),
+            self.assertRaisesRegex(module.control.ToolError, "missing a required"),
+        ):
+            self.reconciler.apply(plan, self.spec)
         self.assertEqual(self.aws.writes, [])
 
     def test_unrelated_named_pod_using_template_blocks(self):

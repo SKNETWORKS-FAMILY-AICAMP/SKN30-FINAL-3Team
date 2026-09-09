@@ -299,7 +299,7 @@ dev-first-deploy-show:
     python3 scripts/plan_guard.py check environments/dev/dev-first-deploy.tfplan
     terraform -chdir=environments/dev show dev-first-deploy.tfplan
 
-# ALB를 재생성하고 CloudFront 및 ASG 자동 배포 연결을 활성화하는 saved plan을 생성한다.
+# 저수준 Terraform 검토용 호환 plan. dev-deep-start는 공통 dev-serving.tfplan을 새로 생성한다.
 dev-deep-start-plan:
     uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" capacity-config
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh

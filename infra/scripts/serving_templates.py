@@ -140,8 +140,8 @@ class TemplateReconciler:
             raise control.ToolError(
                 "register existing Console Template and registry IDs before starting"
             )
-        _, secret_version = control.load_ai_secret(aws)
-        _, operator_version = aws.secret_value(aws.settings.secrets["operator"])
+        # Authenticate through the existing client boundary. Template planning
+        # does not inspect provider keys or read credentials again for a hash.
         api = self.serving.runpod()
         managed_name = (
             control.SHARED_POD_NAME if workload == "f2" else "skn30-general-serving-dev"
@@ -189,8 +189,6 @@ class TemplateReconciler:
                 "registry": registry,
                 "endpoint": aws.endpoint(),
                 "pods": sorted(pods, key=lambda pod: str(pod["id"])),
-                "provider_secret_version": secret_version,
-                "operator_secret_version": operator_version,
             },
         )
 

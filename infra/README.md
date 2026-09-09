@@ -198,17 +198,16 @@ just dev-deep-drift
 
 `dev-deep-stop`은 먼저 ASG를 0으로 내리고 RDS를 정지한 다음, 검토한 `dev-deep-stop.tfplan`으로 CloudFront를 비활성화하고 ALB·listener·ALB alarm 두 개를 제거한다. CloudFront의 ALB origin과 API behavior, Backend `HTTP_ALLOWED_HOSTS`의 ALB DNS도 함께 제거되며 ALB service-managed public IPv4는 AWS가 자동 반납한다. 정상 active 상태라면 네 edge 자원이 `destroy`여야 한다. 이미 원격에서 수동 삭제된 자원은 refresh drift로 plan에서 생략될 수 있으므로 실제 존재 여부와 state 정리를 확인하고, 다른 add·change·destroy가 보이면 기존 미적용 root 변경이나 provider의 dependency 재계산인지 `show`에서 개별 검토한다.
 
-Deep start는 다음 순서로 실행한다.
+Deep start는 [개발자 운영 정본](operations/README.md)의 공통 계획·확인 절차를 사용한다.
 
 ```bash
-just dev-deep-start-plan
-just dev-deep-start-show
-just dev-deep-start
+just dev-start-plan --hours 2
+just dev-deep-start --hours 2
+just dev-verify
 just dev-deep-status
-just dev-drift
 ```
 
-`dev-deep-start`는 검토한 `dev-deep-start.tfplan`으로 ALB·listener·alarm을 만들고 새 ALB DNS를 CloudFront와 Backend 설정에 반영해 distribution 배포가 끝날 때까지 기다린 뒤 RDS·ASG·SSM을 복구한다. 정상 suspended 상태라면 같은 네 edge 자원이 `create`여야 하며, drift로 alarm만 남았다면 alarm은 새 ALB dimension으로 `update`될 수 있다. 새 ALB에는 새 service-managed public IPv4가 할당되며 이전 주소 보존을 전제로 하지 않는다.
+`dev-deep-start`는 `dev-start`를 통해 `dev-serving.tfplan`을 새로 생성하고 확인받는다. 공통 계획기가 선택에서 edge/GPU 활성 입력과 선택된 AWS GPU 생성 대상을 복원하고, saved plan·입력 fingerprint 검증 → 적용 → drift 확인 후 RDS·maintenance 호스트 준비로 진행한다. RunPod 선택은 AWS GPU를 자동 생성하지 않는다. 기존 `dev-deep-start-plan/show`는 저수준 검토용이며 해당 파일을 통합 시작에서 적용하지 않는다. 새 ALB의 DNS·public IPv4가 달라질 수 있으며 이전 주소 보존을 전제로 하지 않는다.
 
 Deep suspend 중에는 기본값이 active인 일반 `dev-plan`, `dev-apply`, `dev-drift`를 사용하지 않는다. 일반 plan은 ALB 재생성과 CloudFront 재활성화를 제안한다. suspended 상태 검증에는 `dev-deep-drift`를 사용하고, 통합·Backend·Frontend Pipeline과 DB migration도 실행하지 않는다. 중단이나 timeout이 발생하면 Console에서 임의로 생성·삭제하지 말고 `dev-deep-status`와 해당 모드의 새 plan을 확인한 뒤 실패한 단계만 재시도한다.
 

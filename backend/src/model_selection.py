@@ -23,10 +23,23 @@ class Capability(StrEnum):
     CHATBOT = "CHATBOT"
 
 
+def lock_selection_inputs(session: Session) -> None:
+    # Maintenance-only, bounded transaction: prevent even writers that do not use
+    # the brokerage row-lock convention from changing inputs after this snapshot.
+    # EXCLUSIVE also conflicts with single-target SELECT FOR UPDATE (ROW SHARE),
+    # so acquire brokerage first before downstream table locks; plain reads work.
+    session.execute(text("SET LOCAL lock_timeout = '5s'"))
+    session.execute(text("SET LOCAL statement_timeout = '30s'"))
+    session.execute(
+        text("LOCK TABLE brokerage, ai_model_config, agent_run, chat_request IN EXCLUSIVE MODE")
+    )
+
+
 def apply_selection(
     session: Session, brokerage_id: int, capability: Capability, selection: GeneralSelection
 ) -> None:
     """Caller holds an explicit maintenance window. Transaction preserves old versions."""
+    lock_selection_inputs(session)
     if (
         session.execute(
             text("SELECT id FROM brokerage WHERE id=:id FOR UPDATE"), {"id": brokerage_id}
@@ -170,7 +183,7 @@ def apply_targets(
     expected_snapshot: str,
 ) -> dict:
     """One transaction checks the reviewed snapshot, then changes explicit targets only."""
-    session.execute(text("SELECT id FROM brokerage ORDER BY id FOR UPDATE")).all()
+    lock_selection_inputs(session)
     preview = list_targets(session, selection)
     if preview["snapshot"] != expected_snapshot:
         raise ValueError("model targets changed after review; list and confirm again")

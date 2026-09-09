@@ -126,6 +126,8 @@ RATE는 USD/시간의 양수이며 생략하면 TTY에서 작업별 현재 견�
 선택·release·DB·등록 정본은 보존하고 GPU·캐시·edge를 검토된 범위에서 제거한다.
 `dev-deep-start`는 `dev-start`와 같은 계획·확인·복구 흐름을 사용한다. 기존 `dev-deep-start-plan/show`는
 낮은 수준 Terraform 검토용 호환 명령이며 그 plan으로 통합 선택 검증을 우회하지 않는다.
+실제 시작은 `dev-serving.tfplan`을 새로 생성·확인하며 edge/GPU 활성 입력과 선택된 AWS 생성 대상을
+복원한다. saved plan·입력 fingerprint 검사 → 적용 → drift 확인을 통과한 뒤 RDS·호스트를 준비한다.
 
 saved plan과 metadata는 Git에서 제외하고 600 권한·24시간 유효기간을 적용한다.
 Terraform 입력·plan hash에 공유 선택 ID/내용·이미지·Template 등록 상태를 함께 묶어 확인한다.

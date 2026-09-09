@@ -25,9 +25,19 @@ Backend의 `src/model_selection.py`가 DB 조회·검증·트랜잭션을 소유
 
 ## 트랜잭션과 기동 경계
 
-호출자가 API·Worker 중지를 확인한다. 배치 적용은 중개사 행을 ID 순서로 잠근 뒤 활성 설정과
-대기 요청 snapshot을 다시 조회한다. 검토 후 변경, 존재하지 않는 대상, 대기/실행 요청,
-선택하지 않은 비호환 활성 설정이 있으면 쓰기 전에 거부한다.
+호출자가 API·Worker 중지를 확인한다. 단일·배치 적용은 같은 helper에서 `brokerage → ai_model_config →
+agent_run → chat_request` 순서로 `EXCLUSIVE` table lock을 획득한다. 그 뒤 배치 적용이 활성 설정과
+대기 요청 snapshot을 다시 조회하며 transaction commit/rollback까지 보호한다. 행 잠금 관례를
+따르지 않는 직접 UPDATE·INSERT나 SELECT FOR UPDATE도 이 구간에는 대기한다. 일반 SELECT는 허용한다.
+검토 후 변경, 존재하지 않는 대상, 대기/실행 요청, 선택하지 않은 비호환 활성 설정은 쓰기 전에 거부한다.
+
+이 잠금은 중지된 maintenance 작업 전용이다. `SET LOCAL lock_timeout='5s'`,
+`statement_timeout='30s'`로 대기와 개별 SQL 실행을 제한하며 lock timeout·deadlock·검증 오류는
+전체 트랜잭션을 rollback한다. 사용자 확인·GPU 준비·외부 네트워크 호출을 잠금 안에서 실행하지 않는다.
+`EXCLUSIVE`는 단일 경로의 brokerage 행 잠금이 먼저 잡힌 상태에서 다른 테이블 잠금과 역전되는 것을
+피하도록 공통 helper에서 가장 먼저 사용한다. 신규 요청·DML을 기동 직전까지 영구 차단하는 잠금이
+아니므로 commit 후에도 API·Worker 중지 및 운영자 순차 실행 계약을 유지해야 한다.
+잠금 충돌 기준은 [PostgreSQL 15 table locks](https://www.postgresql.org/docs/15/explicit-locking.html#LOCKING-TABLES)를 따른다.
 
 선택한 설정이 같으면 버전을 추가하지 않는다. 변경한 대상은 이전 설정을 비활성화하고
 새 버전을 삽입하며 기존 설정·run snapshot을 삭제하거나 덮지 않는다. 여러 활성 설정이
@@ -40,5 +50,6 @@ CLI가 그 명령을 대신 실행하거나 API·Worker를 시작하지 않는�
 DB 버전은 그대로 유지된다.
 
 검증은 `backend/tests/unit/test_model_targets.py`와
-`backend/tests/integration/test_model_targets_postgres.py`에 둔다. 통합 검사는 일회성
+`backend/tests/integration/test_model_targets_postgres.py`,
+`backend/tests/integration/test_model_targets_concurrency.py`에 둔다. 통합 검사는 일회성
 PostgreSQL의 격리 schema에서 migration부터 실행하며 공유 dev DB를 사용하지 않는다.
