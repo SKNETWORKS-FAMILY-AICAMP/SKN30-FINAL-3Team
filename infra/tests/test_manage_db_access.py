@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import io
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -16,25 +14,9 @@ if SPEC is None or SPEC.loader is None:
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
-SEED_MODULE = sys.modules["db_seed_contracts"]
 
 
 class ManageDbAccessTest(unittest.TestCase):
-    def result_summary(self, **changes):
-        return {
-            "event": "synthetic-match-seed-complete",
-            "model_inference": False,
-            "total_targets": 84,
-            "eligible_targets": 81,
-            "completed_results": 81,
-            "verification_checks": 12,
-            "brokerage_id": 42,
-            "user_id": 7,
-            "login_id": "f3_synthetic_dev",
-            "model_profile": "dev-bedrock-gpt56-luna",
-            **changes,
-        }
-
     def target(self):
         return MODULE.DatabaseTarget(
             identifier="project-dev-postgres",
@@ -263,18 +245,12 @@ class ManageDbAccessTest(unittest.TestCase):
             ),
             mock.patch.object(MODULE, "PortForward") as port_forward,
             mock.patch.object(
-                MODULE.subprocess,
-                "run",
-                side_effect=[
-                    applied,
-                    verified,
-                    mock.MagicMock(
-                        returncode=0, stdout=json.dumps(self.result_summary())
-                    ),
-                ],
+                MODULE.subprocess, "run", side_effect=[applied, verified]
             ) as run,
         ):
-            MODULE.seed_f3(settings, apply=True, model_profile="dev-bedrock-gpt56-luna")
+            MODULE.seed_f3(
+                settings, apply=True, model_profile="dev-bedrock-gpt56-luna"
+            )
 
         port_forward.assert_called_once_with(
             direct, "i-0123456789abcdef0", self.target(), 15432
@@ -297,152 +273,12 @@ class ManageDbAccessTest(unittest.TestCase):
         self.assertEqual(environment["PGOPTIONS"], "-c role=app_owner")
         self.assertNotIn("signed/token", " ".join(apply_command))
         self.assertNotIn("signed/token", " ".join(verify_command))
-        result_call = run.call_args_list[2]
-        self.assertEqual(
-            result_call.args[0],
-            [
-                "uv",
-                "run",
-                "--locked",
-                "--project",
-                str(MODULE.REPO_ROOT / "backend"),
-                "python",
-                str(MODULE.REPO_ROOT / "backend/scripts/seed_match_results.py"),
-                "--confirm-synthetic-seed",
-                "--model-profile",
-                "dev-bedrock-gpt56-luna",
-            ],
-        )
-        self.assertEqual(result_call.kwargs["env"], environment)
-        self.assertNotIn("signed/token", " ".join(result_call.args[0]))
-        self.assertTrue(result_call.kwargs["capture_output"])
-
-    def test_seed_failures_stop_pipeline_without_completion(self):
-        settings = MODULE.Settings(
-            "123456789012",
-            "skn30-session",
-            "ap-northeast-2",
-            "project",
-            15432,
-            "Operator",
-        )
-        direct = mock.MagicMock()
-        direct.client.return_value.get_caller_identity.return_value = {
-            "Arn": "arn:aws:iam::123456789012:user/alice"
-        }
-        passing = (
-            "\n".join(
-                f"check-{index}|1|1|PASS"
-                for index in range(MODULE.F3_SEED_VERIFY_CHECK_COUNT)
-            )
-            + "\nselected-profile|dev-bedrock-gpt56-luna"
-        )
-        successful_apply = mock.MagicMock(returncode=0)
-        successful_verify = mock.MagicMock(returncode=0, stdout=passing)
-        cases = (
-            [mock.MagicMock(returncode=1)],
-            [successful_apply, mock.MagicMock(returncode=1)],
-            [
-                successful_apply,
-                mock.MagicMock(
-                    returncode=0, stdout=passing.replace("|PASS", "|FAIL", 1)
-                ),
-            ],
-            [
-                successful_apply,
-                successful_verify,
-                mock.MagicMock(returncode=1, stdout="private", stderr="private"),
-            ],
-            [
-                successful_apply,
-                successful_verify,
-                mock.MagicMock(
-                    returncode=0,
-                    stdout=json.dumps(self.result_summary(completed_results=0)),
-                ),
-            ],
-        )
-        for responses in cases:
-            with (
-                self.subTest(stage_count=len(responses)),
-                mock.patch.object(MODULE.shutil, "which", return_value="/usr/bin/tool"),
-                mock.patch.object(MODULE, "base_session", return_value=direct),
-                mock.patch.object(
-                    MODULE, "describe_database", return_value=self.target()
-                ),
-                mock.patch.object(MODULE, "find_app_instance", return_value="i-test"),
-                mock.patch.object(
-                    MODULE, "ensure_ca_bundle", return_value=Path("/tmp/ca.pem")
-                ),
-                mock.patch.object(MODULE, "PortForward") as tunnel,
-                mock.patch.object(
-                    MODULE.subprocess, "run", side_effect=responses
-                ) as run,
-                mock.patch.object(MODULE, "emit") as emit,
-                mock.patch("sys.stdout", io.StringIO()),
-                self.assertRaises(MODULE.ToolError),
-            ):
-                MODULE.seed_f3(settings, True, "dev-bedrock-gpt56-luna")
-            self.assertEqual(run.call_count, len(responses))
-            self.assertFalse(
-                any(call.args[0] == "f3-seed-complete" for call in emit.call_args_list)
-            )
-            tunnel.return_value.__exit__.assert_called_once()
-
-    def test_result_summary_rejects_missing_inference_or_incomplete_results(self):
-        for changes in (
-            {"model_inference": True},
-            {"model_inference": 0},
-            {"event": "started"},
-            {"completed_results": 80},
-            {"eligible_targets": 80},
-            {"total_targets": 83},
-            {"verification_checks": 0},
-            {"verification_checks": True},
-            {"model_profile": "local-openai"},
-            {"login_id": "another-user"},
-        ):
-            with self.subTest(changes=changes), self.assertRaises(MODULE.ToolError):
-                SEED_MODULE.verify_f3_result_output(
-                    json.dumps(self.result_summary(**changes)), "dev-bedrock-gpt56-luna"
-                )
-        for output in ("not-json", "[]", "null"):
-            with self.subTest(output=output), self.assertRaises(MODULE.ToolError):
-                SEED_MODULE.verify_f3_result_output(output, "dev-bedrock-gpt56-luna")
-
-    def test_result_summary_discards_unapproved_output_fields(self):
-        result = SEED_MODULE.verify_f3_result_output(
-            json.dumps(self.result_summary(debug="signed/token")),
-            "dev-bedrock-gpt56-luna",
-        )
-        self.assertNotIn("debug", result)
-        self.assertNotIn("signed/token", json.dumps(result))
-
-    def test_result_subprocess_failure_suppresses_driver_credentials(self):
-        captured = io.StringIO()
-        with (
-            mock.patch.object(
-                MODULE.subprocess,
-                "run",
-                return_value=mock.MagicMock(
-                    returncode=1, stdout="signed/token", stderr="signed/token"
-                ),
-            ),
-            mock.patch("sys.stdout", captured),
-            self.assertRaises(MODULE.ToolError) as error,
-        ):
-            MODULE.run_f3_result_seed({"PGPASSWORD": "signed/token"}, "local-openai")
-        self.assertNotIn("signed/token", str(error.exception))
-        self.assertEqual(captured.getvalue(), "")
 
     def test_seed_f3_verification_rejects_fail_or_wrong_count(self) -> None:
-        passing = (
-            "\n".join(
-                f"check-{index}|1|1|PASS"
-                for index in range(MODULE.F3_SEED_VERIFY_CHECK_COUNT)
-            )
-            + "\nselected-profile|dev-bedrock-gpt56-luna"
-        )
+        passing = "\n".join(
+            f"check-{index}|1|1|PASS"
+            for index in range(MODULE.F3_SEED_VERIFY_CHECK_COUNT)
+        ) + "\nselected-profile|dev-bedrock-gpt56-luna"
         MODULE.verify_f3_seed_output(passing, "dev-bedrock-gpt56-luna")
 
         with self.assertRaisesRegex(MODULE.ToolError, "reported FAIL"):

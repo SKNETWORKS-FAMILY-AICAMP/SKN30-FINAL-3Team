@@ -57,7 +57,7 @@ from domain.agent_execution.models import (
     LeaseNotHeldError,
     anchor_of,
 )
-from domain.agent_execution.service import input_version_matches
+from domain.agent_execution.service import current_target_version
 
 logger = structlog.get_logger()
 
@@ -157,7 +157,10 @@ def plan_candidate_cards(
             raise LeaseNotHeldError("the worker does not hold a valid lease on this run")
 
         anchor_type, anchor_id = anchor_of(run)
-        if not input_version_matches(session, run, anchor_type, anchor_id, run.input_data_version):
+        if (
+            current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
+            != run.input_data_version
+        ):
             raise InputVersionChangedError("the anchor changed after the candidates were selected")
 
         header = repository.find_match_evaluation_for_run(session, run.brokerage_id, run_id)
@@ -201,8 +204,9 @@ def _record_cards(
             raise CandidateSelectionMissingError("the candidate selection changed during carding")
 
         anchor_type, anchor_id = anchor_of(run)
-        if not input_version_matches(
-            session, run, anchor_type, anchor_id, plan.anchor_data_version
+        if (
+            current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
+            != plan.anchor_data_version
         ):
             raise InputVersionChangedError("the anchor changed while candidate cards were made")
 

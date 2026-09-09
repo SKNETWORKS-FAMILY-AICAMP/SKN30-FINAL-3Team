@@ -16,12 +16,6 @@ class IntakeSession:
         self.commits = 0
         self.rollbacks = 0
 
-    def add(self, _run: AgentRun) -> None:
-        pass
-
-    def flush(self) -> None:
-        pass
-
     def commit(self) -> None:
         self.commits += 1
 
@@ -51,9 +45,6 @@ def test_user_request_promotes_ledger_save_run_in_every_handoff_state(
     )
     resumed: list[tuple[int, int, str]] = []
 
-    monkeypatch.setattr(service.freshness, "eligibility", lambda *_args: ("ELIGIBLE", None))
-    monkeypatch.setattr(service.freshness, "reusable_completed_run", lambda *_args: None)
-    monkeypatch.setattr(service.freshness, "intake_metadata", lambda *_args: {})
     monkeypatch.setattr(service.repository, "lock_run_intake", lambda *_args: None)
     monkeypatch.setattr(
         service,

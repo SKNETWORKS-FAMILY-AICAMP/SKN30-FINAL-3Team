@@ -49,7 +49,7 @@ from domain.agent_execution.models import (
     NegotiationPositionPrice,
     anchor_of,
 )
-from domain.agent_execution.service import current_target_version, input_version_matches
+from domain.agent_execution.service import current_target_version
 
 
 class GenerationBindingError(RuntimeError):
@@ -261,11 +261,8 @@ def prepare_generation(
         anchor_type, anchor_id = resolved.anchor_type, resolved.anchor_id
         current = current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
         expected_version = run.input_data_version if target is None else current
-        if not input_version_matches(session, run, anchor_type, anchor_id, expected_version):
+        if current != expected_version:
             raise InputVersionChangedError("the anchor changed after the run was queued")
-
-        if isinstance(run.redacted_input_snapshot.get("automation"), dict):
-            expected_version = current
 
         assembled = snapshot.build_anchor_snapshot(
             session,
@@ -549,8 +546,9 @@ def _verify_and_insert_card(
     ):
         raise GenerationBindingError("the run binding changed while the card was generated")
 
-    if not input_version_matches(
-        session, run, prepared.anchor_type, prepared.anchor_id, prepared.data_version
+    if (
+        current_target_version(session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id)
+        != prepared.data_version
     ):
         raise InputVersionChangedError("the target changed while the card was generated")
 
@@ -579,16 +577,7 @@ def _verify_and_insert_card(
         as_of=datetime.fromisoformat(prepared.as_of_bucket).replace(tzinfo=UTC),
         input_privacy_mode=prepared.input_privacy_mode,
     )
-    rebuilt_request = rebuilt.request
-    if isinstance(run.redacted_input_snapshot.get("automation"), dict):
-        rebuilt_request = rebuilt_request.model_copy(
-            update={
-                "source": rebuilt_request.source.model_copy(
-                    update={"data_version": prepared.data_version}
-                )
-            }
-        )
-    if input_fingerprint(rebuilt_request) != prepared.input_fingerprint:
+    if input_fingerprint(rebuilt.request) != prepared.input_fingerprint:
         raise SourceChangedError("the model input changed while the card was generated")
 
     analysis_id = prepared.cached_analysis_id

@@ -2,33 +2,6 @@ version: 1
 updated: "2026-09-09"
 
 sources:
-  - id: "f3-expansion-seed-2026-09-09"
-    type: "user-provided-direction"
-    location: "docs/requirements/sources/f3-expansion-seed-2026-09-09.md"
-    received: "2026-09-09"
-    decision_status: "user-implementation-authorized; shared-dev-not-applied"
-    reflected_in:
-      - "docs/db/seed/README.md"
-      - "backend/README.md"
-      - "references/contracts/api-f3-judgments.md"
-      - "docs/architecture/f3/implementation-and-validation.md"
-    scope: "합성 장부별 예시 매칭 결과와 출처 표시, reset 참조 순서 보완, 기존 로컬 DB·시드 계정 검증, 기존 공유 dev 명령 확장·안내. 실제 모델 품질 검증과 공유 환경 반영은 제외."
-
-  - id: "f3-expansion-planning-2026-09-09"
-    type: "user-provided-direction"
-    location: "docs/requirements/sources/f3-expansion-planning-2026-09-09.md"
-    received: "2026-09-09"
-    baseline_commit: "5950681"
-    decision_status: "planning-requested; persona-simulated; team-review-pending; implementation-not-started"
-    reflected_in:
-      - "docs/requirements/f3/judgment-results-list.md"
-      - "docs/screen/f3-judgment-results.md"
-      - "docs/architecture/f3/expansion-contracts.md"
-      - "docs/architecture/f3/planning-validation.md"
-      - "docs/architecture/f3/chatbot-extension.md"
-      - "references/open-questions.md"
-    scope: "최신 dev 별도 워크트리의 F3 화면·API·내부 기능 정의, 공인중개사 페르소나 필요성 검토와 챗봇 후속 확장성. 역할 검토를 실사용 검증으로 표현하지 않으며 정책·구현·배포는 미변경."
-
   - id: "local-functional-regression-report-2026-09-09"
     type: "user-provided-document"
     location: "user-provided:local-functional-regression-report-2026-09-09"
@@ -898,19 +871,6 @@ sources:
       - "docs/requirements/f3/judgment-results-list.md"
       - "references/open-questions.md"
     scope: "별도 프로세스·서버 확장성 검토, GPU 상시 운영 조건과 사용자 대기를 반영한 조건부 자동 판정·결과 목록 우선 제안. 독립 배포·정책·기능 구현 승인 아님"
-
-  - id: "f3-expansion-implementation-2026-09-09"
-    type: "user-instruction"
-    location: "docs/requirements/sources/f3-expansion-implementation-2026-09-09.md"
-    received: "2026-09-09"
-    reflected_in:
-      - "references/decisions/ADR-0035-f3-conditional-automation-results.md"
-      - "references/contracts/api-f3-judgments.md"
-      - "docs/requirements/f3/judgment-results-list.md"
-      - "docs/architecture/f3/implementation-and-validation.md"
-    scope: "최신 dev 병합 후 워크트리의 1차 구현·문서화·API와 브라우저 통합. 후속 사용자 답변은 테스트 모델 통합 검증 승인 및 추가 테이블의 요구사항 접두어 제거·도메인 명명 요청. 팀 병합·공유 dev 배포·실제 모델 평가 승인/성공과 구분"
-
-
   - id: "shared-dev-serving-selection-implementation-2026-09-09"
     type: "user-instruction"
     location: "Codex 인프라 개선 대화: 공유 dev LLM 서빙 선택·기동 절차 통합 계획 전체에 대한 PLEASE IMPLEMENT THIS PLAN 요청"
@@ -922,3 +882,12 @@ sources:
       - "infra/operations/configuration.md"
       - "infra/serving/README.md"
     scope: "SSM 공유 선택·정지 후 변경·통합 계획/비용 확인·기존 Template API 조정·명시 DB 대상/이력·실패 자원 정리·사용자 기동 검증 구현 승인. F2 A5000/L4 24GB 및 general L40S48GB, CPU 전환 제외. 팀 병합·공유 적용·신규 이미지 게시·실제 기동 성공과 구분"
+
+  - id: "f3-expansion-retirement-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 대화: #116 #117 #118 작업 롤백 및 해당 범위 기능 폐기 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0037-f3-expansion-retirement.md"
+      - "docs/requirements/f3/judgment-results-list.md"
+    scope: "세 PR 코드·문서 역적용과 기능 폐기. 기존 미커밋 작업 및 #119 보존. 실제 DB·시드 데이터·배포 변경은 미수행"

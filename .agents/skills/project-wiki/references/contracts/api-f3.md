@@ -17,12 +17,12 @@ updated: 2026-09-08
 
 | Method | Path | 인증 | 동작 |
 |---|---|---|---|
-| POST | /api/v1/f3/runs | 세션·CSRF | 최신 완료 또는 활성 실행을 재사용하고 필요 시 새 실행 접수 |
+| POST | /api/v1/f3/runs | 세션·CSRF | 교차 판정 실행을 적재하거나 같은 입력의 활성 실행 식별자를 반환 |
 | GET | /api/v1/f3/runs/{run_id} | 세션 | 숫자 실행 ID로 현재 상태와 안전한 오류 정보를 조회 |
 | GET | /api/v1/f3/runs/{run_id}/result | 세션 | 실행의 앵커 카드·후보 조회 조건·후보별 판정 결과를 현재 저장 단계까지 조회 |
 | POST | /api/v1/f3/feedback | 세션·CSRF | 포지션 카드 또는 후보 판정에 구조화된 관심없음 사유를 기록 |
 
-위 네 경로와 [저장 결과 조회 3개](api-f3-judgments.md)는 현재 Backend에 **구현됨**이다. 결과 조회와 관심없음 피드백은 더 이상 미구현
+위 네 경로는 모두 현재 Backend에 **구현됨**이다. 결과 조회와 관심없음 피드백은 더 이상 미구현
 후속 경로가 아니며 아래 각 절이 공개 계약의 정본이다. 상담 로그를 만드는 정정 피드백만 후속 범위다.
 
 요청 본문은 앵커만 받는다. `anchor_type`은 `LISTING` 또는 `REQUIREMENT`이고 `anchor_id`는 1 이상의
@@ -48,14 +48,14 @@ updated: 2026-09-08
 ```
 
 `input_data_version`은 앵커가 된 매물 또는 구입장의 `row_version`이다. 같은 화면을 다시 열었을 때
-표시용 버전이다. 완료 재사용은 전체 의미 입력·후보·구성·날짜 identity로 판단한다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
+같은 판정인지 구분하는 기준이 된다 (F3-CM-05). 앵커가 없거나 다른 중개사무소 소유이면 404로 답한다.
 
 `POST /api/v1/f3/runs`는 Worker나 AI를 직접 호출하지 않고 `agent_run` 적재까지만 하므로 F3
 실패가 F1 저장과 조회를 막지 않는다 (F3-CM-06).
 
 ### 활성 실행 중복 방지
 
-같은 `(brokerage_id, anchor_type, anchor_id, input_data_version)`에 원천 revision·UTC 날짜·구성 marker까지 일치하는 활성 루트
+같은 `(brokerage_id, anchor_type, anchor_id, input_data_version)`의 활성 루트
 `CROSS_JUDGMENT` 실행이 있으면 새 행을 만들지 않고 기존 실행을 반환한다. 재사용 대상 상태는
 `QUEUED`, `RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`이다.
 재사용과 신규 접수 모두 `202 Accepted`와 같은 응답 형태를 사용하며 별도 `reused` 필드는 공개하지
@@ -69,10 +69,10 @@ updated: 2026-09-08
 만든 요청자와 접수 계기를 나타내며 이후 같은 실행을 조회한 사용자 목록이 아니다. 후속 재사용 호출
 이력은 현재 별도로 저장하지 않는다.
 
-`COMPLETED`는 현재성 또는 전체 의미 입력 identity를 검증한 경우 기존 실행을 반환한다.
-`FAILED_TERMINAL`·`SUPERSEDED`는 새 접수가 필요하다. 접수·재사용은 원천 revision·UTC 날짜·모델 구성도
-비교하고 순수 메모/담당자 수정의 row_version 증가를 의미 입력 변경으로 취급하지 않는다.
-[ADR-0035](../decisions/ADR-0035-f3-conditional-automation-results.md)에 따른 변경이다.
+`COMPLETED`, `FAILED_TERMINAL`, `SUPERSEDED` 실행은 재사용하지 않는다. 특히 완료 결과는 앵커
+`row_version`만 같다고 재사용하지 않는다. 상담 로그 집합, 세대·단지·당사자 관계와 AI 구성이
+그대로인지 접수 시점에 증명할 identity가 아직 없기 때문이다. 따라서 F3-CR-12 중 **활성 실행
+중복 방지**만 구현됐고, 변경 없는 완료 판정 결과 재사용은 후속 범위다.
 
 `LISTING` 앵커는 사무소가 같고 `property_listing.is_deleted = false`이며 **부모 세대도
 `property_unit.is_deleted = false`** 여야 한다. F1의 세대 소프트 삭제는 이력 보존을 위해 딸린 매물
@@ -80,23 +80,52 @@ updated: 2026-09-08
 사무소의 식별자와 똑같이 404로 답해 삭제 여부와 존재 여부를 구분해서 드러내지 않는다.
 `REQUIREMENT` 앵커는 사무소와 `property_requirement.is_deleted = false`를 본다.
 
-### F1 원자적 변경 이벤트와 자동 접수
+### F1 저장 후 자동 접수
 
-원장·상담·관계·단지·구성의 변경은 migration 020의 DB trigger가 같은 transaction에서 revision과
-사무소별 병합 outbox로 기록한다. outbox 기록 실패는 F1 저장을 rollback한다. 저장 응답의 형태는
-유지하며 AI·agent_run 접수를 같은 HTTP 요청에서 수행하지 않는다.
+다음 네 저장이 성공하면 Backend가 F3 실행을 자동 접수한다 (F3-CR-01, F3-CR-02).
 
-`F3_AUTO_JUDGMENT_ENABLED=true`인 Worker의 독립 소비자가 유효 대상·3초 변경 병합·반대편 후보 유입을
-확인하고 `AUTO_CHANGE` 작업을 접수한다. 이 작업은 카드·SQL 후보·최초 상위 5건 판정까지 수행한다.
-동일 입력의 완료/진행 실행은 재사용한다. 메모·담당자·같은 값 재저장은 새 모델 호출을 만들지 않는다.
-flag 기본 false에서는 변경 기록을 보존하며 조회와 명시적 수동 접수만 제공한다.
+이 실행이 자동으로 수행하는 범위는 **앵커 포지션 카드 생성까지**다 ([ADR-0018](../decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md)). 앵커 카드를 저장해
+`ANCHOR_READY`가 되면 실행은 거기서 멈추고, 후보 조회·후보 카드·중개 판정은 사용자가
+`POST /api/v1/f3/runs`로 판정을 요청할 때 이어서 수행한다 (F3-CR-01~04, 2026-08-31 개정).
+저장 하나가 모델 판정까지 완주하던 종전 계약을 대체한다. 결과를 볼 의사가 없는 저장에서도
+판정 비용이 들었고, 그 비용을 사용자가 선택한 적이 없기 때문이다.
 
-과거 `LEDGER_SAVE` 카드 전용 실행은 호환 대상으로 남는다. 사용자 요청이 들어오면 같은 실행을
-원자적으로 승격해 후보 조회부터 이어간다. `requested_by`는 최초 값, 자동 소비자의 요청자는
-현재 사무소 활성 사용자로 정하며 클라이언트가 지정하지 않는다.
+| 저장 경로 | 앵커 | 접수 조건 |
+|---|---|---|
+| `POST /api/v1/property-units/{unit_id}/listings` | 매물 | 신규 등록 |
+| `PATCH /api/v1/property-listings/{listing_id}` | 매물 | 거래 유형·가격·명도 조건·상태·의뢰인 등 판정 입력의 실제 변경 |
+| `POST /api/v1/property-requirements` | 구입장 | 신규 등록 |
+| `PATCH /api/v1/property-requirements/{requirement_id}` | 구입장 | 거래 유형·예산·면적·평형·이사일·만료일·상태·공동중개·희망 단지 등 판정 입력의 실제 변경 |
 
-소비·선점·heartbeat·재시도와 신규 API 상세는 [구현 기록](../../../../../docs/architecture/f3/implementation-and-validation.md),
-[저장 결과 조회 계약](api-f3-judgments.md)을 따른다. 합성 opt-in이 없으면 Worker 기동은 거절된다.
+자동 접수는 F1 저장 transaction이 commit된 뒤 별도 transaction으로 실행한다. 접수 중 오류가
+발생해도 이미 성공한 F1 저장과 응답을 되돌리거나 실패로 바꾸지 않는다 (F3-CM-06, F3-NF-07).
+요청 처리 중 Worker나 AI를 호출하지 않고 기존 `queue_cross_judgment_run`으로 `agent_run` 적재까지만
+수행한다.
+
+F1 응답 형태에는 실행 ID나 F3 상태를 추가하지 않는다. 화면은 `POST /api/v1/f3/runs`로 실행을
+확인하며, 같은 앵커·입력 버전의 활성 실행이면 저장 시 자동 생성된 실행 ID를 그대로 돌려받는다.
+자동 실행의 `trigger_type`은 `LEDGER_SAVE`이고 직접 실행 요청의 `USER_REQUEST`와 구분한다. 기존
+활성 실행을 재사용할 때는 최초 실행의 `trigger_type`과 `requested_by`를 바꾸지 않는다. **예외는
+`LEDGER_SAVE` 실행에 사용자의 판정 요청이 들어온 경우다.** 실행이 `QUEUED`면 다음 최초 선점이
+전체 판정을 수행하고, `RUNNING`이면 현재 lease의 Worker가 앵커 카드 뒤로 계속 진행하도록
+`trigger_type`을 요청자의 값으로 옮긴다. `ANCHOR_READY`에서 멈춰 있으면 기존 lease를 비우고
+같은 실행을 즉시 선점 가능하게 해 후보 조회부터 이어서 진행한다. 이 계획된 이어받기 선점은 실패
+재시도가 아니므로 `attempt_count`를 늘리지 않는다. `requested_by`는 최초 값을 유지한다. 이어받기는
+앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용이 없고, 화면은 종전과 같은 실행 ID를
+돌려받는다. `trigger_type`이 바뀌면 자동 접수에서 시작했다는 사실과 이전 상태는
+`f3_ledger_save_run_resumed` 로그로 남는다.
+
+PATCH의 접수 여부는 요청에 필드가 포함됐는지가 아니라 F1 서비스가 저장 직전에 비교한 **실제 변경
+필드**로 판단한다. 메모·담당자 같은 운영 필드만 바꾸거나 가격·예산 등 기존과 같은 값을 다시
+보내면 새 실행을 만들지 않는다. 희망 단지는 순서가 아니라 집합 변경을 판정 입력 변경으로 본다.
+자동 접수 실패 로그에는 앵커 종류·ID와 예외 타입만 남기고 상담 원문·연락처·성명은 남기지 않는다.
+
+자동 접수와 AI 처리는 별도 경계다. 접수된 실행은 검토된 합성 전용 환경에서
+`WORKER_ENABLED=true`와 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`를 모두 명시한 경우에만 현재 Worker가
+처리한다. 합성 opt-in이 없으면 Worker는 DB·Provider 접근과 작업 선점 전에 기동을 거절한다. 현재
+Infra 기본값은 두 설정 모두 `false`다. `MASKED` 입력 조립은 아직 구현되지 않았으므로 실제 F1
+사용자 데이터를 처리하는 근거로 합성 opt-in을 사용할 수 없다. 실사용 연결 전에는 ADR-0014에 따라
+Backend 마스킹을 구현하고 `input_privacy_mode=MASKED`로 전환해야 한다.
 
 ### 요청자 기록
 
@@ -173,7 +202,7 @@ Backend가 실제로 기록하는 상태는 아홉 가지다. 실행 접수 시 
 원자 저장하면 `COMPLETED`, 입력 버전·상담 범위가 실행 중 바뀌면 `SUPERSEDED`, lease 최대 시도
 초과나 영구 오류이면 `FAILED_TERMINAL`이다. `ANCHOR_READY`,
 `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`은 중간 상태라 `completed_at`을 채우지
-않고 `COMPLETED`에서 채운다. `ANCHOR_READY`는 legacy LEDGER_SAVE 실행이 사용자 요청을 기다리며 머무는
+않고 `COMPLETED`에서 채운다. `ANCHOR_READY`는 자동 접수된 실행이 사용자 요청을 기다리며 머무는
 지점이기도 하다. 이 상태의 `LEDGER_SAVE` 실행은 Worker 선점과 최대 시도 초과 정리에서 모두
 제외되므로 시도 횟수가 늘지 않고 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료되지도 않는다. 사용자가 끝내 판정을 요청하지 않으면
 실행은 `ANCHOR_READY`로 남으며, 보존 기간이 지난 실행 정리는 `retention_until`·`purged_at`을
@@ -230,8 +259,6 @@ Provider·모델 진단은 공개하지 않는다. 실행의 사무소·요청�
 후보의 `candidate_id`는 반대편 장부 레코드 식별자다. `LISTING` 앵커의 후보는 `property_requirement.id`,
 `REQUIREMENT` 앵커의 후보는 `property_listing.id`다. 이 경로는 후보의 성명, 연락처와 표시 이름을 싣지
 않으므로 화면은 자기 사무소의 F1 조회 결과로 표시 이름을 만든다.
-이 제한은 기존 `GET /f3/runs/{run_id}/result` 응답에 적용한다. 별도 저장 결과 조회 API의
-권한 내 화면용 표시명은 [저장 결과 조회 계약](api-f3-judgments.md)을 따른다.
 
 후보의 `judgment_id`는 저장된 중개 판정의 식별자이며 관심없음 피드백의 `target_id`로 쓴다. 판정 전
 후보와 카드화되지 않은 후보는 `null`이다. 실행 내부 식별자가 아니라 사무소 범위 피드백 대상 식별자이며,
@@ -299,32 +326,34 @@ Worker는 API가 아니라 `claim_next_run(worker_id)` 유스케이스로 실행
 `CROSS_JUDGMENT` 실행 중 `QUEUED`이거나, lease가 만료됐고 시도 횟수가 상한 미만인 구현된 진행
 상태(`RUNNING`, `ANCHOR_READY`, `CANDIDATES_READY`, `CANDIDATE_CARDS_READY`, `JUDGING`)다.
 다만 `trigger_type`이 `LEDGER_SAVE`이고 상태가 `ANCHOR_READY`인 실행은 선점 대상에서 제외한다.
-이 호환 실행은 카드 전용이므로 lease가 만료돼도 다시 집어가지 않는다. AUTO_CHANGE는 전체 흐름을 실행한다. 사용자가
+저장이 자동으로 하는 일은 앵커 카드까지이므로 lease가 만료돼도 다시 집어가지 않는다. 사용자가
 판정을 요청해 `trigger_type`이 옮겨지면 lease가 없는 계획된 handoff로 즉시 선점 대상이 되며,
 그 첫 선점은 `attempt_count`를 늘리지 않는다. 최초
 `QUEUED`만 `RUNNING`으로 바꾸고
 재선점한 진행 상태는 보존한다. `JUDGING`을 재선점하면 최초 판정 바인딩과 후보 집합을 다시
 검증한 뒤 중개 판정 호출부터 안전하게 재실행한다. 5분짜리 lease와 시도 횟수를 기록하며,
 만료됐는데 시도 횟수가 3회 이상이면
-`FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. 실행 중 30초마다 별도 연결에서 lease를 연장하며 중단 시 만료 회수로 복구한다.
+`FAILED_TERMINAL`과 `LEASE_EXPIRED_MAX_ATTEMPTS`로 종료한다. heartbeat는 쓰지 않는다.
 
 `lease_owner`, `lease_expires_at`, `attempt_count`는 내부 실행 제어 값이므로 상태 조회 응답에 싣지
 않는다.
 
 배포용 Worker 프로세스(`backend/src/worker.py`)는 `claim_next_run`을 RDS polling으로 호출하고,
 저장된 상태를 기준으로 앵커 카드 → 후보 SQL → 후보 카드 → 중개 판정 유스케이스를 같은 lease
-아래에서 진행한다. legacy LEDGER_SAVE 실행만 앵커 카드를 저장한 뒤 같은 lease 안에서 더 진행하지 않고
+아래에서 진행한다. 자동 접수된 실행은 앵커 카드를 저장한 뒤 같은 lease 안에서 더 진행하지 않고
 `ANCHOR_READY`에 남기며 그 자리에서 lease를 비운다. 이 주차는 `trigger_type`을 조건에 넣은
 갱신이라 사용자 판정 요청과 같은 행에서 직렬화된다. Worker가 실행을 읽은 뒤 주차하기 전에
 요청이 들어왔으면 주차하지 않고 후보 조회로 이어 간다. 빈 큐에서는 2초 timeout으로 stop event를 기다려 busy loop를 만들지 않는다.
-일시 Provider 오류는 상태를 보존하고 next_attempt_at의 backoff 이후 다음 선점이 재시도하며, 영구 계약·
+일시 Provider 오류는 상태를 보존하고 lease를 즉시 만료시켜 다음 선점이 재시도하며, 영구 계약·
 설정 오류는 `FAILED_TERMINAL`, 입력 변경은 `SUPERSEDED`로 기록한다. raw 예외와 Provider 원문은
 failure 컬럼에 저장하지 않는다.
 
-Worker 실행 여부는 최신 ADR-0034의 프로세스/배포 구성으로 제어한다. `WORKER_ENABLED` 입력은 제거됐다.
-현재 프로세스는 DB·LLM 설정과 합성 opt-in을 검증하고 실행한다. 전역 F3 DB advisory 슬롯은 여러 host의
-동시 실행을 1건으로 제한하며 사용자 요청 priority 100이 자동 작업 0보다 우선한다.
-
+`WORKER_ENABLED=false`는 기존처럼 readiness만 제공하고 실행을 claim하지 않는다. `true`는 DB와
+LLM Provider 설정을 기동 전에 검증한 뒤 polling을 시작한다. 코드가 Provider·모델 기본값을 정하지
+않고 사무소별 `ai_model_config`의 capability별 최신 활성 설정을 사용한다. 실제 배포 설정 기본값은
+계속 `false`이며 운영 Provider 선택과 활성화는 별도 운영 결정이다. 구현됨·미구현의 정본은
+[온라인 실행 아키텍처](../../../../../docs/architecture/f3/online-runtime.md)의 현재 구현 절이고,
+배포 계약은 [백엔드 ADR-0003](../../../backend/references/decisions/ADR-0003-dev-deployment-contract.md)이다.
 
 `anchor_type`과 `anchor_id`는 `target_listing_id`와 `target_requirement_id` 중 **정확히 하나**가 있을
 때만 도출한다. 둘 다 없거나 둘 다 있는 실행은 존재하지 않는 앵커를 정상 응답으로 내보내지 않고

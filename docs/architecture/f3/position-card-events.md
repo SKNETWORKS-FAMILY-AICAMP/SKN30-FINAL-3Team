@@ -60,7 +60,7 @@ revision과 산출물의 기록값이 다르면 보수적으로 STALE을 반환�
 ## 카드 작업과 저장 모델
 
 기존 `negotiation_position_analysis/price/evidence`를 재사용하고 본문을 새 테이블에 복제하지 않는다.
-추가 후보는 `match_change_outbox`, 입력 revision, 대상별 현재 카드·생성 job 참조 및 최신성 메타데이터다.
+추가 후보는 `f3_change_outbox`, 입력 revision, 대상별 현재 카드·생성 job 참조 및 최신성 메타데이터다.
 작업 실행은 기존 `agent_run` 기반을 활용하되 `run_type`/명시적 실행 범위로 **카드만 실행**과 **판정 실행**을 구분한다.
 현재 `trigger_type`은 저장 출처이면서 실행 범위이므로 독립 카드 요청을 일반 USER_REQUEST로 넣으면 판정까지 진행할 위험이 있다.
 기존 주차 실행의 handoff 호환성을 유지하고 명시적 실행 범위로 옮긴다. 자동 판정 경로에는 FULL_JUDGMENT 범위를, 카드만 보는 보조 경로에는 CARD_ONLY 범위를 제안한다.

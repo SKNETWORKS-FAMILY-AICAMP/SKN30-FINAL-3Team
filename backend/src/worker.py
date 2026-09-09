@@ -14,9 +14,7 @@ import os
 import signal
 import socket
 import threading
-import time
 from collections.abc import Callable, Mapping
-from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from uuid import uuid4
 
@@ -36,7 +34,6 @@ from domain.agent_execution.models import (
     AgentRun,
 )
 from domain.engine import create_database_engine
-from f3_worker_reliability import execution_slot, maintain_automation, renew_lease
 
 logger = structlog.get_logger()
 IDLE_WAIT_SECONDS = 2.0
@@ -106,37 +103,18 @@ def run_worker_loop(
     handle: Callable[[Session, AgentRun], None],
     worker_id: str,
     idle_wait_seconds: float = IDLE_WAIT_SECONDS,
-    maintenance: Callable[[Session, bool], object] | None = None,
-    claim_slot: Callable[[], AbstractContextManager[bool]] | None = None,
 ) -> int:
     """RDS polling으로 실행을 선점한다. 빈 큐에서는 stop event를 timeout과 함께 기다린다."""
     handled = 0
-    last_sweep = 0.0
     with session_factory() as session:
         while not stop_event.is_set():
-            if maintenance is not None:
-                sweep = time.monotonic() - last_sweep >= 60
-                maintenance(session, sweep)
-                if sweep:
-                    last_sweep = time.monotonic()
-            with claim_slot() if claim_slot is not None else nullcontext(True) as allowed:
-                if not allowed:
-                    stop_event.wait(idle_wait_seconds)
-                    continue
-                claimed = service.claim_next_run(session, worker_id)
-                if claimed is None:
-                    stop_event.wait(idle_wait_seconds)
-                    continue
-                handle(session, claimed)
-                handled += 1
-
+            claimed = service.claim_next_run(session, worker_id)
+            if claimed is None:
+                stop_event.wait(idle_wait_seconds)
+                continue
+            handle(session, claimed)
+            handled += 1
     return handled
-
-
-def _handle_with_renewal(session, run, worker_id, runtime, loop, stop_event, engine) -> None:
-    with renew_lease(engine, run, worker_id):
-        outcome = process_run(session, run, worker_id, runtime, loop, stop_event.is_set)
-    logger.info("f3_run_settled", run_id=run.id, outcome=outcome.value)
 
 
 def run_enabled_worker(
@@ -163,23 +141,23 @@ def run_enabled_worker(
     logger.info("worker_ready", enabled=True, worker_id=worker_id)
 
     try:
-        with maintain_automation(
-            engine,
-            stop_event,
-            enabled=config.f3.auto_judgment_enabled,
-            debounce_seconds=config.f3.auto_debounce_seconds,
-            batch_size=config.f3.auto_batch_size,
-        ):
-            run_worker_loop(
-                stop_event=stop_event,
-                session_factory=lambda: Session(engine),
-                handle=lambda session, run: _handle_with_renewal(
-                    session, run, worker_id, runtime, loop, stop_event, engine
-                ),
-                worker_id=worker_id,
-                claim_slot=lambda: execution_slot(engine),
-            )
-
+        run_worker_loop(
+            stop_event=stop_event,
+            session_factory=lambda: Session(engine),
+            handle=lambda session, run: logger.info(
+                "f3_run_settled",
+                run_id=run.id,
+                outcome=process_run(
+                    session,
+                    run,
+                    worker_id,
+                    runtime,
+                    loop,
+                    stop_event.is_set,
+                ).value,
+            ),
+            worker_id=worker_id,
+        )
     finally:
         loop.run_until_complete(runtime.close())
         loop.close()

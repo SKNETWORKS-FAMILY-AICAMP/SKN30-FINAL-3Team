@@ -1,5 +1,5 @@
 version: 1
-updated: "2026-09-09"
+updated: "2026-09-08"
 
 # 상세 요구사항은 분할 Markdown 정본에만 둔다.
 # 구현 또는 테스트가 생긴 PR에서 요구사항 ID별 경로를 추가한다.
@@ -24,12 +24,12 @@ requirements:
       - backend/tests/integration/test_candidate_cards.py
       - frontend/tests/f3-mock.test.ts
   - id: F3-CR-03
-    summary: 손님 상세 GET 결과 보기와 명시적 최신 분석 접수 분리
+    summary: 손님 상세의 [교차 판정] 버튼으로 실행
     implementation:
       - frontend/src/AppShell.jsx
       - frontend/src/features/BuyerDetailWorkspace.jsx
   - id: F3-CR-04
-    summary: 매물 상세 GET 결과 보기와 명시적 최신 분석 접수 분리
+    summary: 세대 상세의 [교차 판정] 버튼으로 실행
     implementation:
       - frontend/src/AppShell.jsx
       - frontend/src/features/DetailWorkspace.jsx
@@ -187,48 +187,3 @@ requirements:
     implementation:
       - frontend/src/features/calendar/CalendarView.tsx
       - frontend/src/features/calendar/CalendarEventModal.tsx
-  - id: F3-JL-01
-    summary: 교차 판정 독립 목록과 필터
-    implementation:
-      - backend/src/domain/agent_execution/judgment_queries.py
-      - frontend/src/features/f3/judgments/JudgmentResultsPage.tsx
-    tests:
-      - backend/tests/api/test_f3_judgments.py
-      - frontend/tests/f3-panel.browser.test.mjs
-  - id: F3-JL-02
-    summary: 저장 결과·대상 조회와 안전한 카드·근거
-    implementation:
-      - backend/src/api/f3_judgments.py
-      - backend/src/domain/agent_execution/judgment_content.py
-    tests:
-      - backend/tests/api/test_f3_judgments.py
-  - id: F3-JL-03
-    summary: 원자 이벤트와 조건부 자동 판정
-    implementation:
-      - docs/db/migrate/020_CREATE_F3_AUTOMATION.sql
-      - backend/src/domain/agent_execution/automation.py
-    tests:
-      - backend/tests/integration/test_f3_automation.py
-  - id: F3-JL-04
-    summary: 완료 재사용·최신성·Worker 복구
-    implementation:
-      - backend/src/domain/agent_execution/freshness.py
-      - backend/src/f3_worker_reliability.py
-    tests:
-      - backend/tests/integration/test_f3_automation.py
-      - backend/tests/unit/test_f3_worker_reliability.py
-  - id: F3-JL-05
-    summary: 장부 이동 복원·기존 상담과 피드백
-    implementation:
-      - frontend/src/features/f3/judgments/CandidateDetail.tsx
-      - frontend/src/features/f3/judgments/useLedgerNavigation.ts
-    tests:
-      - frontend/tests/f3-panel.browser.test.mjs
-  - id: F3-JL-06
-    summary: 조회 무실행·미판정·권한·오류 처리
-    implementation:
-      - frontend/src/features/f3/judgments/useJudgmentTarget.ts
-      - backend/src/domain/agent_execution/judgment_queries.py
-    tests:
-      - frontend/tests/f3-judgment-results.test.ts
-      - backend/tests/api/test_f3_judgments.py

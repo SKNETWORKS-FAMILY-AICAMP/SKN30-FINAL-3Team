@@ -614,69 +614,11 @@ def list_client_interactions(
     requirement_id: int | None,
     party_id: int | None,
     page: Page,
-    *,
-    interaction_id: int | None = None,
 ) -> tuple[list[ClientInteraction], int]:
-    # Historical links survive soft deletion. Recheck every attached parent before
-    # returning consultation text, including the exact-ID evidence navigation path.
-    live_unit = (
-        select(col(PropertyUnit.id))
-        .join(PropertyComplex, col(PropertyComplex.id) == PropertyUnit.complex_id)
-        .where(
-            col(PropertyUnit.brokerage_id) == brokerage_id,
-            col(PropertyComplex.brokerage_id) == brokerage_id,
-            col(PropertyUnit.id) == ClientInteraction.unit_id,
-            col(PropertyUnit.is_deleted).is_(False),
-            col(PropertyComplex.is_deleted).is_(False),
-        )
-        .exists()
-    )
-    live_listing = (
-        select(col(PropertyListing.id))
-        .join(PropertyUnit, col(PropertyUnit.id) == PropertyListing.unit_id)
-        .join(PropertyComplex, col(PropertyComplex.id) == PropertyUnit.complex_id)
-        .where(
-            col(PropertyListing.brokerage_id) == brokerage_id,
-            col(PropertyUnit.brokerage_id) == brokerage_id,
-            col(PropertyComplex.brokerage_id) == brokerage_id,
-            col(PropertyListing.id) == ClientInteraction.listing_id,
-            col(PropertyListing.is_deleted).is_(False),
-            col(PropertyUnit.is_deleted).is_(False),
-            col(PropertyComplex.is_deleted).is_(False),
-        )
-        .exists()
-    )
-    live_requirement = (
-        select(col(PropertyRequirement.id))
-        .join(Party, col(Party.id) == PropertyRequirement.party_id)
-        .where(
-            col(PropertyRequirement.brokerage_id) == brokerage_id,
-            col(Party.brokerage_id) == brokerage_id,
-            col(PropertyRequirement.id) == ClientInteraction.requirement_id,
-            col(PropertyRequirement.is_deleted).is_(False),
-            col(Party.is_deleted).is_(False),
-        )
-        .exists()
-    )
-    live_party = (
-        select(col(Party.id))
-        .where(
-            col(Party.brokerage_id) == brokerage_id,
-            col(Party.id) == ClientInteraction.party_id,
-            col(Party.is_deleted).is_(False),
-        )
-        .exists()
-    )
     conditions: list[ColumnElement[bool]] = [
         col(ClientInteraction.brokerage_id) == brokerage_id,
         col(ClientInteraction.is_voided).is_(False),
-        or_(col(ClientInteraction.unit_id).is_(None), live_unit),
-        or_(col(ClientInteraction.listing_id).is_(None), live_listing),
-        or_(col(ClientInteraction.requirement_id).is_(None), live_requirement),
-        or_(col(ClientInteraction.party_id).is_(None), live_party),
     ]
-    if interaction_id is not None:
-        conditions.append(col(ClientInteraction.id) == interaction_id)
     if unit_id is not None:
         conditions.append(col(ClientInteraction.unit_id) == unit_id)
     if requirement_id is not None:

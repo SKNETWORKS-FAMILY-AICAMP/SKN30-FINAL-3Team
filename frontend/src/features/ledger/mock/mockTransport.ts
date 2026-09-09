@@ -612,7 +612,7 @@ export const mockTransport: LedgerTransport = {
         status: 422,
       });
     }
-    const items = getState().interactions.filter(row => scope.interactionId == null || row.id === scope.interactionId).filter(
+    const items = getState().interactions.filter(
       (row) =>
         (scope.unitId != null && row.unit_id === scope.unitId) ||
         (scope.requirementId != null && row.requirement_id === scope.requirementId) ||

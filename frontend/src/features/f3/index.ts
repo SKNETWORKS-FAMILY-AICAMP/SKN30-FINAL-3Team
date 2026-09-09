@@ -19,9 +19,3 @@ export type { CrossMatchSectionProps, DetailRow } from "./CrossMatchSection.tsx"
  * 중개사무소 안에서만 유효하다.
  */
 export { resetCrossJudgmentCache } from "./hooks/useCrossJudgment.ts";
-
-export { JudgmentResultsPage } from "./judgments/JudgmentResultsPage.tsx";
-export { readJudgmentLocation, writeJudgmentLocation } from "./judgments/navigation.ts";
-export type { TargetIdentity } from "./judgments/model.ts";
-export { useJudgmentLedgerNavigation } from "./judgments/useLedgerNavigation.ts";
-export { JudgmentEvidenceModal } from "./judgments/JudgmentEvidenceModal.tsx";

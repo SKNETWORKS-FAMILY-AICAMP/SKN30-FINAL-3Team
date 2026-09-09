@@ -13,7 +13,7 @@ updated: 2026-09-09
 | 역할 | 로컬 | 공유 dev | 추가 작업 |
 |---|---|---|---|
 | 장부·카드·판정·outbox 저장 | 기존 [Compose PostgreSQL 15](../../../infra/local/compose.yaml) | 기존 RDS PostgreSQL 15 | 전진 migration, revision·미처리 이벤트·작업 선점·최신 카드/판정 조회 인덱스 |
-| API | 기존 uv/FastAPI 프로세스 | 기존 EC2의 API container | [신규 조회 GET 3개·기존 POST /runs 재사용 확장](expansion-contracts.md) |
+| API | 기존 uv/FastAPI 프로세스 | 기존 EC2의 API container | 판정 결과 목록·상세 GET·갱신 POST·완료 재사용 |
 | 이벤트 소비·AI 작업 | API와 별도 Worker 프로세스 | [같은 이미지의 Worker container](../../../infra/deploy/compose.dev.yml) | outbox 소비·재시도·우선순위·누락 보정 |
 | 모델 | 단위 검증은 fake, 실제 확인은 기존 개인 OpenAI 설정 | 기존 general capability의 검증된 AWS/RunPod 선택 경로 | F3 전용 GPU 추가는 필요하지 않음. 활성 endpoint·용량은 배포 시 확인 |
 | 관측 | 구조화 로그·로컬 DB 집계 | 기존 CloudWatch 로그/metric/alarm 경로 | 대기 나이·실패·cache hit·호출수·토큰·지연 추가 |

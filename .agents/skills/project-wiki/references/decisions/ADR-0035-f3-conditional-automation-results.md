@@ -1,14 +1,16 @@
 ---
-status: 결정
+status: 대체됨
 updated: 2026-09-09
 ---
 
 # ADR-0035: F3 조건부 자동 판정과 저장 결과 조회
 
 - 승인 범위: 2026-09-09 프로젝트 요청자의 1차 기획 구현 요청. 팀 병합 검토 전이며 공유 dev 배포 승인이 아니다.
-- 출처: [구현 요청](../../../../../docs/requirements/sources/f3-expansion-implementation-2026-09-09.md)
+- 출처: [구현 요청](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/3440fbb/docs/requirements/sources/f3-expansion-implementation-2026-09-09.md)
 - 부분 대체: [ADR-0018](ADR-0018-f3-save-trigger-anchor-card-scope.md)의 저장 시 카드까지만 자동 생성하고 완료 결과를 재사용하지 않는 정책.
 - 유지: ADR-0006 모듈 경계, ADR-0014 합성 입력 경계, 최초 상위 5건 판정, 사무소 공유 결과·기존 피드백 의미.
+
+2026-09-09: 해당 기능은 사용자 지시로 폐기했으며 [ADR-0037](ADR-0037-f3-expansion-retirement.md)이 대체한다. 아래는 과거 결정 보존 기록이다.
 
 ## 배경
 
@@ -33,6 +35,6 @@ GPU 상시 운영 조건에서는 동일 가동시간의 임대료보다 준비�
 자동 flag가 꺼져 있어도 변경 이벤트는 보존되며 읽기·수동 접수는 제공한다. 저장 뒤 legacy 카드 접수를 별도로 수행하지 않는다.
 상시 GPU의 임대료가 같아도 CPU·DB·모델 경합은 남는다. 현재 단일 API의 챗 실행 1건과 전역 F3 실행 1건/후보 최대 5개가 상한이며 다중 API 전환에는 챗 동시성 제한의 공유화가 필요하다.
 
-구체적인 HTTP·상태·화면은 [확장 계약](../../../../../docs/architecture/f3/expansion-contracts.md), 검증·운영은 [구현 기록](../../../../../docs/architecture/f3/implementation-and-validation.md)에 둔다.
+구체적인 HTTP·상태·화면은 [확장 계약](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/3440fbb/docs/architecture/f3/expansion-contracts.md), 검증·운영은 [구현 기록](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/3440fbb/docs/architecture/f3/implementation-and-validation.md)에 둔다.
 
 2026-09-09 후속 명명 요청에 따라 상태 테이블은 기존 `match_evaluation`과 같은 도메인의 `match_source_revision`, `match_change_outbox`, `match_target_state`로 명명한다. 적용 이력과 데이터는 [021 전진 migration](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/blob/e785db47492b1680d7cbf0c76bfe3eca45c5c73b/docs/db/migrate/021_ALTER_MATCH_AUTOMATION_NAMES.sql)으로 보존한다.

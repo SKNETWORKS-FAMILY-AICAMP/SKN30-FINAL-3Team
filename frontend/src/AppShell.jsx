@@ -17,7 +17,7 @@ import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
 import { BuyerLedgerGrid } from "./features/BuyerLedgerGrid.jsx";
 import DetailWorkspace from "./features/DetailWorkspace.jsx";
 import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
-import { CrossMatchSection, JudgmentEvidenceModal, JudgmentResultsPage, readJudgmentLocation, writeJudgmentLocation, useJudgmentLedgerNavigation, resetCrossJudgmentCache } from "./features/f3/index.ts";
+import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { HomeScreen } from "./features/HomeScreen.tsx";
 import { TimeKeeperNotification } from "./features/timeKeeper/index.ts";
@@ -148,7 +148,7 @@ export function AppShell() {
     }
   }, [propertyLoadError, buyerLoadError, markSessionExpired]);
 
-  const [activeNav, setActiveNav] = useState(() => readJudgmentLocation(window.location.search).active ? "교차 판정" : "홈");
+  const [activeNav, setActiveNav] = useState("홈");
   const [searchQuery, setSearchQuery] = useState("");
   const [complexFilter, setComplexFilter] = useState("전체");
   const [saveFilter, setSaveFilter] = useState("전체");
@@ -199,7 +199,13 @@ export function AppShell() {
   /* 신규 접수는 열려 있는 상세가 없는 빈 행에서 시작한다. 참조가 흔들리면 팝업이 매번 초기화된다. */
   const intakeDraft = useMemo(() => ({}), []);
 
-  // 대상 변경 시 기존 상세 펼침만 접는다. 요약과 결과 조회는 GET이며 실행 접수와 분리한다.
+  /*
+   * 상세를 열어도 교차 판정을 시작하지 않는다.
+   *
+   * 패널이 열리는 순간 실행이 접수되므로(useCrossJudgment의 enabled), 상세 진입만으로
+   * 판정 실행이 만들어졌다. 실행 시점은 사용자가 [교차 판정]으로 정한다(F3-CR-03·04).
+   * 다른 행으로 옮기면 이전 행의 패널을 닫는다.
+   */
   useEffect(() => {
     setCrossMatchOpen(false);
   }, [detailRow?.id]);
@@ -493,7 +499,7 @@ export function AppShell() {
   };
 
   const navTo = (item) => {
-    if (item !== "홈" && item !== "매물장" && item !== "구입장" && item !== "교차 판정" && item !== "배치 캠페인") {
+    if (item !== "홈" && item !== "매물장" && item !== "구입장" && item !== "배치 캠페인") {
       alert(`${item}: 대표 F1 업무 흐름 검증이 끝난 뒤 같은 디자인 언어로 확장하는 화면입니다.`);
       return;
     }
@@ -502,7 +508,6 @@ export function AppShell() {
       setSelectedRows([]);
       setSelectionResetToken((current) => current + 1);
     }
-    writeJudgmentLocation(null, item === "교차 판정");
     setActiveNav(item);
   };
 
@@ -575,7 +580,15 @@ export function AppShell() {
     const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
     // Keep the detail draft stable until this save settles; changing its prop can reset saving state.
     ledger.patchRow(savedRow.id, () => savedRow);
-    // 저장은 결과 화면을 열지 않는다. Backend 변경 이벤트가 조건부 자동 판정을 담당한다.
+    /*
+     * 저장은 패널을 열지 않는다.
+     *
+     * 서버 쪽 저장 트리거는 그대로다(F3-CR-01·02). 다만 패널이 열리는 순간 화면도 실행을
+     * 확보하므로(useCrossJudgment의 enabled), 저장할 때마다 패널을 열면 결과를 볼 생각이
+     * 없는 저장에서도 판정이 돌고 사용자가 요청하지 않은 화면 전환이 일어난다.
+     * 결과를 볼 시점은 상세의 [교차 판정] 섹션에서 사용자가 정한다(F3-CR-03·04).
+     * 그때 보내는 실행 요청은 저장이 접수한, 같은 입력 버전의 활성 실행을 재사용한다.
+     */
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
     return ledger.saveRow(savedRow).then(
       (persisted) => {
@@ -590,27 +603,39 @@ export function AppShell() {
       },
     );
   };
-  const f3LedgerNavigation = useJudgmentLedgerNavigation(chatbotUserKey, setDetailRow, markSessionExpired,
-    (title) => setToast({ variant: "warning", title }));
+  const handleEvidenceOpen = () => {
+    const targetId = isBuyerDetail ? "buyer-content" : "detail-log";
+    const target = document.getElementById(targetId);
+    scrollIntoViewRespectingMotion(target, { block: "center" });
+    window.requestAnimationFrame(() => target?.focus());
+  };
   const openCrossMatch = () => {
     setCrossMatchOpen(true);
     setCrossMatchFocusRequest((current) => current + 1);
   };
 
-  /* 저장된 앵커 요약과 결과 조회는 타입 검사를 받는 feature가 소유한다. */
+  /* 앵커 도출과 실행 확보는 타입 검사를 받는 `CrossMatchSection`이 소유한다. */
   const crossMatchPanel = <CrossMatchSection
     isOpen={crossMatchOpen}
     focusRequest={crossMatchFocusRequest}
     onClose={() => setCrossMatchOpen(false)}
     row={detailRow}
-    onSessionExpired={markSessionExpired}
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
-
+    /* 후보 표시 이름은 판정 응답에 없다. 이미 불러온 반대편 장부에서 찾는다. */
+    propertyRows={propertyLedger.state.rows}
+    buyerRows={buyerLedger.state.rows}
+    onComposeMessage={openMessageComposer}
+    onOpenEvidence={handleEvidenceOpen}
+    onLater={() => { closeDetail(); setToast({ variant: "success", title: "F1 보류·후속 처리 목록에 추가했습니다." }); }}
+    onFeedbackResult={({ ok, cause }) => setToast(ok
+      ? { variant: "success", title: "관심없음 피드백을 기록했습니다." }
+      : { variant: "danger", title: describeForUser(cause) })}
+    onSchedule={({ candidate }) => setScheduleSuggestion({ candidate, anchorRow: detailRow })}
   />;
 
   return <div className="app-shell app-shell--compact-ledger">
     <main className={`work-area${
-      isHome || activeNav === "교차 판정"
+      isHome
         ? " work-area--home"
         : isCampaign
           ? " work-area--campaign"
@@ -621,12 +646,12 @@ export function AppShell() {
       <header className="f1-topbar">
         <div className="f1-product-title"><strong>집크크</strong><span>beta</span></div>
         {/* 홈은 본문에 보이는 h1이 있다. 여기서 또 h1을 두면 화면 제목이 둘이 된다. */}
-        {!isHome && activeNav !== "교차 판정" && <h1 className="pf-v6-screen-reader">{isCampaign ? "배치 캠페인" : activeNav}</h1>}
+        {!isHome && <h1 className="pf-v6-screen-reader">{isCampaign ? "배치 캠페인" : activeNav}</h1>}
         <nav className="f1-ledger-switch" aria-label="주요 화면">
-          {["홈", "매물장", "구입장", "교차 판정"].map((item) => <button key={item} type="button" aria-current={activeNav === item ? "page" : undefined} className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}
+          {["홈", "매물장", "구입장"].map((item) => <button key={item} type="button" aria-current={activeNav === item ? "page" : undefined} className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}
         </nav>
         {/* 동·호 조회와 통합 검색은 장부 위에서만 뜻이 있다. 홈에서는 걸 곳이 없어 감춘다. */}
-        {!isHome && activeNav !== "교차 판정" && <>
+        {!isHome && <>
           <div className="jump-control f1-topbar__jump"><input value={jumpQuery} onChange={(event) => setJumpQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && jumpQuery.trim()) handleJump(); }} placeholder="동·호 조회 예) 101 203" aria-label="동·호 조회" /><Button variant="secondary" onClick={handleJump} isDisabled={!jumpQuery.trim()}>조회</Button></div>
           <div className="masthead-search"><SearchIcon aria-hidden="true" /><input type="text" aria-label="통합 검색" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="통합 검색 (성명·전화번호·로그)" /></div>
         </>}
@@ -651,7 +676,7 @@ export function AppShell() {
                 variant="secondary"
                 size="sm"
                 isDisabled={authSubmitting}
-                onClick={() => { resetCrossJudgmentCache(); writeJudgmentLocation(null, false); void signOut(); }}
+                onClick={() => { resetCrossJudgmentCache(); void signOut(); }}
                 style={{ marginLeft: "8px" }}
               >
                 로그아웃
@@ -661,11 +686,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <JudgmentResultsPage key={`f3-${chatbotUserKey}`} active={activeNav === "교차 판정"}
-        suspended={Boolean(detailRow) || Boolean(f3LedgerNavigation.evidence)} userId={user?.id}
-        assignees={user ? [{ id: user.id, displayName: user.displayName }] : []} complexes={complexOptions}
-        onOpenLedger={f3LedgerNavigation.open} onSessionExpired={markSessionExpired} />
-      {activeNav === "교차 판정" ? null : isHome ? (
+      {isHome ? (
         <HomeScreen
           onVoiceIntake={() => setIntakeOpen(true)}
           onOpenPropertyLedger={() => navTo("매물장")}
@@ -874,7 +895,6 @@ export function AppShell() {
       <ModalFooter><Button variant="primary" onClick={() => { setScheduleSuggestion(null); setToast({ variant: "success", title: "F3 제안을 승인해 F1 일정으로 저장했습니다." }); }}>일정 저장</Button><Button variant="link" onClick={() => setScheduleSuggestion(null)}>취소</Button></ModalFooter>
     </Modal>
     {effectiveViewState === "loading" && <div className="global-progress" aria-label="그리드 데이터 불러오는 중"><Spinner size="md" /></div>}
-    <JudgmentEvidenceModal evidence={f3LedgerNavigation.evidence} onClose={f3LedgerNavigation.closeEvidence} onSessionExpired={markSessionExpired} />
     {user && <Chatbot key={chatbotUserKey} userKey={chatbotUserKey} onAction={handleChatbotAction} onSessionExpired={markSessionExpired} suspended={Boolean(detailRow) || intakeOpen || calendarOpen} />}
     {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
   </div>;

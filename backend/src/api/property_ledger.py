@@ -33,6 +33,7 @@ from api.schemas.property_ledger import (
     UnitPartyRelationResponse,
 )
 from core.errors import ValidationError
+from domain.agent_execution import triggers
 from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser
 from domain.property_ledger import repository, service
@@ -290,6 +291,7 @@ def create_property_listing(
     listing_id = service.create_property_listing(
         db, user.brokerage_id, unit_id, changed_fields(payload)
     )
+    triggers.after_listing_saved(db, user.brokerage_id, user.id, listing_id)
     listing = repository.find_property_listing(db, user.brokerage_id, listing_id)
     assert listing is not None
     return PropertyListingResponse.from_domain(listing)
@@ -303,7 +305,10 @@ def update_property_listing(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyListingResponse:
-    service.update_property_listing(db, user.brokerage_id, listing_id, changed_fields(payload))
+    changed = service.update_property_listing(
+        db, user.brokerage_id, listing_id, changed_fields(payload)
+    )
+    triggers.after_listing_saved(db, user.brokerage_id, user.id, listing_id, changed)
     listing = repository.find_property_listing(db, user.brokerage_id, listing_id)
     assert listing is not None
     return PropertyListingResponse.from_domain(listing)
@@ -388,6 +393,7 @@ def create_property_requirement(
     requirement_id = service.create_property_requirement(
         db, user.brokerage_id, user.id, changed_fields(payload)
     )
+    triggers.after_requirement_saved(db, user.brokerage_id, user.id, requirement_id)
     return get_property_requirement(requirement_id, user, db)
 
 
@@ -402,9 +408,10 @@ def update_property_requirement(
     db: Session = Depends(get_db_session),
     _: None = Depends(require_csrf),
 ) -> PropertyRequirementDetailResponse:
-    service.update_property_requirement(
+    changed = service.update_property_requirement(
         db, user.brokerage_id, requirement_id, changed_fields(payload)
     )
+    triggers.after_requirement_saved(db, user.brokerage_id, user.id, requirement_id, changed)
     return get_property_requirement(requirement_id, user, db)
 
 
@@ -426,7 +433,6 @@ def list_client_interactions(
     unit_id: int | None = None,
     requirement_id: int | None = None,
     party_id: int | None = None,
-    interaction_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=100, ge=1, le=MAX_PAGE_SIZE),
     offset: int = Query(default=0, ge=0),
 ) -> ClientInteractionListResponse:
@@ -435,13 +441,7 @@ def list_client_interactions(
 
     page = build_page(limit, offset)
     rows, total = repository.list_client_interactions(
-        db,
-        user.brokerage_id,
-        unit_id,
-        requirement_id,
-        party_id,
-        page,
-        interaction_id=interaction_id,
+        db, user.brokerage_id, unit_id, requirement_id, party_id, page
     )
     return ClientInteractionListResponse(
         items=[ClientInteractionResponse.from_domain(row) for row in rows],

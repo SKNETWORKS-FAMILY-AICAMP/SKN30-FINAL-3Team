@@ -1,4 +1,4 @@
-"""F1 원자 outbox와 기존 CARD_ONLY 실행의 사용자 승격 호환성을 검증한다."""
+"""F1 저장 뒤 F3 자동 접수, 실제 변경 감지와 장애 격리를 검증한다."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from core.config import Config
-from domain.agent_execution import freshness, service, triggers
-from domain.agent_execution.models import AnchorType
+from domain.agent_execution import service, triggers
 from domain.agent_execution.triggers import (
     LISTING_TRIGGER_FIELDS,
     REQUIREMENT_TRIGGER_FIELDS,
@@ -76,39 +75,29 @@ def test_only_actual_judgment_fields_trigger_follow_up() -> None:
 
 
 @requires_database
-def test_new_listing_and_requirement_record_outbox_without_enqueuing_runs(config: Config) -> None:
+def test_new_listing_and_requirement_queue_ledger_save_runs(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, user_id):
         complex_id = create_complex(client, session, brokerage_id, "자동접수단지")
         listing = create_listing(client, complex_id)
         party_id = create_party(session, brokerage_id, user_id, "자동접수 손님")
         requirement = create_requirement(client, party_id)
 
-        assert listing["id"] and requirement["id"]
-        assert stored_runs(session, brokerage_id) == []
-        event = (
-            session.execute(
-                text(
-                    "SELECT revision,source_table FROM match_change_outbox "
-                    "WHERE brokerage_id=:tenant"
-                ),
-                {"tenant": brokerage_id},
-            )
-            .mappings()
-            .one()
-        )
-        assert event["revision"] == freshness.current_revision(session, brokerage_id)
-        assert event["source_table"] == "property_requirement"
+        runs = stored_runs(session, brokerage_id)
+        assert len(runs) == 2
+        assert runs[0]["target_listing_id"] == listing["id"]
+        assert runs[1]["target_requirement_id"] == requirement["id"]
+        assert {run["trigger_type"] for run in runs} == {triggers.LEDGER_SAVE_TRIGGER_TYPE}
+        assert {run["requested_by"] for run in runs} == {user_id}
 
 
 @requires_database
-def test_judgment_input_changes_increment_atomic_revision(config: Config) -> None:
+def test_judgment_input_changes_queue_new_input_versions(config: Config) -> None:
     with ledger_client(config) as (client, session, brokerage_id, user_id):
         complex_id = create_complex(client, session, brokerage_id, "조건변경단지")
         listing = create_listing(client, complex_id)
         party_id = create_party(session, brokerage_id, user_id, "조건변경 손님")
         requirement = create_requirement(client, party_id)
 
-        before = freshness.current_revision(session, brokerage_id)
         listing_response = client.patch(
             f"/api/v1/property-listings/{listing['id']}",
             json={"row_version": listing["row_version"], "sale_price": 2_650_000_000},
@@ -123,8 +112,20 @@ def test_judgment_input_changes_increment_atomic_revision(config: Config) -> Non
 
         assert listing_response.status_code == 200, listing_response.text
         assert requirement_response.status_code == 200, requirement_response.text
-        assert stored_runs(session, brokerage_id) == []
-        assert freshness.current_revision(session, brokerage_id) == before + 2
+        runs = stored_runs(session, brokerage_id)
+        listing_versions = [
+            run["input_data_version"] for run in runs if run["target_listing_id"] == listing["id"]
+        ]
+        requirement_versions = [
+            run["input_data_version"]
+            for run in runs
+            if run["target_requirement_id"] == requirement["id"]
+        ]
+        assert listing_versions == [listing["row_version"], listing["row_version"] + 1]
+        assert requirement_versions == [
+            requirement["row_version"],
+            requirement["row_version"] + 1,
+        ]
 
 
 @requires_database
@@ -228,14 +229,6 @@ def test_screen_request_promotes_queued_run_created_by_save(config: Config) -> N
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "재사용단지")
         listing = create_listing(client, complex_id)
-        service.queue_cross_judgment_run(
-            session,
-            brokerage_id,
-            _user_id,
-            AnchorType.LISTING,
-            listing["id"],
-            trigger_type="LEDGER_SAVE",
-        )
         automatic = stored_runs(session, brokerage_id)[0]
 
         response = client.post(
@@ -258,14 +251,6 @@ def test_screen_request_promotes_running_run_without_replacing_its_lease(config:
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "진행중이어받기단지")
         listing = create_listing(client, complex_id)
-        service.queue_cross_judgment_run(
-            session,
-            brokerage_id,
-            _user_id,
-            AnchorType.LISTING,
-            listing["id"],
-            trigger_type="LEDGER_SAVE",
-        )
         automatic = stored_runs(session, brokerage_id)[0]
         session.execute(
             text(
@@ -301,14 +286,6 @@ def test_user_request_resumes_the_run_parked_after_the_anchor_card(config: Confi
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "이어받기단지")
         listing = create_listing(client, complex_id)
-        service.queue_cross_judgment_run(
-            session,
-            brokerage_id,
-            _user_id,
-            AnchorType.LISTING,
-            listing["id"],
-            trigger_type="LEDGER_SAVE",
-        )
         automatic = stored_runs(session, brokerage_id)[0]
         assert automatic["trigger_type"] == "LEDGER_SAVE"
 
@@ -342,11 +319,11 @@ def test_user_request_resumes_the_run_parked_after_the_anchor_card(config: Confi
 
 
 @requires_database
-def test_save_does_not_call_the_postcommit_intake(
+def test_failed_intake_does_not_rollback_ledger_create_or_update(
     config: Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def fail_intake(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("F1 must only record its transactional outbox")
+        raise RuntimeError("intake unavailable")
 
     monkeypatch.setattr(triggers.service, "queue_cross_judgment_run", fail_intake)
     with ledger_client(config) as (client, session, brokerage_id, _user_id):

@@ -277,7 +277,6 @@ def test_manage_prints_seed_identity_as_json(
             "--confirm-reset",
             "--model-profile",
             "local-openai",
-            "--ledger-only",
         ],
     )
 
@@ -290,52 +289,3 @@ def test_manage_prints_seed_identity_as_json(
         "login_id": "f3_synthetic_dev",
         "verification_checks": EXPECTED_VERIFICATION_CHECKS,
     }
-
-
-@pytest.mark.parametrize("fails", [False, True])
-def test_default_seed_requires_matching_results_success(make_config, monkeypatch, capsys, fails):
-    import synthetic_match_seed
-
-    config = local_config(make_config, "postgresql+psycopg://app:test@localhost:5432/brokerage")
-    monkeypatch.setattr(manage, "get_config", lambda: config)
-    monkeypatch.setattr(
-        manage,
-        "seed_f3_synthetic",
-        lambda *a, **k: SyntheticSeedResult(
-            brokerage_id=7, user_id=11, login_id="f3_synthetic_dev", verification_checks=30
-        ),
-    )
-
-    class Engine:
-        disposed = False
-
-        def dispose(self):
-            self.disposed = True
-
-    engine = Engine()
-    monkeypatch.setattr(manage, "create_database_engine", lambda _: engine)
-
-    def complete(actual_engine, profile):
-        assert actual_engine is engine and profile == "local-openai"
-        if fails:
-            raise RuntimeError("sensitive-driver-text")
-        return {"completed_results": 81, "model_inference": False}
-
-    monkeypatch.setattr(synthetic_match_seed, "complete_match_seed", complete)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["manage.py", "seed-f3-synthetic", "--confirm-reset", "--model-profile", "local-openai"],
-    )
-    if fails:
-        with pytest.raises(SystemExit, match="matching examples failed") as error:
-            manage.main()
-        assert "sensitive-driver-text" not in str(error.value)
-        assert capsys.readouterr().out == ""
-    else:
-        manage.main()
-        assert json.loads(capsys.readouterr().out)["matching_results"] == {
-            "completed_results": 81,
-            "model_inference": False,
-        }
-    assert engine.disposed

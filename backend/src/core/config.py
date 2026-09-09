@@ -116,9 +116,6 @@ class F2Config(BaseModel):
 
 class F3Config(BaseModel):
     allow_synthetic_prototype: bool = False
-    auto_judgment_enabled: bool = False
-    auto_debounce_seconds: int = Field(default=3, ge=0, le=60)
-    auto_batch_size: int = Field(default=20, ge=1, le=100)
 
 
 class ChatbotConfig(BaseModel):
@@ -277,9 +274,6 @@ def bind_config(source: Mapping[str, str]) -> Config:
         ),
         f3=F3Config(
             allow_synthetic_prototype=_boolean(source, "F3_ALLOW_SYNTHETIC_PROTOTYPE", False),
-            auto_judgment_enabled=_boolean(source, "F3_AUTO_JUDGMENT_ENABLED", False),
-            auto_debounce_seconds=_integer(source, "F3_AUTO_DEBOUNCE_SECONDS", 3),
-            auto_batch_size=_integer(source, "F3_AUTO_BATCH_SIZE", 20),
         ),
         chatbot=ChatbotConfig(
             enabled=_boolean(source, "CHATBOT_ENABLED", False),

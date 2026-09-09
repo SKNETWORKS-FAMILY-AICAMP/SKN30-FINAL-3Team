@@ -13,7 +13,6 @@ updated: 2026-09-08
 | [API 공통 계약](api-common.md) | 모든 HTTP API 변경: 기본 규칙, 모델 경계 후보, 인증·세션·CSRF, 오류 코드 |
 | [F1 장부](api-f1.md) | 세대·매물·구입장·상담 로그 경로와 저장·조회 규칙을 변경할 때 |
 | [F2 음성 분석](api-f2.md) | 음성 분석 요청·제안 응답·동시 제한·offline 처리를 변경할 때 |
-| [F3 저장 결과 조회](api-f3-judgments.md) | 교차 판정 목록·대상·결과 GET과 현재성·공개 범위를 변경할 때 |
 | [F3 실행](api-f3.md) | 실행 접수·상태·결과·피드백·F1 저장 트리거·Worker lease를 변경할 때 |
 | [F4 Time Keeper](api-f4-timekeeper.md) | 통합 일정 조회 조건·종류·D-day 계산·응답을 변경할 때 |
 | [F4 캘린더](api-f4-calendar.md) | 직접 만든 일정의 CRUD·낙관적 잠금·통합 조회 관계를 변경할 때 |

@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-09
+updated: 2026-09-08
 ---
 
 # 화면 문서 인덱스
@@ -9,7 +9,6 @@ updated: 2026-09-09
 
 | 문서 | 읽는 조건 |
 |---|---|
-| [F3 교차 판정 결과 화면](f3-judgment-results.md) | 신규 공통 메뉴·양쪽 장부 상세·결과 Drawer·미판정/최신성·복원을 기획할 때. Screen ID 미부여·제안 상태 |
 | [업무 챗봇 화면 검토안](chatbot.md) | 플로팅 버튼·추천 질문·조회 결과·진행·멀티턴 안내·기존 F2 화면 연결을 검토할 때. Screen ID 미부여·제안 상태 |
 | [Screen Matrix](SCREEN_MATRIX_F1_F2_F3.md) | Screen ID, 화면 소유, 주요 상태, 요구사항 연결 또는 화면 이동을 확인할 때 |
 | [화면구조 분석](화면구조_분석_F1_F2_F3.md) | IA, Page·Panel·Modal 경계, 화면 구성 또는 기능 간 결합 관계를 확인할 때 |
