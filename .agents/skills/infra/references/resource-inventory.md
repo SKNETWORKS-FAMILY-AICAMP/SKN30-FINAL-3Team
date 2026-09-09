@@ -8,7 +8,8 @@ updated: 2026-09-09
 이 문서는 **적용 여부의 정본**이다. 실시간 전원·endpoint·Secret 상태는 `just -f infra/justfile doctor`로 조회한다.
 README·아키텍처 문서에는 적용 상태를 복제하지 않는다. 선택 근거는 [결정 인덱스](decisions/index.md),
 일상 명령은 [개발자 운영](../../../../infra/operations/README.md)을 따른다.
-2026-09-09 AWS/RunPod API와 중지 입력(edge/GPU false)의 dev plan을 대조했고 No changes를 확인했다.
+2026-09-09 개선 전 AWS/RunPod API와 중지 입력(edge/GPU false)의 dev plan을 대조해 No changes를 확인했다.
+이후 환경변수·최초 전환 변경은 saved plan 준비 상태이며 dev에는 아직 적용하지 않았다.
 적용 사실과 실제 기동·추론·품질 승격은 별개다.
 
 | 영역 | 적용·구현 범위 | 남은 조건 |
@@ -21,7 +22,8 @@ README·아키텍처 문서에는 적용 상태를 복제하지 않는다. 선�
 | 전달 | 3개 dev source Pipeline·QUEUED·Verify/Build 분리·CodeDeploy 적용 | 확인 당시 통합 마지막 성공 9/2. 이후 코드의 정식 앱 배포 필요 |
 | 관측 | 전용 Alarm SNS/Lambda·Backend/AI 오류 alarm 적용 | RunPod 자체 감시 제거. 실제 알림 전달 시험과 설정 확인을 구분 |
 | 비밀/설정 | Secret 컨테이너·SSM·TTY 회전·프로세스별 주입 구현·기반 적용 | 저장·구조·인증·배포 반영은 별도 확인 |
-| RunPod | F2/general Console Template·registry·Secret 참조·SSM 등록됨 | 과거 불량 digest를 수정 이미지로 교체·등록해야 함 |
+| RunPod | F2/general Console Template·registry·Secret 참조·SSM 등록됨 | 수정 F2 image 게시 성공(run 34305829152), general 공식 FP8 artifact 확보; Console 교체·등록 필요 |
+| offline 선택 | F2 consultation-v3 / RunPod RTX A5000, general 공식 FP8 / RunPod L40S를 SSM에 저장 | endpoint는 offline; 실제 기동·DB 활성 모델 변경 없음 |
 | GPU 실행 | RunPod create/delete와 AWS GPU EC2/EBS·SG·IAM·SSM 통합 코드·기반 적용 | GPU 생성 기본값 빈 집합; 정식 배포·왕복 검증은 미완료 |
 | Bedrock | alias·Instance Role 최소 권한 기반 적용 | 이번 점검에서 실제 추론·DB 활성 모델은 미확인 |
 | 기존 F2 모델 | dev-f2-handwritten-v05-qwen3-4b-full-v1 S3 게시됨 | 미평가 dev 경로, 자동 활성화 없음 |

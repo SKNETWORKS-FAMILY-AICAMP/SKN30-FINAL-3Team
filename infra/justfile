@@ -64,6 +64,7 @@ gpu-profiles-import source:
 # 최초 새 앱 배포용: GPU 직접 검증·endpoint 준비 후 RDS·앱 호스트를 시작한다.
 [confirm("plan과 GPU 비용을 검토했으며 edge·GPU·RDS·앱 호스트를 시작합니까? GPU 직접 추론 후 최신 앱 배포가 필요합니다.")]
 dev-prepare-app:
+    just release-ready
     python3 scripts/plan_guard.py check environments/dev/dev-first-deploy.tfplan
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
     AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-first-deploy.tfplan

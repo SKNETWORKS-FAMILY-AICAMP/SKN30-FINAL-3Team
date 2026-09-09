@@ -76,7 +76,7 @@ F2 consultation-v3/RunPod RTX A5000, general 공식 FP8/RunPod L40S의 offline �
 - 원본 개인 `.env` 5개는 권한만 0600으로 변경했다. OpenAI 키와 GPU 키가 다르므로 자동 덮어쓰지 않았다.
   새 코드 반영 뒤 `env-fix`로 충돌 없는 옛 이름을 이전하고 충돌은 선택 provider에 맞게 정리한다.
 
-### 검토 대기: dev 설정 plan
+### 초기 검토: dev 설정 plan (후속 변경으로 재생성 필요)
 
 `dev-deep-stop.tfplan`은 현재 deep 중지 상태를 유지하는 옵션으로 생성·봉인했다.
 GPU·ALB·DB·앱 생성/기동은 없으며 **2 create / 1 update / 7 delete**다.
@@ -87,7 +87,8 @@ GPU·ALB·DB·앱 생성/기동은 없으며 **2 create / 1 update / 7 delete**�
 - 갱신: app runtime IAM policy. SSM ARN 목록 변경 의존성으로 document를 apply 때 재계산하며
   정책 생성 소스 자체는 변경하지 않았다. apply 뒤 예상 SSM ARN 목록과 기존 나머지 statement 보존을 대조해야 한다.
 
-이 plan은 bootstrap 승인 범위에 포함되지 않으며 아직 적용하지 않았다. 기존 dev.tfplan은 edge를 복구하므로
+이 plan은 bootstrap 승인 범위에 포함되지 않으며 아직 적용하지 않았다. 이후 최초 전환 보호 코드가 추가되어
+해당 초기 plan은 재사용하지 않는다. 아래 `dev-first-deploy.tfplan`이 최종 전환 검토 대상이다. 기존 dev.tfplan은 edge를 복구하므로
 현재 중지 상태의 설정 반영에 사용하지 않는다. 새 코드 병합/배포와 함께 위 삭제의 호환성을 검토한 뒤 승인한다.
 복구는 이전 revision의 Terraform 공개 설정과 앱 revision을 함께 복원하는 새 plan으로 수행한다.
 
@@ -95,7 +96,10 @@ GPU·ALB·DB·앱 생성/기동은 없으며 **2 create / 1 update / 7 delete**�
 
 - F2: 최신 dev `4b5d002`의 [게시 workflow](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/actions/runs/34304809097)를 실행했다.
   빌드 서버의 GPU 부재를 처리하지 못한 CLI parser 검사로 실패했다.
-  parser 기본값 생성에만 CPU 장치 종류를 제공하도록 수정했고 branch 재게시로 검증한다.
+  parser 기본값 생성에만 CPU 장치 종류를 제공하도록 수정했다.
+  [수정 branch 게시 run 34305829152](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/actions/runs/34305829152)가 성공했고
+  실제 installed vLLM CLI parser 검사를 통과했다. 게시 source는 `ebd3cf9`다.
+  최종 image: `ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:ca2cfefb47e97c4b664b388ff585ae4d512e7ae33d6718fe400dc2ebe486b769`.
 - General: 기존 성공 run `34200029859`의 공식 FP8 이미지와 Template artifact를 확보했다.
   정확한 digest는 `infra/serving/published-images.json`을 따른다. 평가 이력은 품질 승인을 뜻하지 않는다.
 - Console Template 변경·SSM 재등록은 아직 수행하지 않았다. 브라우저 연결 도구가 workspace URI 오류로 실행되지 않았다.
@@ -107,7 +111,11 @@ GPU·ALB·DB·앱 생성/기동은 없으며 **2 create / 1 update / 7 delete**�
 새 Pipeline revision 배포 성공 뒤 `automatic` 복구 plan을 별도로 검토·적용한다.
 이 운영 모드는 Terraform 입력이며 애플리케이션 환경변수가 아니다.
 
-최초 전환 saved plan의 변경 주소(민감값 제외):
+최초 전환 saved plan은 **6 create / 5 update / 7 delete**, replacement 없음이다.
+ALB·listener·alarm 복구와 CloudFront 활성화가 포함되며 실행 전 사용자가 비용·전환 창을 검토한다.
+이 apply 자체는 ASG desired 0/RDS stopped를 유지하지만 뒤의 `dev-prepare-app` 단계에서 GPU·앱·DB를 기동한다.
+
+변경 주소(민감값 제외):
 
 - `aws_cloudfront_distribution.frontend`: update
 - `aws_cloudwatch_metric_alarm.alb_target_5xx[0]`: create
@@ -127,3 +135,9 @@ GPU·ALB·DB·앱 생성/기동은 없으며 **2 create / 1 update / 7 delete**�
 - `aws_ssm_parameter.application["backend_http_allowed_hosts"]`: update
 - `aws_ssm_parameter.application["backend_worker_enabled"]`: delete
 - `aws_ssm_parameter.application["backend_worker_ready_file"]`: delete
+
+
+최종 읽기 조회(2026-09-09 03:15 UTC): app desired/instances 0, RDS stopped, AWS EBS 0,
+CloudFront disabled, 운영 키 범위 RunPod 0. F2/general 선택은 RunPod이며 endpoint offline이다.
+Secret의 AWSCURRENT·필수 구조는 통과했고, 두 과거 image 등록과 구 Pipeline revision 교체는 남았다.
+PR은 [#113](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team/pull/113)이다.
