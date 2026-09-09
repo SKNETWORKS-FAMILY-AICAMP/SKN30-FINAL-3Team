@@ -1,0 +1,120 @@
+{
+  "database": {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "name": "brokerage",
+    "existing_database": true,
+    "migration": "021_ALTER_MATCH_AUTOMATION_NAMES"
+  },
+  "seed": {
+    "event": "synthetic-match-seed-complete",
+    "model_inference": false,
+    "brokerage_id": 2,
+    "user_id": 2,
+    "login_id": "f3_synthetic_dev",
+    "model_profile": "local-openai",
+    "total_targets": 84,
+    "eligible_targets": 81,
+    "completed_results": 81,
+    "verification_checks": 12,
+    "generation": {
+      "total": 84,
+      "eligible": 81,
+      "completed": 0,
+      "reused": 81,
+      "ineligible": 2,
+      "insufficient_input": 1,
+      "candidate_count": 868,
+      "judged_count": 365,
+      "unjudged_count": 503,
+      "no_candidate_results": 4,
+      "grades": {
+        "STRONG": 348,
+        "REJECTED": 9,
+        "WEAK": 8
+      },
+      "status": "COMPLETED",
+      "model_inference": false
+    }
+  },
+  "checks": [
+    [
+      "합성 사무소",
+      1,
+      1,
+      "PASS"
+    ],
+    [
+      "전체 대상 상태",
+      84,
+      84,
+      "PASS"
+    ],
+    [
+      "적격 대상의 완료 예시",
+      81,
+      81,
+      "PASS"
+    ],
+    [
+      "완료 결과 포인터",
+      81,
+      81,
+      "PASS"
+    ],
+    [
+      "최신 입력·날짜 검증",
+      81,
+      81,
+      "PASS"
+    ],
+    [
+      "잔여 예시 실행",
+      0,
+      0,
+      "PASS"
+    ],
+    [
+      "자동 처리 대기",
+      0,
+      0,
+      "PASS"
+    ],
+    [
+      "소비할 합성 변경 이벤트",
+      0,
+      0,
+      "PASS"
+    ],
+    [
+      "유효 앵커 카드",
+      81,
+      81,
+      "PASS"
+    ],
+    [
+      "상위 5건 초과 AI 판정 없음",
+      0,
+      0,
+      "PASS"
+    ],
+    [
+      "강함·약함·기각 예시",
+      3,
+      3,
+      "PASS"
+    ],
+    [
+      "모델 추론 미실행 표시",
+      81,
+      81,
+      "PASS"
+    ]
+  ],
+  "nonseed_preservation": {
+    "table_count": 30,
+    "existing_rows": 10,
+    "unchanged": true,
+    "comparison": "existing columns, excluding migration-added agent_run.priority/next_attempt_at"
+  }
+}

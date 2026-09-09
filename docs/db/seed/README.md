@@ -1,6 +1,6 @@
 # F3 합성 seed 데이터
 
-이 디렉터리는 F3 파이프라인을 로컬 또는 공유 dev에서 끝까지 돌려 보기 위한 **합성 장부**를 관리한다.
+이 디렉터리는 F3 파이프라인을 로컬 또는 공유 dev에서 끝까지 돌려 보기 위한 **합성 장부와 예시 매칭 결과**를 관리한다. 실제 모델 호출 없이 화면과 저장 결과 조회를 확인할 수 있다.
 
 seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하지 않고, 번호도 `migrate/`와
 무관하며, prod에는 적용하지 않는다. 합성 데이터가 운영 스키마 전진 migration에 딸려
@@ -13,7 +13,9 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 | `001_F3_SYNTHETIC_RESET.sql` | 쓰기 | 합성 사무소 1곳의 데이터만 지운다 |
 | `002_F3_SYNTHETIC_SEED.sql` | 쓰기 | 합성 사무소·사용자·장부·상담 로그를 만든다 |
 | `model-profiles/*.sql` | 쓰기 | 선택한 Provider·모델 설정 두 건을 만든다 |
-| `003_F3_SYNTHETIC_VERIFY.sql` | 읽기 전용 | 데이터와 단일 허용 모델 프로필을 30가지로 점검한다 |
+| `003_F3_SYNTHETIC_VERIFY.sql` | 읽기 전용 | 결과 생성 전 장부와 모델 프로필을 30가지로 점검한다 |
+| `backend/src/synthetic_match_results.py` | 쓰기 | 실제 실행·저장 파이프라인에 결정적 예시 생성기를 연결한다 |
+| `004_MATCH_RESULTS_VERIFY.sql` | 읽기 전용 | 결과·현재성·예시 출처를 12가지로 점검한다 |
 
 ## 모델 프로필
 
@@ -37,8 +39,8 @@ A/B 분배는 하지 않는다.
 - 개인 로컬 합성 DB와 `infra/environments/dev`가 소유한 공유 dev에서만 사용한다. prod와 다른
   공유·운영 DB에는 적용하지 않는다.
 - 공유 dev 적용은 Bedrock doctor 통과 후 커밋된
-  reset·data·`dev-bedrock-gpt56-luna` profile·verify를 고정 순서로 실행하고
-  30개 검사를 확인하는 `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
+  reset·data·`dev-bedrock-gpt56-luna` profile·장부 검증·예시 결과 생성·결과 검증을
+  고정 순서로 실행하는 `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
   이후 합성 smoke를 실행하고, 실패하면 OpenAI key·runtime이 배포된 경우에만
   `dev-seed-f3-openai`로 명시 복구한다. OpenAI가 준비되지 않았다면 Worker를 정지한다.
 - 실존 이름·연락처·주소·상담 원문을 변형해 쓰지 않았다. 전부 새로 지어낸 값이다.
@@ -62,12 +64,17 @@ uv run python src/manage.py seed-f3-synthetic --confirm-reset \
 
 명령은 `APP_ENV=local`이고 `DB_URL` 호스트가 `localhost` 또는 loopback IP일 때만 동작한다.
 임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` data → 선택한 model profile →
-`003` verify를 고정 순서로 실행한다. 30개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
-`verification_checks`를 출력한다. 몇 번을 반복해도 합성 사무소 ID와 같은 데이터 상태를 유지한다.
+`003` 장부 검증 → 예시 결과 생성 → `004` 결과 검증을 실행한다. 장부 30개와 결과 12개 검사가
+모두 `PASS`여야 성공한다. JSON의 `brokerage_id`, `user_id`, `login_id`는 기존 시드 계정을
+유지하며, `matching_results`에 84개 대상·81개 완료 결과와 `model_inference:false`를 출력한다.
+장부 ID는 reset마다 달라질 수 있으므로 `seed_key` 또는 API로 조회한다.
 
 ## 공유 dev 적용
 
-공유 dev RDS와 app EC2가 실행 중이고 실행자가 `team-db-tunnel` 멤버여야 한다. 먼저 커밋된
+공유 dev RDS와 app EC2가 실행 중이고 실행자가 `team-db-tunnel` 멤버여야 한다.
+기존 `dev-seed-f3`는 **Bedrock 프로필을 선택하는 명령**이다. GPU/Qwen 설정을 유지하는
+범용 seed 명령이 아니므로 현재 배포 모델과 다른 경우 그대로 적용하지 않는다. 허용 프로필과
+해당 Provider의 doctor·배포 절차를 먼저 맞춘다. 먼저 커밋된
 migration을 적용한 뒤 F3 합성 사무소 데이터를 재적재한다.
 
 ```bash
@@ -81,9 +88,12 @@ just dev-seed-f3
 - 개인 `aws login` IAM 사용자와 같은 이름의 PostgreSQL 역할을 사용한다.
 - 태그로 제한된 app EC2의 SSM remote-host 터널과 15분 IAM DB 토큰을 프로세스 내부에서만 쓴다.
 - 실행 파일을 `001` reset → `002` data → `dev-bedrock-gpt56-luna` profile →
-  `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
+  `003` 장부 검증 → `backend/scripts/seed_match_results.py` 결과 생성·`004` 검증으로
+  고정하고 임의 SQL 경로를 받지 않는다.
 - `app_owner` 역할로 실행하며 IAM token과 DB URL을 명령행·로그에 출력하지 않는다.
-- `003`의 30개 결과가 모두 `PASS`일 때만 완료로 보고한다.
+- `003`의 30개 검사와 `004`의 12개 검사, 84개 대상·81개 적격/완료 결과 및
+  `model_inference:false`까지 확인해야 완료로 보고한다. 결과 단계가 실패하면 완료를 표시하지 않는다.
+- Backend의 `uv`와 잠긴 의존성도 필요하다. 적용 전 `uv sync --locked --project ../backend`로 준비한다.
 
 확인 프롬프트는 기존 `F3_SYNTHETIC 합성중개사무소`의 실행 결과와 장부를 reset한 뒤 다시
 적재한다는 사실을 명시한다. 다른 사무소 데이터는 reset 대상이 아니지만, 공유 dev에서 실행 중인
@@ -101,7 +111,7 @@ AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 ```
 
 이후 [Backend 실행 안내](../../../backend/README.md)에 따라 API를 실행하고
-`http://127.0.0.1:8000/docs`에서 개발 세션 발급 → F3 실행 접수 → 상태·결과 조회 순서로
+`http://127.0.0.1:8000/docs`에서 개발 세션 발급 → 저장 결과 목록·상세 조회 순서로
 확인한다. 인증·CSRF와 F3 경로의 정본은 [API 계약](../../../.agents/skills/project-wiki/references/contracts/api.md)이다.
 이 seed는 별도의 `create-development-user`, `seed-sample-ledger`와 AI 모델 설정 등록을 대신한다.
 
@@ -110,15 +120,41 @@ AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 적용한 다음 애플리케이션을 다시 배포한다. seed 명령은 Terraform 설정이나 실행 중인 프로세스를
 자동으로 변경하지 않는다.
 
-## 실행 결과는 seed하지 않는다
+## 예시 결과와 실제 모델 검증
 
-`agent_run`, `negotiation_position_analysis`, `negotiation_position_price`,
-`match_evaluation`, `match_candidate_evaluation`과 근거 행은 **넣지 않는다**. 이 행들은
-Worker가 직접 만들어야 파이프라인 전체가 검증된다. 결과를 미리 넣으면 무엇이 동작하고
-무엇이 안 하는지 구분할 수 없다.
+기본 명령은 `agent_run`, 포지션 카드·가격·근거, `match_evaluation`, 후보 판정·근거와
+`match_target_state`를 채운다. 매물 36건·구입장 48건 중 적격 81건에 완료 결과를 만들고,
+종료된 `L6`·`R7`과 미지원 거래 `R8`은 판정하지 않는다. 후보가 없는 적격 대상은 후보 0건의
+완료 결과를 갖는다. 다수 후보는 기존 SQL 순서와 상위 5건 정책을 따르며 나머지는 미판정이다.
 
-`003`의 `agent_run 수`, `포지션 카드 수`, `판정 결과 수` 검사는 이 원칙이 지켜졌는지
-확인하는 항목이다.
+생성기는 AI 공개 DTO와 실제 Backend 접수·후보 선택·저장 파이프라인을 사용한다.
+외부 모델 호출·토큰 사용은 없으며 활성 Provider 설정을 테스트 Provider로 바꾸지 않는다.
+실행 입력·출력의 `synthetic_fixture`에 `DETERMINISTIC_MATCH_SEED`, `version:v2`,
+`model_inference:false`를 저장한다. 공개 API는 `is_synthetic_fixture`만 제공하고 화면에는
+**시드 예시 결과 — 실제 모델 추론 결과가 아닙니다.**를 표시한다. 고정 규칙으로 만든 등급은
+화면·저장 경계 검증용이며 실제 모델 품질을 보장하지 않는다. 예시 카드·판정은 전용
+prompt/workflow 버전으로 캐시를 분리해 후속 실제 모델 실행이 예시 카드를 재사용하지 않게 한다.
+예시 등급은 표기 가격·예산 차이(10% 이내 부족은 약함)와 1년 초과 희망 입주일 등을
+사용하는 표시 규칙이다. 실제 중개 판정 정책으로 적용하지 않는다.
+
+`match_target_state`를 먼저 제거한 뒤 결과·장부를 삭제하고, 장부 삭제 트리거가 만든
+`match_change_outbox`와 `match_source_revision`을 마지막에 정리한다. 결과 생성 후에도 해당
+합성 사무소의 이벤트·예약만 정리한다. 다른 사무소 실행을 선점하지 않는다.
+완료 결과의 현재성은 운영과 동일한 입력 revision·모델 설정·UTC 날짜 기준을 따른다.
+다음 날이나 장부 수정 후에는 이전 결과가 되며, 새 모델 판정이 완료되면 예시 표시가 사라진다.
+
+실제 모델과 Worker의 실행을 확인할 때는 결과가 없는 원장을 별도로 준비한다.
+
+```bash
+cd backend
+uv run python src/manage.py seed-f3-synthetic --confirm-reset \
+  --model-profile local-openai --ledger-only
+```
+
+이 경우 `003`의 결과 0건 검증까지만 수행한다. API·Worker를 실행하고 실제 판정을 요청한다.
+공유 dev의 기본 명령은 예시 결과까지 생성하므로, 모델 smoke는 기존 `just ai-smoke general` 등
+현재 활성 Provider의 운영 절차로 별도 검증한다. 시드 결과 조회 성공을 모델 smoke 성공으로
+기록하지 않는다.
 
 ## 케이스 구성
 
@@ -212,9 +248,9 @@ ORDER BY seed_key;
 - `anchor_card.evidence`에 저장된 상담 로그를 가리키는 근거가 있는가
 - `candidates[].match_grade`가 `STRONG`·`WEAK`·`REJECTED` 중 하나인가
 - `REJECTED` 후보에 `rejection_reason`이 있는가
-- 케이스 C·D가 모델 판정 없이 빈 결과로 `COMPLETED`가 되는가
+- 케이스 C는 빈 결과로 `COMPLETED`, D는 `INSUFFICIENT_INPUT`이며 실행이 생성되지 않는가
 
-등급 자체를 정답으로 고정하지 않는다. 케이스 설계는 등급이 나올 **근거**를 상담 로그에
+실제 모델 검증에서는 등급 자체를 정답으로 고정하지 않는다. 기본 시드는 화면 확인을 위해 결정적 예시 등급을 제공한다. 케이스 설계는 등급이 나올 **근거**를 상담 로그에
 넣어 둔 것이지 모델의 출력을 강제하지 않는다.
 
 ## AI 모델 설정

@@ -25,7 +25,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 
 ## 현재 기준선
 
-현재 기준선은 31개 테이블과 19개 전진 migration이다.
+현재 기준선은 34개 테이블과 21개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -48,6 +48,17 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 017_ALTER_PROPERTY_LEDGER_AGENDA_INDEX.sql | 매물·수요 원장 확장 | 0 | 일정·할 일 조회용 의뢰 만기·희망 입주일·최종 접촉·접수일 부분 인덱스 |
 | 018_CREATE_CALENDAR.sql | 캘린더 | 1 | calendar_event |
 | 019_CREATE_CHATBOT.sql | F4 챗봇 | 3 | chat_conversation, chat_request, chat_message |
+| 020_CREATE_F3_AUTOMATION.sql | 조건부 매칭 판정 | 3 | 자동화 상태의 최초 생성 이력. 최종 객체명은 021에서 변경 |
+| 021_ALTER_MATCH_AUTOMATION_NAMES.sql | 매칭 자동화 명명 | 0 | match_source_revision, match_change_outbox, match_target_state; 데이터 보존 rename |
+
+021은 기존 020을 역편집하지 않고 테이블·PK/FK·인덱스·trigger/function 이름을 매칭 도메인으로 바꾼다. 현재 Backend를 사용하려면 021까지 적용한다.
+
+020은 원장·상담·관계·모델 설정의 의미 있는 변경을 동일 transaction의 revision·outbox에
+기록한다. outbox 실패는 원장 변경도 rollback한다. 기존 장부는 합성 허용과 자동 판정 설정을
+켠 Worker가 제한된 배치로 검증한다. migration 적용만으로 모델을 실행하지 않는다.
+`match_target_state`는 기존 결과를 가리키는 재구축 가능한 projection이다. seed reset·시험 정리에서는
+결과를 삭제하기 전에 이 포인터를 먼저 제거하고, 원장 DELETE trigger가 만든 outbox·revision은
+사무소 삭제 직전에 정리한다. 과거 migration 파일을 역편집하지 않는다.
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 
