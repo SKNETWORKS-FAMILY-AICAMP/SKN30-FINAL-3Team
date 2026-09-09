@@ -1,5 +1,8 @@
 """앵커 포지션 카드 생성·저장 수직 슬라이스 검증.
 
+이름·연락처·상담 문장은 모두 테스트에서 만든 합성 데이터이며 실제 인물·상담과 무관하다.
+전화번호는 형식 검증용 더미다. 외부 연락·운영 DB 입력에는 사용하지 않는다.
+
 Repository 를 mock 하지 않는다. 실제 PostgreSQL 에 붙고 AI 호출 경계만 fake generator 로
 바꾼다. 확인하는 것은 네 가지다. 무엇을 AI 로 보내는가, 모델을 기다리는 동안 DB 를 쥐고
 있지 않은가, 저장 직전에 무엇을 다시 확인하는가, 실패하면 무엇이 남는가.
@@ -48,9 +51,9 @@ from domain.agent_execution.anchor_card import (
 
 WORKER = "worker-card"
 ATTEMPT = 1
-OWNER_NAME = "김소유"
-OWNER_PHONE = "010-1234-5678"
-BUYER_NAME = "박손님"
+OWNER_NAME = "SYNTHETIC_OWNER_001"
+OWNER_PHONE = "010-0000-0000"
+BUYER_NAME = "SYNTHETIC_BUYER_001"
 OWNER_QUOTE = "급하게 팔 생각은 없습니다"
 BUYER_QUOTE = "30억까지는 볼 수 있습니다"
 AS_OF = datetime(2026, 8, 20, 1, 0, tzinfo=UTC)

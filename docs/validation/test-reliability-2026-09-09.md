@@ -72,7 +72,7 @@ OpenAI 전송 규칙은 [AI ADR-0006](../../.agents/skills/ai/references/decisio
 | 빈 임시 DB의 Yoyo migration 및 재적용 | 두 번 통과 |
 | Frontend `npm run test:fast` | 21개 파일, 216 사례 통과 |
 | Frontend `npm run typecheck`, `npm run build`, `npm run test:release` | 통과, 릴리스 검사 2 사례 |
-| Frontend 브라우저 | 전체 묶음 17개 중 16 통과. 캘린더의 포커스 복귀 대기 조건을 고친 뒤 해당 1개 통과. 수정 후 전체 묶음 재실행은 하지 않음 |
+| Frontend `npm run test:browser` | 수정 후 전체 직렬 실행 17개 통과, 실패·skip 0 (128.29초) |
 | Infra `tests/`, `runpod/tests/`, `serving/tests/` | 각각 206·36·23 통과 |
 | `node --test --test-isolation=none .github/scripts/tests/*.test.mjs` | 61 통과 |
 | `node .github/scripts/check-skill-docs.mjs` | 오류 0 |
@@ -84,6 +84,22 @@ Provider·클라우드 변경을 수행하지 않았다. 임시 테스트 DB는 
 
 캘린더 검사에서는 dialog가 숨겨지는 시점과 다음 animation frame의 포커스 복귀 시점이
 달랐다. 즉시 단언을 실제 `activeElement` 복귀 조건 대기로 고쳤으며 고정 sleep을 추가하지 않았다.
+최초 전체 실행의 16개 통과·캘린더 1개 실패와 단독 재검증 기록은 보존하며,
+PR 리뷰 반영 시 전체 묶음을 다시 실행해 17개 통과를 확인했다.
 Frontend 실행 로그는 `/tmp/frontend-{fast,typecheck,build,release}-verified.log`,
 브라우저 전체·캘린더 재검증 로그는 각각 `/tmp/frontend-browser-verified.log`,
-`/tmp/frontend-calendar-verified.log`다. 로컬 로그는 저장소 산출물이 아니다.
+`/tmp/frontend-calendar-verified.log`, 최종 전체 실행은 `/tmp/skn30-pr114-browser-full.log`다.
+로컬 로그는 저장소 산출물이 아니다.
+
+## PR #114 리뷰 확인
+
+- `43be6c0`의 secret-like 경고 4개 파일을 로컬 감지기로 재현했다. OpenAI HTTP 테스트의
+  명시적 합성 키, PR 검토 도구의 비밀값 마스킹·출력 정제 테스트와 기존 파일에서 삭제된
+  동일 사례에 해당한다. HTTP 테스트는 `synthetic.invalid`와 `MockTransport`를 사용한다.
+  감지기는 삭제된 줄도 검사하며 패턴 일치만으로 HIGH finding을 만든다. 이번 값은 회전할
+  실제 자격 증명이 아니며 감지기·마스킹 규칙은 유지했다. 향후 다른 감지를 자동 면제하지 않는다.
+- 앵커 카드 fixture의 이름·연락처·상담 상수는 기존 테스트에서 이동된 합성 입력이다.
+  이름을 명백한 `SYNTHETIC_*` 토큰으로 바꾸고 연락처도 형식 검증용 더미로 표시했다.
+  변경된 fixture의 실제 PostgreSQL 통합 검사 23개가 통과했다.
+- 새 로컬 보고서 출처의 절대 경로를 제거하고 기존 출처 ID·제목·기준 커밋을 유지했다.
+  실제 인물·운영 데이터·자격 증명을 새로 반입한 변경은 아니다.

@@ -4,7 +4,9 @@ updated: "2026-09-09"
 sources:
   - id: "local-functional-regression-report-2026-09-09"
     type: "user-provided-document"
-    location: "/mnt/c/Users/playdata2/.codex/attachments/d080bc33-906c-4b56-9d8a-b19b0b09012b/pasted-text.txt"
+    location: "user-provided:local-functional-regression-report-2026-09-09"
+    title: "로컬 기능 검증 — F2 제외"
+    baseline_commit: "4b5d002"
     received: "2026-09-09"
     reflected_in:
       - "docs/validation/test-reliability-2026-09-09.md"
