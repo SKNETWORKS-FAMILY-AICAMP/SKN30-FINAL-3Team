@@ -92,16 +92,22 @@ class StartPlan:
         self.path = self.root / "dev-serving.tfplan"
         self.metadata = self.root / "dev-serving.lifecycle.plan-meta.json"
         self.templates = TemplateReconciler(serving)
-        # AWS SDK temporary credentials stay only in process environment.
-        credentials = serving.session.get_credentials().get_frozen_credentials()
+        # Terraform's provider owns AssumeRole. Reusing the SDK's already-assumed
+        # session would attempt a second role assumption and fail the trust policy.
         self.env = {
-            **os.environ,
-            "AWS_ACCESS_KEY_ID": credentials.access_key,
-            "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
-            "AWS_SESSION_TOKEN": credentials.token or "",
-            "AWS_REGION": serving.settings.region,
+            key: value
+            for key, value in os.environ.items()
+            if key
+            not in {
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_SESSION_TOKEN",
+                "AWS_SECURITY_TOKEN",
+            }
         }
-        self.env.pop("AWS_PROFILE", None)
+        self.env.update(
+            AWS_PROFILE=serving.settings.profile, AWS_REGION=serving.settings.region
+        )
         self.expected = None
         self.approved = False
 

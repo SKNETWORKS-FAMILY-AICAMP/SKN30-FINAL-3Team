@@ -82,6 +82,21 @@ class DeepRecovery(unittest.TestCase):
         self.quiet.__enter__()
         self.addCleanup(self.quiet.__exit__, None, None, None)
 
+    def test_terraform_uses_login_profile_without_sdk_role_credentials(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "AWS_ACCESS_KEY_ID": "inherited",
+                "AWS_SECRET_ACCESS_KEY": "inherited",
+                "AWS_SESSION_TOKEN": "inherited",
+            },
+        ):
+            plan = serving_plan.StartPlan(self.serving, infra=self.infra)
+        self.assertEqual(plan.env["AWS_PROFILE"], self.serving.settings.profile)
+        for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+            self.assertNotIn(key, plan.env)
+        self.serving.session.get_credentials.assert_not_called()
+
     def terraform(self, *args):
         self.commands.append(args)
         if args[0] == "plan":
