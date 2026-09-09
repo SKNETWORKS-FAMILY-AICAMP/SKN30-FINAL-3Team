@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-03
+updated: 2026-09-09
 ---
 
 # ADR-0008: 개발 DB 계정과 IAM 인증 관리
@@ -48,7 +48,12 @@ Backend는 현재 일반 실행에도 `DB_MIGRATION_URL`을 요구하므로 migr
 - `seed-f3 --apply --model-profile <profile>`은 개인 IAM 사용자로 SSM 터널과 IAM
   토큰을 만들고 커밋된 F3 합성 reset·data seed·선택 model profile·verify를
   고정 순서로 `app_owner`에서 실행한다. 임의 파일·provider·model과 대상 DB는
-  받지 않으며 30개 검사가 모두 `PASS`일 때만 완료한다. 공유 dev wrapper는 최신 Launch
+  받지 않는다. 30개 기본 검사가 모두 `PASS`인 뒤 동일 IAM 터널의 `PG*` 환경으로
+  `backend/scripts/seed_match_results.py`를 실행한다. 이 스크립트는 로컬과 같은 Backend
+  파이프라인과 결정적 합성 생성기로 결과를 저장하고 `004` 결과 검증을 수행한다.
+  외부 모델은 호출하지 않으며, 완료 JSON의 프로필·합성 계정·전체/완료 대상 수와
+  `model_inference: false`를 확인한 뒤에만 완료한다. 자격 증명은 명령행에 전달하지 않고
+  하위 프로세스의 원문 오류도 출력하지 않는다. 공유 dev wrapper는 최신 Launch
   Template으로 EC2를 교체하고 Backend를 배포한 뒤 Bedrock doctor를 통과해야 적용할
   `dev-bedrock-gpt56-luna`를 명시하고, smoke 실패 복구 wrapper는
   `local-openai`를 명시한다.

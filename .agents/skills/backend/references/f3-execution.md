@@ -5,6 +5,10 @@ updated: 2026-09-09
 
 # F3 실행 경계와 확장
 
+현재 작업 브랜치는 최신 dev `f700f5a`를 병합한 뒤 조건부 자동 판정·저장 결과 조회를 구현했다.
+아래 리팩토링 경위와 이전 PR 검증 수치는 당시 기록이며, 현재 확장 동작은 구현 구조와
+서버 운영 절을 따른다. 공유 dev에 적용·배포했다는 의미는 아니다.
+
 ## 리팩토링 판단과 범위
 
 최신 `dev`의 `1d44019`를 병합한 작업 브랜치에서 검토했다. F3는 이미 영속 작업·Worker,
@@ -24,6 +28,11 @@ AI facade, 입력 준비/모델 호출/검증 저장의 경계가 있으므로 �
 | 책임 | 구현 | 변경 시 기준 |
 |---|---|---|
 | 기동·종료·polling·실행별 격리 | `backend/src/worker.py` | 프로세스 수명과 공유 event loop 소유 |
+| 변경 이벤트·자동 재검증 | `automation.py`, migration020~021 | 원장과 원자 outbox, 3초 병합, 별도 소비 세션, 제한된 배치 |
+| 최신성·완료 결과 재사용 | `freshness.py` | 원천 revision·UTC·구성 fencing과 실제 입력 지문 비교 |
+| 최종 AI 입력 재사용 | `judgment_cache.py` | 동일 양측 카드·판정 바인딩만 재사용하고 저장 DTO 재검증 |
+| 결과 목록·상세 조회 | `judgment_queries.py`, `judgment_targets.py`, `judgment_content.py` | GET은 조회만 수행, 기존 공개·tenant 검증 유지 |
+| 실행 슬롯·lease 갱신·이벤트 소비 수명 | `backend/src/f3_worker_reliability.py` | DB 전역 F3 슬롯과 독립 heartbeat·consumer 세션 |
 | 모델 route·provider·AI facade 조립 | `backend/src/f3_runtime.py` | DB 모델 설정으로 필요한 capability만 생성; Worker 밖 조립 진입점 |
 | 저장 상태 → 다음 단계 | `backend/src/domain/agent_execution/execution_policy.py` | dispatch·capability·실패 단계가 같은 매핑 사용 |
 | 단계 호출·재시도·오류 처리 | `backend/src/domain/agent_execution/pipeline.py` | 상태 변경은 유스케이스의 DB 검증과 함께 수행 |
@@ -41,10 +50,22 @@ AI facade, 입력 준비/모델 호출/검증 저장의 경계가 있으므로 �
 기존 SQL 함수·자료형의 본문은 옮기고 공개 호출 경계를 유지했다. 트랜잭션 commit/rollback은
 기존 유스케이스가 계속 소유한다.
 
-`execution_policy`는 실행 권한이나 자동 판정 조건을 승인하는 모듈이 아니다. 저장으로 생성된
-실행은 기존 [ADR-0018](../../project-wiki/references/decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md)에
-따라 앵커 카드 이후 대기한다. 사용자 요청과 겹칠 때는 여전히 `park_ledger_save_run`의 조건부
-UPDATE 결과로 승격 여부를 확인한다. 메모리에서 선택한 단계만 믿고 상태를 바꾸지 않는다.
+`execution_policy`는 저장 상태에서 다음 단계를 선택한다. F1 저장 요청은 AI나 후속 접수
+함수를 호출하지 않고 원장 transaction 안의 DB trigger로 revision과 outbox를 기록한다.
+`F3_AUTO_JUDGMENT_ENABLED=true`인 Worker는 유효한 대상만 `AUTO_CHANGE` 전체 판정으로
+접수한다. 비입력 메모·담당자 수정과 같은 값 저장은 이벤트를 만들지 않는다. outbox 기록이
+실패하면 원장 저장도 rollback한다.
+
+기존 `LEDGER_SAVE` 실행과 내부 backfill 함수의 CARD_ONLY 주차·사용자 승격은 호환을 위해
+유지한다. 신규 F1 HTTP 경로는 `triggers.py`를 호출하지 않는다. 진행 작업은 재사용하며,
+검증 가능한 완료 결과도 재사용한다. 전체 SQL 후보가 달라져 새 결과 snapshot이 필요해도
+최종 상위 5건의 카드와 바인딩이 같으면 저장 판정을 재검증해 모델 호출을 생략한다.
+
+원천 revision은 소비 지연 중에도 이전 결과를 STALE로 만드는 사무소 단위 보수적 토큰이다.
+Worker는 실제 앵커·선택 후보 입력과 전체 SQL 후보 집합을 비교해 무관한 변경의 추론을
+생략한다. 새 상대 후보 유입은 기존 후보 역참조에 한정하지 않고 재검증한다. 원장 데이터와
+설정·UTC 변경은 저장 직전 fencing하고, 비입력 수정으로만 증가한 row_version은 신규
+실행의 의미 입력 변경으로 취급하지 않는다. 기존 실행은 이전 row_version 검증을 유지한다.
 
 ## 후보 카드 부분 실패 수정
 
@@ -59,27 +80,47 @@ UPDATE 결과로 승격 여부를 확인한다. 메모리에서 선택한 단계
 현재 단계 실패 시 소모한 토큰은 실행 합계에 완전히 집계되지 않을 수 있다. 이 수정은 호출 유실을
 줄이며 사용량 계측 보완이나 동일 cache key의 동시 AI 호출 방지를 구현하지는 않는다.
 
-## 서버 분리와 다음 확장
+## 서버 운영과 확장 경계
 
-API와 Worker는 동일 image를 쓰는 별도 프로세스·컨테이너다. 같은 EC2 배치는 초기 dev에
-사용할 수 있으며, 작업 분배·재개는 프로세스 메모리 대신 PostgreSQL이 소유한다.
-이번 분리는 DB 기반 소비자를 다른 호스트에 배치하는 기존 경계를 유지한다.
-다만 다중 호스트 배포가 구현 완료됐다는 뜻은 아니다. 현재 공용 EC2와 배포 스크립트는
-API·Worker를 함께 관리하며 독립 확장에는 SG/IAM·환경 주입·배포 검증과 GPU 동시성 관리가 필요하다.
-자세한 근거는 [Worker 배포 검토](../../../../docs/architecture/f3/worker-deployment-review.md)에 있다.
+API와 Worker는 동일 image를 쓰는 별도 프로세스·컨테이너다. 같은 EC2 배치는 현재 dev
+구성이며, 작업 분배·재개·최신 결과 포인터는 PostgreSQL이 소유한다. Worker 내부의 이벤트
+소비 스레드는 2초마다 독립 Session에서 outbox를 처리하므로 느린 모델 응답을 기다리지 않는다.
+UTC·구성 재검증 sweep은 60초 간격이며 배치 기본값은 20이다. 소비 오류는 안전한 분류만
+로그하고 내구성 상태에서 재시도한다. 종료 시 소비 스레드는 최대 5초 drain을 기다린다.
 
-고정 300초 lease·최대 claim 3회·heartbeat 부재도 그대로다. 다중 Worker에서 lease보다 오래
-모델이 실행되면 이전 결과 저장은 fencing으로 차단되지만 모델 호출 중복까지 막히지는 않는다.
-자동 실행량을 늘리거나 Worker 수를 늘리기 전 단계별 p95와 timeout/repair 예산을 측정하고
-lease 갱신·동시성 제한·대기열 우선순위를 설계해야 한다.
+Worker는 PostgreSQL session advisory lock으로 F3 실행 한 건만 선점한다. 이 전용 연결은
+AUTOCOMMIT이며 모델 대기 동안 열린 transaction·행 잠금을 유지하지 않는다. 다른 호스트에
+Worker를 늘려도 F3 실행 슬롯은 1개다. 실행 내부의 후보 카드 생성은 최대 5개 병렬이다.
+현재 단일 API의 챗봇 제한 1건과 합쳐 general 모델의 애플리케이션 요청 상한은 6건이다.
+이는 GPU 처리량 실측값이 아니며 API를 여러 프로세스·호스트로 늘리려면 챗봇 admission도
+공유 저장소에서 제한해야 한다.
 
-새 조건부 자동 판정·완료 결과 재사용·결과 목록·독립 카드 API는 이 리팩토링에 포함되지 않는다.
-제품 기준은 [조건부 자동 판정 제안](../../../../docs/architecture/f3/conditional-auto-judgment.md)과
-[결과 목록 요구안](../../../../docs/requirements/f3/judgment-results-list.md)에 있다.
-추후 자동 접수 정책은 `triggers`/`service`, 최신성·무효화는 입력 revision과 결과 조회,
-영속 이벤트는 F1 commit 경계에서 구현한다. 상태→단계 매핑에 모든 정책을 섞지 않는다.
+lease는 300초, 소유자·attempt를 확인하는 별도 heartbeat는 30초 간격이다. 만료한 lease는
+최대 claim 3회까지 복구하며 일시 실패 후 `5 × attempt_count`초를 기다린다. 수동 요청은
+priority 100, 자동 요청은 0이고 이미 실행 중인 작업을 선점 중단하지 않는다. 새 입력과
+lease 상실 시 늦은 결과는 현재 결과 포인터를 덮지 못한다. 연결 단절로 슬롯을 잃었을 때의
+일시적 외부 추론 중복 가능성까지 exactly-once로 보장하지는 않는다.
 
-## 검증 기록
+별도 Worker 서버를 위한 실행 상태 경계는 준비되어 있지만 현재 배포는 API·Worker를 함께
+관리한다. 실제 서버 분리는 SG/IAM·환경 주입·독립 배포·drain·관측 검증이 추가로 필요하다.
+현재 단계에 SQS·추가 EC2·GPU는 필수가 아니다. 자세한 배포 근거는
+[Worker 배포 검토](../../../../docs/architecture/f3/worker-deployment-review.md),
+기능·API 범위는 [결과 목록 요구사항](../../../../docs/requirements/f3/judgment-results-list.md)과
+[확장 계약](../../../../docs/architecture/f3/expansion-contracts.md)을 따른다.
+
+## 이번 확장의 검증 경계
+
+`tests/integration/test_f3_automation.py`는 실제 PostgreSQL에서 원자 이벤트·중복 접수·완료
+재사용·새 후보·늦은 응답·비입력 수정·UTC 재검증·전역 슬롯을 검증한다. 기존 F3 API 회귀는
+저장 요청이 실행을 직접 접수하지 않는 변경과 CARD_ONLY 승격 호환을 함께 확인한다.
+`tests/unit/test_f3_worker_reliability.py`는 heartbeat fencing·종료와 독립 소비를 검증한다.
+
+`backend/scripts/f3_browser_validation.py`는 명시 확인과 localhost의 `*_validation` DB,
+합성 seed를 요구하는 재현 도구다. 실제 HTTP·outbox·Worker·PostgreSQL을 사용하지만 모델은
+결정적 테스트 generator다. 제품 설정에 fake fallback을 추가하지 않는다. 실제 모델 품질과
+GPU p95·장애 부하 시험은 이 성공 검증으로 대신하지 않는다.
+
+## 이전 리팩토링 검증 기록
 
 2026-09-09 별도 워크트리에서 잠금 파일의 Backend 의존성으로 검증했다.
 
