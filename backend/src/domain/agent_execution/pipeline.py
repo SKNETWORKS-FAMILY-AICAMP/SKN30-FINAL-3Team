@@ -1,8 +1,8 @@
 """선점한 F3 실행을 저장된 상태에서 다음 단계로 진행시킨다.
 
 DB 상태가 재개 지점의 정본이다. 한 번 선점한 실행은 같은 lease 아래에서 가능한 단계까지
-진행하고, 프로세스가 중단되면 다음 Worker가 저장된 상태부터 이어받는다. 운영 Worker가
-별도 DB 세션으로 lease를 갱신하며 이 파이프라인은 메모리 checkpoint를 만들지 않는다.
+진행하고, 프로세스가 중단되면 다음 Worker가 저장된 상태부터 이어받는다. 별도 scheduler,
+heartbeat 또는 메모리 checkpoint를 만들지 않는다.
 """
 
 from __future__ import annotations

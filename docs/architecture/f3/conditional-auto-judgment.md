@@ -1,9 +1,11 @@
 ---
-status: 제안
+status: 폐기됨
 updated: 2026-09-09
 ---
 
 # GPU 상시 운영에서 조건부 자동 교차 판정 검토
+
+2026-09-09 사용자 지시로 아래 확장 기능을 폐기했다. 아래는 과거 검토 기록이며 구현 계획이 아니다. [폐기 결정](../../../.agents/skills/project-wiki/references/decisions/ADR-0037-f3-expansion-retirement.md)을 따른다.
 
 출처: [후속 사용자 검토 요청](../../requirements/sources/f3-worker-auto-judgment-review-2026-09-09.md).
 

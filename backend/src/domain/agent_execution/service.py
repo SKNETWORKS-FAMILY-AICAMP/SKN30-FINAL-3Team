@@ -9,8 +9,8 @@ from brokerage_ai.f3 import InputPrivacyMode
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session
 
-from core.errors import NotFoundError, ValidationError
-from domain.agent_execution import freshness, repository, snapshot
+from core.errors import NotFoundError
+from domain.agent_execution import repository, snapshot
 from domain.agent_execution.cache_key import position_card_cache_key
 from domain.agent_execution.fingerprint import input_fingerprint
 from domain.agent_execution.models import (
@@ -30,7 +30,7 @@ from domain.agent_execution.models import (
 
 logger = structlog.get_logger()
 
-# Worker 선점 정책. 운영 Worker는 heartbeat로 갱신하고 장애 시 만료 lease를 회수한다.
+# Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
 LEASE_DURATION_SECONDS = 300
 MAX_CLAIM_ATTEMPTS = 3
 
@@ -103,23 +103,18 @@ def queue_cross_judgment_run(
     *,
     trigger_type: str = USER_REQUEST_TRIGGER_TYPE,
 ) -> AgentRun:
-    """유효한 완료 결과 또는 진행 작업을 재사용하고 필요할 때만 전체 판정을 접수한다."""
+    """F3 실행을 적재하거나 같은 앵커·입력 버전의 활성 실행을 반환한다.
+
+    완료 결과는 여기서 재사용하지 않는다. 앵커 ``row_version``만으로는 상담 로그·세대·단지·
+    당사자 관계와 AI 구성이 그대로인지 증명할 수 없기 때문이다. 완료 결과 재사용은 그 입력
+    identity를 접수 시점에 검증할 수 있을 때 별도로 연다.
+    """
 
     try:
         # 프로세스 메모리 lock은 API 인스턴스 사이의 동시 접수를 막지 못한다. 앵커 조회보다
         # 먼저 DB lock을 잡아 기다리는 동안 입력 버전이 바뀌어도 잠금 뒤의 최신 값을 읽는다.
         repository.lock_run_intake(session, brokerage_id, anchor_type, anchor_id)
         anchor = resolve_anchor(session, brokerage_id, anchor_type, anchor_id)
-        state, reason = freshness.eligibility(session, brokerage_id, anchor_type, anchor_id)
-        if state != "ELIGIBLE":
-            raise ValidationError(
-                reason or "분석 조건을 확인해 주세요", code="F3_INPUT_NOT_ELIGIBLE"
-            )
-        completed = freshness.reusable_completed_run(session, brokerage_id, anchor_type, anchor_id)
-        if completed is not None:
-            session.commit()
-            return completed
-        marker = freshness.intake_metadata(session, brokerage_id)
         existing = repository.find_reusable_active_run(
             session,
             brokerage_id,
@@ -128,23 +123,6 @@ def queue_cross_judgment_run(
             anchor.input_data_version,
         )
         if existing is not None:
-            previous_marker = existing.redacted_input_snapshot.get("automation")
-            if previous_marker is not None and previous_marker != marker:
-                existing.status = "SUPERSEDED"
-                existing.failure_code = "INPUT_SUPERSEDED"
-                existing.failure_message = "입력 변경으로 최신 분석을 준비합니다"
-                existing.completed_at = datetime.now(UTC)
-                existing.lease_owner = None
-                existing.lease_expires_at = None
-                session.add(existing)
-                session.flush()
-                existing = None
-        if existing is not None:
-            if trigger_type == USER_REQUEST_TRIGGER_TYPE:
-                existing.priority = 100
-                existing.next_attempt_at = None
-                session.add(existing)
-                session.flush()
             # 저장이 만든 실행이 어느 단계에 있든 사용자 판정 요청을 기억한다. QUEUED면 첫
             # Worker가 전체 실행을 하고, RUNNING이면 현재 Worker가 계속 가며, ANCHOR_READY면
             # lease를 비운 뒤 같은 실행을 후보 조회부터 이어받는다.
@@ -184,8 +162,7 @@ def queue_cross_judgment_run(
             target_unit_id=anchor.target_unit_id,
             target_requirement_id=anchor.target_requirement_id,
             input_data_version=anchor.input_data_version,
-            redacted_input_snapshot={**redacted_input_snapshot(anchor), "automation": marker},
-            priority=100 if trigger_type == USER_REQUEST_TRIGGER_TYPE else 0,
+            redacted_input_snapshot=redacted_input_snapshot(anchor),
             redacted_output_snapshot={},
         )
         repository.add_agent_run(session, run)
@@ -313,22 +290,9 @@ def current_target_version(
     return requirement.row_version
 
 
-def input_version_matches(
-    session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int, expected_version: int
-) -> bool:
-    current = current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
-    if isinstance(run.redacted_input_snapshot.get("automation"), dict):
-        # Atomic source revision excludes operational row-version-only edits.
-        freshness.verify_run_fence(session, run)
-        return True
-    return current == expected_version
-
-
 def current_anchor_version(
     session: Session, run: AgentRun, anchor_type: AnchorType, anchor_id: int
 ) -> int:
-    if input_version_matches(session, run, anchor_type, anchor_id, run.input_data_version):
-        return run.input_data_version
     return current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
 
 

@@ -88,7 +88,7 @@ export interface LedgerTransport {
   deleteRequirement(requirementId: number, rowVersion: number, signal?: AbortSignal): Promise<void>;
 
   listClientInteractions(
-    scope: { unitId?: number; requirementId?: number; partyId?: number; interactionId?: number; limit?: number },
+    scope: { unitId?: number; requirementId?: number; partyId?: number; limit?: number },
     signal?: AbortSignal,
   ): Promise<PageDto<ClientInteractionDto>>;
   createClientInteraction(

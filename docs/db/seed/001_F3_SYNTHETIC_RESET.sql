@@ -24,8 +24,6 @@ WHERE name = 'F3_SYNTHETIC 합성중개사무소';
 -- 삭제 순서는 참조를 거슬러 올라간다. agent_run 은 model_config_id 로 ai_model_config 를
 -- 참조하므로 반드시 그보다 먼저 지운다.
 
-DELETE FROM match_target_state            WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
-
 DELETE FROM ai_evaluation_result          WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
 DELETE FROM ai_decision_feedback          WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
 DELETE FROM match_candidate_evidence      WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
@@ -54,10 +52,6 @@ DELETE FROM party                         WHERE brokerage_id IN (SELECT brokerag
 
 DELETE FROM user_session     WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
 DELETE FROM ai_model_config  WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
-
--- 원장·모델 DELETE trigger가 만든 이벤트를 마지막에 정리한다.
-DELETE FROM match_change_outbox WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
-DELETE FROM match_source_revision WHERE brokerage_id IN (SELECT brokerage_id FROM f3_synthetic_tenant);
 
 -- brokerage 와 app_user 행은 **일부러 남긴다**.
 --

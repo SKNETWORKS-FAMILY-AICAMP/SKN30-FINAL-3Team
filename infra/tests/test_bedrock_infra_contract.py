@@ -52,7 +52,7 @@ class BedrockInfraContractTests(unittest.TestCase):
 
     def test_shared_dev_seed_requires_explicit_bedrock_profile(self) -> None:
         justfile = read("infra/justfile")
-        db_access = read("infra/scripts/db_seed_contracts.py")
+        db_access = read("infra/scripts/manage_db_access.py")
 
         self.assertIn(
             "seed-f3 --model-profile dev-bedrock-gpt56-luna --apply",

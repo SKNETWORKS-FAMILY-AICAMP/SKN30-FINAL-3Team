@@ -1,5 +1,5 @@
 ---
-status: 부분 대체됨
+status: 결정
 updated: 2026-08-31
 ---
 
@@ -12,8 +12,6 @@ updated: 2026-08-31
 - 관련 요구사항: [교차 판정](../../../../../docs/requirements/f3/cross-judgment.md) F3-CR-01~04
 - 관련 계약: [API 계약](../contracts/api.md)
 - 관련 아키텍처: [F3 온라인 런타임](../../../../../docs/architecture/f3/online-runtime.md)
-
-> 2026-09-09 사용자 구현 승인으로 저장·완료 재사용 정책은 [ADR-0035](ADR-0035-f3-conditional-automation-results.md)에서 부분 대체한다. 아래는 이전 결정의 근거이며 legacy 카드 전용 실행의 주차/승격은 호환 동작으로 유지한다. 팀 병합 검토·공유 배포 전이다.
 
 ## 맥락
 

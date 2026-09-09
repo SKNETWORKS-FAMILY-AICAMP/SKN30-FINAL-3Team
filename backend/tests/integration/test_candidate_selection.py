@@ -44,7 +44,6 @@ AS_OF = datetime(2026, 8, 23, 1, 0, tzinfo=UTC)
 CREATED_BROKERAGES: list[int] = []
 
 _CLEANUP_ORDER = (
-    "DELETE FROM match_target_state WHERE brokerage_id = ANY(:ids)",
     "DELETE FROM match_candidate_evidence WHERE brokerage_id = ANY(:ids)",
     "DELETE FROM match_candidate_evaluation WHERE brokerage_id = ANY(:ids)",
     "DELETE FROM match_evaluation WHERE brokerage_id = ANY(:ids)",
@@ -63,8 +62,6 @@ _CLEANUP_ORDER = (
     "DELETE FROM property_complex WHERE brokerage_id = ANY(:ids)",
     "DELETE FROM ai_model_config WHERE brokerage_id = ANY(:ids)",
     "DELETE FROM app_user WHERE brokerage_id = ANY(:ids)",
-    "DELETE FROM match_change_outbox WHERE brokerage_id = ANY(:ids)",
-    "DELETE FROM match_source_revision WHERE brokerage_id = ANY(:ids)",
     "DELETE FROM brokerage WHERE id = ANY(:ids)",
 )
 

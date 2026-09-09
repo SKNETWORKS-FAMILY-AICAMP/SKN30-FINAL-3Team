@@ -45,7 +45,6 @@ updated: 2026-09-09
 
 | 문서 | 언제 읽는가? | 다루는 범위 |
 |---|---|---|
-| [F3 1차 구현·통합 검증](f3/implementation-and-validation.md) | 조건부 자동 판정·저장 결과 GET·Worker 복구의 현재 구현과 검증 한계를 확인할 때  코드·설정·검증 한계 |
 | [챗봇 구현·검증](chatbot/implementation-and-validation.md) | 활성화·실제 평가·검증 명령과 제한을 확인할 때 | Luna 실제 평가, Qwen 보류, 격리 DB·브라우저·HTTP/SSE 검증 |
 | [챗봇 도입 검토](chatbot/overview.md) | 도입 근거·구현 가능성·복잡성·공수·스택·확장 순서를 검토할 때 | 읽기 전용 자연어 조회·F2 연결, 현재 기반과 추가 작업 |
 | [챗봇 실행 구조](chatbot/runtime.md) | 도구·모델·멀티턴 구현을 검토할 때 | 제한된 조건 생성, Backend capability, local Luna·dev Qwen |
@@ -59,9 +58,6 @@ updated: 2026-09-09
 | [F2 프론트엔드 필드 반영](f2/frontend-voice-field-population.md) | 현재 프론트엔드에서 음성 분석 결과가 매물장·구입장 필드로 들어가는 과정을 확인할 때 | 진입, 업로드, 장부 판정, 필드 매핑, draft 반영, 최종 저장과 구현 제약 |
 | [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) | 평가셋과 모델 개선·승격 기준을 논의할 때 | 합성 데이터, 분할, 평가 계층, 버전, 피드백 루프 |
 | [F3 개요](f3/overview.md) | F3 전체 흐름과 팀별 책임을 처음 파악할 때 | 핵심 교차 판정, 모듈 경계, SQL 후보와 하이브리드 로그 검색 |
-| [F3 확장 API·내부 계약안](f3/expansion-contracts.md) | 구체적 신규 조회·기존 실행 확장·DB 책임·출시 단위를 설계할 때 | 기능/화면 정의 연결, 제안 상태 |
-| [F3 기획 필요성 검토](f3/planning-validation.md) | 공인중개사 역할 검토 결과와 실제 사용자 검증 계획을 확인할 때 | 반영/보류 근거, 가상 검토의 한계 |
-| [F3 챗봇 후속 연계](f3/chatbot-extension.md) | 기존 챗봇 후속 설계와 연결 가능한 경계를 확인할 때 | 공통 조회/접수·도구/DTO·권한·삭제/취소·GPU 경합 |
 | [F3 카드 분리 현황 검토](f3/position-card-review.md) | 현재 저장 부하·Worker·반복 판정·카드 API 공백을 확인할 때 | 코드 기준 현황과 성능 미측정 범위 |
 | [F3 Worker 실행·확장 검토](f3/worker-deployment-review.md) | 스레드/프로세스/컨테이너·서버 분리·확장 준비도를 확인할 때 | 단일 EC2 배치, 분산 선점 기반과 독립 배포의 미완료 범위 |
 | [F3 조건부 자동 판정](f3/conditional-auto-judgment.md) | 상시 GPU에서 자동 사전 계산과 사용자 대기를 검토할 때 | 조건 gate·병합·후보 유입·우선순위·처리 용량과 효과 검증 |
