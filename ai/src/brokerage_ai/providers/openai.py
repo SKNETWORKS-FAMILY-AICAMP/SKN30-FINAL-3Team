@@ -58,8 +58,8 @@ class OpenAIAdapter:
             },
             "store": False,
         }
-        if request.temperature is not None:
-            parameters["temperature"] = request.temperature
+        # if request.temperature is not None:
+        #     parameters["temperature"] = request.temperature
         if request.max_output_tokens is not None:
             parameters["max_output_tokens"] = request.max_output_tokens
 
