@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from aiohttp import FormData, web
 from aiohttp.test_utils import TestClient, TestServer
@@ -58,6 +60,55 @@ class AuthProxyTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self) -> None:
         await self.client.close()
         await self.upstream_server.close()
+
+    async def test_status_only_exposes_verified_identity_and_memory_sample(
+        self,
+    ) -> None:
+        image = (
+            "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:"
+            + "a" * 64
+        )
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "F2_SERVING_IDENTITY": json.dumps(
+                        {
+                            "release_id": "consultation-v3",
+                            "model": "Qwen/Qwen3-4B",
+                            "revision": "b" * 40,
+                            "api_key": "synthetic-secret",
+                            "bundle_url": "https://host?secret=x",
+                        }
+                    ),
+                    "SERVING_IMAGE": image,
+                },
+            ),
+            patch.object(
+                auth_proxy.asyncio,
+                "to_thread",
+                new=AsyncMock(
+                    return_value={
+                        "status": "sampled",
+                        "used_mib": 15000,
+                        "total_mib": 24576,
+                        "device_count": 1,
+                    }
+                ),
+            ),
+        ):
+            unauthorized = await self.client.get("/ops/status")
+            self.assertEqual(unauthorized.status, 401)
+            response = await self.client.get(
+                "/ops/status", headers={"Authorization": f"Bearer {API_KEY}"}
+            )
+            self.assertEqual(response.status, 200)
+            body = await response.json()
+        self.assertEqual(body["identity"]["release_id"], "consultation-v3")
+        self.assertEqual(body["identity"]["image"], image)
+        self.assertEqual(body["gpu"]["used_mib"], 15000)
+        self.assertNotIn("secret", json.dumps(body))
+        self.assertEqual(self.calls, [])
 
     async def test_missing_wrong_and_duplicate_authorization_are_rejected(self) -> None:
         for headers in (

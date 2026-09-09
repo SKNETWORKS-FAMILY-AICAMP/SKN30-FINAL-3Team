@@ -3,9 +3,10 @@ import json
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import general_middleware
 import general_runtime
 from general_middleware import ServingRoutes
 
@@ -23,13 +24,23 @@ class GeneralHttpSurface(unittest.TestCase):
 
         with patch.dict("os.environ", {"VLLM_API_KEY": "k" * 43}):
             middleware = ServingRoutes(app)
-        asyncio.run(
-            middleware(
-                {"type": "http", "method": method, "path": path, "headers": headers},
-                None,
-                send,
+        with patch.object(
+            general_middleware.asyncio,
+            "to_thread",
+            new=AsyncMock(return_value={"status": "unavailable"}),
+        ):
+            asyncio.run(
+                middleware(
+                    {
+                        "type": "http",
+                        "method": method,
+                        "path": path,
+                        "headers": headers,
+                    },
+                    None,
+                    send,
+                )
             )
-        )
         return upstream, messages
 
     def test_native_admin_paths_are_blocked_even_with_valid_key(self):
@@ -54,7 +65,10 @@ class GeneralHttpSurface(unittest.TestCase):
             _, messages = self.request("GET", "/ops/status", headers)
         self.assertEqual(messages[0]["status"], 200)
         payload = json.loads(messages[1]["body"])
-        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes", "model"})
+        self.assertEqual(
+            set(payload),
+            {"disk_total_bytes", "disk_free_bytes", "model", "identity", "gpu"},
+        )
 
 
 class GeneralStartup(unittest.TestCase):
@@ -67,9 +81,21 @@ class GeneralStartup(unittest.TestCase):
                 general_runtime.main()
             execute.assert_not_called()
 
+    def test_missing_profile_fails_before_download_or_exec(self):
+        with (
+            patch.dict("os.environ", {"AI_GENERAL_API_KEY": "k" * 43}, clear=True),
+            patch.object(general_runtime, "prepare_model") as download,
+            patch.object(general_runtime.os, "execvp") as execute,
+        ):
+            with self.assertRaisesRegex(ValueError, "GENERAL_MODEL_PROFILE"):
+                general_runtime.main()
+            download.assert_not_called()
+            execute.assert_not_called()
+
     def test_startup_keeps_key_out_of_command_and_removes_cloud_credentials(self):
         environment = {
             "AI_GENERAL_API_KEY": "k" * 43,
+            "GENERAL_MODEL_PROFILE": "qwen38-27b-fp8",
             "AWS_ACCESS_KEY_ID": "synthetic",
             "AWS_SECRET_ACCESS_KEY": "synthetic",
             "AWS_SESSION_TOKEN": "synthetic",
@@ -86,7 +112,7 @@ class GeneralStartup(unittest.TestCase):
             command = execute.call_args.args[1]
             self.assertNotIn("k" * 43, " ".join(command))
             self.assertEqual(general_runtime.os.environ["VLLM_API_KEY"], "k" * 43)
-            for key in environment:
+            for key in set(environment) - {"GENERAL_MODEL_PROFILE"}:
                 self.assertNotIn(key, general_runtime.os.environ)
 
     def test_missing_mounted_snapshot_fails_before_exec(self):
@@ -96,6 +122,7 @@ class GeneralStartup(unittest.TestCase):
                 {
                     "AI_GENERAL_API_KEY": "k" * 43,
                     "GENERAL_MODEL_PATH": "/models/general",
+                    "GENERAL_MODEL_PROFILE": "qwen38-27b-fp8",
                 },
                 clear=True,
             ),

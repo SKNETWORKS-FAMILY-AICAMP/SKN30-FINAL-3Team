@@ -13,7 +13,7 @@ Backend·AI의 dev/test/prod는 dotenv를 읽지 않는다. F3 opt-in도 같은 
 |---|---|---|
 | 로컬 공개 기본값 | 모듈별 추적 `.env.local` | 모듈 프로세스 재시작 |
 | 로컬 비밀·개인 override | 모듈별 ignored `.env`, 권한 600 | 해당 모듈만 재시작 |
-| dev 공개 설정 | `environments/dev/configuration.tf` → SSM | 검토한 Terraform 적용 후 앱 재배포 |
+| dev 공개 설정 | `environments/dev/configuration.tf` → SSM | 검토한 Terraform 적용 후 maintenance 환경 재생성; 범용 모델 값은 공유 선택에서 생성 |
 | Frontend 공개 배포값 | `environments/dev/delivery.tf` | CodeBuild가 빌드에 주입; `VITE_*`에 비밀 금지 |
 | OpenAI·F2 SLLM·STT·general 키 | AWS `ai/provider-api-keys`의 평면 JSON | `secret-rotate` TTY 입력, runtime renderer 주입 |
 | F2/general RunPod 키 | RunPod Console Secret | AWS AI Secret과 같은 값을 운영자가 입력; 새 Pod에서 인증 검증 |
@@ -23,9 +23,40 @@ Backend·AI의 dev/test/prod는 dotenv를 읽지 않는다. F3 opt-in도 같은 
 | DB migration | 개인/Instance Role IAM 인증 | migration 전용 `DB_MIGRATION_URL`; 빈 호환 Secret은 정상 |
 | Discord webhook | delivery / observability 전용 AWS Secret | 각각의 Lambda만 사용 |
 | F2/general endpoint | 운영자가 갱신하는 SSM endpoint 문서 | API/Worker 환경파일 재생성; Terraform은 값 덮어쓰기 제외 |
-| 이미지·Template·registry 등록 | 작업별 SSM control 문서 | `runpod-register*`; 기동 성공을 뜻하지 않음 |
-| 선택 cloud·모델·release | SSM `serving/SELECTION` | `ai-configure` 명시 저장, 자동 모델 선택 없음 |
-| AWS GPU 프로필 | ignored `gpu-profiles.auto.tfvars.json` | AMI·digest·EBS만; 기동 대상은 별도 capacity 파일 |
+| 이미지·Template·registry 등록 | 작업별 SSM control 문서 | 최초 `runpod-register*`; 이후 통합 시작 계획이 기존 Template 차이를 반영·검증·재등록. 기동 성공과 구분 |
+| 선택 cloud·GPU·모델·release·이미지 | SSM `serving/SELECTION` v2 | `ai-select` 명시 저장; 선택 ID·변경자·시각, 자동 모델 선택 없음 |
+| 마지막 적용 결과·검증 앱 revision | SSM `serving/APPLIED` | 선택 ID·해시·단계·시각·시도 자원, `application_revision`의 CodeDeploy 배포 ID·revision 해시 |
+| 지원 조합·검증 근거 | Git `serving/hardware-profiles.json`, `model-profiles.json`, `published-images.json`, `runpod/releases.json` | 공통 enum과 조합 검증. 새 모델/이미지는 검토한 catalog 변경 필요 |
+| 중개사·capability별 모델 이력 | Backend DB `ai_model_config` | 시작 중 목록·전후 비교 후 명시 대상만 새 버전 추가 |
+| AWS GPU 기반 프로필 | ignored `gpu-profiles.auto.tfvars.json` | 검토한 AMI·EBS·기존 digest; 통합 시작 입력에서 선택 이미지로 정확히 맞춤 |
+| 통합 시작용 Terraform 입력·plan | ignored `serving-selection.auto.tfvars.json`, `dev-serving.tfplan`·metadata | 선택 모델·이미지·생성 대상·maintenance를 공통 계획기로 생성·검증 |
+
+## 선택과 실제 상태의 관계
+
+모든 SSM 경로는 `/skn30-final-3team-dev/` 아래다. `SELECTION`은 희망 구성이고
+`APPLIED`는 마지막 실행 결과다. 실제 주소·준비 여부는 기존 endpoint 문서를 읽는다.
+선택 성공만으로 endpoint가 준비되거나 DB 모델이 바뀌지 않는다. `dev-status`가 이 상태를 구분한다.
+SSM은 최근 parameter 변경 이력을 제공하며 새 장기 감사 저장소·상시 제어 서비스는 추가하지 않는다.
+
+`application_revision`은 `dev-start`의 앱 합성 검증이 통과한 실제 호스트에 성공적으로 설치된
+CodeDeploy S3 revision의 근거다. 배포 ID와 version/eTag를 포함한 revision의 해시를 기록하고,
+다음 적용 중·실패 기록에도 이전 검증 근거를 보존한다. 새 호스트 복구는 이 근거의 정확한
+revision만 사용하며 최신 성공 Pipeline으로 자동 대체하지 않는다. 근거가 없으면 최초 앱 배포가 필요하다.
+
+기존 문서는 읽을 때 정확한 cloud·RunPod GPU ID·release·모델을 보존해 v2로 해석하고,
+다음 명시 저장 시 선택 ID·변경자·UTC 시각과 함께 기록한다. 알려지지 않은 GPU·모델을
+다른 값으로 대체하지 않는다. AWS의 과거 미사용 RunPod GPU ID는 AWS 하드웨어 profile로 정규화한다.
+일반·deep 종료는 선택을 지우지 않는다. 새 운영자 PC도 SSM을 읽고 같은 선택으로 복원한다.
+
+앱의 `general_model_selection`과 AWS GPU의 이미지·생성 대상은 이 선택으로부터 생성한다.
+같은 값을 `dev.tfvars`, `TF_VAR_*`, 과거 validation/capacity auto 입력에 다시 지정하지 않는다.
+시작 계획이 실제 Terraform 해석값과 선택값을 대조하며 다르면 적용을 막는다.
+AWS-only 작업에는 RunPod Template 등록을 요구하지 않는다.
+
+검토한 로컬 계획에는 선택 ID·내용 해시·이미지와 등록 상태를 묶는다. 저장 파일·SSM 선택·
+Template이 변경되거나 24시간이 지나면 재계획한다. 한 운영자만 명령을 순차 실행하며
+배포·모델 변경·전원 명령을 동시에 실행하지 않는다. `APPLIED` 컨테이너는 Terraform 소유이고,
+운영 도구는 그 값만 기록한다. 이 문서는 공유 환경에 해당 Terraform 변경이 적용됐다는 뜻이 아니다.
 
 ## 자주 틀리는 이름
 

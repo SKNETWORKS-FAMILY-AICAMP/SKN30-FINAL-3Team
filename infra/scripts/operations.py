@@ -243,7 +243,18 @@ def inspect_cloud(
     except QueryError as error:
         add(checks, "fail", "잔여 자원", str(error))
 
+    try:
+        selection = aws.parameter("serving/SELECTION")
+    except QueryError:
+        selection = {}
+        add(checks, "fail", "서빙 선택", "SSM 선택 조회 실패")
+    needs_runpod = any(
+        (selection.get(name) or {}).get("cloud") == "runpod"
+        for name in ("f2", "general")
+    )
     for suffix, fields in SECRET_FIELDS.items():
+        if suffix == "runpod/operator-api-key" and not needs_runpod:
+            continue
         try:
             description = aws.call(
                 "secretsmanager", "describe-secret", "--secret-id", PREFIX + suffix
@@ -295,9 +306,8 @@ def inspect_cloud(
             )
 
     try:
-        selection = aws.parameter("serving/SELECTION")
-        key = aws.secret("runpod/operator-api-key")
-        pods = get_runpod(key, "pods")
+        key = aws.secret("runpod/operator-api-key") if needs_runpod else None
+        pods = get_runpod(key, "pods") if needs_runpod else []
         add(
             checks,
             "info",
@@ -318,6 +328,35 @@ def inspect_cloud(
         for workload in ("f2", "general"):
             selected = selection.get(workload)
             endpoint = aws.parameter("ai/" + ENDPOINT[workload])
+            if selected and selected.get("cloud") == "aws":
+                # AWS image choice is independent of Console/RunPod registration.
+                import sys
+
+                sys.path.insert(0, str(INFRA / "serving"))
+                from selection_catalog import normalize_spec
+
+                selected = normalize_spec(workload, selected)
+                state, message = image_check(
+                    selected["image"], workload, selected.get("model_profile"), catalog
+                )
+                add(checks, state, workload + " AWS 이미지", message)
+                add(
+                    checks,
+                    "info",
+                    workload,
+                    "AWS 선택; RunPod Template 등록 불필요, endpoint="
+                    + str(endpoint.get("status")),
+                )
+                continue
+            if not selected:
+                add(
+                    checks,
+                    "fail" if ready else "info",
+                    workload,
+                    "선택 없음",
+                    "just ai-select",
+                )
+                continue
             registration = aws.parameter("runpod/" + CONTROL[workload])
             add(
                 checks,
@@ -464,7 +503,7 @@ def verify_running(
                 account,
                 "--profile",
                 profile,
-                "smoke",
+                "verify",
                 workload,
             ],
             capture_output=True,
@@ -472,6 +511,18 @@ def verify_running(
             check=False,
             timeout=900,
         )
+        for line in result.stdout.splitlines():
+            try:
+                detail = json.loads(line)
+                if detail.get("event") == "dev-verification":
+                    add(
+                        checks,
+                        "info",
+                        workload + " 검증 측정",
+                        json.dumps(detail, ensure_ascii=False),
+                    )
+            except (ValueError, AttributeError):
+                pass
         add(
             checks,
             "ok" if result.returncode == 0 else "fail",

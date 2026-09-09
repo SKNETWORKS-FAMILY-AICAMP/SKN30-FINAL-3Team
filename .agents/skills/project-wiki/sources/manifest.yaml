@@ -909,3 +909,16 @@ sources:
       - "docs/requirements/f3/judgment-results-list.md"
       - "docs/architecture/f3/implementation-and-validation.md"
     scope: "최신 dev 병합 후 워크트리의 1차 구현·문서화·API와 브라우저 통합. 후속 사용자 답변은 테스트 모델 통합 검증 승인 및 추가 테이블의 요구사항 접두어 제거·도메인 명명 요청. 팀 병합·공유 dev 배포·실제 모델 평가 승인/성공과 구분"
+
+
+  - id: "shared-dev-serving-selection-implementation-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 인프라 개선 대화: 공유 dev LLM 서빙 선택·기동 절차 통합 계획 전체에 대한 PLEASE IMPLEMENT THIS PLAN 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0036-shared-dev-serving-selection.md"
+      - ".agents/skills/infra/references/decisions/ADR-0024-shared-serving-selection-lifecycle.md"
+      - "infra/operations/README.md"
+      - "infra/operations/configuration.md"
+      - "infra/serving/README.md"
+    scope: "SSM 공유 선택·정지 후 변경·통합 계획/비용 확인·기존 Template API 조정·명시 DB 대상/이력·실패 자원 정리·사용자 기동 검증 구현 승인. F2 A5000/L4 24GB 및 general L40S48GB, CPU 전환 제외. 팀 병합·공유 적용·신규 이미지 게시·실제 기동 성공과 구분"

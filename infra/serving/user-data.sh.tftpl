@@ -4,6 +4,7 @@ umask 077
 install -d -m 0700 /opt/brokerage-gpu
 printf '%s' '${host_script}' | base64 -d > /opt/brokerage-gpu/gpu_host.py
 printf '%s' '${download_script}' | base64 -d > /opt/brokerage-gpu/download_models.py
+printf '%s' '${metrics_script}' | base64 -d > /opt/brokerage-gpu/gpu_metrics.py
 printf '%s' '${probe_script}' | base64 -d > /opt/brokerage-gpu/probe.py
 printf '%s' '${profiles_script}' | base64 -d > /opt/brokerage-gpu/model_profiles.py
 printf '%s' '${profiles_json}' | base64 -d > /opt/brokerage-gpu/model-profiles.json

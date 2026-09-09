@@ -4,16 +4,23 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hmac
+import json
 import logging
 import os
 import re
 import shutil
+import sys
 import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from multidict import CIMultiDict
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gpu_metrics import safe_identity, sample_gpu
 
 LOGGER = logging.getLogger("f2_auth_proxy")
 MAX_REQUEST_BYTES = 26 * 1024 * 1024
@@ -155,8 +162,19 @@ def create_application(
 
     async def disk_status(request: web.Request) -> web.Response:
         usage = shutil.disk_usage(os.environ.get("HF_HOME", "/tmp"))
+        try:
+            identity = json.loads(os.environ.get("F2_SERVING_IDENTITY", "null"))
+        except ValueError:
+            identity = None
+        identity = safe_identity(identity)
+        identity.update(safe_identity({"image": os.environ.get("SERVING_IMAGE")}))
         return web.json_response(
-            {"disk_total_bytes": usage.total, "disk_free_bytes": usage.free}
+            {
+                "disk_total_bytes": usage.total,
+                "disk_free_bytes": usage.free,
+                "identity": identity,
+                "gpu": await asyncio.to_thread(sample_gpu),
+            }
         )
 
     application.router.add_get("/ops/status", disk_status)

@@ -213,6 +213,7 @@ resource "aws_iam_policy" "sllm_release_publisher" {
           aws_ssm_parameter.general_runpod_control.arn,
           aws_ssm_parameter.general_endpoint.arn,
           aws_ssm_parameter.serving_selection.arn,
+          aws_ssm_parameter.serving_applied.arn,
         ]
       },
       {

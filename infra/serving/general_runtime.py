@@ -8,13 +8,13 @@ import re
 import sys
 from pathlib import Path
 
-from model_profiles import DEFAULT_PROFILE, load_profile, verify_weights
+from model_profiles import load_profile, verify_weights
 
-MODEL = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit"
-REVISION = "8aa5f05d26b7205477066e1449e0af13f762a299"
+MODEL = "Qwen/Qwen3.8-27B-FP8"
+REVISION = "017b9c7af6b5689d5dd426a76e0bc077eb5ca20a"
 
 
-def build_command(model: str, profile_name: str = DEFAULT_PROFILE) -> list[str]:
+def build_command(model: str, profile_name: str) -> list[str]:
     profile = load_profile(profile_name)
     return [
         "vllm",
@@ -68,7 +68,9 @@ def main() -> None:
     if not re.fullmatch(r"[A-Za-z0-9_-]{43,128}", key):
         raise ValueError("AI_GENERAL_API_KEY must be a resolved service credential")
     # A mounted, immutable snapshot is used on AWS; RunPod downloads the same commit.
-    profile_name = os.environ.get("GENERAL_MODEL_PROFILE", DEFAULT_PROFILE)
+    profile_name = os.environ.get("GENERAL_MODEL_PROFILE")
+    if not profile_name:
+        raise ValueError("GENERAL_MODEL_PROFILE must be explicitly selected")
     profile = load_profile(profile_name)
     model = os.environ.get("GENERAL_MODEL_PATH", profile["model"])
     if model != profile["model"] and model != "/models/general":

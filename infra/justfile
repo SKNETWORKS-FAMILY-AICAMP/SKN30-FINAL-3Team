@@ -61,14 +61,17 @@ f2-select release_id cloud="runpod" gpu_id="NVIDIA RTX A5000":
 gpu-profiles-import source:
     python3 scripts/release_tools.py adopt-gpu-profiles {{ quote(source) }}
 
-# 최초 새 앱 배포용: GPU 직접 검증·endpoint 준비 후 RDS·앱 호스트를 시작한다.
-[confirm("plan과 GPU 비용을 검토했으며 edge·GPU·RDS·앱 호스트를 시작합니까? GPU 직접 추론 후 최신 앱 배포가 필요합니다.")]
-dev-prepare-app:
-    just release-ready
-    python3 scripts/plan_guard.py check environments/dev/dev-first-deploy.tfplan
-    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
-    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-first-deploy.tfplan
-    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" prepare-deployment --apply
+# 공유 dev 선택: 인자 없이 대화형, 명시형은 --workload/--cloud/--hardware-profile/--release 또는 --model-profile.
+ai-select *options:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" select {{ options }}
+
+# Terraform·Template·GPU 비용 계획만 표시한다. 자원 기동 없음.
+dev-start-plan *options:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start {{ options }}
+
+# 최초 배포: 공통 계획을 검토한 뒤 maintenance 호스트·모델을 준비한다.
+dev-prepare-app *options:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" prepare-deployment --apply {{ options }}
 
 # 사용자가 최신 dev의 통합 배포를 요청한다. 완료 여부는 doctor/CodePipeline에서 확인한다.
 app-deploy:
@@ -89,7 +92,7 @@ check:
     terraform fmt -check -recursive .
     terraform -chdir=bootstrap validate
     terraform -chdir=environments/dev validate
-    uvx ruff check scripts/env_doctor.py scripts/operations.py scripts/plan_guard.py scripts/release_tools.py serving scripts/manage_serving.py scripts/serving_cli.py scripts/serving_deployment.py scripts/connect_serving.py deploy/scripts/serving_contract.py scripts/manage_bedrock.py scripts/manage_db_access.py scripts/db_access_contracts.py scripts/db_seed_contracts.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py tests
+    uvx ruff check scripts/env_doctor.py scripts/operations.py scripts/plan_guard.py scripts/release_tools.py serving scripts/manage_serving.py scripts/serving_cli.py scripts/serving_deployment.py scripts/serving_selection.py scripts/serving_plan.py scripts/serving_lifecycle.py scripts/serving_templates.py scripts/serving_model_targets.py scripts/serving_app_revision.py scripts/serving_verification.py scripts/connect_serving.py deploy/scripts/serving_contract.py scripts/manage_bedrock.py scripts/manage_db_access.py scripts/db_access_contracts.py scripts/db_seed_contracts.py scripts/manage_dev_power.py scripts/manage_runpod.py scripts/manage_runpod_control.py scripts/manage_sllm_artifact.py deploy/scripts/render_env.py deploy/scripts/smoke_f2.py runpod/scripts runpod/tests delivery/lambda/discord_notifier.py delivery/lambda/cloudwatch_alarm_notifier.py tests
     uv run --python 3.13 --with 'boto3>=1.40,<2' --with 'psycopg[binary]>=3.3,<4' python -m unittest discover -s tests -v
     uv run --python 3.12 --with 'aiohttp==3.14.3' --with 'multidict==6.7.1' python -m unittest discover -s runpod/tests -v
     uv run --python 3.12 --with 'aiohttp==3.14.3' --with 'multidict==6.7.1' python -m unittest discover -s serving/tests -v
@@ -169,10 +172,9 @@ dev-destroy:
 dev-status:
     uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" status
 
-# 선택 GPU 준비·연결 후 RDS·ASG·앱을 복구하고 합성 추론을 검증한다.
-[confirm("선택한 GPU와 공유 개발 RDS·앱을 시작하고 사용 요금을 발생시킵니까?")]
-dev-start:
-    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
+# 현재 선택·Terraform·Template 계획을 표시하고 확인 후 기동한다. DB 대상은 별도 확인한다.
+dev-start *options:
+    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply {{ options }}
 
 # 활성 작업 확인 후 ASG를 0으로 내리고 RDS를 정지한다.
 [confirm("배포, migration, API 요청과 Worker 작업이 모두 끝났습니까?")]
@@ -297,7 +299,7 @@ dev-first-deploy-show:
     python3 scripts/plan_guard.py check environments/dev/dev-first-deploy.tfplan
     terraform -chdir=environments/dev show dev-first-deploy.tfplan
 
-# ALB를 재생성하고 CloudFront 및 ASG 자동 배포 연결을 활성화하는 saved plan을 생성한다.
+# 저수준 Terraform 검토용 호환 plan. dev-deep-start는 공통 dev-serving.tfplan을 새로 생성한다.
 dev-deep-start-plan:
     uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" capacity-config
     TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
@@ -310,13 +312,10 @@ dev-deep-start-show:
     python3 scripts/plan_guard.py check environments/dev/dev-deep-start.tfplan
     terraform -chdir=environments/dev show dev-deep-start.tfplan
 
-# 검토·승인된 deep start plan을 적용한 뒤 RDS·ASG를 시작한다.
-[confirm("dev-deep-start.tfplan의 ALB 재생성과 CloudFront 재활성화를 승인하고 공유 RDS·EC2를 시작합니까?")]
-dev-deep-start:
-    TARGET_ACCOUNT_ID="{{ account_id }}" AWS_PROFILE="{{ aws_profile }}" scripts/preflight.sh
-    python3 scripts/plan_guard.py check environments/dev/dev-deep-start.tfplan
-    AWS_PROFILE="{{ aws_profile }}" terraform -chdir=environments/dev apply dev-deep-start.tfplan
-    uv run --script scripts/manage_serving.py --account-id "{{ account_id }}" --profile "{{ aws_profile }}" start --apply
+# 동일한 선택으로 공통 시작 계획을 생성·확인한 뒤 삭제된 자원까지 재구성한다.
+
+dev-deep-start *options:
+    just dev-start {{ options }}
 
 # Terraform state의 edge mode와 RDS·ASG·SSM·target 상태를 읽기 전용으로 확인한다.
 dev-deep-status:

@@ -5,13 +5,24 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from enum import Enum
 from pathlib import Path
 
-DEFAULT_PROFILE = "qwen38-27b-bnb"
+
+class GeneralModelProfile(str, Enum):
+    QWEN3_14B_AWQ = "qwen3-14b-awq"
+    QWEN3_32B_AWQ = "qwen3-32b-awq"
+    QWEN38_27B_BNB = "qwen38-27b-bnb"
+    QWEN38_27B_FP8 = "qwen38-27b-fp8"
+
+
+# Menu/discovery default only; runtime entrypoints require an explicit profile.
+DEFAULT_PROFILE = GeneralModelProfile.QWEN38_27B_FP8.value
 PROFILE_FILE = Path(__file__).with_name("model-profiles.json")
 
 
 def load_profile(name: str = DEFAULT_PROFILE) -> dict:
+    name = GeneralModelProfile(name).value
     document = json.loads(PROFILE_FILE.read_text())
     if document.get("schema_version") != 1:
         raise ValueError("unsupported serving profile schema")

@@ -37,14 +37,16 @@ updated: 2026-09-09
 | [ADR-0027](ADR-0027-bedrock-gpt56-luna-dev-poc.md) | 승인됨·코드 구현, AWS 미적용 | local OpenAI Luna와 합성 dev Bedrock Luna SigV4 POC 사용, GPU Infra 보류 |
 | [ADR-0028](ADR-0028-f2-single-pass-auto-ledger-routing.md) | 승인됨·코드 구현 | F2 신규 음성을 한 번 분석하고 상담 유형에서 추천 장부와 그 장부 필드를 함께 반환 |
 | [ADR-0029](ADR-0029-runpod-manual-observation.md) | 사용자 명시 선택·구현 및 기반 제거 적용 승인·2026-09-07 감시 제거 적용 확인·팀 병합 검토 대기 | RunPod 자체 감시 제거, 운영자 시작·종료 확인, 실패 시 offline 정리·재시도 |
-| [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md) | 사용자 구현·기반 적용 승인·AWS/RunPod 후보 합성 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료 | local 개인 OpenAI 유지, dev F2/general 독립 AWS·RunPod 전환, alias·업무 데이터 보존 |
+| [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md) | 부분 대체됨(ADR-0036)·사용자 구현·기반 적용 승인·AWS/RunPod 후보 합성 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료 | local 개인 OpenAI 유지, dev F2/general 독립 AWS·RunPod 전환, alias·업무 데이터 보존 |
 | [ADR-0031](ADR-0031-runpod-junior-operations.md) | 사용자 구현 승인·코드 구현·팀 병합 검토 대기. Console 등록과 후속 감시 제거의 적용 기록은 Infra validation 참조; F2 정식 앱 배포는 미완료 | 약 10명 부트캠프 시연: Console 등록, 게시 품질 검증, API 전용 refresh·F2 동시 1건, 단일 GPU·점검 중단 허용 |
 
 | [ADR-0032](ADR-0032-general-model-comparison-profiles.md) | 사용자 구현·평가 승인·코드 구현·팀 검토 대기 | 범용 3모델 고정 프로필·실제 가중치 검증·명시 선택과 동일 조건 비교 |
 
 | [ADR-0033](ADR-0033-environment-input-maintenance.md) | 사용자 구현 승인·구현됨·팀 검토 전 | env 파일 역할·주석·Worker config 통일·F2 명시 연결·진단 기준 |
 
-| [ADR-0034](ADR-0034-module-owned-environment.md) | 사용자 명시 구현 승인·코드 구현·팀 병합 검토 전·기동 미실행 | 모듈 소유 입력·enum 선택·로컬 주입·Worker/F2/endpoint 입력의 명시적 부분 대체 |
+| [ADR-0034](ADR-0034-module-owned-environment.md) | 부분 대체됨(ADR-0036)·사용자 명시 구현 승인·코드 구현·팀 병합 검토 전·기동 미실행 | 모듈 소유 입력·enum 선택·로컬 주입·Worker/F2/endpoint 입력의 명시적 부분 대체 |
+
+| [ADR-0036](ADR-0036-shared-dev-serving-selection.md) | 사용자 계획 구현 승인·코드/자동 검증·공유 적용/기동 미수행 | SSM 공유 선택·정지 후 변경·명시 DB 대상/이력·사용자 검증 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import manage_serving as serving
+import serving_deployment
 
 
 class RemoteSelection(unittest.TestCase):
@@ -175,24 +176,26 @@ class DeploymentPreparation(unittest.TestCase):
         controller.application_smoke = Mock()
         return controller, events
 
-    def test_endpoint_is_ready_before_app_host_without_old_revision_or_smoke(self):
-        controller, events = self.controller()
-        with patch.object(serving, "emit"):
-            controller.prepare_deployment()
-        self.assertEqual(
-            events, ["preflight", "app-stop", "gpu-ready", "endpoint", "power"]
+    def test_preparation_uses_shared_reviewed_lifecycle(self):
+        controller, _ = self.controller()
+        with patch("serving_lifecycle.Lifecycle") as lifecycle:
+            controller.prepare_deployment(apply=True, hours=2, rates={"f2": 1})
+        lifecycle.assert_called_once_with(controller)
+        lifecycle.return_value.run.assert_called_once_with(
+            prepare_only=True, apply=True, hours=2, rates={"f2": 1}
         )
         controller.restore_application.assert_not_called()
         controller.application_smoke.assert_not_called()
-        controller.app.assert_called_once_with("stop")
 
     def test_missing_or_mismatched_profile_blocks_every_mutation(self):
         for selected in (None, {"model_profile": "qwen3-14b-awq"}):
             controller, events = self.controller()
             controller.selection.return_value["general"] = selected
             with self.assertRaises(serving.ToolError):
-                controller.prepare_deployment()
-            self.assertEqual(events, ["preflight"])
+                serving_deployment.require_general_selection(
+                    controller.ssm, controller.prefix, controller.selection()
+                )
+            self.assertEqual(events, [])
             controller.power.start.assert_not_called()
 
     def test_automatic_launch_association_blocks_gpu_before_mutation(self):
@@ -204,8 +207,10 @@ class DeploymentPreparation(unittest.TestCase):
         )
         group["autoScalingGroups"] = [{"name": "fixture-dev-app"}]
         with self.assertRaises(serving.ToolError):
-            controller.prepare_deployment()
-        self.assertEqual(events, ["preflight"])
+            serving_deployment.require_maintenance_deployment(
+                controller.session, controller.settings
+            )
+        self.assertEqual(events, [])
         controller.prepare.assert_not_called()
         controller.power.start.assert_not_called()
 
@@ -228,18 +233,18 @@ class DeploymentPreparation(unittest.TestCase):
             ]
             group["ec2TagSet"]["ec2TagSetList"] = groups
             with self.assertRaises(serving.ToolError):
-                controller.prepare_deployment()
-            self.assertEqual(events, ["preflight"])
+                serving_deployment.require_maintenance_deployment(
+                    controller.session, controller.settings
+                )
+            self.assertEqual(events, [])
             controller.prepare.assert_not_called()
 
-    def test_failed_gpu_preparation_does_not_power_app_or_restore_old_revision(self):
+    def test_start_uses_same_reviewed_lifecycle(self):
         controller, _ = self.controller()
-        controller.prepare.side_effect = serving.ToolError("GPU unavailable")
-        with self.assertRaises(serving.ToolError):
-            controller.prepare_deployment()
-        controller.power.start.assert_not_called()
+        with patch("serving_lifecycle.Lifecycle") as lifecycle:
+            controller.start(apply=False)
+        lifecycle.return_value.run.assert_called_once_with(apply=False)
         controller.restore_application.assert_not_called()
-        controller.application_smoke.assert_not_called()
 
 
 if __name__ == "__main__":

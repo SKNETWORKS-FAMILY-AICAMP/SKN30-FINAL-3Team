@@ -29,8 +29,8 @@ class ModelProfiles(unittest.TestCase):
             self.assertEqual(command[command.index("--max-model-len") + 1], "8192")
             self.assertEqual(command[command.index("--max-num-seqs") + 1], "1")
 
-    def test_fp8_manifest_preserves_default_and_pins_all_publisher_shards(self):
-        self.assertEqual(load_profile()["quantization"], "bitsandbytes")
+    def test_fp8_is_discovery_default_and_pins_all_publisher_shards(self):
+        self.assertEqual(load_profile()["quantization"], "fp8")
         profile = load_profile("qwen38-27b-fp8")
         self.assertEqual(profile["model"], "Qwen/Qwen3.8-27B-FP8")
         self.assertEqual(

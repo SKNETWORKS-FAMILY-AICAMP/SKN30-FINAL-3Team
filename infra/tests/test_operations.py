@@ -262,7 +262,7 @@ class CloudSafety(unittest.TestCase):
         self.assertTrue(
             any(x["status"] == "fail" and x["target"] == "f2" for x in result)
         )
-        self.assertEqual(get_runpod.call_args.args[1], "pods")
+        get_runpod.assert_not_called()
 
     def test_known_broken_or_incompatible_image_never_ready(self):
         for digest in operations.BROKEN_IMAGES:
@@ -329,7 +329,7 @@ class CloudSafety(unittest.TestCase):
             return_value=Mock(returncode=1, stdout="private", stderr="private"),
         ) as run:
             result = operations.verify_running(aws, ["f2"], "123456789012", "profile")
-            self.assertEqual(run.call_args.args[0][-2:], ["smoke", "f2"])
+            self.assertEqual(run.call_args.args[0][-2:], ["verify", "f2"])
             self.assertNotIn("private", json.dumps(result))
             self.assertEqual(result[0]["status"], "fail")
 

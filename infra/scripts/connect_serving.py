@@ -21,7 +21,7 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy" / "scripts"))
-from serving_contract import DEFAULT_GENERAL_PROFILE, GENERAL_KEY, PORTS, endpoint_urls
+from serving_contract import GENERAL_KEY, PORTS, endpoint_urls
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "serving"))
 from model_profiles import load_profile
@@ -39,11 +39,11 @@ def local_environment(
             "AI_VLLM_SLLM_API_KEY": keys[0],
             "AI_VLLM_STT_API_KEY": keys[1],
         }
+    if not model_profile:
+        raise ValueError("explicit general model profile required")
     return {
         "AI_GENERAL_PROVIDER": "vllm",
-        "AI_GENERAL_MODEL": load_profile(model_profile or DEFAULT_GENERAL_PROFILE)[
-            "model"
-        ],
+        "AI_GENERAL_MODEL": load_profile(model_profile)["model"],
         "AI_GENERAL_BASE_URL": urls[0],
         GENERAL_KEY: keys[0],
     }

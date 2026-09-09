@@ -29,10 +29,25 @@ case "${1:-}" in
     compose run --rm --no-deps -T worker python src/model_selection.py \
       --brokerage-id "$2" --capability "$3" --shared-dev --apply --workloads-stopped
     ;;
+  model-targets|model-targets-check)
+    [[ -z "$(compose ps --status running --quiet api worker)" ]]
+    action="$1"
+    shift
+    python3 "${REVISION_DIR}/scripts/render_env.py" --api-output "${API_ENV_FILE}" --worker-output "${WORKER_ENV_FILE}" --migration-output "${MIGRATION_ENV_FILE}"
+    if [[ "${action}" == model-targets-check ]]; then
+      if compose run --rm --no-deps --pull never -T worker python src/model_selection.py --help | grep -q -- '--list-targets'; then
+        echo 'model-targets-ready'
+      else
+        echo 'app-deploy-required'
+      fi
+    else
+      compose run --rm --no-deps --pull never -T worker python src/model_selection.py --shared-dev "$@"
+    fi
+    ;;
   start)
     python3 "${REVISION_DIR}/scripts/render_env.py" --api-output "${API_ENV_FILE}" --worker-output "${WORKER_ENV_FILE}" --migration-output "${MIGRATION_ENV_FILE}"
     compose up --detach --no-deps --force-recreate --pull never api worker
     "${REVISION_DIR}/scripts/validate_service.sh"
     ;;
-  *) echo 'Usage: serving_maintenance.sh stop|start|activate-general BROKERAGE_ID CAPABILITY' >&2; exit 2 ;;
+  *) echo 'Usage: serving_maintenance.sh stop|start|activate-general BROKERAGE_ID CAPABILITY|model-targets MODEL_SELECTION_ARGS|model-targets-check' >&2; exit 2 ;;
 esac

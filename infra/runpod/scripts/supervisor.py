@@ -236,9 +236,12 @@ def _model_environment(
     return result
 
 
-def _proxy_environment(environment: dict[str, str], api_key: str) -> dict[str, str]:
+def _proxy_environment(
+    environment: dict[str, str], api_key: str, identity: dict | None = None
+) -> dict[str, str]:
     result = _clean_environment(environment)
     result["F2_PROXY_API_KEY"] = api_key
+    result["F2_SERVING_IDENTITY"] = json.dumps(identity or {})
     return result
 
 
@@ -330,7 +333,16 @@ def run() -> int:
         )
         serving["sllm-proxy"] = _start(
             _proxy_command("sllm", 8001, 18001),
-            _proxy_environment(environment, config.sllm_api_key),
+            _proxy_environment(
+                environment,
+                config.sllm_api_key,
+                {
+                    "release_id": release.release_id,
+                    "model": release.base_model_id,
+                    "revision": release.base_model_revision,
+                    "artifact_sha256": environment.get("F2_SLLM_BUNDLE_SHA256"),
+                },
+            ),
         )
         # Avoid overlapping the two engines' GPU memory profiling and warmup.
         _wait_for_model(
@@ -342,7 +354,11 @@ def run() -> int:
         )
         serving["stt-proxy"] = _start(
             _proxy_command("stt", 8002, 18002),
-            _proxy_environment(environment, config.stt_api_key),
+            _proxy_environment(
+                environment,
+                config.stt_api_key,
+                {"model": config.stt_model_id, "revision": config.stt_model_revision},
+            ),
         )
         _wait_for_model(
             serving, requested, deadline, 8002, "AI_VLLM_STT_API_KEY", "stt"

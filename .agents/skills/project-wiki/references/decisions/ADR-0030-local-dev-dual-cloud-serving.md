@@ -5,6 +5,8 @@ updated: 2026-09-08
 
 # ADR-0030: local·dev를 구분한 F2·범용 GPU 운영
 
+> 2026-09-09 부분 대체: 공유 선택·실행 중 GPU 전환·기동 DB 연계는 [ADR-0036](ADR-0036-shared-dev-serving-selection.md)를 따른다. local 경계와 기존 후보 검증 기록은 보존한다.
+
 > 환경변수 입력·주입 계약은 [ADR-0034](ADR-0034-module-owned-environment.md)에서 부분 대체한다.
 
 > 2026-09-08 범용 단일 모델 선택 부분은 [ADR-0032](ADR-0032-general-model-comparison-profiles.md)가 부분 대체한다.

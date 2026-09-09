@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # ADR-0023: 개발자 운영 진입점과 검증 인계
 
+> 2026-09-09 부분 대체: 별도 general_model_selection 입력, 최초 배포 후 automatic 복구, 분리 기동 절차는 [ADR-0024](ADR-0024-shared-serving-selection-lifecycle.md)의 공유 선택 기반 계획·maintenance 유지 방식으로 대체한다. 기존 state 보호 적용 기록은 유지한다.
+
 - 상태: 사용자 개선 요청으로 구현, 팀 병합 검토 전. 실제 기동 검증은 사용자 수행.
 - 유지: Terraform/SSM/Secrets Manager 소유권, 개인 dotenv 경계, 수동 전원·명시적 모델 선택.
 

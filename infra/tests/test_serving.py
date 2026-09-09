@@ -17,6 +17,7 @@ import manage_serving as serving
 import render_env
 from connect_serving import local_environment
 from serving_contract import GENERAL_KEY, aws_base_url, endpoint_urls
+from serving_selection import document
 
 
 class Contracts(unittest.TestCase):
@@ -135,11 +136,29 @@ class Cutover(unittest.TestCase):
         controller.selection = Mock(
             return_value={
                 "f2": None,
-                "general": {"cloud": "runpod", "gpu_id": "NVIDIA L40S"},
+                "general": {
+                    "cloud": "runpod",
+                    "gpu_id": "NVIDIA L40S",
+                    "model_profile": "qwen38-27b-fp8",
+                },
             }
         )
         controller.no_deployment = Mock()
-        controller.endpoint = Mock(return_value={"status": "active"})
+        controller.endpoint = Mock(return_value={"status": "offline"})
+        controller.power = Mock()
+        controller.power.describe_asg.return_value = {
+            "DesiredCapacity": 0,
+            "Instances": [],
+        }
+        controller.instances = Mock(return_value=[])
+        controller.managed_pods = Mock(return_value=[])
+        controller.selection_document = Mock(
+            return_value=document(controller.selection())
+        )
+        controller.session = Mock()
+        controller.session.client.return_value.get_caller_identity.return_value = {
+            "Arn": "arn:aws:iam::123456789012:role/operator"
+        }
         controller.prepare = Mock(
             return_value={
                 "cloud": "aws",
@@ -150,6 +169,8 @@ class Cutover(unittest.TestCase):
         controller.app = Mock()
         controller.activate = Mock()
         controller.application_smoke = Mock()
+        controller.app_id = Mock(return_value="maintenance-host")
+        controller.command = Mock()
         controller.write = Mock()
         controller.stop_resources = Mock()
         return controller
@@ -160,47 +181,60 @@ class Cutover(unittest.TestCase):
         c.prepare.assert_not_called()
         c.write.assert_not_called()
 
-    def test_prepare_failure_keeps_live_routing(self):
+    def test_active_endpoint_refuses_switch_without_drain_or_gpu_changes(self):
         c = self.controller()
-        c.prepare.side_effect = serving.ToolError("GPU unavailable")
-        with self.assertRaises(serving.ToolError):
+        c.endpoint.return_value = {"status": "active"}
+        with self.assertRaisesRegex(serving.ToolError, "offline"):
             c.switch("general", "aws", apply=True)
         c.app.assert_not_called()
+        c.prepare.assert_not_called()
         c.activate.assert_not_called()
         c.write.assert_not_called()
 
-    def test_drain_failure_never_changes_routing(self):
+    def test_running_app_refuses_switch(self):
         c = self.controller()
-        c.app.side_effect = serving.ToolError("drain timed out")
-        with self.assertRaises(serving.ToolError):
+        c.power.describe_asg.return_value = {"DesiredCapacity": 1, "Instances": []}
+        with self.assertRaisesRegex(serving.ToolError, "host must be stopped"):
             c.switch("general", "aws", apply=True)
-        c.activate.assert_not_called()
-        c.stop_resources.assert_not_called()
-
-    def test_failed_smoke_stays_in_maintenance_and_keeps_selection(self):
-        c = self.controller()
-        c.application_smoke.side_effect = serving.ToolError("bad output")
-        with self.assertRaises(serving.ToolError):
-            c.switch("general", "aws", apply=True)
-        self.assertEqual(c.app.call_args.args, ("stop",))
-        self.assertIsNone(c.activate.call_args.args[2])
+        c.app.assert_not_called()
         c.write.assert_not_called()
-        c.stop_resources.assert_not_called()
 
-    def test_old_gpu_is_stopped_only_after_smoke(self):
+    def test_running_aws_gpu_refuses_switch(self):
         c = self.controller()
-        order = []
-        c.application_smoke.side_effect = lambda _: order.append("smoke")
-        c.write.side_effect = lambda *_: order.append("selection")
-        c.stop_resources.side_effect = lambda *_, **kw: order.append("cleanup")
+        c.instances.return_value = [{"State": {"Name": "running"}}]
+        with self.assertRaisesRegex(serving.ToolError, "GPUs stopped"):
+            c.switch("general", "aws", apply=True)
+        c.stop_resources.assert_not_called()
+        c.write.assert_not_called()
+
+    def test_remaining_managed_pod_refuses_switch(self):
+        c = self.controller()
+        c.managed_pods.return_value = [{"id": "existing-pod"}]
+        with self.assertRaisesRegex(serving.ToolError, "Pods deleted"):
+            c.switch("general", "aws", apply=True)
+        c.stop_resources.assert_not_called()
+        c.write.assert_not_called()
+
+    def test_offline_switch_only_saves_selection_and_preserves_model(self):
+        c = self.controller()
         c.switch("general", "aws", apply=True)
-        self.assertEqual(order, ["smoke", "selection", "cleanup"])
-
-    def test_same_cloud_switch_does_not_restart_gpu(self):
-        c = self.controller()
-        c.switch("general", "runpod", apply=True)
         c.prepare.assert_not_called()
         c.app.assert_not_called()
+        c.activate.assert_not_called()
+        c.stop_resources.assert_not_called()
+        suffix, value = c.write.call_args.args
+        self.assertEqual(suffix, "serving/SELECTION")
+        self.assertEqual(value["general"]["cloud"], "aws")
+        self.assertEqual(value["general"]["model_profile"], "qwen38-27b-fp8")
+        self.assertIsNone(value["f2"])
+
+    def test_same_cloud_while_active_is_still_refused(self):
+        c = self.controller()
+        c.endpoint.return_value = {"status": "active"}
+        with self.assertRaises(serving.ToolError):
+            c.switch("general", "runpod", apply=True)
+        c.prepare.assert_not_called()
+        c.write.assert_not_called()
 
 
 class LifecycleFailures(unittest.TestCase):
@@ -254,15 +288,16 @@ class LifecycleFailures(unittest.TestCase):
         c.stop_resources.assert_not_called()
         c.power.stop.assert_not_called()
 
-    def test_failed_app_restart_keeps_maintenance(self):
+    def test_start_delegates_failure_to_shared_lifecycle(self):
         c = Cutover().controller()
-        c.app_id = Mock(return_value="app")
-        c.power = Mock()
-        c.restore_application = Mock(side_effect=serving.ToolError("deployment failed"))
-        with self.assertRaises(serving.ToolError):
-            c.start()
-        self.assertEqual(c.app.call_args.args, ("stop",))
-        c.stop_resources.assert_not_called()
+        with patch("serving_lifecycle.Lifecycle") as lifecycle:
+            lifecycle.return_value.run.side_effect = serving.ToolError(
+                "deployment failed"
+            )
+            with self.assertRaisesRegex(serving.ToolError, "deployment failed"):
+                c.start(apply=True, hours=1)
+        lifecycle.assert_called_once_with(c)
+        lifecycle.return_value.run.assert_called_once_with(apply=True, hours=1)
 
     def test_operational_parameters_are_not_application_environment(self):
         payload = {
@@ -330,8 +365,9 @@ class PreparationFailures(unittest.TestCase):
         c.write.side_effect = serving.ToolError("SSM unavailable")
         with self.assertRaises(serving.ToolError):
             c.switch("general", "aws", apply=True)
-        self.assertEqual(c.app.call_args.args, ("stop",))
-        self.assertIsNone(c.activate.call_args.args[2])
+        c.app.assert_not_called()
+        c.activate.assert_not_called()
+        c.prepare.assert_not_called()
         c.stop_resources.assert_not_called()
 
 
