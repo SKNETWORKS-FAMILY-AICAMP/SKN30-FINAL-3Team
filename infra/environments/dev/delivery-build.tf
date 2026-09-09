@@ -471,6 +471,11 @@ resource "aws_codebuild_project" "frontend_deploy" {
     }
 
     environment_variable {
+      name  = "APP_DEPLOYMENT_MODE"
+      value = var.app_deployment_mode
+    }
+
+    environment_variable {
       name  = "APP_READINESS_PATH"
       value = local.application_ready_path
     }
@@ -478,7 +483,7 @@ resource "aws_codebuild_project" "frontend_deploy" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "buildspec.yml"
+    buildspec = file("${path.module}/../../delivery/buildspec-frontend-deploy.yml")
   }
 
   logs_config {

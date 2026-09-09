@@ -71,6 +71,12 @@ just ai-select --workload f2 --cloud aws --hardware-profile aws-g6-2xlarge --rel
 5. `just app-deploy` 후 통합 Pipeline 성공을 확인한다. CodeDeploy는 maintenance 상태에서
    migration·이미지·구성 준비를 수행하며 API·Worker를 시작하지 않는다. `dev-prepare-app`이나
    Pipeline 성공만으로 앱 기동 검증이 끝난 것은 아니다.
+   maintenance 배포는 `WITHOUT_TRAFFIC_CONTROL`을 사용하고 CodeDeploy의 target group 연결을
+   비운다. 정지한 API의 ALB health를 기다리지 않으며, ASG의 target group 연결은 유지한다.
+   ALB 정상 여부는 최종 `dev-start`에서 API를 기동한 뒤 확인한다.
+   Frontend 배포도 maintenance에서는 Backend readiness를 선행 조건으로 요구하지 않는다.
+   배포 모드와 pre-build 절차는 Terraform의 CodeBuild 설정이 함께 주입하며 automatic은 기존
+   readiness 검사를 유지한다. 정적 파일 업로드와 index-last 복구 계약은 동일하다.
 6. `just dev-start --hours 2`에서 같은 계획을 확인한다. RDS의 중개사 ID·capability별 현재 모델을
    보고 바꿀 대상만 `7:CHATBOT,7:POSITION_CARD`처럼 명시한다. 전후 비교를 확인한 뒤 모델 준비가
    통과하면 선택 대상에만 새 DB 버전을 추가한다. 마지막에 API·Worker와 앱 경유 합성 검증을 실행한다.

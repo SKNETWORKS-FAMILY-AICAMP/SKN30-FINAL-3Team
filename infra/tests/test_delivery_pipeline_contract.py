@@ -3,6 +3,7 @@ import os
 import shlex
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -178,6 +179,40 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             '"https://${CLOUDFRONT_DOMAIN}${APP_READINESS_PATH}"', frontend_deploy
         )
         self.assertNotIn("${CLOUDFRONT_DOMAIN}/health/ready", frontend_deploy)
+
+    def test_frontend_maintenance_defers_readiness_but_other_modes_fail_closed(self):
+        source = read("infra/delivery/buildspec-frontend-deploy.yml")
+        command = textwrap.dedent(
+            source.split("      - |\n", 1)[1].split("  build:", 1)[0]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            curl = Path(directory) / "curl"
+            curl.write_text("#!/bin/sh\necho readiness-called\nexit 22\n")
+            curl.chmod(0o700)
+            for mode, expected, calls_readiness in (
+                ("maintenance", 0, False),
+                ("automatic", 22, True),
+                ("invalid", 1, False),
+                ("", 1, False),
+            ):
+                with self.subTest(mode=mode):
+                    result = subprocess.run(
+                        ["bash", "-eu", "-c", command],
+                        check=False,
+                        env={
+                            **os.environ,
+                            "PATH": directory + ":" + os.environ["PATH"],
+                            "APP_DEPLOYMENT_MODE": mode,
+                            "CLOUDFRONT_DOMAIN": "fixture.invalid",
+                            "APP_READINESS_PATH": "/health/ready",
+                        },
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(result.returncode, expected)
+                    self.assertEqual(
+                        "readiness-called" in result.stdout, calls_readiness
+                    )
 
     def test_app_instance_uses_valid_rds_db_user_arn(self) -> None:
         terraform = read("infra/environments/dev/runtime.tf")

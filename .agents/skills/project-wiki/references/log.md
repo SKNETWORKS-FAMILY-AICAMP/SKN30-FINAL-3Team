@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # 위키 변경 로그
 
+- 2026-09-09: 승인된 공유 dev 기동 중 maintenance의 API 정지와 CodeDeploy ALB health 대기 충돌을 확인했다. Infra ADR-0024·운영 정본에 maintenance WITHOUT_TRAFFIC_CONTROL과 automatic 기존 트래픽 제어의 경계를 명시하고, Terraform 적용·drift 및 같은 앱 산출물의 CodeDeploy 재시도 성공을 확인했다. 전체 앱 기동 검증과는 구분한다.
+
 - 2026-09-09: 사용자 폐기 지시에 따라 #116·#117·#118을 역적용하고 ADR-0037로 ADR-0035를 대체했다. 기존 F3 요청 실행과 #119를 보존한다. DB·시드·배포 상태는 변경하지 않았다.
 
 - 2026-09-09: 사용자 확정 계획에 따라 공유 dev ai-select/SSM v2·적용 결과·통합 시작 계획·기존 RunPod Template API 조정·maintenance 배포·이전 검증 revision의 정확한 복원·명시 DB 대상 적용을 구현했다. Backend 단위 및 격리 PostgreSQL의 snapshot/원자성/이력 보존 검증과 운영 정본·ADR-0036/Infra ADR-0024를 연결했다. 공유 클라우드 적용·새 이미지 게시·GPU 기동/추론은 수행하지 않았고 사용자 검증으로 남긴다.

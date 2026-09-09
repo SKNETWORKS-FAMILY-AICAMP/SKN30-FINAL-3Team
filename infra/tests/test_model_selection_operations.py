@@ -135,6 +135,10 @@ class DeploymentPreparation(unittest.TestCase):
         controller.session.client.return_value.get_deployment_group.return_value = {
             "deploymentGroupInfo": {
                 "autoScalingGroups": [],
+                "deploymentStyle": {
+                    "deploymentType": "IN_PLACE",
+                    "deploymentOption": "WITHOUT_TRAFFIC_CONTROL",
+                },
                 "ec2TagSet": {
                     "ec2TagSetList": [
                         [{"Key": key, "Value": value, "Type": "KEY_AND_VALUE"}]
@@ -213,6 +217,34 @@ class DeploymentPreparation(unittest.TestCase):
         self.assertEqual(events, [])
         controller.prepare.assert_not_called()
         controller.power.start.assert_not_called()
+
+    def test_maintenance_traffic_control_is_rejected_before_start(self):
+        for style in (
+            {},
+            {"deploymentType": "IN_PLACE", "deploymentOption": "WITH_TRAFFIC_CONTROL"},
+            {
+                "deploymentType": "BLUE_GREEN",
+                "deploymentOption": "WITHOUT_TRAFFIC_CONTROL",
+            },
+        ):
+            with self.subTest(style=style):
+                controller, events = self.controller()
+                group = controller.session.client.return_value.get_deployment_group.return_value[
+                    "deploymentGroupInfo"
+                ]
+                group["deploymentStyle"] = style
+                with self.assertRaises(serving.ToolError):
+                    serving_deployment.require_maintenance_deployment(
+                        controller.session, controller.settings
+                    )
+                self.assertEqual(events, [])
+                controller.power.start.assert_not_called()
+
+    def test_maintenance_without_traffic_control_is_accepted(self):
+        controller, _ = self.controller()
+        serving_deployment.require_maintenance_deployment(
+            controller.session, controller.settings
+        )
 
     def test_broad_or_wrong_maintenance_tag_sets_are_rejected(self):
         for groups in (

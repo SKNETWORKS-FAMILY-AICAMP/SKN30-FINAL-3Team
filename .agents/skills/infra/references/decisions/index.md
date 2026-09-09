@@ -31,4 +31,4 @@ updated: 2026-09-09
 | [ADR-0021](ADR-0021-runpod-operational-reduction.md) | 사용자 감시 제거 명시 선택·기반 제거 적용 승인·2026-09-07 적용 및 drift 확인·팀 병합 검토 대기 | 감시 자원·key·GraphQL 제거, 단방향 offline 복구와 명시적 재시도 |
 | [ADR-0022](ADR-0022-dual-cloud-gpu-lifecycle.md) | 부분 대체됨(ADR-0024)·사용자 구현·기반 적용 승인·SSM/IAM 적용 및 AWS 후보 사설 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료 | 독립 GPU EC2·gp3 캐시·고정 SSM 터널과 일반/deep 전원 통합 |
 
-| [ADR-0024](ADR-0024-shared-serving-selection-lifecycle.md) | 사용자 구현 승인·코드/자동 검증·팀 검토 대기·공유 적용/기동 미수행 | 공유 선택 기반 계획·Template API 조정·maintenance·실패 정리·검증 인계 |
+| [ADR-0024](ADR-0024-shared-serving-selection-lifecycle.md) | 기반 병합·공유 Terraform/서빙 준비 확인·maintenance 트래픽 수정 검토·전체 앱 검증 대기 | 공유 선택 기반 계획·Template API 조정·maintenance·실패 정리·검증 인계 |
