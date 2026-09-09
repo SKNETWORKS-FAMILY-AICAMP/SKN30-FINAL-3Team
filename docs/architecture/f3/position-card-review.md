@@ -9,6 +9,13 @@ updated: 2026-09-09
 `1d44019`를 병합한 뒤 진행했다. [리팩토링 구현·확장 경계](../../../.agents/skills/backend/references/f3-execution.md)를 함께 본다.
 공유 dev의 현재 배포 revision·DB·실제 요청 지연은 조회하지 않았다. 아래 구현 사실은 코드 기준이며 성능 수치는 실측값이 아니다.
 
+## 최신 구현 진입
+
+최신 dev `f700f5a`를 병합해 구현한 1차 범위는 [기능 정의](../../requirements/f3/judgment-results-list.md),
+[화면 위치·이동](../../screen/f3-judgment-results.md), [조회 API·내부 확장](expansion-contracts.md)에 둔다.
+[페르소나 검토·검증안](planning-validation.md)과 [챗봇 후속 연계](chatbot-extension.md)를 반영했다. **현재 코드·검증은 [1차 구현 기록](implementation-and-validation.md)과 [ADR-0035](../../../.agents/skills/project-wiki/references/decisions/ADR-0035-f3-conditional-automation-results.md)가 우선한다.**
+아래는 당시 코드의 역사적 검토이며 현재 Worker heartbeat·자동 실행·완료 재사용 정책과 다르다. 과거 검증을 이번 검증으로 재집계하지 않는다.
+
 ## 검토 결론
 
 후속 사용자 요청을 반영해 제품·자동 실행 권고를 수정했다. [Worker 실행·확장성](worker-deployment-review.md),
@@ -20,7 +27,7 @@ updated: 2026-09-09
 - 초기 독립 카드 요청은 [대안 요구안](../../requirements/f3/position-card-delivery.md)에 보존한다. 최신 권고는 조건부 자동 판정의 결과 목록을 우선하고 카드는 근거 상세로 제공하는 것이다.
 - [이벤트·재사용 설계](position-card-events.md), [로컬·dev 자원 제안](position-card-infrastructure.md)을 단계적으로 적용하는 안을 권고한다. 아직 구현·승인한 변경은 아니다.
 
-## 현재 구현
+## 최초 검토 당시 구현
 
 | 흐름 | 코드에서 확인한 동작 | 근거 |
 |---|---|---|
