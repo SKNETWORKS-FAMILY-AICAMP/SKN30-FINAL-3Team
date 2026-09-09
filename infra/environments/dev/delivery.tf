@@ -110,13 +110,16 @@ resource "aws_codedeploy_deployment_group" "backend" {
   }
 
   deployment_style {
-    deployment_option = "WITH_TRAFFIC_CONTROL"
+    deployment_option = var.app_deployment_mode == "maintenance" ? "WITHOUT_TRAFFIC_CONTROL" : "WITH_TRAFFIC_CONTROL"
     deployment_type   = "IN_PLACE"
   }
 
-  load_balancer_info {
-    target_group_info {
-      name = aws_lb_target_group.app.name
+  dynamic "load_balancer_info" {
+    for_each = var.app_deployment_mode == "automatic" ? [1] : []
+    content {
+      target_group_info {
+        name = aws_lb_target_group.app.name
+      }
     }
   }
 }

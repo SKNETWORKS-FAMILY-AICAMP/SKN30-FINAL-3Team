@@ -14,6 +14,15 @@ def require_maintenance_deployment(session, settings: Settings) -> None:
             "first deployment requires the reviewed app_deployment_mode=maintenance "
             "Terraform plan; automatic ASG launch deployment is still attached"
         )
+    style = group.get("deploymentStyle", {})
+    if (
+        style.get("deploymentType") != "IN_PLACE"
+        or style.get("deploymentOption") != "WITHOUT_TRAFFIC_CONTROL"
+    ):
+        raise ToolError(
+            "maintenance deployment must use IN_PLACE / WITHOUT_TRAFFIC_CONTROL; "
+            "the stopped app cannot satisfy CodeDeploy ALB health checks"
+        )
     expected = {
         ("Project", settings.project),
         ("Environment", settings.environment),

@@ -5,7 +5,7 @@ updated: 2026-09-09
 
 # ADR-0024: 공유 선택 기반 시작 계획·Template 조정·실패 복구
 
-- 상태: 사용자 구현 승인·코드/오프라인 자동 검증. 팀 병합·공유 Terraform 적용·새 이미지 게시·GPU 기동/추론은 미수행이다.
+- 상태: 기반 구현은 PR #119로 병합됐다. 사용자 기동 요청에 따라 공유 Terraform 적용과 기존 게시 이미지의 RunPod F2/general 준비·합성 요청을 확인했다. maintenance 트래픽 대기 수정은 후속 PR 검토 대상이며, 전체 앱 기동·사용자 검증 완료와 구분한다.
 - 공통 정책: [프로젝트 ADR-0036](../../../project-wiki/references/decisions/ADR-0036-shared-dev-serving-selection.md).
 - 부분 대체: ADR-0020의 기존 Template 수동 수정, ADR-0022의 분리 선택/전환/시작 경로,
   ADR-0023의 별도 general_model_selection 입력과 최초 배포 뒤 automatic 복구 절차.
@@ -48,6 +48,11 @@ Whisper는 고정 Hugging Face revision을 사용한다. URL·장기 AWS 키를 
 ## maintenance와 실패 복구
 
 배포 계획은 maintenance로 유지하며 CodeDeploy와 호스트 marker가 API·Worker 시작을 보류한다.
+이 모드의 CodeDeploy는 IN_PLACE / WITHOUT_TRAFFIC_CONTROL과 빈 load balancer 연결을 사용한다.
+정지한 API를 대상으로 AllowTraffic의 ALB health를 기다리면 배포가 완료되지 않으므로,
+트래픽 전환은 maintenance 배포에서 제외한다. ASG의 target group 연결은 유지하고 앱 기동 후 확인한다.
+automatic 모드는 기존 WITH_TRAFFIC_CONTROL을 유지한다.
+구현 근거: [AWS DeploymentStyle](https://docs.aws.amazon.com/codedeploy/latest/APIReference/API_DeploymentStyle.html).
 `app-deploy`는 명시적으로 실행한다. 최초/구 revision 호스트에는 CLI 준비를 위한 배포 선행 조건을
 표시한다. 이전 검증 근거가 있는 호스트 재생성은 아래의 정확한 revision 복원 경로를 사용한다.
 이후 RDS 대상 목록·사용자 확인·모델 준비·Backend 트랜잭션·최종 호환성 검사 뒤에만 앱을 시작한다.
