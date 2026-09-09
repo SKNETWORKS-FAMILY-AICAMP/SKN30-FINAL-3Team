@@ -13,7 +13,7 @@ def test_candidate_card_implementation_and_project_wiki_stay_aligned() -> None:
         / "project-wiki"
         / "references"
         / "contracts"
-        / "api.md"
+        / "api-f3.md"
     ).read_text(encoding="utf-8")
     ai_contract = (
         REPOSITORY_ROOT
@@ -22,7 +22,7 @@ def test_candidate_card_implementation_and_project_wiki_stay_aligned() -> None:
         / "project-wiki"
         / "references"
         / "contracts"
-        / "f3-ai.md"
+        / "f3-ai-position-card.md"
     ).read_text(encoding="utf-8")
     online_runtime = (
         REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"

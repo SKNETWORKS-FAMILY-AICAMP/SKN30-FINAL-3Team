@@ -18,6 +18,7 @@ updated: 2026-08-18
 | [aws-account-bootstrap.md](aws-account-bootstrap.md) | AWS 계정 인증, state bootstrap, 비용·IAM 기본 설정을 다룰 때 |
 | [decisions/index.md](decisions/index.md) | Infra 내부 구조나 운영 방식을 변경하기 전에 승인 결정을 확인할 때 |
 | [open-questions.md](open-questions.md) | 아직 승인되지 않은 배포·보안·운영 선택에 의존할 때 |
+| [Qwen JSON 기록](../../../../infra/serving/qwen-records.md) | 평가·이미지 JSON 선행 반영과 후속 #107의 구현 경계를 확인할 때 |
 | [AWS·RunPod LLM 운영](../../../../infra/serving/README.md) | f2/general 등록, local 연결, 전환, GPU 캐시·전원과 실제 검증을 수행할 때 |
 
 모델별 선택·동일 조건 평가·프로필 provenance는 [3모델 비교 기록](../../../../infra/serving/model-comparison-2026-09-08.md)을 확인한다.

@@ -13,7 +13,7 @@ def test_candidate_selection_implementation_and_project_wiki_stay_aligned() -> N
         / "project-wiki"
         / "references"
         / "contracts"
-        / "api.md"
+        / "api-f3.md"
     ).read_text(encoding="utf-8")
     online_runtime = (
         REPOSITORY_ROOT / "docs" / "architecture" / "f3" / "online-runtime.md"

@@ -204,7 +204,7 @@ test("changed paths select only applicable module policies", async () => {
   );
 });
 
-test("policy packs select API sections and bounded Infra domains", async () => {
+test("policy packs select split API contracts and bounded Infra domains", async () => {
   const api = await selectPolicyPaths(
     ["frontend/src/features/f3/api/f3Transport.ts"],
     policy,
@@ -212,15 +212,12 @@ test("policy packs select API sections and bounded Infra domains", async () => {
   );
   assert.ok(api.policyPackIds.includes("api-contract-base"));
   assert.ok(api.policyPackIds.includes("api-contract-f3"));
-  const apiDocument = api.documents.find(
-    (document) => document.path === ".agents/skills/project-wiki/references/contracts/api.md"
-  );
-  assert.deepEqual(apiDocument.sections, [
-    "기본 규칙",
-    "모델 경계 후보",
-    "초기 Backend 계약",
-    "F3 실행 계약"
-  ]);
+  const contracts = ".agents/skills/project-wiki/references/contracts/";
+  for (const filename of ["api-common.md", "api-f3.md", "f3-ai-common.md", "f3-ai-position-card.md", "f3-ai-brokerage.md", "f3-ai-implementation.md"]) {
+    assert.ok(api.paths.includes(contracts + filename), filename);
+  }
+  assert.equal(api.paths.includes(contracts + "api-f2.md"), false);
+  assert.equal(api.paths.includes(contracts + "api.md"), false);
 
   const network = await selectPolicyPaths(
     ["infra/environments/dev/network.tf"],
@@ -243,6 +240,37 @@ test("policy packs select API sections and bounded Infra domains", async () => {
   );
   assert.ok(backendFeatures.policyPackIds.includes("api-contract-f2"));
   assert.ok(backendFeatures.policyPackIds.includes("api-contract-f3"));
+});
+
+test("split contract edits retain common and feature evidence in leaf and arbiter", async () => {
+  const contracts = ".agents/skills/project-wiki/references/contracts/";
+  const cases = [
+    ["api-f1.md", ["api-common.md", "api-f1.md"]],
+    ["api-f2.md", ["api-common.md", "api-f2.md"]],
+    ["api-f3.md", ["api-common.md", "api-f3.md", "f3-ai-common.md", "f3-ai-position-card.md", "f3-ai-brokerage.md", "f3-ai-implementation.md"]],
+    ["f3-ai-position-card.md", ["api-common.md", "api-f3.md", "f3-ai-common.md", "f3-ai-brokerage.md"]],
+    ["api-f4-timekeeper.md", ["api-common.md", "api-f4-timekeeper.md"]],
+    ["api-f4-calendar.md", ["api-common.md", "api-f4-calendar.md", "api-f4-timekeeper.md"]]
+  ];
+  for (const phase of ["leaf", "arbiter"]) {
+    for (const [changed, expected] of cases) {
+      const selected = await selectPolicyPaths([contracts + changed], policy, rootDir, { phase });
+      for (const filename of expected) assert.ok(selected.paths.includes(contracts + filename), `${phase} ${changed}: ${filename}`);
+    }
+  }
+});
+
+test("calendar code selects its persistence contract and Time Keeper union boundary", async () => {
+  const contracts = ".agents/skills/project-wiki/references/contracts/";
+  for (const filename of ["backend/src/domain/calendar/service.py", "frontend/src/features/calendar/model/dto.ts"]) {
+    const selected = await selectPolicyPaths([filename], policy, rootDir);
+    assert.ok(selected.policyPackIds.includes("api-contract-f4-calendar"));
+    for (const document of ["api-common.md", "api-f4-calendar.md", "api-f4-timekeeper.md"]) {
+      assert.ok(selected.paths.includes(contracts + document), document);
+    }
+    assert.ok(selected.paths.includes(".agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md"));
+    assert.equal(selected.paths.includes(contracts + "api-f2.md"), false);
+  }
 });
 
 test("Markdown section selection keeps document identity and rejects missing headings", () => {
