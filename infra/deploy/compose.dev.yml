@@ -70,6 +70,8 @@ services:
     env_file:
       - path: "${MIGRATION_ENV_FILE:?MIGRATION_ENV_FILE is required}"
         format: raw
+    environment:
+      PGOPTIONS: "-c role=app_owner"
     command: ["python", "src/migration_guard.py"]
     restart: "no"
     logging:
