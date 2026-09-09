@@ -52,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
         "seed-f3-synthetic",
         help="로컬 loopback DB의 F3 합성 seed를 초기화하고 검증한다",
     )
+    f3_seed.add_argument(
+        "--ledger-only",
+        action="store_true",
+        help="예시 매칭 결과 없이 원장만 적재하여 실제 모델 파이프라인을 검증한다",
+    )
     backfill = subcommands.add_parser(
         "backfill-position-cards",
         help="활성 매물·손님의 포지션 카드를 미리 만들도록 F3 실행을 접수한다",
@@ -131,7 +136,21 @@ def main() -> None:
             )
         except SyntheticSeedError as error:
             raise SystemExit(str(error)) from None
-        print(json.dumps(asdict(result), ensure_ascii=False))
+        output = asdict(result)
+        if not arguments.ledger_only:
+            from synthetic_match_seed import complete_match_seed
+
+            engine = create_database_engine(config)
+            try:
+                output["matching_results"] = complete_match_seed(engine, arguments.model_profile)
+            except Exception:
+                raise SystemExit(
+                    "Ledger seed applied, but matching examples failed verification. "
+                    "Retry the synthetic seed command. Sensitive details withheld."
+                ) from None
+            finally:
+                engine.dispose()
+        print(json.dumps(output, ensure_ascii=False))
         return
 
     engine = create_database_engine(config)

@@ -166,6 +166,9 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
         select(AgentRun)
         .where(
             *root_cross_judgment_conditions(),
+            or_(
+                col(AgentRun.next_attempt_at).is_(None), col(AgentRun.next_attempt_at) <= func.now()
+            ),
             # 저장이 만든 실행은 앵커 카드까지만 만들고 멈춘다. 사용자가 판정을 요청하면
             # `service` 가 trigger_type 을 옮겨 다시 선점 대상이 된다(F3-CR-01~04).
             not_(
@@ -191,7 +194,9 @@ def lock_claimable_run(session: Session, max_attempts: int) -> AgentRun | None:
                 ),
             ),
         )
-        .order_by(col(AgentRun.created_at).asc(), col(AgentRun.id).asc())
+        .order_by(
+            col(AgentRun.priority).desc(), col(AgentRun.created_at).asc(), col(AgentRun.id).asc()
+        )
         .limit(1)
         .with_for_update(skip_locked=True)
     )
@@ -453,6 +458,7 @@ def release_lease(
         # 경계값이 같아 한 번 건너뛸 수 있다. 확실히 과거로 보내 즉시 재선점 가능하게 한다.
         .values(
             lease_expires_at=func.now() - func.make_interval(0, 0, 0, 0, 0, 0, 1),
+            next_attempt_at=func.now() + func.make_interval(0, 0, 0, 0, 0, 0, 5 * attempt_count),
             updated_at=func.now(),
         )
         .execution_options(synchronize_session=False)

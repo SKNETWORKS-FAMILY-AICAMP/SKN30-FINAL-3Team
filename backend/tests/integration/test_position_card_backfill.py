@@ -59,6 +59,9 @@ def isolated_brokerage() -> Any:
 
     with Session(engine) as session:
         # 참조하는 쪽부터 지운다. `agent_run` 이 매물을 외래키로 잡고 있다.
+        session.execute(
+            text("DELETE FROM match_target_state WHERE brokerage_id = :b"), {"b": BROKERAGE_ID}
+        )
         session.execute(text("DELETE FROM agent_run WHERE brokerage_id = :b"), {"b": BROKERAGE_ID})
         complex_ids = session.exec(
             select(PropertyComplex.id).where(
@@ -77,6 +80,12 @@ def isolated_brokerage() -> Any:
                 session.execute(delete(PropertyUnit).where(col(PropertyUnit.id).in_(unit_ids)))
             session.execute(delete(PropertyComplex).where(col(PropertyComplex.id).in_(complex_ids)))
         session.execute(text("DELETE FROM app_user WHERE brokerage_id = :b"), {"b": BROKERAGE_ID})
+        session.execute(
+            text("DELETE FROM match_change_outbox WHERE brokerage_id = :b"), {"b": BROKERAGE_ID}
+        )
+        session.execute(
+            text("DELETE FROM match_source_revision WHERE brokerage_id = :b"), {"b": BROKERAGE_ID}
+        )
         session.execute(text("DELETE FROM brokerage WHERE id = :b"), {"b": BROKERAGE_ID})
         session.commit()
 
@@ -101,7 +110,12 @@ def _listing_under_new_unit(session: Session, unit_number: str) -> tuple[int, in
     )
     session.add(unit)
     session.flush()
-    listing = PropertyListing(brokerage_id=BROKERAGE_ID, unit_id=unit.id or 0)
+    listing = PropertyListing(
+        brokerage_id=BROKERAGE_ID,
+        unit_id=unit.id or 0,
+        is_sale_available=True,
+        sale_price=2_880_000_000,
+    )
     session.add(listing)
     session.flush()
     session.commit()

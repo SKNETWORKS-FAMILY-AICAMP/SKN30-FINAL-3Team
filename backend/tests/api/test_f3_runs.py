@@ -202,14 +202,21 @@ def test_requirement_anchor_stores_the_requirement_target_and_row_version(
 
 
 @requires_database
-def test_redacted_input_snapshot_keeps_only_anchor_and_version(config: Config) -> None:
+def test_redacted_input_snapshot_keeps_only_identifiers_and_freshness_tokens(
+    config: Config,
+) -> None:
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "스냅샷단지")
         listing = create_listing(client, complex_id)
 
         client.post("/api/v1/f3/runs", json={"anchor_type": "LISTING", "anchor_id": listing["id"]})
 
-        assert stored_runs(session, brokerage_id)[0]["redacted_input_snapshot"] == {
+        snapshot = stored_runs(session, brokerage_id)[0]["redacted_input_snapshot"]
+        marker = snapshot.pop("automation")
+        assert set(marker) == {"revision", "day", "configuration"}
+        assert isinstance(marker["revision"], int)
+        assert len(marker["configuration"]) == 64
+        assert snapshot == {
             "anchor_type": "LISTING",
             "anchor_id": listing["id"],
             "input_data_version": listing["row_version"],

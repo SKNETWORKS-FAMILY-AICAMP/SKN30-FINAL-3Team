@@ -179,6 +179,7 @@ export const httpTransport: LedgerTransport = {
         unit_id: scope.unitId,
         requirement_id: scope.requirementId,
         party_id: scope.partyId,
+        interaction_id: scope.interactionId,
         limit: scope.limit,
       },
       signal,

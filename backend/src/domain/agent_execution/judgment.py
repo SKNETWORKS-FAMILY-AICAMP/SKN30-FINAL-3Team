@@ -39,7 +39,7 @@ from brokerage_ai.f3 import (
 )
 from sqlmodel import Session
 
-from domain.agent_execution import repository
+from domain.agent_execution import freshness, judgment_cache, repository
 from domain.agent_execution.anchor_card import GenerationBindingError
 from domain.agent_execution.candidate_cards import CandidateSelectionMissingError
 from domain.agent_execution.candidates import (
@@ -59,7 +59,7 @@ from domain.agent_execution.models import (
     NegotiationPositionAnalysis,
     anchor_of,
 )
-from domain.agent_execution.service import current_target_version
+from domain.agent_execution.service import current_target_version, input_version_matches
 
 
 class JudgmentAlreadyStoredError(RuntimeError):
@@ -195,7 +195,11 @@ def _judgment_card(card: NegotiationPositionAnalysis) -> JudgmentCard:
 
 
 def _load_cards(
-    session: Session, brokerage_id: int, anchor_card_id: int, candidate_card_ids: tuple[int, ...]
+    session: Session,
+    brokerage_id: int,
+    anchor_card_id: int,
+    candidate_card_ids: tuple[int, ...],
+    run: AgentRun | None = None,
 ) -> tuple[JudgmentCard, tuple[JudgmentCard, ...]]:
     """앵커와 후보 카드를 활성 상태로 읽는다. 하나라도 없으면 판정하지 않는다."""
     wanted = (anchor_card_id, *candidate_card_ids)
@@ -206,7 +210,12 @@ def _load_cards(
         raise AnchorCardMissingError("a position card required for the judgment is unavailable")
     for card in found.values():
         card_target = _position_card_target(card)
-        if current_target_version(session, brokerage_id, *card_target) != card.data_version:
+        matches = (
+            input_version_matches(session, run, *card_target, card.data_version)
+            if run is not None
+            else current_target_version(session, brokerage_id, *card_target) == card.data_version
+        )
+        if not matches:
             raise InputVersionChangedError("a position card target changed before the judgment")
     return (
         _judgment_card(found[anchor_card_id]),
@@ -255,10 +264,7 @@ def prepare_judgment(
             raise LeaseNotHeldError("the worker does not hold a valid lease on this run")
 
         anchor_type, anchor_id = anchor_of(run)
-        if (
-            current_target_version(session, run.brokerage_id, anchor_type, anchor_id)
-            != run.input_data_version
-        ):
+        if not input_version_matches(session, run, anchor_type, anchor_id, run.input_data_version):
             raise InputVersionChangedError("the anchor changed after the cards were made")
 
         header = repository.find_match_evaluation_for_run(session, run.brokerage_id, run_id)
@@ -277,7 +283,11 @@ def prepare_judgment(
             _require_supported_privacy_mode(binding.input_privacy_mode)
             model_snapshot = _expected_model_snapshot(session, run.brokerage_id, binding)
             anchor_card, candidate_cards = _load_cards(
-                session, run.brokerage_id, header.anchor_position_analysis_id, candidate_card_ids
+                session,
+                run.brokerage_id,
+                header.anchor_position_analysis_id,
+                candidate_card_ids,
+                run,
             )
             request = BrokerageJudgmentRequest(
                 input_privacy_mode=binding.input_privacy_mode,
@@ -286,6 +296,9 @@ def prepare_judgment(
             )
 
             expected_binding = _judgment_snapshot(binding, model_snapshot)
+            expected_binding["input_identity"] = judgment_cache.request_identity(
+                request, expected_binding
+            )
             if run.status == CANDIDATE_CARDS_READY_STATUS:
                 # 후보가 있을 때만 JUDGING 을 거친다. 판정할 것이 없으면 "판정 중"이 거짓이다.
                 snapshot = dict(run.redacted_output_snapshot)
@@ -302,7 +315,10 @@ def prepare_judgment(
                 )
                 if changed != 1:
                     raise LeaseNotHeldError("the lease was lost before the run could advance")
-            elif run.redacted_output_snapshot.get("judgment") != expected_binding:
+            elif run.redacted_output_snapshot.get("judgment") not in (
+                expected_binding,
+                {key: value for key, value in expected_binding.items() if key != "input_identity"},
+            ):
                 # JUDGING lease 재선점 시 최초 시도의 바인딩을 바꾸지 않는다.
                 raise GenerationBindingError("the resumed judgment binding does not match")
 
@@ -459,13 +475,12 @@ def store_judgment(
             ):
                 raise GenerationBindingError("the judgment binding changed while the model ran")
 
-        if (
-            current_target_version(
-                session, run.brokerage_id, prepared.anchor_type, prepared.anchor_id
-            )
-            != prepared.anchor_data_version
+        if not input_version_matches(
+            session, run, prepared.anchor_type, prepared.anchor_id, prepared.anchor_data_version
         ):
             raise InputVersionChangedError("the anchor changed while the judgment ran")
+
+        freshness.verify_run_fence(session, run)
 
         header = repository.find_match_evaluation_for_run(session, run.brokerage_id, run_id)
         if header is None or header.id != prepared.match_evaluation_id:
@@ -495,6 +510,7 @@ def store_judgment(
                 run.brokerage_id,
                 prepared.anchor_card_id,
                 prepared.candidate_card_ids,
+                run,
             )
             validate_judgment_result(request, result)
             offsets = _quote_offsets(
@@ -558,6 +574,7 @@ def store_judgment(
         )
         if changed != 1:
             raise LeaseNotHeldError("the lease was lost before the run could complete")
+        freshness.publish_result(session, run, prepared.match_evaluation_id)
         session.commit()
     except BaseException:
         session.rollback()
@@ -602,6 +619,14 @@ async def judge_and_store(
     if prepared.request is not None:
         if binding is None:
             raise GenerationBindingError("the judgment binding is unavailable")
-        result = await binding.generator.judge_candidates(prepared.request)
+        result = judgment_cache.find_reusable_judgment(
+            session,
+            prepared.brokerage_id,
+            prepared.request,
+            _judgment_snapshot(binding, prepared.model_snapshot or {}),
+        )
+        session.commit()  # Close cache lookup transaction before any provider call.
+        if result is None:
+            result = await binding.generator.judge_candidates(prepared.request)
 
     return store_judgment(session, run_id, worker_id, attempt_count, binding, prepared, result)
