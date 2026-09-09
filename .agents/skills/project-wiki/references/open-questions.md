@@ -1,12 +1,16 @@
 ---
 status: 미확정
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 # 미해결 질문
 
 | ID | 질문 | 현재 후보·맥락 | 영향 | 결정 주체 |
 |---|---|---|---|---|
+| OQ-F3-04 | Worker 독립 배포 전환 시점·역할별 자원 예산·lease/drain·GPU 전체 동시성은 어떻게 정할 것인가? | [Worker 검토](../../../../docs/architecture/f3/worker-deployment-review.md): 분산 선점 기반은 구현, 현재 배포는 단일 app ASG/호스트에 결합. 다중 host 검증 전 | 배포·복구·CPU/DB/GPU 용량·API 지연 | Backend·AI·Infra·팀 |
+| OQ-F3-01 | 결과 목록의 1차 배치·필터·카드 근거 표시를 어떻게 정할 것인가? | 후속 [요구안](../../../../docs/requirements/f3/judgment-results-list.md)은 결과 목록 우선·카드는 근거 상세를 권고. 독립 카드 조회는 보조 대안이며 사용자 검토 전 | API·Frontend·사용자 대기 | 기획·Frontend·Backend·팀 |
+| OQ-F3-02 | 저장 이벤트의 원자적 기록 실패를 F1 저장 실패로 취급할 것인가? | [설계안](../../../../docs/architecture/f3/position-card-events.md)은 transactional outbox 권고. 기존 commit 후 F3 실패 무시와 차이 있음. 이벤트/작업 보존은 OQ-007 연계 | F1 성공 의미·내구성·DB·복구 | Backend·기획·팀 |
+| OQ-F3-03 | 조건부 자동 판정 gate·병합 지연·최신성 SLA·날짜 기준을 어떻게 정할 것인가? | 사용자 GPU 상시 운영 조건을 반영한 [설계안](../../../../docs/architecture/f3/conditional-auto-judgment.md)은 유효 대상의 의미 있는 변경을 자동 판정하고 완료 결과 재사용 권고. ADR-0018 후속 개정은 제안. 큐 전환은 OQ-009 | 사용자 대기·후보 무효화·처리 용량 | 기획·AI·Backend·Infra·팀 |
 | OQ-CHAT-03 | 후속 시세 착수 시 요약 범위·지역·단지·표본 기준을 어떻게 정할 것인가? | **1차 비차단·후속 착수 시 결정.** 사용자가 시세를 1차에서 제외했다. [공공 API 조사](../../../../docs/architecture/chatbot/public-market-data.md)의 후보·F4 가격 평가 제외와의 관계를 후속 단계에서 검토 | 외부 API, 데이터 품질, 후속 공수 | 기획·Backend·Data·팀 |
 | OQ-007 | 아직 확정되지 않은 개인정보의 보존 기간과 삭제 절차는 무엇인가? | 기능 및 법률 검토 후 결정. `agent_run.requested_by`와 `ai_decision_feedback.created_by`는 [개인정보 정책](privacy/policy.md)에서 확정했고 인물 성명·연락처, 상담 원문과 임시 음성이 남아 있다 | DB, 로그, 큐, 백업 | 기획·팀 |
 | OQ-009 | RDS 작업 polling에서 SQS·DLQ로 전환할 측정 조건과 소비·재시도 계약은 무엇인가? | 1차는 RDS polling이며 독립 재시도·지연 격리·Worker 확장이 어려워질 때만 SQS·DLQ 도입 | backend-ai 계약, 멱등성, DLQ, 배포 | 백엔드·에이전트·인프라 담당·팀 |

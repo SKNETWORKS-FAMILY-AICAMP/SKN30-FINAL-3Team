@@ -713,3 +713,56 @@ def test_the_plan_only_covers_the_carded_top_candidates() -> None:
         assert plan.candidate_side is AnchorType.REQUIREMENT
         assert len(plan.candidate_ids) == CANDIDATE_CARD_LIMIT
         assert fixture.snapshot()["total_count"] == 18
+
+
+@requires_database
+@pytest.mark.parametrize("failed_ordinal", [0, 1])
+def test_retry_reuses_successful_cards_after_an_earlier_candidate_failure(
+    failed_ordinal: int,
+) -> None:
+    """선행 후보가 실패해도 후행 성공 카드를 저장하고 재시도는 누락분만 생성한다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        for index in range(3):
+            fixture.requirement(budget=3_000_000_000, party_name=f"합성손님{index}")
+        run_id = fixture.prepared_run()
+        plan = candidate_cards_module.plan_candidate_cards(session, run_id, WORKER, ATTEMPT)
+        failed_id = plan.candidate_ids[failed_ordinal]
+        generator = FakeGenerator(fail_on_anchor_id=failed_id)
+
+        with pytest.raises(RuntimeError, match="provider is unavailable"):
+            asyncio.run(
+                generate_and_store_candidate_cards(
+                    session,
+                    run_id=run_id,
+                    worker_id=WORKER,
+                    attempt_count=ATTEMPT,
+                    binding=binding_for(fixture, generator),
+                    as_of=AS_OF,
+                )
+            )
+
+        assert generator.calls == 3
+        assert {card["requirement_id"] for card in fixture.cards("REQUIREMENT")} == (
+            set(plan.candidate_ids) - {failed_id}
+        )
+        assert fixture.stored_run(run_id)["status"] == CANDIDATES_READY_STATUS
+        assert "candidate_cards" not in fixture.snapshot()
+
+        retry = FakeGenerator()
+        result = asyncio.run(
+            generate_and_store_candidate_cards(
+                session,
+                run_id=run_id,
+                worker_id=WORKER,
+                attempt_count=ATTEMPT,
+                binding=binding_for(fixture, retry),
+                as_of=AS_OF,
+            )
+        )
+
+        assert retry.calls == 1
+        assert retry.requests[0].anchor_id == failed_id
+        assert tuple(card.candidate_id for card in result.cards) == plan.candidate_ids
+        assert sum(card.cache_hit for card in result.cards) == 2
+        assert fixture.stored_run(run_id)["status"] == CANDIDATE_CARDS_READY_STATUS

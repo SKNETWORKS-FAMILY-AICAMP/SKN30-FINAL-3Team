@@ -73,8 +73,9 @@ DB 기본값(`negotiation_intent = 'UNKNOWN'`, `urgency = 'UNKNOWN'`,
   다시 확인한다.
 - 같은 대상·입력·모델·프롬프트·워크플로의 유효한 캐시가 있으면 모델을 호출하지 않는다.
 - 후보 카드는 child 실행을 만들지 않고 루트 `agent_run`에 귀속한다.
-- 후보를 순차 처리하고 전부 확보한 뒤에만 `CANDIDATE_CARDS_READY`로 전이한다. 중간에 실패하면
-  이미 저장된 카드는 유효한 캐시로 남지만 상태는 `CANDIDATES_READY`를 유지한다.
+- 입력 준비와 저장은 순차 처리하고 DB transaction 밖의 모델 호출만 병렬 실행한다.
+  전부 확보한 뒤에만 `CANDIDATE_CARDS_READY`로 전이한다. 일부 생성이 실패해도 다른 성공
+  카드는 각각 재검증 후 저장하여 재사용하며, 상태는 `CANDIDATES_READY`를 유지한다.
 - 후보가 0건이면 모델을 호출하지 않고 빈 카드 목록을 기록한 뒤 상태를 전이한다.
 
 이 단계도 ADR-0014의 `SYNTHETIC_PROTOTYPE` 입력만 허용한다. 실사용 F1 마스킹은

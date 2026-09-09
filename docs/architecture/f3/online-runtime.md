@@ -188,7 +188,10 @@ sequenceDiagram
 
 현재 구현된 앵커 카드 유스케이스는 lease·attempt와 앵커 입력을 확인하고, cache hit이면 검증된 카드를 재사용하며, cache miss이면 주입된 AI 생성기를 호출한 뒤 카드·가격·근거를 저장하고 `ANCHOR_READY`로 전이한다. Worker handler가 `RUNNING` 상태에서 이 유스케이스를 호출한다.
 
-후보 카드 유스케이스는 `candidate-selection:v3` snapshot에서 `selected_for_cards`인 상위 5건을 순서대로 읽고 앵커의 반대편 포지션 카드를 확보한다. 앵커 카드와 같은 snapshot·privacy mode·cache key·저장 직전 fencing 경로를 재사용하며 후보의 현재 `row_version`을 고정한다. 후보를 순차 처리해 전부 확보한 경우에만 카드 ID를 snapshot에 기록하고 `CANDIDATE_CARDS_READY`로 전이한다. 후보가 0건이면 모델 호출 없이 전이하고, 하나라도 실패하면 상태는 `CANDIDATES_READY`에 남는다. Worker handler가 `CANDIDATES_READY` 상태에서 이 유스케이스를 호출한다.
+후보 카드 유스케이스는 `candidate-selection:v3` snapshot에서 `selected_for_cards`인 상위 5건을 순서대로 읽고 앵커의 반대편 포지션 카드를 확보한다. 앵커 카드와 같은 snapshot·privacy mode·cache key·저장 직전 fencing 경로를 재사용하며 후보의 현재 `row_version`을 고정한다. 입력 준비·저장은 순차 처리하고 모델 호출만 병렬 실행하며, 전부 확보한 경우에만 카드 ID를 snapshot에 기록하고 `CANDIDATE_CARDS_READY`로 전이한다. 후보가 0건이면 모델 호출 없이 전이하고, 하나라도 실패하면 상태는 `CANDIDATES_READY`에 남는다. Worker handler가 `CANDIDATES_READY` 상태에서 이 유스케이스를 호출한다.
+
+Worker 수명주기, 모델 조립, 단계 선택과 Repository의 내부 책임은
+[Backend F3 실행 경계](../../../.agents/skills/backend/references/f3-execution.md)에 정리한다.
 
 Worker는 실패 원인을 원문 없이 집계할 수 있게 두 구조화 로그를 남긴다.
 
@@ -217,9 +220,9 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 |---|---|
 | `POST /api/v1/f3/runs`. 활성 실행이 없으면 `QUEUED` 생성, 있으면 같은 실행 반환 | `backend/src/api/f3_runs.py` |
 | 상세 진입·저장에서 패널을 열지 않고 판정 요청 버튼에서만 실행 확인·polling 시작. 세대 상세는 레일의 [교차 판정]과 섹션의 [교차 판정 실행]이 같은 실행을 요청 | `frontend/src/AppShell.jsx`, `frontend/src/features/DetailWorkspace.jsx`, `frontend/src/features/f3/CrossMatchSection.tsx` |
-| 저장이 만든 실행은 앵커 카드 뒤 `ANCHOR_READY`에서 멈추고, 사용자 요청이 같은 실행을 이어받아 후보 조회부터 진행 | `backend/src/domain/agent_execution/pipeline.py`, `repository.py`, `service.py` |
+| 저장이 만든 실행은 앵커 카드 뒤 `ANCHOR_READY`에서 멈추고, 사용자 요청이 같은 실행을 이어받아 후보 조회부터 진행 | `backend/src/domain/agent_execution/pipeline.py`, `repository/runs.py`, `service.py` |
 | 앵커 검증. 사무소, 매물·부모 세대·구입장 삭제 여부 | `backend/src/domain/agent_execution/service.py` |
-| 사무소·앵커·입력 버전의 활성 실행 재사용과 PostgreSQL 동시 접수 직렬화 | `backend/src/domain/agent_execution/service.py`, `repository.py` |
+| 사무소·앵커·입력 버전의 활성 실행 재사용과 PostgreSQL 동시 접수 직렬화 | `backend/src/domain/agent_execution/service.py`, `repository/runs.py` |
 | F1 매물·구입장 저장 성공 후 `LEDGER_SAVE` 자동 접수와 F3 실패 격리 | `backend/src/domain/agent_execution/triggers.py`, `backend/src/api/property_ledger.py` |
 | 매물·구입장 PATCH의 실제 변경 감지, 동일 값 `row_version` 유지와 희망 단지 변경 버전 증가 | `backend/src/domain/property_ledger/service.py` |
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
@@ -236,7 +239,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | 판정 결과와 근거 저장 | `match_evaluation`, `match_candidate_evaluation`, `match_candidate_evidence` (migration 006) |
 | 결정적 SQL 후보 추출, 점수와 정렬, `CANDIDATES_READY` 전이 | `backend/src/domain/agent_execution/candidates.py` |
 | 후보 조회 조건과 전체 후보 집합 보존 | `match_evaluation.candidate_selection_snapshot` (migration 006) |
-| 상위 5건 후보 카드 순차 생성·재사용, 카드 ID 기록과 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
+| 상위 5건 후보 카드 병렬 생성·순차 저장·재사용, 카드 ID 기록과 `CANDIDATE_CARDS_READY` 전이 | `backend/src/domain/agent_execution/candidate_cards.py` |
 | 실패 단계·분류·후보 순번을 원문 없이 남기는 구조화 로그 | `backend/src/domain/agent_execution/pipeline.py`, `candidate_cards.py` |
 | API와 같은 image를 쓰는 Worker 프로세스 진입점 | `backend/src/worker.py`, `infra/deploy/compose.dev.yml` |
 | Worker의 DB readiness 확인, readiness file, SIGTERM·SIGINT graceful shutdown | `backend/src/worker.py` |
@@ -334,8 +337,9 @@ snapshot은 상위 5건이 아니라 **전체** 후보의 ID, 구성 점수, 순
 고정한다.
 
 후보 카드는 루트 실행에 직접 귀속하고 child `AgentRun`을 만들지 않는다. 카드별 transaction을
-순차로 처리해 SQLModel Session을 async task 사이에 공유하지 않는다. 일부 후보 처리 후 실패한
-경우 이미 저장한 카드는 재시도에서 사용할 수 있는 유효 캐시로 남지만, 모든 후보 카드가
+순차로 처리해 SQLModel Session을 async task 사이에 공유하지 않는다. transaction을 닫은 뒤
+cache miss의 모델 호출만 병렬 실행한다. 생성에 실패한 후보 전후의 성공 카드도 각각
+fencing과 입력 검증을 거쳐 저장하며 재시도에서 사용할 수 있는 유효 캐시로 남지만, 모든 후보 카드가
 확보되기 전에는 실행 상태와 후보 카드 ID 목록을 완료 처리하지 않는다. 최종 카드 ID는
 `match_evaluation.candidate_selection_snapshot.candidate_cards`에 기록한다.
 
