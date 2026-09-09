@@ -52,6 +52,9 @@ Whisper는 고정 Hugging Face revision을 사용한다. URL·장기 AWS 키를 
 정지한 API를 대상으로 AllowTraffic의 ALB health를 기다리면 배포가 완료되지 않으므로,
 트래픽 전환은 maintenance 배포에서 제외한다. ASG의 target group 연결은 유지하고 앱 기동 후 확인한다.
 automatic 모드는 기존 WITH_TRAFFIC_CONTROL을 유지한다.
+Frontend CodeBuild도 같은 배포 모드를 받아 maintenance에서는 정적 파일 배포를 허용하며
+Backend readiness를 최종 앱 기동 뒤로 미룬다. automatic의 readiness 선행 검사는 유지한다.
+배포 buildspec과 모드는 Terraform에서 함께 적용하여 이미 빌드된 앱 산출물을 그대로 재시도할 수 있다.
 구현 근거: [AWS DeploymentStyle](https://docs.aws.amazon.com/codedeploy/latest/APIReference/API_DeploymentStyle.html).
 `app-deploy`는 명시적으로 실행한다. 최초/구 revision 호스트에는 CLI 준비를 위한 배포 선행 조건을
 표시한다. 이전 검증 근거가 있는 호스트 재생성은 아래의 정확한 revision 복원 경로를 사용한다.
