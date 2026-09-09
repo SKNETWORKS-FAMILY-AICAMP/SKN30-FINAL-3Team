@@ -155,18 +155,7 @@ def _load_context(
 
 
 def _label_eligibility(label: TargetLabel) -> str:
-    from domain.agent_execution.candidates import (
-        ACTIVE_LISTING_STATUSES,
-        ACTIVE_REQUIREMENT_STATUSES,
-    )
-
-    active = label.status in (
-        ACTIVE_LISTING_STATUSES
-        if label.anchor_type is AnchorType.LISTING
-        else ACTIVE_REQUIREMENT_STATUSES
-    )
-    supported = bool(set(label.trade_types) & {"SALE", "JEONSE", "MONTHLY_RENT"})
-    return "INELIGIBLE" if not active else ("ELIGIBLE" if supported else "INSUFFICIENT_INPUT")
+    return label.eligibility
 
 
 def _views(header: MatchEvaluation, context: ReadContext) -> list[results.CandidateView]:
@@ -191,8 +180,8 @@ def _views(header: MatchEvaluation, context: ReadContext) -> list[results.Candid
         candidate_id = entry.get("candidate_id")
         if not isinstance(candidate_id, int) or candidate_id not in context.counterparts:
             continue
-        if _label_eligibility(context.counterparts[candidate_id]) != "ELIGIBLE":
-            continue
+        # 현재 적격성과 당시 후보 집합은 별개다. 종료·조건 미충족만으로 과거 후보를 지우지 않는다.
+        # 삭제·권한 밖 후보는 위의 현재 사무소 표기 조회에서 계속 제외한다.
         card_id = cards_by_candidate.get(candidate_id)
         judgment = judgments.get(card_id) if card_id in context.valid_cards else None
         views.append(

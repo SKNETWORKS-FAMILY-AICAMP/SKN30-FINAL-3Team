@@ -45,9 +45,13 @@ def expand_changes(session: Session, *, debounce_seconds: int, batch_size: int) 
                 desired_revision=EXCLUDED.desired_revision, due_at=EXCLUDED.due_at"""),
             {"tenant": row["brokerage_id"], "revision": row["revision"]},
         )
+        # 사무소당 1행이며 위 SELECT의 행 잠금은 commit까지 유지된다.
+        # 처리한 revision도 명시해 삭제 범위를 드러낸다.
         session.execute(
-            text("DELETE FROM match_change_outbox WHERE brokerage_id=:tenant"),
-            {"tenant": row["brokerage_id"]},
+            text(
+                "DELETE FROM match_change_outbox WHERE brokerage_id=:tenant AND revision=:revision"
+            ),
+            {"tenant": row["brokerage_id"], "revision": row["revision"]},
         )
     session.commit()
     return len(rows)

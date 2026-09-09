@@ -33,6 +33,7 @@ class F3RecentRecordResponse(BaseModel):
 
 
 class F3JudgmentCandidateResponse(F3CandidateResponse):
+    current_eligibility: Literal["ELIGIBLE", "INELIGIBLE", "INSUFFICIENT_INPUT"]
     target: F3TargetLabelResponse
     position_card: F3AnchorCardResponse | None
     recent_records: list[F3RecentRecordResponse]

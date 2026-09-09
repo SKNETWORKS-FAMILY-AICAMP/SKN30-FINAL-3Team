@@ -44,7 +44,14 @@ export interface RecentRecord {
   anchor_id: number;
   interaction_id: number | null;
 }
+export type CandidateEligibility =
+  | "ELIGIBLE"
+  | "INELIGIBLE"
+  | "INSUFFICIENT_INPUT";
+
 export interface JudgmentCandidate extends CandidateDto {
+  /** 현재 조건의 적격성은 저장된 판정 등급과 별개다. 구 API의 누락은 null로 보존한다. */
+  current_eligibility: CandidateEligibility | null;
   target: TargetIdentity;
   position_card: AnchorCardDto | null;
   recent_records: RecentRecord[];
@@ -122,10 +129,29 @@ function decodeRecord(value: unknown): RecentRecord {
     interaction_id: asNullableNumber(r.interaction_id, "interaction_id"),
   };
 }
+function decodeCandidateEligibility(value: unknown): CandidateEligibility | null {
+  if (value === undefined || value === null) return null;
+  if (
+    value === "ELIGIBLE" ||
+    value === "INELIGIBLE" ||
+    value === "INSUFFICIENT_INPUT"
+  ) return value;
+  throw new DecodeError("current_eligibility", "알 수 없는 후보 현재 적격성");
+}
+
+export function candidateEligibilityLabel(
+  value: CandidateEligibility | null,
+): string | null {
+  if (value === "INELIGIBLE") return "현재 분석 대상 아님";
+  if (value === "INSUFFICIENT_INPUT") return "현재 거래 조건 확인 필요";
+  return null;
+}
+
 export function decodeJudgmentCandidate(value: unknown): JudgmentCandidate {
   const r = asRecord(value, "candidate");
   return {
     ...decodeCandidate(r),
+    current_eligibility: decodeCandidateEligibility(r.current_eligibility),
     target: decodeIdentity(r.target),
     position_card:
       r.position_card == null ? null : decodeAnchorCard(r.position_card),

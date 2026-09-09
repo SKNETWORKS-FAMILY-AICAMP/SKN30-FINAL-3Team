@@ -439,3 +439,47 @@ test("열린 패널의 외부 버전 갱신은 명시적 재판정 전까지 실
     await page.waitForFunction(() => document.querySelector("#lifecycle-count")?.textContent === "2");
   } finally { await page.close(); }
 });
+
+
+test("종료·정보 부족 후보는 목록과 상세에 남고 저장 등급과 현재 적격성을 구분한다", { timeout: 120_000 }, async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  try {
+    await openPropertyLedger(page);
+    await page.evaluate(async () => {
+      const { judgmentApi } = await import('/src/features/f3/judgments/api.ts');
+      const list = judgmentApi.list; const detail = judgmentApi.detail;
+      const annotate = (candidate) => ({ ...candidate, current_eligibility: candidate.rank === 1 ? 'INELIGIBLE' : candidate.rank === 2 ? 'INSUFFICIENT_INPUT' : 'ELIGIBLE' });
+      judgmentApi.list = async (...args) => {
+        const value = await list(...args);
+        return { ...value, items: value.items.map(item => ({ ...item, representative_candidates: item.representative_candidates.map(annotate) })) };
+      };
+      judgmentApi.detail = async (...args) => {
+        const value = await detail(...args);
+        return { ...value, candidates: value.candidates.map(annotate), selected_candidate: value.selected_candidate ? annotate(value.selected_candidate) : null };
+      };
+    });
+    await page.getByRole('button', { name: '교차 판정', exact: true }).click();
+    const region = page.getByRole('region', { name: '교차 판정 업무 목록', exact: true });
+    const row = region.locator('#f3-anchor-2');
+    await row.waitFor();
+    const rowBody = row.locator('xpath=ancestor::li[1]');
+    await rowBody.getByText('현재 분석 대상 아님', { exact: true }).waitFor();
+    await rowBody.getByText('현재 거래 조건 확인 필요', { exact: true }).waitFor();
+    await row.click();
+    const result = region.getByRole('region', { name: '교차 판정 결과 상세', exact: true });
+    const candidates = result.locator('.f3-judgments__candidate-list button');
+    await candidates.first().waitFor();
+    assert.equal(await candidates.count(), 20);
+    assert.match(await candidates.first().innerText(), /강함[\s\S]*현재 분석 대상 아님/);
+    assert.match(await candidates.nth(1).innerText(), /강함[\s\S]*현재 거래 조건 확인 필요/);
+    const selected = result.locator('.f3-judgments__candidate');
+    await selected.getByText('현재 분석 대상 아님', { exact: true }).waitFor();
+    assert.match(await selected.locator('h3').innerText(), /강함/);
+    await candidates.nth(1).click();
+    await selected.getByText('현재 거래 조건 확인 필요', { exact: true }).waitFor();
+    assert.match(await selected.locator('h3').innerText(), /강함/);
+    await result.getByRole('button', { name: '다음 후보', exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.f3-judgments__candidate-list button').length === 3);
+    await result.getByText('후보 페이지 2', { exact: true }).waitFor();
+  } finally { await page.close(); }
+});

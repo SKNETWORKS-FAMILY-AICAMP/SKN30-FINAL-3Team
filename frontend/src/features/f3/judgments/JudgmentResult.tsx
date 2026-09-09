@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Label, Skeleton } from "@patternfly/react-core";
 import { ApiError, isCanceled } from "../../../shared/api/index.ts";
 import { judgmentApi } from "./api.ts";
+import { CandidateEligibilityLabel } from "./CandidateEligibilityLabel.tsx";
 import { CandidateDetail } from "./CandidateDetail.tsx";
 import type { OpenLedger } from "./CandidateDetail.tsx";
 import type { JudgmentDetail } from "./model.ts";
@@ -252,7 +253,8 @@ export function JudgmentResult({
                   >
                     {candidate.target.display_name} ·{" "}
                     {gradeLabel(candidate.match_grade)} · 담당{" "}
-                    {candidate.target.assignee_name ?? "미지정"}
+                    {candidate.target.assignee_name ?? "미지정"}{" "}
+                    <CandidateEligibilityLabel value={candidate.current_eligibility} />
                   </Button>
                 ))}
               </div>

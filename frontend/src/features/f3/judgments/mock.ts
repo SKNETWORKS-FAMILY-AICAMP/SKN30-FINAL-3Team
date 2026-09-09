@@ -45,6 +45,7 @@ function detail(
   );
   const candidates: JudgmentCandidate[] = run.candidates.map((c) => ({
     ...c,
+    current_eligibility: null,
     evidence: c.evidence.map((e) => ({
       ...e,
       evidence_side:

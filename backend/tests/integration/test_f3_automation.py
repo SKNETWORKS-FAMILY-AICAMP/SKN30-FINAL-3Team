@@ -410,3 +410,69 @@ def test_expired_day_schedules_durable_revalidation_without_starting_inference()
         assert tenant_count(session, fixture, "match_change_outbox") == 1
         assert completed.id is not None
         assert fixture.stored_run(completed.id)["status"] == "COMPLETED"
+
+
+def test_coalesced_outbox_keeps_other_tenant_beyond_batch_and_later_revision():
+    with (
+        automation_fixture() as (owner_session, first),
+        automation_fixture() as (_, second),
+        Session(owner_session.get_bind()) as session,
+    ):
+        tenants = [first.brokerage_id, second.brokerage_id]
+        for price in (2800000000, 2810000000, 2820000000):
+            session.execute(
+                text("UPDATE property_listing SET sale_price=:price WHERE id=:id"),
+                {"price": price, "id": first.listing_id},
+            )
+        session.execute(
+            text(
+                "UPDATE match_change_outbox SET changed_at='2000-01-01T00:00:00Z' "
+                "WHERE brokerage_id=ANY(:ids)"
+            ),
+            {"ids": tenants},
+        )
+        session.commit()
+
+        def pending():
+            return set(
+                session.execute(
+                    text(
+                        "SELECT brokerage_id FROM match_change_outbox WHERE brokerage_id=ANY(:ids)"
+                    ),
+                    {"ids": tenants},
+                ).scalars()
+            )
+
+        assert pending() == set(tenants)
+        # 같은 사무소의 여러 변경은 PK 행 하나에 병합되며 배치 밖 사무소는 남는다.
+        assert automation.expand_changes(session, debounce_seconds=0, batch_size=1) == 1
+        remaining = pending()
+        assert len(remaining) == 1
+        assert automation.expand_changes(session, debounce_seconds=0, batch_size=1) == 1
+        assert pending() == set()
+        old_revision = freshness.current_revision(session, first.brokerage_id)
+        session.execute(
+            text("UPDATE property_listing SET sale_price=2830000000 WHERE id=:id"),
+            {"id": first.listing_id},
+        )
+        session.execute(
+            text(
+                "UPDATE match_change_outbox SET changed_at='2000-01-01T00:00:00Z' "
+                "WHERE brokerage_id=:b"
+            ),
+            {"b": first.brokerage_id},
+        )
+        session.commit()
+        assert pending() == {first.brokerage_id}
+        assert automation.expand_changes(session, debounce_seconds=0, batch_size=1) == 1
+        assert pending() == set()
+        assert (
+            session.execute(
+                text(
+                    "SELECT desired_revision FROM match_target_state WHERE brokerage_id=:b "
+                    "AND anchor_type='LISTING' AND anchor_id=:id"
+                ),
+                {"b": first.brokerage_id, "id": first.listing_id},
+            ).scalar_one()
+            == old_revision + 1
+        )

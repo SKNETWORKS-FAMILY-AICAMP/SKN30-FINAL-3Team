@@ -66,6 +66,7 @@ def candidate_summary(view: CandidateView, label: TargetLabel) -> dict[str, Any]
     judgment = view.judgment
     return {
         "candidate_id": view.candidate_id,
+        "current_eligibility": label.eligibility,
         "rank": view.rank,
         "selected_for_cards": view.selected_for_cards,
         "sql_score": view.score,

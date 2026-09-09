@@ -27,6 +27,21 @@ class TargetLabel:
     complex_ids: tuple[int, ...]
     trade_types: tuple[str, ...]
 
+    @property
+    def eligibility(self) -> str:
+        from domain.agent_execution.candidates import (
+            ACTIVE_LISTING_STATUSES,
+            ACTIVE_REQUIREMENT_STATUSES,
+        )
+
+        active = self.status in (
+            ACTIVE_LISTING_STATUSES
+            if self.anchor_type is AnchorType.LISTING
+            else ACTIVE_REQUIREMENT_STATUSES
+        )
+        supported = bool(set(self.trade_types) & {"SALE", "JEONSE", "MONTHLY_RENT"})
+        return "INELIGIBLE" if not active else ("ELIGIBLE" if supported else "INSUFFICIENT_INPUT")
+
     def public(self) -> dict[str, Any]:
         return {
             "anchor_type": self.anchor_type.value,

@@ -3,9 +3,12 @@ import { test } from "node:test";
 import { DecodeError } from "../src/shared/decode/index.ts";
 import {
   decodeDetail,
+  decodeJudgmentCandidate,
+  candidateEligibilityLabel,
   decodeTarget,
   gradeLabel,
 } from "../src/features/f3/judgments/model.ts";
+import { candidateEntry } from "../src/features/f3/mock/scenario.ts";
 import { readJudgmentLocation } from "../src/features/f3/judgments/navigation.ts";
 const target = {
   anchor: {
@@ -101,4 +104,37 @@ test("시드 예시 표시는 명시된 boolean만 수용하고 이전 API 누�
   for (const invalid of ["true", "false", 1, null]) {
     assert.throws(() => decodeTarget({ ...target, is_synthetic_fixture: invalid }), DecodeError);
   }
+});
+
+
+function savedCandidate() {
+  return {
+    ...candidateEntry({ runId: 11, anchorType: "LISTING", anchorId: 7, createdAt: 0 }, 0, true),
+    target: { ...target.anchor, anchor_type: "REQUIREMENT", anchor_id: 1101, property_unit_id: null },
+    position_card: null,
+    recent_records: [],
+  };
+}
+
+test("종료·정보 부족 후보도 저장된 등급과 순위·식별자를 유지하고 현재 적격성을 따로 읽는다", () => {
+  for (const eligibility of ["INELIGIBLE", "INSUFFICIENT_INPUT", "ELIGIBLE"]) {
+    const candidate = decodeJudgmentCandidate({ ...savedCandidate(), current_eligibility: eligibility });
+    assert.equal(candidate.current_eligibility, eligibility);
+    assert.equal(candidate.match_grade, "STRONG");
+    assert.equal(candidate.rank, 1);
+    assert.equal(candidate.candidate_id, 1101);
+    assert.equal(candidate.judgment_id, 11001);
+  }
+});
+
+test("구 API의 현재 적격성 누락·null은 판정하지 않고 잘못된 새 값은 거절한다", () => {
+  assert.equal(decodeJudgmentCandidate(savedCandidate()).current_eligibility, null);
+  assert.equal(decodeJudgmentCandidate({ ...savedCandidate(), current_eligibility: null }).current_eligibility, null);
+  for (const invalid of ["ACTIVE", "", false, 1]) {
+    assert.throws(() => decodeJudgmentCandidate({ ...savedCandidate(), current_eligibility: invalid }), DecodeError);
+  }
+  assert.equal(candidateEligibilityLabel(null), null);
+  assert.equal(candidateEligibilityLabel("ELIGIBLE"), null);
+  assert.equal(candidateEligibilityLabel("INELIGIBLE"), "현재 분석 대상 아님");
+  assert.equal(candidateEligibilityLabel("INSUFFICIENT_INPUT"), "현재 거래 조건 확인 필요");
 });

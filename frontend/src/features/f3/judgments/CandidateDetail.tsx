@@ -20,6 +20,7 @@ import type {
   FeedbackReason,
 } from "../model/dto.ts";
 import { f3Transport } from "../api/f3Transport.ts";
+import { CandidateEligibilityLabel } from "./CandidateEligibilityLabel.tsx";
 import { dateLabel, gradeLabel } from "./model.ts";
 import type { JudgmentCandidate, TargetIdentity } from "./model.ts";
 import { ApiError } from "../../../shared/api/index.ts";
@@ -255,6 +256,7 @@ export function CandidateDetail({
       <h3>
         {candidate.target.display_name}{" "}
         <Label>{gradeLabel(candidate.match_grade)}</Label>{" "}
+        <CandidateEligibilityLabel value={candidate.current_eligibility} />
         {stale && <Label color="orange">이전 분석</Label>}
       </h3>
       <p>

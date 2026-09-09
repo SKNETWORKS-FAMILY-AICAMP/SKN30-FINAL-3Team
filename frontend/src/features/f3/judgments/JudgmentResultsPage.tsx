@@ -41,6 +41,7 @@ import {
   isInvalidCursor,
   judgmentError,
 } from "./useJudgmentTarget.ts";
+import { CandidateEligibilityLabel } from "./CandidateEligibilityLabel.tsx";
 import { TargetStatus } from "./TargetStatus.tsx";
 import "./Judgments.css";
 interface Props {
@@ -467,6 +468,7 @@ export function JudgmentResultsPage({
                                 {c.target.display_name} · 담당{" "}
                                 {c.target.assignee_name ?? "미지정"}{" "}
                                 <Label>{gradeLabel(c.match_grade)}</Label>{" "}
+                                <CandidateEligibilityLabel value={c.current_eligibility} />
                                 {(target.freshness !== "CURRENT" ||
                                   (pendingPage != null &&
                                     pendingPage.revision !==

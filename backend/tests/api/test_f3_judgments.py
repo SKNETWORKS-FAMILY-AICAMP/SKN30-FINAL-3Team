@@ -210,28 +210,49 @@ def test_closed_anchor_exposes_status_without_judgment_content(config: Config):
 
 
 @requires_database
-def test_closed_candidate_disappears_from_summary_detail_and_direct_selection(config: Config):
+@pytest.mark.parametrize(
+    "change,state", [("status='종료'", "INELIGIBLE"), ("demand_type='매도'", "INSUFFICIENT_INPUT")]
+)
+def test_past_candidate_remains_visible_when_current_eligibility_changes(
+    config: Config, change, state
+):
     with ledger_client(config) as (client, session, b, u):
         run, listing, _card, candidate, header = _stored(client, session, b, u)
         _current(session, b, run, listing, header)
         session.execute(
-            text("UPDATE property_requirement SET status='종료' WHERE id=:id"),
-            {"id": candidate},
+            text(f"UPDATE property_requirement SET {change} WHERE id=:id"), {"id": candidate}
         )
         session.commit()
+        target = client.get(f"/api/v1/f3/judgment-targets/LISTING/{listing['id']}").json()
+        assert target["freshness"] == "STALE"
+        assert target["summary"]["total_count"] == 1
+        assert target["representative_candidates"][0]["current_eligibility"] == state
+        selected = client.get(
+            f"/api/v1/f3/judgment-results/{header}?candidate_id={candidate}&limit=1"
+        )
+        assert selected.status_code == 200, selected.text
+        body = selected.json()
+        assert body["summary"]["total_count"] == 1 and body["next_cursor"] is None
+        assert [c["candidate_id"] for c in body["candidates"]] == [candidate]
+        assert body["selected_candidate"]["current_eligibility"] == state
+        assert body["selected_candidate"]["match_grade"] == "STRONG"
+        assert client.get("/api/v1/f3/judgment-results?anchor_type=LISTING").json()["items"] == []
 
-        target = client.get(f"/api/v1/f3/judgment-targets/LISTING/{listing['id']}")
-        assert target.status_code == 200, target.text
-        assert target.json()["representative_candidates"] == []
-        assert target.json()["summary"]["total_count"] == 0
-        assert target.json()["summary"]["strong_count"] == 0
-        detail = client.get(f"/api/v1/f3/judgment-results/{header}")
-        assert detail.status_code == 200, detail.text
-        assert detail.json()["candidates"] == []
-        assert detail.json()["selected_candidate"] is None
-        assert "예산이 가깝다" not in detail.text
-        selected = client.get(f"/api/v1/f3/judgment-results/{header}?candidate_id={candidate}")
-        assert selected.status_code == 404, selected.text
+
+@requires_database
+def test_deleted_candidate_stays_private_even_in_past_snapshot(config: Config):
+    with ledger_client(config) as (client, session, b, u):
+        _run, _listing, _card, candidate, header = _stored(client, session, b, u)
+        session.execute(
+            text("UPDATE property_requirement SET is_deleted=true WHERE id=:id"), {"id": candidate}
+        )
+        session.commit()
+        body = client.get(f"/api/v1/f3/judgment-results/{header}").json()
+        assert body["candidates"] == [] and body["summary"]["total_count"] == 0
+        assert (
+            client.get(f"/api/v1/f3/judgment-results/{header}?candidate_id={candidate}").status_code
+            == 404
+        )
 
 
 @requires_database
@@ -359,3 +380,26 @@ def test_fixture_provenance_is_explicit_without_exposing_internal_snapshot(confi
             assert "DETERMINISTIC_MATCH_SEED" not in response.text
         listing_response = client.get("/api/v1/f3/judgment-results?anchor_type=LISTING")
         assert listing_response.json()["items"][0]["is_synthetic_fixture"] is True
+
+
+@requires_database
+def test_display_label_is_only_in_authorized_read_model_not_legacy_execution_result(config: Config):
+    with ledger_client(config) as (client, session, b, u):
+        run, _listing, _card, candidate, header = _stored(client, session, b, u)
+        session.execute(
+            text(
+                "UPDATE party SET name='SYNTHETIC_READ_LABEL_ONLY' "
+                "WHERE id=(SELECT party_id FROM property_requirement WHERE id=:id)"
+            ),
+            {"id": candidate},
+        )
+        session.commit()
+        detail = client.get(f"/api/v1/f3/judgment-results/{header}")
+        assert detail.status_code == 200
+        assert (
+            detail.json()["candidates"][0]["target"]["display_name"] == "SYNTHETIC_READ_LABEL_ONLY"
+        )
+        assert "phone" not in detail.text and "party_id" not in detail.text
+        legacy = client.get(f"/api/v1/f3/runs/{run['run_id']}/result")
+        assert legacy.status_code == 200, legacy.text
+        assert "SYNTHETIC_READ_LABEL_ONLY" not in legacy.text
