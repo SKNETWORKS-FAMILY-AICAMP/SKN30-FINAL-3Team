@@ -119,8 +119,8 @@ class ChatExecution(ChatModel):
     intent: ChatIntent
     diagnostics: ProviderDiagnostics | None = None
     model_calls: int = Field(default=0, ge=0, le=3)
-    prompt_version: str = "chatbot-prompt:v1"
-    workflow_version: str = "chatbot-workflow:v3"
+    prompt_version: str = "chatbot-prompt:v2"
+    workflow_version: str = "chatbot-workflow:v4"
 
 
 class ChatReadPort(Protocol):

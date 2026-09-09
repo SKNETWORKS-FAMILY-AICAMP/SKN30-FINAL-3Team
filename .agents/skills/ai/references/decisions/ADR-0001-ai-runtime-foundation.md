@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-24
+updated: 2026-09-09
 ---
 
 # ADR-0001: AI 런타임 기반과 Provider 경계
@@ -8,7 +8,8 @@ updated: 2026-08-24
 - 상태: 부분 대체됨
 - 결정일: 2026-08-17
 - 대체 범위: 환경 profile 파일과 dotenv 우선순위는 [프로젝트 ADR-0015](../../../project-wiki/references/decisions/ADR-0015-environment-configuration-ownership.md)가,
-  `ModelRoute`의 endpoint alias와 복수 LLM 등록은 [ADR-0004](ADR-0004-aliased-llm-endpoint-routing.md)가 대체
+  `ModelRoute`의 endpoint alias와 복수 LLM 등록은 [ADR-0004](ADR-0004-aliased-llm-endpoint-routing.md)가,
+  OpenAI Responses parse 호출 방식은 [ADR-0006](ADR-0006-openai-structured-output-schema.md)이 대체
 
 ## 맥락
 

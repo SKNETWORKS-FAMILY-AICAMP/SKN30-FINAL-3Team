@@ -25,6 +25,7 @@ from brokerage_ai.core.types import (
     ProviderDiagnostics,
     ProviderKind,
     StructuredGenerationResult,
+    TokenUsage,
 )
 
 
@@ -70,6 +71,85 @@ def workflow(provider, **kwargs):
 
 def request(question="매매 5억 이하 매물", **kwargs):
     return ChatInput(question=question, as_of=date(2026, 9, 8), **kwargs)
+
+
+@pytest.mark.parametrize("ending", ["만기", "만료"])
+@pytest.mark.parametrize(
+    ("target", "category"),
+    [
+        ("세대 임대차", "TENANCY_EXPIRY"),
+        ("매물 임대차", "TENANCY_EXPIRY"),
+        ("고객 임대차", "CLIENT_TENANCY_EXPIRY"),
+        ("구입장", "REQUEST_EXPIRY"),
+    ],
+)
+async def test_expiry_vocabulary_reaches_exact_authorized_agenda_read(target, category, ending):
+    provider = FakeProvider(
+        {
+            "tool": "agenda",
+            "filters": {
+                "categories": [category],
+                "date_expression": "2026년 9월 1일부터 9월 30일까지",
+            },
+        }
+    )
+    reads = FakeReads()
+    result = await workflow(provider).run(
+        request(f"2026년 9월 1일부터 9월 30일까지 {target} {ending} 일정을 보여줘"),
+        capability=reads,
+    )
+    assert result.model_calls == 1
+    assert len(reads.calls) == 1
+    assert reads.calls[0][0].filters.categories == (category,)
+
+
+@pytest.mark.parametrize("question", ["이번 달 만기 일정 보기", "고객 임대차 만기 일정 보기"])
+async def test_expiry_synonyms_never_authorize_an_invented_or_wrong_target(question):
+    bad = {"tool": "agenda", "filters": {"categories": ["TENANCY_EXPIRY"]}}
+    provider = FakeProvider(bad, bad, bad)
+    reads = FakeReads()
+    with pytest.raises(ChatbotContractError):
+        await workflow(provider).run(request(question), capability=reads)
+    assert len(provider.requests) == 3
+    assert reads.calls == []
+
+
+@pytest.mark.parametrize(
+    ("total", "output", "accepted"),
+    [
+        (8192, 1024, True),
+        (8193, 1024, False),
+        (8192, 1025, False),
+        (8192, None, True),
+        (8193, None, False),
+    ],
+)
+async def test_actual_usage_budget_is_checked_before_read_without_repair(total, output, accepted):
+    class UsageProvider(FakeProvider):
+        async def generate_structured(self, request, output_schema):
+            result = await super().generate_structured(request, output_schema)
+            return result.model_copy(
+                update={
+                    "diagnostics": result.diagnostics.model_copy(
+                        update={
+                            "usage": TokenUsage(
+                                input_tokens=1, output_tokens=output, total_tokens=total
+                            )
+                        }
+                    )
+                }
+            )
+
+    provider = UsageProvider({"tool": "properties"})
+    reads = FakeReads()
+    if accepted:
+        await workflow(provider).run(request(), capability=reads)
+        assert len(reads.calls) == 1
+    else:
+        with pytest.raises(ChatbotContextLimitError):
+            await workflow(provider).run(request(), capability=reads)
+        assert reads.calls == []
+    assert len(provider.requests) == 1
 
 
 async def test_one_interpretation_one_authorized_read_and_progress_before_io():

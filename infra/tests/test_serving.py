@@ -1,6 +1,5 @@
 """Behavioral regression tests for routing, maintenance, and cloud ownership."""
 
-import asyncio
 import json
 import sys
 import tempfile
@@ -17,7 +16,6 @@ sys.path[:0] = [
 import manage_serving as serving
 import render_env
 from connect_serving import local_environment
-from general_middleware import ServingRoutes
 from serving_contract import GENERAL_KEY, aws_base_url, endpoint_urls
 
 
@@ -289,53 +287,6 @@ class LifecycleFailures(unittest.TestCase):
         }
         with self.assertRaises(SystemExit):
             render_env.expand_ai_vllm_endpoint_set(public)
-
-
-class GeneralHttpSurface(unittest.TestCase):
-    def request(self, method, path, headers):
-        messages = []
-        upstream = Mock()
-
-        async def app(scope, receive, send):
-            upstream()
-
-        async def send(message):
-            messages.append(message)
-
-        with patch.dict("os.environ", {"VLLM_API_KEY": "k" * 43}):
-            middleware = ServingRoutes(app)
-        asyncio.run(
-            middleware(
-                {"type": "http", "method": method, "path": path, "headers": headers},
-                None,
-                send,
-            )
-        )
-        return upstream, messages
-
-    def test_native_admin_paths_are_blocked_even_with_valid_key(self):
-        headers = [(b"authorization", b"Bearer " + b"k" * 43)]
-        for path in ("/load_lora_adapter", "/sleep", "/metrics", "/docs"):
-            upstream, messages = self.request("GET", path, headers)
-            upstream.assert_not_called()
-            self.assertEqual(messages[0]["status"], 404)
-
-    def test_missing_or_duplicate_authorization_is_rejected(self):
-        for headers in ([], [(b"authorization", b"Bearer " + b"k" * 43)] * 2):
-            upstream, messages = self.request("POST", "/v1/chat/completions", headers)
-            upstream.assert_not_called()
-            self.assertEqual(messages[0]["status"], 401)
-
-    def test_inference_is_forwarded_and_status_never_contains_credentials(self):
-        headers = [(b"authorization", b"Bearer " + b"k" * 43)]
-        upstream, messages = self.request("POST", "/v1/chat/completions", headers)
-        upstream.assert_called_once()
-        self.assertEqual(messages, [])
-        with patch.dict("os.environ", {"HF_HOME": "/tmp"}):
-            _, messages = self.request("GET", "/ops/status", headers)
-        self.assertEqual(messages[0]["status"], 200)
-        payload = json.loads(messages[1]["body"])
-        self.assertEqual(set(payload), {"disk_total_bytes", "disk_free_bytes", "model"})
 
 
 class PreparationFailures(unittest.TestCase):

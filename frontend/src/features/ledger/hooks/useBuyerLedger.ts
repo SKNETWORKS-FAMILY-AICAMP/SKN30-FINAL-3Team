@@ -72,6 +72,7 @@ export function useBuyerLedger(
         complexId: primary?.complex.id ?? null,
         complex: primary?.complex.name ?? "",
         content: interactions.items[0]?.interaction_content ?? "",
+        savedInteractionContent: interactions.items[0]?.interaction_content ?? "",
       };
       patchRow(row.id, () => next);
       return next;
@@ -119,13 +120,19 @@ export function useBuyerLedger(
           rowVersion: savedVersion,
         }));
 
-        const newLog = newInteractionContent(row.content, "");
+        // 최신 서버 로그와 비교하므로 다른 필드 저장과 후속 조회 실패 뒤 재시도도 중복을 만들지 않는다.
+        const changedLog = newInteractionContent(row.content, row.savedInteractionContent);
+        const latestLogs = changedLog == null ? null
+          : await ledgerTransport.listClientInteractions({ requirementId: requirementId, limit: 1 });
+        const newLog = changedLog == null ? null
+          : newInteractionContent(changedLog, latestLogs?.items[0]?.interaction_content);
         if (newLog != null) {
           await ledgerTransport.createClientInteraction({
             interaction_content: newLog,
             requirement_id: requirementId,
           });
         }
+        patchRow(row.id, (current) => ({ ...current, savedInteractionContent: row.content }));
 
         const refreshed = await ledgerTransport.getRequirement(requirementId);
         const primary = refreshed.desired_complexes[0];
@@ -135,6 +142,7 @@ export function useBuyerLedger(
           complexId: primary?.complex.id ?? row.complexId,
           complex: primary?.complex.name ?? row.complex,
           content: row.content,
+          savedInteractionContent: row.content,
         };
         patchRow(row.id, () => saved);
         return saved;

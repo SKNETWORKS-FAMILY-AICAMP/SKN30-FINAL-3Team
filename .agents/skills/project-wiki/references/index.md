@@ -15,6 +15,7 @@ updated: 2026-09-09
 | [모듈 경계](architecture/overview.md) | 모듈 책임이나 의존 관계를 변경할 때 |
 | [런타임 구조](architecture/runtime.md) | 프레임워크·런타임·배포 선택을 검토할 때 |
 | [개발환경](development/environments.md) | 로컬·CI·공유 dev·prod 환경이나 의존성을 변경할 때 |
+| [테스트 개선 검증 범위](../../../../docs/validation/test-reliability-2026-09-09.md) | 2026-09-09 로컬 결함 회귀, 테스트 실행·분리 변경과 검증 한계를 확인할 때 |
 | [HTTP 계약 라우터](contracts/api.md) | HTTP 계약을 구현·해석·변경할 때. 공통 규칙과 해당 기능 계약을 선택 |
 | [F3 AI 계약 라우터](contracts/f3-ai.md) | 포지션 카드·중개 판정의 Backend–AI 계약을 확인할 때. 공통 경계와 해당 작업 계약을 선택 |
 | [챗봇 AI–Backend 계약](contracts/chatbot-ai.md) | 챗봇 DTO·facade·조회 capability·오류 경계를 변경할 때 |

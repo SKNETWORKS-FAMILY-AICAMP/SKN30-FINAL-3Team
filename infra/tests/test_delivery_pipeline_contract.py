@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -23,13 +24,46 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         )
         self.assertIn("export AWS_PROFILE := aws_profile", justfile)
         self.assertNotIn("$$(terraform", justfile)
-        self.assertEqual(
-            justfile.count(
-                'SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw '
-                'sllm_model_bucket_name)"'
-            ),
-            11,
+        candidates = [
+            shlex.split(line.strip())
+            for line in justfile.splitlines()
+            if "scripts/manage_runpod.py" in line
+            or "scripts/manage_sllm_artifact.py" in line
+        ]
+        commands = []
+        for command in candidates:
+            for script, prefix in (
+                ("scripts/manage_runpod.py", "pod-"),
+                ("scripts/manage_sllm_artifact.py", "publish"),
+            ):
+                if script in command and command[command.index(script) + 1].startswith(
+                    prefix
+                ):
+                    commands.append(command)
+        self.assertTrue(
+            commands, "RunPod and release commands must remain discoverable"
         )
+        for command in commands:
+            with self.subTest(command=command):
+                assignments = dict(
+                    token.split("=", 1)
+                    for token in command[: command.index("uv")]
+                    if "=" in token
+                )
+                bucket_source = assignments.get("SLLM_MODEL_BUCKET", "")
+                self.assertTrue(
+                    bucket_source.startswith("$(") and bucket_source.endswith(")")
+                )
+                self.assertEqual(
+                    shlex.split(bucket_source[2:-1]),
+                    [
+                        "terraform",
+                        "-chdir=environments/dev",
+                        "output",
+                        "-raw",
+                        "sllm_model_bucket_name",
+                    ],
+                )
 
     def test_runpod_image_publish_is_gated_before_digest_output(self) -> None:
         workflow = read(".github/workflows/runpod-image.yml")
@@ -88,12 +122,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         build_buildspec = read("infra/delivery/buildspec-frontend-build.yml")
 
         self.assertIn("npm run typecheck", verify_script)
-        self.assertIn("npm run test:ledger", verify_script)
-        self.assertIn("npm run test:env", verify_script)
-        self.assertIn("npm run test:auth", verify_script)
-        self.assertIn("npm run test:root-error", verify_script)
-        self.assertIn("npm run test:f2", verify_script)
-        self.assertIn("npm run test:f3", verify_script)
+        self.assertIn("npm run test:fast", verify_script)
         self.assertNotIn("npm run build", verify_script)
         self.assertNotIn("npm run test:release", verify_script)
         self.assertIn("npm run build", build_script)

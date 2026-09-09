@@ -96,3 +96,95 @@ def test_full_evaluation_excludes_legacy_mismatch_rows(
     loaded = module.load_dataset(path, None, "full", ["매도의뢰", "매수문의", "기타상담"])
 
     assert [row["sample_id"] for row in loaded] == ["matched"]
+
+
+def test_full_metrics_match_hand_calculated_extraction_table(monkeypatch: pytest.MonkeyPatch):
+    module = load_evaluate_module(monkeypatch)
+    rows = [
+        {
+            "expected": {"consultation_type": "A", "fields": {"x": "1", "y": "2"}},
+            "prediction": {"consultation_type": "A", "fields": {"x": "1", "y": "wrong"}},
+            "evidence_grounding_violations": 1,
+            "latency_seconds": 1.0,
+            "error": None,
+        },
+        {
+            "expected": {"consultation_type": "B", "fields": {"z": "3", "w": "4"}},
+            "prediction": {"consultation_type": "A", "fields": {"z": "3"}},
+            "evidence_grounding_violations": 0,
+            "latency_seconds": 3.0,
+            "error": None,
+        },
+        {
+            "expected": {"consultation_type": "B", "fields": {"q": "5"}},
+            "prediction": None,
+            "evidence_grounding_violations": 0,
+            "latency_seconds": 999.0,
+            "error": "synthetic parse failure",
+        },
+    ]
+
+    metrics = module.calculate_metrics(rows, ["A", "B"])
+
+    # The full evaluator intentionally reports extraction/class scores on parsed rows;
+    # its separate parse rate exposes failed samples. Classification-only scores below
+    # instead count invalid outputs in their denominator. Do not mix these protocols.
+    assert metrics["samples"] == 3
+    assert metrics["json_parse_rate"] == pytest.approx(2 / 3)
+    assert metrics["classification_accuracy"] == 0.5
+    assert metrics["classification_f1_by_class"] == {"A": pytest.approx(2 / 3), "B": 0.0}
+    assert metrics["classification_macro_f1"] == pytest.approx(1 / 3)
+    # TP=2, FP=1 (wrong y), FN=2 (correct y and missing w).
+    assert metrics["field_precision"] == pytest.approx(2 / 3)
+    assert metrics["field_recall"] == 0.5
+    assert metrics["field_f1"] == pytest.approx(4 / 7)
+    assert metrics["evidence_grounding_violations"] == 1
+    assert metrics["mean_latency_seconds"] == 2.0
+    assert metrics["p95_latency_seconds"] == 3.0
+
+
+def test_classification_scores_include_failed_and_unknown_predictions(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    module = load_evaluate_module(monkeypatch)
+    cases = [("A", "A"), ("A", "B"), ("B", "B"), ("B", None), ("A", "unknown")]
+    rows = [
+        {
+            "expected": {"consultation_type": expected},
+            "prediction": {"consultation_type": predicted} if predicted else None,
+            "latency_seconds": float(index + 1),
+            "error": None if predicted else "parse failure",
+        }
+        for index, (expected, predicted) in enumerate(cases)
+    ]
+
+    metrics = module.calculate_classification_metrics(rows, ["A", "B"])
+
+    assert metrics["json_parse_rate"] == 0.8
+    assert metrics["valid_label_rate"] == 0.6
+    assert metrics["classification_accuracy"] == 0.4
+    assert metrics["classification_macro_f1"] == 0.5
+    assert metrics["classification_metrics_by_class"] == {
+        "A": {"precision": 1.0, "recall": pytest.approx(1 / 3), "f1": 0.5, "support": 3},
+        "B": {"precision": 0.5, "recall": 0.5, "f1": 0.5, "support": 2},
+    }
+    assert metrics["confusion_matrix"] == {
+        "A": {"A": 1, "B": 1, "__invalid__": 1},
+        "B": {"A": 0, "B": 1, "__invalid__": 1},
+    }
+    assert metrics["mean_latency_seconds"] == 2.75
+    assert metrics["p95_latency_seconds"] == 5.0
+
+
+@pytest.mark.parametrize("name", ["calculate_metrics", "calculate_classification_metrics"])
+def test_empty_evaluation_has_zero_scores_and_no_latency(
+    monkeypatch: pytest.MonkeyPatch, name: str
+):
+    module = load_evaluate_module(monkeypatch)
+    metrics = getattr(module, name)([], ["A", "B"])
+    assert metrics["samples"] == 0
+    assert metrics["json_parse_rate"] == 0
+    assert metrics["classification_accuracy"] == 0
+    assert metrics["classification_macro_f1"] == 0
+    assert metrics["mean_latency_seconds"] is None
+    assert metrics["p95_latency_seconds"] is None

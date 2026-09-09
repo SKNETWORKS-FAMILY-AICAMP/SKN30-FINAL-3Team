@@ -546,3 +546,19 @@ test("저장 응답이 없으면 작성값을 그대로 둔다", () => {
   assert.deepEqual(carrySavedIdentity(draft, undefined), draft);
   assert.deepEqual(carrySavedIdentity(draft, null), draft);
 });
+
+test("저장된 상담 기준값은 이어받되 저장 중 추가 입력은 보존한다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), log: "저장 중 추가 입력", savedInteractionContent: "이전 상담" };
+  const persisted = { ...draft, log: "이번 저장 상담", savedInteractionContent: "이번 저장 상담" };
+  const carried = carrySavedIdentity(draft, persisted);
+  assert.equal(carried.log, "저장 중 추가 입력");
+  assert.equal(carried.savedInteractionContent, "이번 저장 상담");
+  assert.equal(newInteractionContent(carried.log, carried.savedInteractionContent), "저장 중 추가 입력");
+});
+
+test("목록의 기존 상담은 비고만 바꾸어도 신규 로그로 분류하지 않는다", () => {
+  const dto = createUnitRowDtos(1)[0]!;
+  const row = toPropertyRow({ ...dto, latest_interaction_content: "이미 저장된 상담" });
+  const edited = { ...row, memo: "비고만 변경" };
+  assert.equal(newInteractionContent(edited.log, edited.savedInteractionContent), null);
+});
