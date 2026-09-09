@@ -5,6 +5,19 @@ API·Worker·모델 선택은 저장소 루트에서 `just -f infra/justfile loc
 [환경변수 관리](../../docs/development/environment-variables.md)가 정본이다.
 `run.py`는 Backend·AI 파일을 각각 읽어 검증하며 비밀값을 출력하거나 다른 파일로 복사하지 않는다.
 
+## F3 자동 판정
+
+API와 Worker는 서로 다른 프로세스로 실행한다. migration021과 합성 seed를 준비한 뒤
+개인 `backend/.env`에서 `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`와
+`F3_AUTO_JUDGMENT_ENABLED=true`를 함께 지정하고 `just -f infra/justfile local-worker`를 실행한다.
+자동 판정 기본값은 false이며 `F3_AUTO_DEBOUNCE_SECONDS=3`, `F3_AUTO_BATCH_SIZE=20`이
+병합 시간과 배치 크기다. Worker가 꺼져 있어도 원장 transaction에 변경 이벤트가 보존된다.
+모델 대기 중에도 Worker의 별도 소비 스레드가 독립 DB 세션으로 이벤트를 처리한다.
+
+새 로컬 큐 제품은 필요하지 않다. PostgreSQL이 이벤트·실행·최신 결과 포인터를 관리하며
+기존 general 모델 endpoint를 사용한다. 모델 호출 없이 브라우저와 실제 Backend·DB·Worker
+경로를 확인하려면 [명시적 테스트 모델 검증](../../backend/README.md)을 따른다.
+
 # 로컬 개발 DB
 
 backend를 실제 PostgreSQL에 붙여 보기 위한 컨테이너 구성이다. 운영 인프라는

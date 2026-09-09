@@ -573,22 +573,12 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
             <div className="detail-info-column detail-info-column--facility"><h3>시설·연락 보조</h3><div className="detail-inline-fields"><DetailTextAreaField id="detail-spec" className="detail-field--spec" label="스펙" value={draft.spec} onChange={(value) => stageField("spec", value)} /><DetailField id="detail-built-in" label="붙박이" value={draft.builtIn} onChange={(value) => stageField("builtIn", value)} /><DetailField id="detail-facility-state" label="시설 상태" value={draft.facilityState} onChange={(value) => stageField("facilityState", value)} /><DetailField id="detail-brokerage" label="임대부동산" value={draft.brokerage} onChange={(value) => stageField("brokerage", value)} /><DetailPhoneField id="detail-owner-phone" label="임대인 전화" value={draft.phone} onChange={stageOwnerPhone} /><DetailPhoneField id="detail-tenant-phone" label="임차인 전화" value={draft.tenantPhone} onChange={(value) => stageField("tenantPhone", value)} /></div><div className="detail-people-card" aria-labelledby="detail-people-heading"><h4 id="detail-people-heading">연락 동의 인물<span>O/X, 값 없음은 X</span></h4><div className="detail-people-list">{people.map((person) => <div className="detail-person-row" key={person.id}><div><strong>{person.name || "성명 미입력"}</strong><span>{person.role} · {person.relationship || "관계 미입력"} · 등록 {person.position || 1}번</span></div><span className={`detail-consent-badge detail-consent-badge--${person.consent === "O" ? "yes" : "no"}`} aria-label={`연락 동의 ${person.consent === "O" ? "O" : "X"}`}>{person.consent === "O" ? "O" : "X"}</span><span>{person.phone || "연락처 없음"}{person.tag ? ` · ${person.tag}` : ""}</span><Button variant="link" aria-label={`${person.name || "인물"} 관계 수정`} onClick={() => { setRelationTarget(person); setRelationOpen(true); }}>수정</Button></div>)}{!people.length && <p className="detail-empty-state">등록된 인물이 없습니다.</p>}</div></div></div>
           </div>
         </section>
-        {/*
-          * 교차 판정 실행 시점은 사용자가 정한다(F3-CR-03·04).
-          *
-          * 패널이 열리는 순간 실행이 확보되므로, 이 섹션을 저장이나 상세 진입으로 열지
-          * 않는다. 저장이 접수한 실행은 서버에 남아 있고 버튼을 누르면 같은 입력 버전의
-          * 활성 실행을 그대로 이어받는다.
-          *
-          * 액션 레일과 이 섹션의 버튼은 같은 실행을 요청한다. 둘 다 저장이 만들어 둔 앵커
-          * 카드를 이어받아 후보 조회부터 진행한다. 여닫기 컨트롤이 아니므로 aria-expanded를
-          * 붙이지 않고, aria-controls도 패널이 실제로 있을 때만 가리킨다.
-          */}
+        {/* 요약·결과 열기는 조회만 수행한다. 최신 분석 접수는 feature의 명시적 버튼이 담당한다. */}
         <section id="detail-section-cross-match" className={`detail-section${isCrossMatchOpen ? " detail-section--cross-match-open" : ""}`} aria-labelledby={isCrossMatchOpen ? "cross-match-panel-title" : "detail-cross-match-heading"} data-screen-id="F3-PNL-010" data-requirement-ids="F3-CR-03~04">
           {/* 패널이 열리면 패널 자신의 머리말이 같은 제목과 [닫기]를 들고 있다. 여기서 또 그리면 제목이 둘이 된다. */}
           {!isCrossMatchOpen && <div className="detail-section__heading">
-            <div><Title headingLevel="h2" id="detail-cross-match-heading" size="md" tabIndex={-1}>교차 판정</Title><span>{isDirty ? "저장된 매물 건을 기준으로 판정합니다. 지금 화면의 미저장 변경은 반영되지 않습니다." : "저장된 매물 건을 기준으로 조건이 맞는 손님 후보를 찾습니다."}</span></div>
-            <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)}>교차 판정 실행</Button>
+            <div><Title headingLevel="h2" id="detail-cross-match-heading" size="md" tabIndex={-1}>교차 판정</Title><span>{isDirty ? "저장된 매물 건을 기준으로 판정합니다. 지금 화면의 미저장 변경은 반영되지 않습니다." : "저장된 매물 건의 판정 요약과 준비된 후보를 확인합니다."}</span></div>
+            <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)}>교차 판정 결과 보기</Button>
           </div>}
           {crossMatchPanel}
         </section>

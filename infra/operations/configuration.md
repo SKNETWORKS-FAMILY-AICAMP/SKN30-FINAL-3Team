@@ -57,3 +57,24 @@ API/Worker를 중지한 상태에서 새 Terraform 공개 입력과 앱 버전�
 기존 AWS AI Secret의 OpenAI/GPU 필드 이름은 유지한다. renderer가 선택 provider에 맞는 키 하나를
 앱의 `AI_GENERAL_API_KEY`로 매핑한다. Bedrock은 키를 주입하지 않고 Worker에는 F2/embedding 키를 주입하지 않는다.
 이 변경의 Terraform 적용·앱 기동·실제 인증은 아직 수행하지 않았다.
+
+
+## F3 자동 판정 배포 설정
+
+공개 dev 설정은 `infra/environments/dev/configuration.tf`의 Backend 환경에서 관리한다.
+`F3_AUTO_JUDGMENT_ENABLED=false`, `F3_AUTO_DEBOUNCE_SECONDS=3`,
+`F3_AUTO_BATCH_SIZE=20`을 주입하며 자동 판정 활성화는 migration021과 통합 검증 후
+검토된 Terraform 변경·앱 재시작으로 반영한다. 이 브랜치의 구현·로컬 검증은 공유 dev
+활성화나 배포를 의미하지 않는다. 비활성 Worker 모드는 없으며 Worker 실행 자체가
+수동 접수된 작업의 처리를 시작한다.
+
+API·Worker는 같은 image의 별도 컨테이너다. 자동 이벤트 소비와 lease heartbeat는 Worker
+컨테이너 내부의 별도 스레드·DB 세션이다. 기존 RDS와 general GPU를 사용하고 SQS나
+새 서버를 필수 자원으로 추가하지 않는다. 상시 GPU 전제에서 자동 판정 검토 기준은
+추가 임대 시간보다 공유 모델 요청 상한·대기 시간·완료율이다.
+
+F3 DB 전역 실행 슬롯 1개와 후보 생성 최대 5개, 현재 단일 API의 챗봇 제한 1건으로
+애플리케이션 general 요청 상한은 6건이다. Worker 서버가 추가되어도 F3 상한은 유지되지만
+API를 여러 프로세스·호스트로 늘리면 챗봇 제한도 공유 저장소로 옮겨야 한다. 독립 Worker
+배포·SG/IAM·drain·health·부하 검증은 별도 운영 작업이며 현재 함께 배포하는 EC2 구성을
+독립 자동 확장이 완료된 구조로 해석하지 않는다.

@@ -592,7 +592,7 @@ def test_longest_documented_status_round_trips_through_the_model() -> None:
 
 
 @requires_database
-def test_retry_release_makes_the_same_stage_immediately_claimable() -> None:
+def test_retry_release_preserves_stage_and_waits_for_backoff_before_reclaiming() -> None:
     with claim_session() as (session, brokerage_id, user_id):
         run_id = insert_run(session, brokerage_id, user_id)
         claimed = service.claim_next_run(session, WORKER_A)
@@ -602,9 +602,16 @@ def test_retry_release_makes_the_same_stage_immediately_claimable() -> None:
             session, run_id, brokerage_id, WORKER_A, claimed.attempt_count
         )
         session.commit()
-        reclaimed = service.claim_next_run(session, WORKER_B)
-
         assert changed == 1
+        assert service.claim_next_run(session, WORKER_B) is None
+        assert stored_run(session, run_id)["next_attempt_at"] is not None
+        # Advance the persisted retry deadline without a wall-clock sleep.
+        session.execute(
+            text("UPDATE agent_run SET next_attempt_at=now()-interval '1 second' WHERE id=:id"),
+            {"id": run_id},
+        )
+        session.commit()
+        reclaimed = service.claim_next_run(session, WORKER_B)
         assert reclaimed is not None and reclaimed.id == run_id
         stored = stored_run(session, run_id)
         assert stored["status"] == "RUNNING"

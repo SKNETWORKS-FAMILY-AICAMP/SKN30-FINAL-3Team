@@ -1,0 +1,81 @@
+.f3-judgments {
+  padding: var(--pf-t--global--spacer--lg);
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  background: var(--pf-t--global--background--color--primary--default);
+}
+.f3-judgments__heading,
+.f3-judgments__actions,
+.f3-judgments__status,
+.f3-judgments__candidate-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm);
+  margin-block: var(--pf-t--global--spacer--md);
+}
+.f3-judgments__heading {
+  justify-content: space-between;
+}
+.f3-judgments__status {
+  color: var(--pf-t--global--text--color--subtle);
+}
+.f3-judgments__result,
+.f3-judgments__candidate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--pf-t--global--spacer--md);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.f3-judgments__card {
+  border-block-start: var(--pf-t--global--border--width--regular) solid
+    var(--pf-t--global--border--color--default);
+  padding-block: var(--pf-t--global--spacer--md);
+}
+.f3-judgments__card summary {
+  cursor: pointer;
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+.f3-judgments__evidence {
+  padding-inline-start: var(--pf-t--global--spacer--lg);
+}
+.f3-judgments__evidence li {
+  margin-block: var(--pf-t--global--spacer--sm);
+}
+.f3-target-summary {
+  padding: var(--pf-t--global--spacer--md);
+  border-block-start: var(--pf-t--global--border--width--regular) solid
+    var(--pf-t--global--border--color--default);
+}
+
+/* Keep the close action reachable while the result body scrolls. */
+.f3-judgments .pf-v6-c-drawer__head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--pf-t--global--background--color--primary--default);
+}
+@media (max-width: 767px) {
+  /* On narrow screens the result uses the area below the existing 48px masthead. */
+  .f3-judgments .pf-v6-c-drawer.pf-m-expanded .pf-v6-c-drawer__panel {
+    position: fixed;
+    inset-block: 48px 0;
+    inset-inline: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    transform: translateX(0);
+    z-index: var(--pf-t--global--z-index--md, 100);
+  }
+}
+
+.f3-judgments__candidate-list .pf-v6-c-button {
+  max-inline-size: 100%;
+  white-space: normal;
+  text-align: start;
+}
+.f3-judgments .pf-v6-c-toolbar__item > label {
+  white-space: nowrap;
+}

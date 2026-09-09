@@ -52,6 +52,10 @@ locals {
       LOG_FORMAT                   = "json"
       LOG_LEVEL                    = "INFO"
       F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
+      # Enable after migration 021 and integrated validation; no new compute resource.
+      F3_AUTO_JUDGMENT_ENABLED = "false"
+      F3_AUTO_DEBOUNCE_SECONDS = "3"
+      F3_AUTO_BATCH_SIZE       = "20"
     }, local.development_auth_identity_environment)
     ai = merge({
       # Shared provider/model choices are validated together in general-model.tf; restart after reviewed apply.

@@ -1,0 +1,51 @@
+{
+  "model": "Persisted deterministic seed examples; not real model inference.",
+  "checks": [
+    {
+      "name": "seed_session",
+      "loginId": "f3_synthetic_dev",
+      "brokerageId": 2
+    },
+    {
+      "name": "dynamic_seed_scenarios",
+      "listingCount": 36,
+      "buyerCount": 48,
+      "listingResult": 197,
+      "buyerResult": 243,
+      "noCandidateResult": 167,
+      "unjudgedResult": 197
+    },
+    {
+      "name": "seed_listing_detail_and_ten_read_only_refreshes",
+      "resultId": 197
+    },
+    {
+      "name": "seed_buyer_detail",
+      "resultId": 243
+    },
+    {
+      "name": "zero_candidates_remain_normal_seed_result",
+      "resultId": 167
+    },
+    {
+      "name": "unjudged_is_not_rejected_and_feedback_disabled",
+      "resultId": 197,
+      "count": 5
+    }
+  ],
+  "requests": {
+    "runPosts": 0,
+    "feedbackPosts": 0,
+    "unexpectedWrites": 0,
+    "resultGets": 19
+  },
+  "pageErrors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "screenshots": [
+    "seed-browser-listing.png",
+    "seed-browser-unjudged.png"
+  ],
+  "unexpectedConsoleErrors": []
+}

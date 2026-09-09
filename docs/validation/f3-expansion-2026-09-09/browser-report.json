@@ -1,0 +1,60 @@
+{
+  "origin": "http://127.0.0.1:5178",
+  "model": "approved deterministic Worker test adapter; no real model success claim",
+  "checks": [
+    {
+      "name": "persisted_both_directions",
+      "listingResult": 3,
+      "buyerResult": 2
+    },
+    {
+      "name": "drawer_candidates_cards",
+      "candidates": 3
+    },
+    {
+      "name": "ten_get_refreshes_zero_run_posts",
+      "refreshes": 10,
+      "runPosts": 0
+    },
+    {
+      "name": "ledger_return_restores_filter_selection"
+    },
+    {
+      "name": "exact_original_consultation_and_return"
+    },
+    {
+      "name": "feedback_persisted_real_database",
+      "feedbackPosts": 1
+    },
+    {
+      "name": "buyer_direction_actual_result"
+    },
+    {
+      "name": "independent_context_restores_database_result",
+      "result": 2
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "documentWidth": 390,
+      "panelWidth": 390,
+      "panelContentWidth": 390
+    }
+  ],
+  "requests": {
+    "runPosts": 0,
+    "feedbackPosts": 1,
+    "targetGets": 21,
+    "detailGets": 19
+  },
+  "pageErrors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "screenshots": [
+    "browser-final.png",
+    "browser-mobile.png"
+  ],
+  "unexpectedConsoleErrors": [],
+  "date": "2026-09-09"
+}

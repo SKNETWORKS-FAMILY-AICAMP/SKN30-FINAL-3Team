@@ -61,7 +61,7 @@ F2의 처리·필드·완료 기준 일부는 아직 독립 요구사항 ID가 �
 | [개요·공통](f3/overview-and-common.md) | `F3-CM`, 구성 요소와 공통 원칙 |
 | [포지션 카드](f3/position-card.md) | `F3-PC`, 카드 규격·캐시 |
 | [카드 독립 조회 검토안](f3/position-card-delivery.md) | 신규 카드 API·상세 표시·최신성·생성 상태·판정 재사용. 2026-09-09 제안, 미구현 |
-| [자동 판정·결과 목록 검토안](f3/judgment-results-list.md) | 후속 권고: 조건부 자동 판정·앵커별 결과 목록·카드 근거 상세·사용자 대기. 제안, 미구현 |
+| [자동 판정·결과 목록 검토안](f3/judgment-results-list.md) | 1차 기능 정의: 공통 메뉴·장부 요약·결과 상세·조건부 자동 처리·수용 기준. 화면/API/페르소나 검토 연결. 제안, 미구현 |
 | [대리·중개 판정](f3/delegates-and-brokerage.md) | `F3-LA`, `F3-CA`, `F3-BR` |
 | [후보 추출·도구](f3/candidate-selection-and-tools.md) | `F3-SQ`, `F3-TL`, 코드 필터·공유 도구 |
 | [교차 판정](f3/cross-judgment.md) | `F3-CR`, 트리거·결과·사용자 행동 |
