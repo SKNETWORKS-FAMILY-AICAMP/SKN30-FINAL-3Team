@@ -5,6 +5,7 @@ from api.authentication import router as authentication_router
 from api.calendar import router as calendar_router
 from api.chatbot import router as chatbot_router
 from api.f2 import router as f2_router
+from api.f3_judgments import router as f3_judgments_router
 from api.f3_runs import router as f3_runs_router
 from api.property_ledger import router as property_ledger_router
 from api.time_keeper import router as time_keeper_router
@@ -17,6 +18,7 @@ def create_api_router(config: Config) -> APIRouter:
     router.include_router(property_ledger_router)
     router.include_router(f2_router)
     router.include_router(f3_runs_router)
+    router.include_router(f3_judgments_router)
     router.include_router(time_keeper_router)
     router.include_router(calendar_router)
     router.include_router(chatbot_router)

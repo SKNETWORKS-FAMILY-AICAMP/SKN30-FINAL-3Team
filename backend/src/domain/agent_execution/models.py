@@ -139,6 +139,8 @@ class AgentRun(SQLModel, table=True):
     completed_at: datetime | None = Field(default=None, sa_column=timestamp_column())
     lease_owner: str | None = Field(default=None, max_length=64)
     lease_expires_at: datetime | None = Field(default=None, sa_column=timestamp_column())
+    next_attempt_at: datetime | None = Field(default=None, sa_column=timestamp_column())
+    priority: int = 0
     attempt_count: int = Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
     retention_until: datetime | None = Field(default=None, sa_column=timestamp_column())
     purged_at: datetime | None = Field(default=None, sa_column=timestamp_column())

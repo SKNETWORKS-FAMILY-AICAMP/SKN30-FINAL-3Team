@@ -591,6 +591,7 @@ def test_the_run_snapshot_carries_no_prompt_or_model_response() -> None:
         }
         # 판정 바인딩은 allowlist 필드만 남는다. API key 와 endpoint 는 들어가지 않는다.
         assert set(snapshot["judgment"]) == {
+            "input_identity",
             "model_config_id",
             "model_snapshot",
             "prompt_version",
@@ -598,6 +599,10 @@ def test_the_run_snapshot_carries_no_prompt_or_model_response() -> None:
             "input_privacy_mode",
         }
         assert snapshot["judgment"]["input_privacy_mode"] == "SYNTHETIC_PROTOTYPE"
+        identity = snapshot["judgment"]["input_identity"]
+        assert len(identity) == 64 and all(
+            character in "0123456789abcdef" for character in identity
+        )
         assert set(snapshot["judgment"]["model_snapshot"]) == {
             "provider",
             "model_name",
