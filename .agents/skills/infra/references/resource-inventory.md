@@ -20,12 +20,13 @@ README·아키텍처 문서에는 적용 상태를 복제하지 않는다. 선�
 | 앱·edge | EC2/ASG·ALB·CloudFront/OAC·deep lifecycle 적용 | deep 중지 시 ALB 제거·CF 비활성·ASG 0; 실제 상태는 doctor |
 | RDS | PostgreSQL 15.18·db.t4g.small·20GiB/최대50GiB·비공개·암호화·IAM·백업7일 | 기존 migration 이력 있음. 최신 migration은 새 앱 배포에서 확인 |
 | 저장소 | audio·data-model·frontend·pipeline S3, Backend/AI·CI pgvector ECR 적용 | immutable tag·scan·digest 배포, state와 업무 bucket 분리 유지 |
-| 전달 | 3개 dev source Pipeline·QUEUED·Verify/Build 분리·CodeDeploy 적용 | 9/9 통합 Pipeline 성공; 9/10 검증된 정확한 revision 복원 및 앱 기동 성공 |
+| 전달 | 3개 dev source Pipeline·QUEUED·Verify/Build 분리·CodeDeploy 적용 | 9/10 최신 dev a550ae9 통합 배포와 실행 digest 일치·설정 재기동 확인 |
 | 관측 | 전용 Alarm SNS/Lambda·Backend/AI 오류 alarm 적용 | RunPod 자체 감시 제거. 실제 알림 전달 시험과 설정 확인을 구분 |
 | 비밀/설정 | Secret 컨테이너·SSM·TTY 회전·프로세스별 주입 구현·기반 적용 | 저장·구조·인증·배포 반영은 별도 확인 |
 | RunPod | F2/general Console Template·registry·Secret 참조·SSM 등록됨 | 9/10 새 F2/general digest 게시·기존 Template 반영·SSM 등록 완료 |
-| 공유 선택 | F2 consultation-v3 / RunPod RTX 4090, general Qwen3.8-27B-FP8 / RunPod L40S와 새 digest를 SSM에 저장 | 9/10 두 endpoint active; DB 대기 요청 0·모델 호환 확인, DB 설정 변경 없음 |
+| 공유 선택 | F2 consultation-v3 / RunPod RTX 4090, general Qwen3.8-27B-FP8 / RunPod L40S와 새 digest를 SSM에 저장 | 9/10 두 endpoint active; 사무소 2 CHATBOT 모델 추가, 기존 F3 설정 유지 |
 | GPU 실행 | RunPod create/delete와 AWS GPU EC2/EBS·SG·IAM·SSM 통합 코드·기반 적용 | 9/10 RunPod 두 GPU 준비 및 앱 합성 요청 성공; AWS 전환·왕복 검증은 별도 |
+| 챗봇 | dev 활성화 SSM·API general 연결·사무소 2 CHATBOT 모델 적용 | [설정 재적용 기록](../../../../infra/operations/dev-feature-configuration-2026-09-10.md): 실제 모델 호출·CloudFront SSE 완료 검증 |
 | Bedrock | alias·Instance Role 최소 권한 기반 적용 | 이번 점검에서 실제 추론·DB 활성 모델은 미확인 |
 | 기존 F2 모델 | dev-f2-handwritten-v05-qwen3-4b-full-v1 S3 게시됨 | 미평가 dev 경로, 자동 활성화 없음 |
 | 신규 F2 모델 | consultation-v3 LoRA 번들 검증·별도 catalog 등록 | 9/9 S3 게시·checksum 검증, 9/10 새 이미지·RTX 4090 기동과 앱 합성 요청 성공 |

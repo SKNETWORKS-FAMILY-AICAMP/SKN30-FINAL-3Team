@@ -10,6 +10,7 @@ updated: 2026-09-10
 | 문서 | 읽는 조건 |
 |---|---|
 | [개발자 운영](../../../../infra/operations/README.md) | 설정·상태 점검, 최초 배포와 사용자 기동 검증 명령을 찾을 때 |
+| [dev 기능 설정 재적용](../../../../infra/operations/dev-feature-configuration-2026-09-10.md) | 최신 dev 배포 후 챗봇 활성화·DB 모델·API 연결과 추가 설정 누락 감사 범위를 확인할 때 |
 | [설정 관리 위치](../../../../infra/operations/configuration.md) | 환경변수·Secret의 이름·소유자·주입 경로를 확인할 때 |
 | [F2 모델 목록](../../../../infra/runpod/releases.json) | 기존 dev 모델과 신규 consultation-v3를 구분·선택할 때 |
 | [resource-inventory.md](resource-inventory.md) | 아키텍처에 필요한 AWS·RunPod 자원과 도입 상태를 확인할 때 |
