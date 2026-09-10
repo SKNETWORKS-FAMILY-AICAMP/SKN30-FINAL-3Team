@@ -8,6 +8,8 @@
 새 digest를 공유 선택에 저장하고 공식 `dev-start`·`dev-verify`를 통과했다.
 identity 일치·VRAM 관측 결과와 RunPod REST의 GPU 식별 제한·별도 GraphQL 보완 확인은 적용 기록에 있다.
 과거 후보 검증이나 게시 성공을 새 이미지·release의 기동 검증 완료로 간주하지 않는다.
+최신 앱 배포 후 기능 flag·DB 모델·API 연결을 함께 확인한 범위는
+[dev 기능 설정 재적용 기록](dev-feature-configuration-2026-09-10.md)을 참고한다.
 
 새 checkout에는 개인 `.env`, Terraform 입력과 모델 파일이 복제되지 않는다.
 `infra/.env.example`에서 `infra/.env`를 준비하고 계정 ID를 넣은 뒤

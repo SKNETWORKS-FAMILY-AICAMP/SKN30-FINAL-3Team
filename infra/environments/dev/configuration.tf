@@ -36,6 +36,7 @@ locals {
       APP_ENV                               = "dev"
       APP_HOST                              = "0.0.0.0"
       APP_PORT                              = "8000"
+      CHATBOT_ENABLED                       = "true"
       AUTH_DEVELOPMENT_ENABLED              = tostring(local.development_auth_enabled)
       AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "720"
       AUTH_SESSION_IDLE_TIMEOUT_MINUTES     = "30"
