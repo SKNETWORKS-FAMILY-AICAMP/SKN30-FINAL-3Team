@@ -1,9 +1,11 @@
 ---
 status: 구현됨
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # 위키 변경 로그
+
+- 2026-09-10: 새 F2/general 이미지의 정확한 소스·digest와 CI checkout/린트 수정, 공유 적용 및 공식 `dev-start`·`dev-verify` 통과를 [Infra 적용 기록](../../../../infra/serving/image-rollout-validation-2026-09-10.md)에 연결했다. 초기 RunPod 생성 500의 원인은 미확정이며 identity·VRAM 관측, REST GPU 식별 제한·GraphQL 보완 확인 및 품질 평가 경계를 구분한다.
 
 - 2026-09-10: F2 503의 로컬 RunPod 재현으로 JSON 공백 반복과 length 종료를 확인하고, Infra에 xgrammar 공백 제한 설정과 검증 경계를 기록했다.
 

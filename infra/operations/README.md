@@ -2,13 +2,12 @@
 
 공유 dev의 설정은 `ai-select`, 실행은 `dev-*`, 새 앱 배포는 `app-deploy`로 관리한다.
 모든 명령은 `infra/`에서 실행한다. 루트에서는 `just -f infra/justfile <명령>`을 사용한다.
-이번 통합은 코드·자동 검사 범위이며 **클라우드 적용, 새 이미지 게시와 실제 기동·추론은 사용자가 수행한다.**
-과거 후보 검증을 새 이미지·release의 검증 완료로 간주하지 않는다.
-
-**현재 catalog에 고정된 F2 `ca2cfefb…`와 general `801473c8…` 이미지는 새 identity/VRAM
-계측 코드보다 이전 이미지다. 이 이미지 그대로는 강화된 `dev-verify`에서 계측 누락으로 실패한다.**
-아래 최초 배포 2단계의 이미지 게시·artifact 검토·Git catalog 변경 후, 완전히 정지된 상태에서
-`ai-select`로 새 digest를 저장해야 한다. 이번 구현에서는 이미지 게시를 실행하지 않았다.
+새 이미지 게시·선택 저장과 실제 기동·추론의 검증 상태는
+[2026-09-10 이미지 적용 기록](../serving/image-rollout-validation-2026-09-10.md)에서 구분한다.
+해당 작업은 F2 공백 제한과 identity/VRAM 계측을 포함한 두 이미지를 게시하고 정지 상태에서
+새 digest를 공유 선택에 저장하고 공식 `dev-start`·`dev-verify`를 통과했다.
+identity 일치·VRAM 관측 결과와 RunPod REST의 GPU 식별 제한·별도 GraphQL 보완 확인은 적용 기록에 있다.
+과거 후보 검증이나 게시 성공을 새 이미지·release의 기동 검증 완료로 간주하지 않는다.
 
 새 checkout에는 개인 `.env`, Terraform 입력과 모델 파일이 복제되지 않는다.
 `infra/.env.example`에서 `infra/.env`를 준비하고 계정 ID를 넣은 뒤
