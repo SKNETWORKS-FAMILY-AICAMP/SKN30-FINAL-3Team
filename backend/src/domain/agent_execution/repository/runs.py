@@ -458,3 +458,29 @@ def release_lease(
         .execution_options(synchronize_session=False)
     )
     return cast(CursorResult[Any], session.execute(statement)).rowcount
+
+
+def renew_lease(
+    session: Session,
+    run_id: int,
+    brokerage_id: int,
+    worker_id: str,
+    attempt_count: int,
+    lease_seconds: int,
+) -> int:
+    """Never revive an expired, released, completed or replaced claim."""
+    statement = (
+        update(AgentRun)
+        .where(
+            *root_cross_judgment_conditions(),
+            col(AgentRun.id) == run_id,
+            col(AgentRun.brokerage_id) == brokerage_id,
+            col(AgentRun.lease_owner) == worker_id,
+            col(AgentRun.attempt_count) == attempt_count,
+            col(AgentRun.lease_expires_at) > func.now(),
+            col(AgentRun.status).in_(list(IN_PROGRESS_STATUSES)),
+        )
+        .values(lease_expires_at=func.now() + func.make_interval(0, 0, 0, 0, 0, 0, lease_seconds))
+        .execution_options(synchronize_session=False)
+    )
+    return cast(CursorResult[Any], session.execute(statement)).rowcount

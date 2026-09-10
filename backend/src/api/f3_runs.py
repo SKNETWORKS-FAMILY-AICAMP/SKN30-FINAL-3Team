@@ -12,6 +12,7 @@ from api.schemas.f3_runs import (
     F3RunStatusResponse,
 )
 from domain.agent_execution import feedback, results, service
+from domain.agent_execution.timing import measure
 from domain.authentication.dependencies import get_current_user, require_csrf
 from domain.authentication.models import CurrentUser
 from domain.session import get_db_session
@@ -49,10 +50,12 @@ def create_f3_run(
     _: None = Depends(require_csrf),
 ) -> F3RunResponse:
     """동일 앵커·입력 버전의 활성 실행이 있으면 새 실행 대신 그 식별자를 반환한다."""
-    run = service.queue_cross_judgment_run(
-        db, user.brokerage_id, user.id, payload.anchor_type, payload.anchor_id
-    )
-    return F3RunResponse.from_domain(run)
+    with measure("INTAKE") as timing:
+        run = service.queue_cross_judgment_run(
+            db, user.brokerage_id, user.id, payload.anchor_type, payload.anchor_id
+        )
+        timing.run_id = run.id
+        return F3RunResponse.from_domain(run)
 
 
 @router.get("/runs/{run_id}", response_model=F3RunStatusResponse)
@@ -61,8 +64,9 @@ def get_f3_run(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db_session),
 ) -> F3RunStatusResponse:
-    run = service.require_cross_judgment_run(db, user.brokerage_id, run_id)
-    return F3RunStatusResponse.from_domain(run)
+    with measure("STATUS", run_id=run_id):
+        run = service.require_cross_judgment_run(db, user.brokerage_id, run_id)
+        return F3RunStatusResponse.from_domain(run)
 
 
 @router.get("/runs/{run_id}/result", response_model=F3RunResultResponse)
@@ -74,5 +78,6 @@ def get_f3_run_result(
     db: Session = Depends(get_db_session),
 ) -> F3RunResultResponse:
     """실행의 현재 결과를 전체 SQL 후보 기준 페이지로 조회한다."""
-    result = results.load_run_result(db, user.brokerage_id, run_id, limit=limit, offset=offset)
-    return F3RunResultResponse.from_domain(result)
+    with measure("RESULT", run_id=run_id):
+        result = results.load_run_result(db, user.brokerage_id, run_id, limit=limit, offset=offset)
+        return F3RunResultResponse.from_domain(result)

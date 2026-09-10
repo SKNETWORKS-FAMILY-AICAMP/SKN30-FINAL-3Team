@@ -29,7 +29,7 @@ from core.config import Config, get_config, load_ai_config
 from core.errors import ConfigurationError
 from core.logging import configure_logging
 from core.worker_health import READY_FILE
-from domain.agent_execution import pipeline, service
+from domain.agent_execution import lease, pipeline, service
 from domain.agent_execution.models import (
     AgentRun,
 )
@@ -86,6 +86,8 @@ def process_run(
     should_stop: Callable[[], bool] | None = None,
 ) -> pipeline.StepOutcome:
     """선점한 실행 하나의 설정 오류와 단계 오류를 다른 실행에서 격리한다."""
+    bind = session.get_bind().engine
+    run_id, brokerage_id, attempt_count = run.id or 0, run.brokerage_id, run.attempt_count
     return pipeline.drive_run(
         session,
         run,
@@ -93,6 +95,9 @@ def process_run(
         lambda current: f3_runtime.build_bindings(session, runtime, current),
         loop,
         should_stop,
+        renew_lease=lambda: lease.renew(
+            lambda: Session(bind), run_id, brokerage_id, worker_id, attempt_count
+        ),
     )
 
 
