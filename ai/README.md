@@ -38,6 +38,12 @@ F2는 SLLM/STT URL이 모두 없으면 미구성(503), 일부만 있으면 설�
 우선순위·개인 파일 이전·DB 모델 버전 반영과 실행 명령은
 [환경변수 관리](../docs/development/environment-variables.md)를 따릅니다.
 
+긴 범용 모델 호출에는 `AI_GENERAL_REQUEST_TIMEOUT_SECONDS=300`을 주입할 수 있습니다.
+미설정 시 공통 한도를 따르며 F2/embedding 한도는 늘리지 않습니다. 범용 vLLM은 스트리밍으로
+수신하되 검증된 최종 결과만 반환합니다. `AI_GENERAL_VLLM_MAX_IN_FLIGHT`(기본 1)로 로컬에서
+동시 요청 수를 제한하며 대기+수신 전체에 절대 한도를 적용합니다. 이는 F3 전체 완료 한도가
+아닙니다. [시드 실측 보고서](../docs/validation/f3-runpod-performance-2026-09-10.md)를 참고하세요.
+
 ## F2 음성메모 파이프라인
 
 `brokerage_ai.f2`에는 다음 실행 흐름을 연결하는 프레임워크 중립 파이프라인이 있습니다.

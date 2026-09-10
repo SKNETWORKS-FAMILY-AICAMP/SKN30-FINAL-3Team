@@ -1,0 +1,55 @@
+[
+  {
+    "label": "runpod-httpx-shutdown-check",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 300.0,
+    "anchor_type": "REQUIREMENT",
+    "cache": "warm",
+    "repetition": 1,
+    "run_id": 12,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 46.45,
+    "pickup_ms": 66.99,
+    "total_ms": 78648.79,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 67.58,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 32.21,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 120.33,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 78344.36,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "input_chars": 9897,
+        "provider_ms": 78257.99237200044,
+        "usage": {
+          "input_tokens": 3714,
+          "output_tokens": 1123,
+          "total_tokens": 4837
+        },
+        "wall_ms": 78267.7
+      }
+    ]
+  }
+]

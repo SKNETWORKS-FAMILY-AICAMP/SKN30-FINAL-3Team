@@ -49,9 +49,14 @@ from brokerage_ai.f3 import (
     UrgencyAssessment,
     validate_judgment_result,
 )
+from brokerage_ai.f3.judgment_generator import BROKERAGE_JUDGMENT_MAX_OUTPUT_TOKENS
 from brokerage_ai.f3.judgment_model_output import (
     BrokerageJudgmentModelOutput,
+    ComparisonReason,
+    ConcessionReason,
     ModelCandidateJudgment,
+    ObstacleReason,
+    RejectionReason,
 )
 
 ROUTE = ModelRoute(provider=ProviderKind.VLLM, model="test-broker")
@@ -209,21 +214,25 @@ def model_output(*candidates: ModelCandidateJudgment) -> BrokerageJudgmentModelO
 
 
 def model_candidate(
-    card_id: int, rank: int, *, grade: MatchGrade = MatchGrade.STRONG
+    card_id: int,
+    rank: int,
+    *,
+    grade: MatchGrade = MatchGrade.STRONG,
+    evidence_refs: tuple[int, ...] = (1,),
 ) -> ModelCandidateJudgment:
     return ModelCandidateJudgment(
         card_id=card_id,
         grade=grade,
         rank=rank,
-        comparison_basis="예산 상한이 앵커 추정가에 가장 가깝다",
-        primary_obstacle="가격 차",
-        rejection_reason="시점이 맞지 않는다" if grade is MatchGrade.REJECTED else None,
-        evidence=(
-            JudgmentEvidence(
-                evidence_side=NegotiationSide.LISTING,
-                source=quote(ANCHOR_INTERACTION, ANCHOR_QUOTE),
-            ),
+        comparison_reason=ComparisonReason.PRICE_FIT,
+        comparison_detail="예산 상한이 앵커 추정가에 가장 가깝다",
+        obstacle_reason=ObstacleReason.PRICE_GAP,
+        concession_reason=ConcessionReason.NONE,
+        rejection_reason=(
+            RejectionReason.TIMING_IMPOSSIBLE if grade is MatchGrade.REJECTED else None
         ),
+        rejection_detail="시점이 맞지 않는다" if grade is MatchGrade.REJECTED else None,
+        evidence_refs=evidence_refs,
     )
 
 
@@ -252,6 +261,18 @@ def test_a_candidate_without_evidence_is_rejected() -> None:
 def test_a_rank_below_one_is_rejected() -> None:
     with pytest.raises(ValidationError):
         judgment(2, 0)
+
+
+def test_model_output_limits_detail_length_and_evidence_count() -> None:
+    values = model_candidate(2, 1).model_dump()
+    values["comparison_detail"] = "가" * 121
+    with pytest.raises(ValidationError, match="comparison_detail"):
+        ModelCandidateJudgment(**values)
+
+    values = model_candidate(2, 1).model_dump()
+    values["evidence_refs"] = (1, 2, 3, 4)
+    with pytest.raises(ValidationError, match="evidence_refs"):
+        ModelCandidateJudgment(**values)
 
 
 def test_candidates_must_be_on_the_opposite_side_of_the_anchor() -> None:
@@ -467,6 +488,7 @@ async def test_all_candidates_go_out_in_a_single_structured_request() -> None:
 
     assert len(provider.calls) == 1
     assert provider.schemas == [BrokerageJudgmentModelOutput]
+    assert provider.calls[0].max_output_tokens == BROKERAGE_JUDGMENT_MAX_OUTPUT_TOKENS
     assert len(produced.candidates) == 3
     validate_judgment_result(source, produced)
 
@@ -483,6 +505,38 @@ async def test_the_anchor_card_is_sent_exactly_once() -> None:
 
     body = "".join(message.content for message in provider.calls[0].messages)
     assert body.count(source.anchor.target_label) == 1
+    # 같은 카드의 intent와 다른 항목이 같은 인용을 써도 catalog에는 원문을 한 번만 싣는다.
+    assert body.count(ANCHOR_QUOTE) == 1
+
+
+async def test_evidence_reference_is_rehydrated_from_the_request_card() -> None:
+    source = request((2,))
+    provider = FakeProvider(model_output(model_candidate(2, 1, evidence_refs=(1, 3))))
+
+    produced = await LlmBrokerageJudgmentGenerator(
+        provider=provider, route=ROUTE, allow_synthetic_prototype=True
+    ).judge_candidates(source)
+
+    assert [item.source for item in produced.candidates[0].evidence] == [
+        quote(ANCHOR_INTERACTION, ANCHOR_QUOTE),
+        quote(CANDIDATE_INTERACTION, CANDIDATE_QUOTE),
+    ]
+    assert produced.candidates[0].comparison_basis.startswith("가격 조건이 상대적으로")
+
+
+async def test_evidence_reference_from_another_candidate_is_rejected() -> None:
+    source = request((2, 3))
+    provider = SequenceProvider(
+        model_output(model_candidate(2, 1, evidence_refs=(5,)), model_candidate(3, 2)),
+        model_output(model_candidate(2, 1), model_candidate(3, 2)),
+    )
+
+    produced = await LlmBrokerageJudgmentGenerator(
+        provider=provider, route=ROUTE, allow_synthetic_prototype=True
+    ).judge_candidates(source)
+
+    assert len(provider.calls) == 2
+    assert produced.candidates[0].evidence[0].source == quote(ANCHOR_INTERACTION, ANCHOR_QUOTE)
 
 
 async def test_the_target_is_copied_from_the_request_not_the_model() -> None:
@@ -552,7 +606,7 @@ async def test_the_prompt_carries_no_run_or_tenant_identifier() -> None:
         assert forbidden not in body
 
 
-async def test_the_prompt_states_that_evidence_kind_picks_the_shape() -> None:
+async def test_the_prompt_requires_catalog_evidence_references() -> None:
     source = request()
     provider = FakeProvider(model_output(model_candidate(2, 1), model_candidate(3, 2)))
     generator = generator_for(provider)
@@ -560,7 +614,7 @@ async def test_the_prompt_states_that_evidence_kind_picks_the_shape() -> None:
     await generator.judge_candidates(source)
 
     body = "".join(message.content for message in provider.calls[0].messages)
-    for rule in ("kind=QUOTE", "kind=INFERENCE", "kind 가 형태를 정한다"):
+    for rule in ("evidence_refs", "evidence_catalog", "quote_text나 note를 다시 출력하지"):
         assert rule in body
 
 

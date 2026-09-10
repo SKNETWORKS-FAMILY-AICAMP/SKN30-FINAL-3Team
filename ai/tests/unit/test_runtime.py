@@ -14,13 +14,52 @@ from brokerage_ai.runtime import ClientFactory, HttpClientFactory, create_ai_run
 class FakeClient:
     def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
-        self.close = AsyncMock()
+        http_client = options.get("http_client")
+        self.close = AsyncMock(side_effect=http_client.aclose if http_client is not None else None)
 
 
 class FakeHttpClient:
     def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
         self.aclose = AsyncMock()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "provider,model", [("vllm", "Qwen/Qwen3.8-27B-FP8"), ("openai", "gpt-5.6-luna")]
+)
+async def test_general_timeout_does_not_change_shared_endpoint_f2_or_embeddings(provider, model):
+    created: list[FakeClient] = []
+
+    def factory(**options: Any) -> AsyncOpenAI:
+        client = FakeClient(options)
+        created.append(client)
+        return cast(AsyncOpenAI, client)
+
+    config = bind_ai_config(
+        {
+            "AI_REQUEST_TIMEOUT_SECONDS": "60",
+            "AI_GENERAL_REQUEST_TIMEOUT_SECONDS": "300",
+            "AI_GENERAL_PROVIDER": provider,
+            "AI_GENERAL_MODEL": model,
+            "AI_GENERAL_BASE_URL": "https://shared.example/v1",
+            "AI_GENERAL_API_KEY": "same-key",
+            "AI_VLLM_SLLM_BASE_URL": "https://shared.example/v1",
+            "AI_VLLM_SLLM_API_KEY": "same-key",
+            "AI_VLLM_STT_BASE_URL": "https://shared.example/stt/v1",
+            "AI_VLLM_EMBEDDING_BASE_URL": "https://shared.example/v1",
+            "AI_VLLM_EMBEDDING_API_KEY": "same-key",
+        },
+        AiProfile.TEST,
+    )
+    runtime = create_ai_runtime(config, client_factory=factory)
+    assert len(created) == 2
+    assert sorted(client.options["timeout"] for client in created) == [60, 300]
+    assert all(client.options["max_retries"] == 0 for client in created)
+    await runtime.close()
+    await runtime.close()
+    for client in created:
+        client.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -103,7 +142,9 @@ async def test_runtime_keeps_default_and_aliased_vllm_routes_separate() -> None:
     default = runtime.providers.get_llm(ProviderKind.VLLM)
     aliased = runtime.providers.get_llm(ProviderKind.VLLM, "general-dev-gpu")
     assert default is not aliased
-    assert len(created) == 1
+    assert len(created) == 2
+    assert "http_client" not in created[0].options
+    assert isinstance(created[1].options["http_client"], httpx.AsyncClient)
     await runtime.close()
 
 

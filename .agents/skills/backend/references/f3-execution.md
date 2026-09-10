@@ -141,3 +141,11 @@ SQL 시간은 cursor 실행 시간이며 JSON 역직렬화·ORM 조립·응답 �
 병렬 호출 시간의 합계는 처리 지연이 아니므로 stage wall_ms와 별도로 해석한다.
 
 측정 및 남은 병목은 [검증 보고서](../../../../docs/validation/f3-reliability-performance-2026-09-10.md)에 둔다.
+
+
+범용 vLLM의 스트리밍 도입에 따라 Worker는 SDK client를 닫은 다음
+`loop.shutdown_asyncgens()`를 완료하고 event loop를 닫는다. 스트림 내부 비동기 generator의
+정리 작업을 버리지 않도록 벤치마크도 같은 종료 순서를 사용한다. Provider 내부 로컬 대기는
+`f3_model_call.wall_ms`에 포함되고 Provider diagnostics 시간에는 포함되지 않는다.
+범용 300초 설정과 실제 RunPod 시드 측정은
+[RunPod 검증 보고서](../../../../docs/validation/f3-runpod-performance-2026-09-10.md)를 따른다.

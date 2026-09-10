@@ -8,7 +8,6 @@ from pathlib import Path
 from time import perf_counter
 from urllib.parse import urlsplit
 
-from brokerage_ai.core.types import ProviderKind
 from brokerage_ai.runtime import create_ai_runtime
 from sqlalchemy import text
 from sqlmodel import Session
@@ -23,6 +22,9 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--confirm-isolated", action="store_true", required=True)
 parser.add_argument("--label", required=True)
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--repetitions", type=int, choices=range(1, 31), default=3)
+parser.add_argument("--anchor-type", choices=("LISTING", "REQUIREMENT"))
+parser.add_argument("--cache", choices=("cold", "warm"))
 args = parser.parse_args()
 label = args.label
 config = get_config()
@@ -31,8 +33,10 @@ if config.app.environment.value != "local" or urlsplit(
 ).hostname not in {"localhost", "127.0.0.1", "::1"}:
     parser.error("a dedicated local synthetic database is required")
 engine = create_database_engine(config)
-runtime = create_ai_runtime(load_ai_config("local", os.environ))
-provider = runtime.providers.get_llm(ProviderKind.OPENAI, None)
+ai_config = load_ai_config("local", os.environ)
+runtime = create_ai_runtime(ai_config)
+route = ai_config.general.route
+provider = runtime.providers.get_llm(route.provider, route.endpoint_alias)
 original_generate = provider.generate_structured
 calls = []
 stages = []
@@ -40,17 +44,30 @@ stages = []
 
 async def generate(*args, **kwargs):
     begin = perf_counter()
-    record = {"stage": active_stage, "ok": False}
+    request = args[0] if args else kwargs["request"]
+    record = {
+        "stage": active_stage,
+        "ok": False,
+        "input_chars": sum(len(message.content) for message in request.messages),
+    }
     try:
         result = await original_generate(*args, **kwargs)
         record["ok"] = True
+        record["provider_ms"] = result.diagnostics.latency_ms
+        if result.diagnostics.usage is not None:
+            record["usage"] = result.diagnostics.usage.model_dump()
         return result
     except Exception as error:
         record["error_type"] = type(error).__name__
+        context = error.__context__
+        http_status = getattr(context, "status_code", None)
+        if isinstance(http_status, int):
+            record["http_status"] = http_status
         raise
     finally:
         record["wall_ms"] = round((perf_counter() - begin) * 1000, 2)
         calls.append(record)
+        print(json.dumps({"model_call": record}), flush=True)
 
 
 provider.generate_structured = generate
@@ -110,8 +127,10 @@ try:
         ).scalar_one()
         db.rollback()
         for kind, target in [("LISTING", listing), ("REQUIREMENT", requirement)]:
-            for repetition in range(1, 4):
-                for cache in ["cold", "warm"]:
+            if args.anchor_type and kind != args.anchor_type:
+                continue
+            for repetition in range(1, args.repetitions + 1):
+                for cache in [args.cache] if args.cache else ["cold", "warm"]:
                     if cache == "cold":
                         db.execute(
                             text(
@@ -138,6 +157,9 @@ try:
                     value = results.load_run_result(db, b, run_id)
                     entry = dict(
                         label=label,
+                        provider=route.provider.value,
+                        model=route.model,
+                        timeout_seconds=ai_config.general_timeout_seconds,
                         anchor_type=kind,
                         cache=cache,
                         repetition=repetition,
@@ -162,7 +184,10 @@ try:
                         flush=True,
                     )
                     db.rollback()
+                    if value.run.status != "COMPLETED":
+                        raise SystemExit("Incomplete run recorded; stop before queuing another run")
 finally:
     loop.run_until_complete(runtime.close())
+    loop.run_until_complete(loop.shutdown_asyncgens())
     loop.close()
     engine.dispose()

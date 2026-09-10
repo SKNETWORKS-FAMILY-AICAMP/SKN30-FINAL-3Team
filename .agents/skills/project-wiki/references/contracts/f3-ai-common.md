@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-10
 ---
 
 # F3 Backend–AI 공통 계약
@@ -40,12 +40,12 @@ updated: 2026-09-04
 | 축 | 값 | 의미 | 소유 |
 |---|---|---|---|
 | 계약 버전 | `position-card:v1` | DTO와 의미 규격의 버전 | AI |
-| Prompt 버전 | `position-card-prompt:v1` | 프롬프트 원문의 버전 | AI |
+| Prompt 버전 | `position-card-prompt:v5` | 프롬프트 원문의 버전 | AI |
 | Workflow 버전 | `position-card-workflow:v1` | 생성 절차의 버전 | AI |
 | Cache key 버전 | `position-card:v3` | 캐시 키 계산 방식의 버전 | Backend |
 | 판정 계약 버전 | `brokerage-judgment:v1` | 중개 판정 DTO와 의미 규격의 버전 | AI |
-| 판정 Prompt 버전 | `brokerage-judgment-prompt:v1` | 중개 판정 프롬프트 원문의 버전 | AI |
-| 판정 Workflow 버전 | `brokerage-judgment-workflow:v1` | 중개 판정 절차의 버전 | AI |
+| 판정 Prompt 버전 | `brokerage-judgment-prompt:v5` | 중개 판정 프롬프트 원문의 버전 | AI |
+| 판정 Workflow 버전 | `brokerage-judgment-workflow:v2` | 근거 reference 복원과 판정 조립 절차의 버전 | AI |
 
 각 값은 서로 다른 것을 버전하며 독립적으로 올라간다. 번호가 다른 것은 정상이다.
 
@@ -73,6 +73,12 @@ AI가 소유한다.
 - 요청·결과 교차 검증의 순수 규칙
 - 모델 Provider와 모델 선택
 
+중개 판정의 모델 전용 출력은 공개 DTO보다 작다. 요청 카드의 검증된 근거를 정수 reference로
+고르고 reason code와 120자 이하 detail을 반환하며, AI 조립 단계가 공개 DTO의 근거 원문과 고정
+문구를 복원한다. reference가 없거나 다른 후보의 근거를 가리키면 저장하지 않는다. 판정 호출의
+현재 출력 상한은 2,048 tokens이며 정식 p99 평가 전의 보수적인 tail guard다. 세부 결정은
+[AI ADR-0008](../../../ai/references/decisions/ADR-0008-f3-compact-judgment-output.md)을 따른다.
+
 Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 않으며 Provider나 모델 ID를
 직접 고르지 않는다. AI는 DB, SQLAlchemy, SQLModel, Session, Repository, FastAPI와 Backend의
 `AgentRun` ORM 모델을 알지 않는다.
@@ -91,6 +97,13 @@ Backend는 프롬프트 원문을 소유하지 않고 LangGraph를 import하지 
 - SDK 자동 재시도 정책은 바꾸지 않는다 (AI ADR-0001).
 - 프롬프트 원문과 전체 모델 응답은 diagnostics에 넣지 않는다.
 - Secret, token, 인증 헤더는 넣지 않는다.
+
+범용 vLLM은 내부 스트리밍 수신 후 검증된 최종 결과만 반환한다. 런타임별 슬롯을 기다리는
+시간은 호출자 wall time에 포함되며 `ProviderDiagnostics.latency_ms`는 슬롯 획득 후 전송·생성
+시간이다. 범용 한도는 `AI_GENERAL_REQUEST_TIMEOUT_SECONDS`로 분리할 수 있다. vLLM에서는
+대기와 생성을 합친 절대 한도이며 F3 전체 완료 시간이나 Frontend polling 한도와 다르다.
+세부 동작은 [AI ADR-0007](../../../ai/references/decisions/ADR-0007-vllm-streaming-budget.md)을
+따른다. Backend의 후보 병렬 작업·부분 성공 보존·lease 갱신 계약은 유지한다.
 
 `prompt_version`과 `workflow_version`은 AI가 소유하는 문자열이며 비어 있을 수 없다. 현재 값은
 각각 `position-card-prompt:v1`, `position-card-workflow:v1`이다. Backend는 이 두 값을 cache key

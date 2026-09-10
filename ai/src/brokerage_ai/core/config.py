@@ -149,10 +149,17 @@ class AiConfig(BaseModel):
     profile: AiProfile
     general: GeneralSelection = Field(default_factory=GeneralSelection)
     request_timeout_seconds: float = Field(default=60, gt=0)
+    general_request_timeout_seconds: float | None = Field(default=None, gt=0)
+    general_vllm_max_in_flight: int = Field(default=1, ge=1)
     openai: OpenAIConfig | None = None
     vllm: VllmConfig = Field(default_factory=VllmConfig)
     llm_endpoints: tuple[LlmEndpointConfig, ...] = ()
     f2: F2Config = Field(default_factory=F2Config)
+
+    @property
+    def general_timeout_seconds(self) -> float:
+        """범용 생성만 별도 제한을 쓰며, 미설정 환경은 기존 공통 제한을 유지한다."""
+        return self.general_request_timeout_seconds or self.request_timeout_seconds
 
 
 def _optional(source: Mapping[str, str], name: str) -> str | None:
@@ -281,6 +288,14 @@ def bind_ai_config(source: Mapping[str, str], profile: AiProfile | str) -> AiCon
             profile=selected_profile,
             general=general,
             request_timeout_seconds=_positive_float(source, "AI_REQUEST_TIMEOUT_SECONDS", 60),
+            general_request_timeout_seconds=(
+                _positive_float(source, "AI_GENERAL_REQUEST_TIMEOUT_SECONDS", 60)
+                if _optional(source, "AI_GENERAL_REQUEST_TIMEOUT_SECONDS") is not None
+                else None
+            ),
+            general_vllm_max_in_flight=TypeAdapter(int).validate_python(
+                _optional(source, "AI_GENERAL_VLLM_MAX_IN_FLIGHT") or "1"
+            ),
             openai=openai_config,
             vllm=VllmConfig(
                 sllm=sllm,

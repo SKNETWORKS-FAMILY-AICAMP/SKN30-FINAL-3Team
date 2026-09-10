@@ -34,6 +34,15 @@ Backend 앱은 AI 개인 파일을 직접 읽지 않는다. `backend/.env*`에 A
 Worker에는 F2·embedding 연결/키를 주입하지 않는다. 챗봇을 끈 API에는 범용 키를 주입하지 않는다. 공유 배포 migration에는 DB migration URL만 주입한다.
 
 Backend·AI 변경은 프로세스 재시작, Frontend 변경은 개발 서버 재시작 또는 재빌드가 필요하다.
+
+RunPod 범용 호출을 300초로 설정하려면 AI 입력에 `AI_GENERAL_REQUEST_TIMEOUT_SECONDS=300`을
+주입한다. 공통 `AI_REQUEST_TIMEOUT_SECONDS=60`은 유지할 수 있다. 범용 vLLM의 기본 동시
+요청 수는 `AI_GENERAL_VLLM_MAX_IN_FLIGHT=1`이며 대기+수신에 절대 한도를 적용한다.
+공유 dev에서는 공개 AI 설정 map/Parameter Store와 배포 주입을 갱신하고 Worker 및 범용 모델을
+사용하는 API를 재시작한다. 이 변경만으로 GPU 재시작이나 자원 증설은 필요하지 않다.
+비스트리밍 프록시 제한은 timeout 숫자만으로 해제되지 않으므로 스트리밍 구현도 함께 배포한다.
+실측과 적용 범위는 [F3 RunPod 검증](../validation/f3-runpod-performance-2026-09-10.md)을 따른다.
+
 `VITE_*`는 브라우저 공개값이므로 비밀값 금지. boolean은 true/false로 작성한다.
 Backend의 1/0·yes/no·on/off는 읽기 호환을 유지한다. provider/model/log 선택값은 대소문자까지 enum과 같아야 한다.
 

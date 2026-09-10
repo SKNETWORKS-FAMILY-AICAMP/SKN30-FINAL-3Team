@@ -56,9 +56,11 @@ locals {
     }, local.development_auth_identity_environment)
     ai = merge({
       # Shared provider/model choices are validated together in general-model.tf; restart after reviewed apply.
-      AI_GENERAL_PROVIDER        = var.general_model_selection.provider
-      AI_GENERAL_MODEL           = var.general_model_selection.model
-      AI_REQUEST_TIMEOUT_SECONDS = "60"
+      AI_GENERAL_PROVIDER                = var.general_model_selection.provider
+      AI_GENERAL_MODEL                   = var.general_model_selection.model
+      AI_REQUEST_TIMEOUT_SECONDS         = "60"
+      AI_GENERAL_REQUEST_TIMEOUT_SECONDS = "300"
+      AI_GENERAL_VLLM_MAX_IN_FLIGHT      = "1"
       }, var.general_model_selection.provider == "bedrock" ? {
       # Bedrock only: ap-northeast-2, matching this root's runtime role; omitted for API-key providers.
       AI_GENERAL_AWS_REGION = var.general_model_selection.aws_region

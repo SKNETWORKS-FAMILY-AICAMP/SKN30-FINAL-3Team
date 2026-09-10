@@ -71,23 +71,31 @@ def create_ai_runtime(
     http_client_factory: HttpClientFactory = httpx.AsyncClient,
     aws_credential_loader: AwsCredentialLoader | None = None,
 ) -> AiRuntime:
-    clients_by_endpoint: dict[tuple[str, str], AsyncOpenAI] = {}
+    clients_by_endpoint: dict[tuple[str, str, float, bool], AsyncOpenAI] = {}
 
     def client_for(
         endpoint: OpenAIConfig | ProviderEndpointConfig | SelfHostedLlmEndpointConfig,
+        *,
+        timeout_seconds: float | None = None,
+        stream_transport: bool = False,
     ) -> AsyncOpenAI:
         api_key = (
             endpoint.api_key.get_secret_value() if endpoint.api_key is not None else "not-required"
         )
-        key = (str(endpoint.base_url), api_key)
+        timeout = timeout_seconds if timeout_seconds is not None else config.request_timeout_seconds
+        key = (str(endpoint.base_url), api_key, timeout, stream_transport)
         client = clients_by_endpoint.get(key)
         if client is None:
             options: dict[str, Any] = {
                 "api_key": api_key,
                 "base_url": str(endpoint.base_url),
-                "timeout": config.request_timeout_seconds,
+                "timeout": timeout,
                 "max_retries": 0,
             }
+            if stream_transport:
+                # SDK 3.1 supports HTTPX alongside HTTPX2. HTTPX2 leaves nested body
+                # iterators pending after SSE [DONE], which breaks Worker loop shutdown.
+                options["http_client"] = http_client_factory()
             client = client_factory(**options)
             clients_by_endpoint[key] = client
         return client
@@ -99,9 +107,15 @@ def create_ai_runtime(
     resolved_credential_loader = aws_credential_loader
 
     if config.openai is not None:
-        openai_adapter = OpenAIAdapter(client_for(config.openai))
+        general_client = client_for(config.openai, timeout_seconds=config.general_timeout_seconds)
+        embedding_client = client_for(config.openai)
+        openai_adapter = OpenAIAdapter(general_client)
         llm_providers.append(openai_adapter)
-        embedding_providers.append(openai_adapter)
+        embedding_providers.append(
+            openai_adapter
+            if general_client is embedding_client
+            else OpenAIAdapter(embedding_client)
+        )
 
     vllm_llm_client = client_for(config.vllm.sllm) if config.vllm.sllm is not None else None
     vllm_embedding_client = (
@@ -121,7 +135,7 @@ def create_ai_runtime(
         if isinstance(endpoint, BedrockLlmEndpointConfig):
             if bedrock_client is None:
                 bedrock_client = http_client_factory(
-                    timeout=config.request_timeout_seconds,
+                    timeout=config.general_timeout_seconds,
                     follow_redirects=False,
                 )
             if resolved_credential_loader is None:
@@ -138,9 +152,18 @@ def create_ai_runtime(
                 )
             )
             continue
-        client = client_for(endpoint)
+        client = client_for(
+            endpoint,
+            timeout_seconds=config.general_timeout_seconds,
+            stream_transport=endpoint.provider is ProviderKind.VLLM,
+        )
         if endpoint.provider is ProviderKind.VLLM:
-            provider: LlmProvider = VllmAdapter(llm_client=client, embedding_client=None)
+            provider: LlmProvider = VllmAdapter(
+                llm_client=client,
+                embedding_client=None,
+                stream_timeout_seconds=config.general_timeout_seconds,
+                max_in_flight=config.general_vllm_max_in_flight,
+            )
         elif endpoint.provider is ProviderKind.LLAMA_CPP:
             provider = LlamaCppAdapter(client)
         else:

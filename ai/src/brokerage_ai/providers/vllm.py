@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from time import perf_counter
 from typing import Any, TypeVar
 
+import httpx
+import httpx2
 from openai import AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, ValidationError
 
@@ -11,6 +14,8 @@ from brokerage_ai.core.errors import (
     ProviderOutputInvalidError,
     ProviderRefusalError,
     ProviderResponseError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
     describe_validation_error,
     translate_openai_error,
 )
@@ -33,9 +38,13 @@ class VllmAdapter:
         *,
         llm_client: AsyncOpenAI | None,
         embedding_client: AsyncOpenAI | None,
+        stream_timeout_seconds: float | None = None,
+        max_in_flight: int = 1,
     ) -> None:
         self._llm_client = llm_client
         self._embedding_client = embedding_client
+        self._stream_timeout_seconds = stream_timeout_seconds
+        self._stream_slots = asyncio.Semaphore(max_in_flight)
 
     @property
     def kind(self) -> ProviderKind:
@@ -77,7 +86,23 @@ class VllmAdapter:
 
         started_at = perf_counter()
         try:
-            response = await self._llm_client.chat.completions.parse(**parameters)
+            if self._stream_timeout_seconds is None:
+                response = await self._llm_client.chat.completions.parse(**parameters)
+            else:
+                # Queue locally before opening the proxy connection. The absolute budget
+                # includes queue wait and does not reset for each received token.
+                async with asyncio.timeout(self._stream_timeout_seconds), self._stream_slots:
+                    started_at = perf_counter()
+                    async with self._llm_client.chat.completions.stream(
+                        **parameters, stream_options={"include_usage": True}
+                    ) as stream:
+                        response = await stream.get_final_completion()
+                    if any(choice.finish_reason != "stop" for choice in response.choices):
+                        raise ProviderOutputInvalidError("stream ended without a complete output")
+        except (TimeoutError, httpx.TimeoutException, httpx2.TimeoutException):
+            raise ProviderTimeoutError() from None
+        except (httpx.TransportError, httpx2.TransportError):
+            raise ProviderUnavailableError() from None
         except OpenAIError as exc:
             raise translate_openai_error(exc) from None
         except ValidationError as exc:

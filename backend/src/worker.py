@@ -165,6 +165,7 @@ def run_enabled_worker(
         )
     finally:
         loop.run_until_complete(runtime.close())
+        loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
         engine.dispose()
         ready_file.unlink(missing_ok=True)

@@ -6,7 +6,9 @@ import asyncio
 import os
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import pytest
 from brokerage_ai.core.config import AiProfile
@@ -73,6 +75,57 @@ def test_worker_ids_are_unique_and_fit_the_lease_column() -> None:
 
     assert first != second
     assert len(first) <= WORKER_ID_MAX_LENGTH
+
+
+def test_worker_shutdown_finalizes_stream_generators_before_closing_loop(tmp_path, monkeypatch):
+    import worker
+
+    loop = asyncio.new_event_loop()
+    finalized = []
+    generators = []
+    runtime = SimpleNamespace(close=AsyncMock())
+    disposed = []
+
+    async def chunks():
+        try:
+            yield "chunk"
+        finally:
+            await asyncio.sleep(0)
+            finalized.append(True)
+
+    def poll(**_kwargs):
+        stream = chunks()
+        generators.append(stream)  # Keep it alive until the Worker shuts down.
+
+        async def first_chunk():
+            return await anext(stream)
+
+        assert loop.run_until_complete(first_chunk()) == "chunk"
+
+    monkeypatch.setattr(worker.asyncio, "new_event_loop", lambda: loop)
+    monkeypatch.setattr(worker, "database_is_ready", lambda *_args: True)
+    monkeypatch.setattr(worker, "require_ai_provider", lambda *_args: None)
+    monkeypatch.setattr(worker, "create_ai_runtime", lambda *_args: runtime)
+    monkeypatch.setattr(
+        worker,
+        "create_database_engine",
+        lambda *_args: SimpleNamespace(dispose=lambda: disposed.append(True)),
+    )
+    monkeypatch.setattr(worker, "run_worker_loop", poll)
+    ready_file = tmp_path / "worker-ready"
+    run_enabled_worker(
+        config=bind_config(config_values(F3_ALLOW_SYNTHETIC_PROTOTYPE="true")),
+        stop_event=threading.Event(),
+        ready_file=ready_file,
+        worker_id="shutdown-test",
+        environ={},
+    )
+
+    assert finalized == [True]
+    assert disposed == [True]
+    assert loop.is_closed()
+    assert not ready_file.exists()
+    runtime.close.assert_awaited_once()
 
 
 def test_enabled_worker_requires_an_explicit_llm_provider() -> None:

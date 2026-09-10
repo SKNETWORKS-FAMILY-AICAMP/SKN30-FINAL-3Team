@@ -1,0 +1,81 @@
+[
+  {
+    "label": "runpod-300",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 300.0,
+    "anchor_type": "LISTING",
+    "cache": "cold",
+    "repetition": 1,
+    "run_id": 6,
+    "outcome": "RETRY",
+    "status": "CANDIDATES_READY",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 34.64,
+    "pickup_ms": 55.47,
+    "total_ms": 214402.29,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 88521.43,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 29.39,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 125784.58,
+        "outcome": "RETRY"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "input_chars": 3980,
+        "provider_ms": 88427.85554299917,
+        "usage": {
+          "input_tokens": 1807,
+          "output_tokens": 1008,
+          "total_tokens": 2815
+        },
+        "wall_ms": 88428.56
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3305,
+        "provider_ms": 53982.860575000814,
+        "usage": {
+          "input_tokens": 1577,
+          "output_tokens": 771,
+          "total_tokens": 2348
+        },
+        "wall_ms": 53983.53
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3385,
+        "provider_ms": 112908.78313300345,
+        "usage": {
+          "input_tokens": 1632,
+          "output_tokens": 861,
+          "total_tokens": 2493
+        },
+        "wall_ms": 112908.92
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": false,
+        "input_chars": 3362,
+        "error_type": "ProviderUnavailableError",
+        "wall_ms": 125608.72
+      }
+    ]
+  }
+]
