@@ -106,6 +106,18 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(command[command.index("--chat-template") + 1], str(output))
             self.assertNotIn("--default-chat-template-kwargs", command)
 
+    def test_sllm_json_whitespace_is_bounded_for_base_and_lora(self) -> None:
+        for selected_release in (base_release(), release()):
+            with self.subTest(mode=selected_release.release_mode):
+                config = supervisor.load_config(selected_release, valid_environment())
+                commands = supervisor.build_commands(config, "vllm")
+                sllm = commands["sllm"]
+                option = sllm.index("--structured-outputs-config")
+                self.assertEqual(
+                    json.loads(sllm[option + 1]), {"backend": "xgrammar", "disable_any_whitespace": True}
+                )
+                self.assertNotIn("--structured-outputs-config", commands["stt"])
+
     def test_both_engines_limit_sequences_to_one(self) -> None:
         config = supervisor.load_config(base_release(), valid_environment())
         for command in supervisor.build_commands(config, "vllm").values():
