@@ -41,6 +41,7 @@ from .evaluations import (
     count_match_candidate_evaluations,
     finalize_match_evaluation,
     find_anchor_card_for_run,
+    find_anchor_card_from_context,
     find_candidate_judgment,
     find_match_evaluation_for_run,
     insert_match_candidate_evaluation,
@@ -97,6 +98,7 @@ from .runs import (
     mark_run_claimed,
     park_ledger_save_run,
     release_lease,
+    renew_lease,
     resume_ledger_save_run,
     root_cross_judgment_conditions,
 )
@@ -135,6 +137,7 @@ __all__ = [
     "count_match_candidate_evaluations",
     "finalize_match_evaluation",
     "find_anchor_card_for_run",
+    "find_anchor_card_from_context",
     "find_candidate_judgment",
     "find_match_evaluation_for_run",
     "insert_match_candidate_evaluation",
@@ -185,6 +188,7 @@ __all__ = [
     "mark_run_claimed",
     "park_ledger_save_run",
     "release_lease",
+    "renew_lease",
     "resume_ledger_save_run",
     "root_cross_judgment_conditions",
 ]

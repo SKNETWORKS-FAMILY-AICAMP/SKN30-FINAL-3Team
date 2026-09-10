@@ -588,7 +588,7 @@ export default function DetailWorkspace({ row, isOpen, onClose, onSave, onDiscar
           {/* 패널이 열리면 패널 자신의 머리말이 같은 제목과 [닫기]를 들고 있다. 여기서 또 그리면 제목이 둘이 된다. */}
           {!isCrossMatchOpen && <div className="detail-section__heading">
             <div><Title headingLevel="h2" id="detail-cross-match-heading" size="md" tabIndex={-1}>교차 판정</Title><span>{isDirty ? "저장된 매물 건을 기준으로 판정합니다. 지금 화면의 미저장 변경은 반영되지 않습니다." : "저장된 매물 건을 기준으로 조건이 맞는 손님 후보를 찾습니다."}</span></div>
-            <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)}>교차 판정 실행</Button>
+            <Button id="detail-cross-match-start" variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)}>교차 판정 실행</Button>
           </div>}
           {crossMatchPanel}
         </section>

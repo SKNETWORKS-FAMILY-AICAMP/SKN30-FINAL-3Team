@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # 프로젝트 위키 인덱스
@@ -10,6 +10,8 @@ updated: 2026-09-09
 | 문서 | 읽는 조건 |
 |---|---|
 | [개발자 인프라 운영](../../../../infra/operations/README.md) | 설정·공유 dev 상태·배포 준비·기동 검증 명령을 찾을 때 |
+| [F3 Linux Chrome·300초 조회 검증](../../../../docs/validation/f3-linux-chrome-2026-09-10.md) | 실제 Chrome 배율·초점 복원과 300초 조회 상한의 후속 검증을 확인할 때 |
+| [F3 조회·lease·성능 검증](../../../../docs/validation/f3-reliability-performance-2026-09-10.md) | 조회 재개·페이지 비용·heartbeat 개선과 실제 모델 측정·Windows 검증 공백을 확인할 때 |
 | [F3 실행·카드·자동 판정 검토](../../../../docs/architecture/f3/position-card-review.md) | F3 현재 구현·Worker 확장성·조건부 자동 판정·결과 목록의 검토안을 확인할 때 |
 | [프로젝트 개요](project-overview.md) | 목표·범위·제약을 확인할 때 |
 | [요구사항 인덱스](../../../../docs/requirements/index.md) | 기능 범위·사용자 동작·수용 기준·요구사항 ID를 확인할 때 |

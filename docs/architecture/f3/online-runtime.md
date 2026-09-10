@@ -228,6 +228,7 @@ SSE 진행 구독과 재연결은 아직 구현하지 않았다. 현재 Frontend
 | `GET /api/v1/f3/runs/{run_id}` polling용 상태 조회 | `backend/src/api/f3_runs.py` |
 | `GET /api/v1/f3/runs/{run_id}/result` 진행 단계별 앵커 카드·전체 SQL 후보·후보 판정 페이지 조회 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/results.py` |
 | `POST /api/v1/f3/feedback` 카드·후보 판정의 구조화 관심없음 사유 기록 | `backend/src/api/f3_runs.py`, `backend/src/domain/agent_execution/feedback.py` |
+| 처리 중 30초마다 별도 DB 연결로 300초 lease 갱신, 소유권 상실 시 생성 취소·저장 차단 | `backend/src/domain/agent_execution/lease.py`, [Backend ADR-0006](../../../.agents/skills/backend/references/decisions/ADR-0006-f3-lease-renewal.md) |
 | `claim_next_run` 작업 선점, `RUNNING`·`ANCHOR_READY`·`CANDIDATES_READY`·`CANDIDATE_CARDS_READY`·`JUDGING` 재선점과 5분 lease·3회 상한 | `backend/src/domain/agent_execution/service.py`, migration 016 |
 | 합성 F1 앵커 snapshot과 측면별 상담 로그 범위·날짜 신호 조립 | `backend/src/domain/agent_execution/snapshot.py` |
 | 입력 fingerprint·상담 범위 identity를 포함한 `position-card:v3` cache key와 재사용 | `backend/src/domain/agent_execution/fingerprint.py`, `cache_key.py` |

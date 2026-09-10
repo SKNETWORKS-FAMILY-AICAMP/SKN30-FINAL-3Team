@@ -2,7 +2,7 @@
 
 DB 상태가 재개 지점의 정본이다. 한 번 선점한 실행은 같은 lease 아래에서 가능한 단계까지
 진행하고, 프로세스가 중단되면 다음 Worker가 저장된 상태부터 이어받는다. 별도 scheduler,
-heartbeat 또는 메모리 checkpoint를 만들지 않는다.
+메모리 checkpoint를 만들지 않는다. 모델 대기 중 lease는 별도 세션으로 갱신한다.
 """
 
 from __future__ import annotations
@@ -60,6 +60,7 @@ from domain.agent_execution.models import (
     InputVersionChangedError,
     LeaseNotHeldError,
 )
+from domain.agent_execution.timing import measure
 
 logger = structlog.get_logger()
 
@@ -334,49 +335,57 @@ def advance_run(
     worker_id: str,
     bindings: ExecutionBindings | BindingResolver,
     loop: asyncio.AbstractEventLoop,
+    renew_lease: Callable[[], bool] | None = None,
 ) -> StepOutcome:
     """한 단계를 진행하고 예외를 저장 가능한 실행 결과로 수렴시킨다."""
-    try:
-        resolved = bindings(run) if callable(bindings) else bindings
-        return loop.run_until_complete(_advance(session, run, worker_id, resolved))
-    except BaseException as error:  # noqa: BLE001 - 실행 하나의 실패를 격리하는 경계다.
-        outcome = classify(error)
-        stage = failure_stage(run.status).value
-        category = failure_category(error).value
-        location = exception_location(error)
-        logger.warning(
-            "f3_step_failed",
-            run_id=run.id,
-            status=run.status,
-            failure_stage=stage,
-            attempt=run.attempt_count,
-            outcome=outcome.value,
-            failure_category=category,
-            error_type=type(error).__name__,
-            error_location=location,
-        )
-        if outcome is StepOutcome.LEASE_LOST:
-            session.rollback()
-            return outcome
-        if outcome is StepOutcome.RETRY:
-            return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
-        if not record_failure(session, run, worker_id, outcome):
-            return StepOutcome.LEASE_LOST
-        if outcome is StepOutcome.FAILED_TERMINAL:
-            # Emit the alarm signal only after FAILED_TERMINAL was durably committed.
-            logger.error(
-                "ai_terminal_failure",
-                component="ai",
-                source="f3",
+    stage = failure_stage(run.status).value
+    with measure(stage, run_id=run.id):
+        try:
+            resolved = bindings(run) if callable(bindings) else bindings
+            operation = _advance(session, run, worker_id, resolved)
+            if renew_lease is not None:
+                from domain.agent_execution.lease import protect
+
+                return loop.run_until_complete(protect(operation, renew_lease))
+            return loop.run_until_complete(operation)
+        except BaseException as error:  # noqa: BLE001 - 실행 하나의 실패를 격리하는 경계다.
+            outcome = classify(error)
+            stage = failure_stage(run.status).value
+            category = failure_category(error).value
+            location = exception_location(error)
+            logger.warning(
+                "f3_step_failed",
                 run_id=run.id,
-                status=FAILED_TERMINAL_STATUS,
+                status=run.status,
                 failure_stage=stage,
                 attempt=run.attempt_count,
+                outcome=outcome.value,
                 failure_category=category,
                 error_type=type(error).__name__,
                 error_location=location,
             )
-        return outcome
+            if outcome is StepOutcome.LEASE_LOST:
+                session.rollback()
+                return outcome
+            if outcome is StepOutcome.RETRY:
+                return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
+            if not record_failure(session, run, worker_id, outcome):
+                return StepOutcome.LEASE_LOST
+            if outcome is StepOutcome.FAILED_TERMINAL:
+                # Emit the alarm signal only after FAILED_TERMINAL was durably committed.
+                logger.error(
+                    "ai_terminal_failure",
+                    component="ai",
+                    source="f3",
+                    run_id=run.id,
+                    status=FAILED_TERMINAL_STATUS,
+                    failure_stage=stage,
+                    attempt=run.attempt_count,
+                    failure_category=category,
+                    error_type=type(error).__name__,
+                    error_location=location,
+                )
+            return outcome
 
 
 def drive_run(
@@ -386,10 +395,11 @@ def drive_run(
     bindings: ExecutionBindings | BindingResolver,
     loop: asyncio.AbstractEventLoop,
     should_stop: Callable[[], bool] | None = None,
+    renew_lease: Callable[[], bool] | None = None,
 ) -> StepOutcome:
     """같은 lease 아래에서 완료·실패·중단 지점까지 실행을 진행한다."""
     while True:
-        outcome = advance_run(session, run, worker_id, bindings, loop)
+        outcome = advance_run(session, run, worker_id, bindings, loop, renew_lease)
         if outcome is not StepOutcome.ADVANCED:
             return outcome
         if should_stop is not None and should_stop():

@@ -1,0 +1,627 @@
+{
+  "browser": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+  "mode": "headed",
+  "cases": [
+    {
+      "kind": "listing",
+      "requested": [
+        1920,
+        1080
+      ],
+      "zoom": 1,
+      "outer": [
+        1919,
+        1079
+      ],
+      "inner": [
+        1919,
+        940
+      ],
+      "dpr": 1,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "listing",
+      "requested": [
+        1366,
+        768
+      ],
+      "zoom": 1,
+      "outer": [
+        1366,
+        768
+      ],
+      "inner": [
+        1366,
+        629
+      ],
+      "dpr": 1,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "listing",
+      "requested": [
+        1920,
+        1080
+      ],
+      "zoom": 2,
+      "outer": [
+        1919,
+        1079
+      ],
+      "inner": [
+        959,
+        470
+      ],
+      "dpr": 2,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "listing",
+      "requested": [
+        1366,
+        768
+      ],
+      "zoom": 2,
+      "outer": [
+        1366,
+        768
+      ],
+      "inner": [
+        683,
+        314
+      ],
+      "dpr": 2,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "requirement",
+      "requested": [
+        1920,
+        1080
+      ],
+      "zoom": 1,
+      "outer": [
+        1919,
+        1079
+      ],
+      "inner": [
+        1919,
+        940
+      ],
+      "dpr": 1,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "requirement",
+      "requested": [
+        1366,
+        768
+      ],
+      "zoom": 1,
+      "outer": [
+        1366,
+        768
+      ],
+      "inner": [
+        1366,
+        629
+      ],
+      "dpr": 1,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "requirement",
+      "requested": [
+        1920,
+        1080
+      ],
+      "zoom": 2,
+      "outer": [
+        1919,
+        1079
+      ],
+      "inner": [
+        959,
+        470
+      ],
+      "dpr": 2,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "kind": "requirement",
+      "requested": [
+        1366,
+        768
+      ],
+      "zoom": 2,
+      "outer": [
+        1366,
+        768
+      ],
+      "inner": [
+        683,
+        314
+      ],
+      "dpr": 2,
+      "nextAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "closeAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "focusRestored": true,
+      "reopenPostCount": 1,
+      "baselineStylesAndWidthEqual": true,
+      "panelHorizontalOverflow": false
+    },
+    {
+      "phase": "QUEUED",
+      "editableDuringJudgment": true
+    },
+    {
+      "phase": "RUNNING",
+      "editableDuringJudgment": true
+    },
+    {
+      "phase": "ANCHOR_READY",
+      "editableDuringJudgment": true
+    },
+    {
+      "phase": "CANDIDATES_READY",
+      "editableDuringJudgment": true
+    },
+    {
+      "phase": "CANDIDATE_CARDS_READY",
+      "editableDuringJudgment": true
+    },
+    {
+      "phase": "JUDGING",
+      "editableDuringJudgment": true
+    },
+    {
+      "phase": "FAILED_TERMINAL",
+      "editableDuringJudgment": true
+    },
+    {
+      "scenario": "paused",
+      "retryAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "postCount": 1
+    },
+    {
+      "scenario": "network",
+      "retryAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "postCount": 1
+    },
+    {
+      "scenario": "notFound",
+      "retryAccess": {
+        "focused": true,
+        "visible": true,
+        "uncovered": true
+      },
+      "postCount": 2
+    },
+    {
+      "scenario": "empty",
+      "panel": {
+        "width": 1103,
+        "clientWidth": 1103,
+        "scrollWidth": 1103,
+        "styles": [
+          {
+            "tag": "SECTION",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "DIV",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "16px",
+            "gap": "16px",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H3",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "DIV",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "16px",
+            "gap": "16px",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H3",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "long",
+      "panel": {
+        "width": 1103,
+        "clientWidth": 1103,
+        "scrollWidth": 1103,
+        "styles": [
+          {
+            "tag": "SECTION",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H3",
+            "font": "16px / 24px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H4",
+            "font": "13px / 19.5px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(242, 242, 242)",
+            "padding": "12px 12px 12px 9px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "H4",
+            "font": "13px / 19.5px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "BUTTON",
+            "font": "14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgb(255, 255, 255)",
+            "padding": "12px",
+            "gap": "4px",
+            "borderRadius": "4px"
+          },
+          {
+            "tag": "H3",
+            "font": "16px / 24px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H4",
+            "font": "600 14px / 21px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H4",
+            "font": "13px / 19.5px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H4",
+            "font": "13px / 19.5px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          },
+          {
+            "tag": "H4",
+            "font": "13px / 19.5px \"Noto Sans KR\", \"Red Hat Text\", RedHatText, \"Noto Sans Arabic\", \"Noto Sans Hebrew\", \"Noto Sans JP\", \"Noto Sans KR\", \"Noto Sans Malayalam\", \"Noto Sans SC\", \"Noto Sans TC\", \"Noto Sans Thai\", Helvetica, Arial, sans-serif",
+            "color": "rgb(21, 21, 21)",
+            "background": "rgba(0, 0, 0, 0)",
+            "padding": "0px",
+            "gap": "normal",
+            "borderRadius": "0px"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": []
+}

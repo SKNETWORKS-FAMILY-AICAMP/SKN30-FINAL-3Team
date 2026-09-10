@@ -22,3 +22,14 @@
   다른 경로로 열린 패널의 입력 버전이 바뀌면 이전 결과를 폐기 상태로 표시하고 명시적 재판정을 기다린다.
 - 검색·그리드 필터 적용 후 실제 표시 행 수를 건수로 알린다.
 - 캘린더는 월간 목록과 일정 편집 중 하나의 dialog만 활성화한다. 일정 편집을 닫으면 월간 목록으로 돌아간다.
+
+
+F3 조회 복구는 `tests/f3-recovery.browser.test.mjs`의 합성 transport와 가상 시계로 60초 이후 지속·300초 조회 중단,
+통신 오류, 기존 실행 404, result/status 순서 역전, 세션 종료 후 늦은 응답과 명시적 재판정을 검증한다.
+실제 Windows Chrome 화면 검증은 headless 테스트와 구분한다. 2026-09-10 작업의 실행 범위·도구
+연결 실패와 실제 모델 측정은 [F3 검증 보고서](../docs/validation/f3-reliability-performance-2026-09-10.md)에 기록한다.
+
+후속 Linux Google Chrome 실제 창·100/200% 배율 검증은 `tests/manual/f3-linux-chrome.mjs`로
+실행한다. 창 관리자의 실제 크기 제한과 좁은 확대 화면의 제목 가림은
+[Linux Chrome 검증 기록](../docs/validation/f3-linux-chrome-2026-09-10.md)을 따른다.
+`f3-panel.browser.test.mjs`는 매물·구입 패널을 Tab→Enter로 닫은 뒤 실행 버튼 초점 복원도 검사한다.
