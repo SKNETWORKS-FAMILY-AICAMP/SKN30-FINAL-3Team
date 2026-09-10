@@ -9,8 +9,8 @@ import {
   ExclamationTriangleIcon, FilterIcon, HelpIcon, MicrophoneIcon, OutlinedCommentsIcon, SaveIcon, SearchIcon,
   UserIcon,
 } from "@patternfly/react-icons";
-import { useBuyerLedger, useComplexOptions, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser, isEmptyDraft } from "./features/ledger/index.ts";
+import { useBuyerLedger, useComplexOptions, useComplexQuickAdd, usePropertyLedger } from "./features/ledger/index.ts";
+import { describeForUser, isEmptyDraft, loadSavedBuyer, loadSavedProperty } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
@@ -20,6 +20,10 @@ import BuyerDetailWorkspace from "./features/BuyerDetailWorkspace.jsx";
 import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.ts";
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { HomeScreen } from "./features/HomeScreen.tsx";
+import { TimeKeeperNotification } from "./features/timeKeeper/index.ts";
+import { CalendarView, loadSavedCalendarEvent } from "./features/calendar/index.ts";
+import { Chatbot } from "./features/chatbot/index.ts";
+import { ApiError } from "./shared/api/index.ts";
 import VoiceMemoModal from "./features/VoiceMemoModal.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -103,6 +107,11 @@ export function AppShell() {
   // 로그인 여부는 AuthGate가 이미 걸렀다. 여기서는 헤더 표시와 로그아웃만 다룬다.
   const { state: authState, isSubmitting: authSubmitting, signOut, markSessionExpired } = useAuth();
   const user = currentUser(authState);
+  const chatbotUserKey = user ? `${user.brokerageId}:${user.id}` : "anonymous";
+  const chatbotActionRequest = useRef(null);
+  const [chatbotCalendarEvent, setChatbotCalendarEvent] = useState(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  useEffect(() => () => chatbotActionRequest.current?.abort(), [chatbotUserKey]);
   // 장부 데이터는 features/ledger가 소유한다. mock/API 전환은 VITE_LEDGER_SOURCE가 정한다.
   const ledgerEnabled = isMockSource() || user != null;
   const ledgerQuery = useMemo(() => ({}), []);
@@ -144,10 +153,11 @@ export function AppShell() {
   const [complexFilter, setComplexFilter] = useState("전체");
   const [saveFilter, setSaveFilter] = useState("전체");
   const [columnPreset, setColumnPreset] = useState("all");
-  const [buyerPeriodMode, setBuyerPeriodMode] = useState("all");
   const [buyerAssigneeFilter, setBuyerAssigneeFilter] = useState("전체");
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectionResetToken, setSelectionResetToken] = useState(0);
+  /** 동·호 조회로 찾은 행. 팝업을 열지 않고 매물장 그리드에서 스크롤·강조만 한다. */
+  const [jumpFocus, setJumpFocus] = useState({ id: null, token: 0 });
   const [detailRow, setDetailRow] = useState(null);
   const [f2FocusRequest, setF2FocusRequest] = useState(0);
   const [crossMatchOpen, setCrossMatchOpen] = useState(false);
@@ -200,16 +210,8 @@ export function AppShell() {
     setCrossMatchOpen(false);
   }, [detailRow?.id]);
 
-  const filteredCount = useMemo(() => {
-    if (viewState === "filtered-empty") return 0;
-    const query = searchQuery.trim().toLowerCase();
-    return rows.filter((row) => {
-      const textMatch = !query || [row.complex, row.building, row.unit, row.owner, row.phone, row.log]
-        .some((value) => String(value || "").toLowerCase().includes(query));
-      return textMatch && (complexFilter === "전체" || row.complex === complexFilter)
-        && (saveFilter === "전체" || row.saveState === saveFilter);
-    }).length;
-  }, [rows, searchQuery, complexFilter, saveFilter, viewState]);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [buyerFilteredCount, setBuyerFilteredCount] = useState(0);
 
   const updateRow = (nextRow) => {
     const ledger = nextRow?.ledgerType === "buyer" || nextRow?.rowKind === "buyer" ? buyerLedger : propertyLedger;
@@ -463,23 +465,37 @@ export function AppShell() {
       option.name.toLocaleLowerCase("ko-KR") === normalizedName.toLocaleLowerCase("ko-KR"));
     if (duplicate) throw new Error(`이미 등록된 단지입니다: ${duplicate.name}`);
     // 서버가 준 id를 받아야 이 단지로 세대를 저장할 수 있다.
-    const created = await complexes.createComplex({ name: normalizedName, address });
-    setToast({ variant: "success", title: `${created.name} 단지를 추가하고 현재 상세에 선택했습니다.` });
-    return created;
+    try {
+      const created = await complexes.createComplex({ name: normalizedName, address });
+      setToast({ variant: "success", title: `${created.name} 단지를 추가했습니다.` });
+      return created;
+    } catch (error) {
+      throw new Error(describeForUser(error));
+    }
   };
+
+  const complexQuickAdd = useComplexQuickAdd(handleCreateComplex);
 
   const clearFilters = () => {
     setSearchQuery(""); setComplexFilter("전체"); setSaveFilter("전체");
     if (viewState === "filtered-empty") setViewState("normal");
   };
 
+  /*
+   * 동·호 조회는 상세 팝업을 열지 않는다.
+   *
+   * 매물장 메인 그리드로 이동해 그 행을 강조·스크롤한다. 필터에 가려 있으면 찾은 의미가
+   * 없으므로 필터를 함께 해제한다. 상세를 보려면 사용자가 그 행을 직접 클릭한다(F1-GR-28).
+   */
   const handleJump = () => {
     const query = jumpQuery.replace(/\s/g, "");
+    if (!query) return;
     const match = rows.find((row) => `${row.building}동${row.unit}호`.includes(query) || `${row.building}${row.unit}`.includes(query));
-    if (match) {
-      setDetailRow(match);
-      setToast({ variant: "info", title: `${match.building}동 ${match.unit}호를 열었습니다.` });
-    } else setToast({ variant: "warning", title: "일치하는 동·호를 찾지 못했습니다." });
+    if (!match) { setToast({ variant: "warning", title: "일치하는 동·호를 찾지 못했습니다." }); return; }
+    if (activeNav !== "매물장") setActiveNav("매물장");
+    clearFilters();
+    setJumpFocus({ id: match.id, token: Date.now() });
+    setToast({ variant: "info", title: `${match.building}동 ${match.unit}호를 찾았습니다.` });
   };
 
   const navTo = (item) => {
@@ -509,16 +525,44 @@ export function AppShell() {
     setCrossMatchOpen(false);
     setDetailRow(null);
   };
+  const handleChatbotAction = async (action) => {
+    chatbotActionRequest.current?.abort();
+    const controller = new AbortController();
+    chatbotActionRequest.current = controller;
+    if (action.type === "open_f2") {
+      setIntakeOpen(true);
+      return;
+    }
+    try {
+      if (action.type === "open_calendar") {
+        const event = await loadSavedCalendarEvent(action.target_id, controller.signal);
+        if (!controller.signal.aborted) setChatbotCalendarEvent(event);
+        return;
+      }
+      const row = action.type === "open_property"
+        ? await loadSavedProperty(action.target_id, controller.signal)
+        : await loadSavedBuyer(action.target_id, controller.signal);
+      if (controller.signal.aborted) return;
+      setCrossMatchOpen(false);
+      setDetailRow(row);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof ApiError && error.kind === "unauthorized") markSessionExpired();
+      else setToast({ variant: "warning", title: `상세를 열지 못했습니다 · ${describeForUser(error)}` });
+    }
+  };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
     else if (detailRow) propertyLedger.discardRow(detailRow);
     closeDetail();
   };
   const saveDetail = (nextRow) => {
+    /*
+     * 거래 금액 세 열은 상세가 이미 유지한다(DetailWorkspace의 priceFieldPatch).
+     * 여기서 다시 조립하면 안 된다. 월세 분기가 사용자가 적은 매물 보증금·차임 대신
+     * **현재 임대차**의 deposit·rent로 덮어써서 입력값을 잃은 적이 있다.
+     */
     const propertyColumns = isBuyerDetail ? {} : {
-      salePrice: nextRow.listingType === "매매" ? nextRow.price || "" : nextRow.salePrice || "",
-      leaseDeposit: nextRow.listingType === "전세" ? nextRow.price || nextRow.deposit || "" : nextRow.leaseDeposit || "",
-      rentCondition: nextRow.listingType === "월세" ? [nextRow.deposit, nextRow.rent].filter(Boolean).join(" / ") : nextRow.rentCondition || "",
       ownerPhone: nextRow.phone || nextRow.ownerPhone || "",
     };
     const savedRow = {
@@ -532,19 +576,26 @@ export function AppShell() {
       : `${savedRow.building || "미입력"}동 ${savedRow.unit || "미입력"}호`;
 
     // 낙관적 반영 후 서버에 보낸다. 실패하면 행의 sync 상태가 남고 사용자에게 알린다.
-    updateRow(savedRow);
-    /*
-     * 저장 트리거는 그대로 둔다(F3-CR-01·02). 저장이 성공하면 서버가 실행을 접수하므로,
-     * 화면이 패널을 닫아 두면 이미 도는 판정의 결과를 아무도 보지 못한다.
-     * 화면이 보내는 실행 요청은 같은 입력 버전의 활성 실행을 재사용한다.
-     */
-    setCrossMatchOpen(true);
+    setCrossMatchOpen(false);
     const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
+    // Keep the detail draft stable until this save settles; changing its prop can reset saving state.
+    ledger.patchRow(savedRow.id, () => savedRow);
+    /*
+     * 저장은 패널을 열지 않는다.
+     *
+     * 서버 쪽 저장 트리거는 그대로다(F3-CR-01·02). 다만 패널이 열리는 순간 화면도 실행을
+     * 확보하므로(useCrossJudgment의 enabled), 저장할 때마다 패널을 열면 결과를 볼 생각이
+     * 없는 저장에서도 판정이 돌고 사용자가 요청하지 않은 화면 전환이 일어난다.
+     * 결과를 볼 시점은 상세의 [교차 판정] 섹션에서 사용자가 정한다(F3-CR-03·04).
+     * 그때 보내는 실행 요청은 저장이 접수한, 같은 입력 버전의 활성 실행을 재사용한다.
+     */
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
     return ledger.saveRow(savedRow).then(
       (persisted) => {
         setDetailRow((current) => (current?.id === persisted.id ? persisted : current));
         setToast({ variant: "success", title: `${targetLabel}을(를) 저장했습니다.` });
+        // 상세가 다음 저장에 쓸 row_version을 알아야 한다. 돌려주지 않으면 두 번째 저장이 409가 된다.
+        return persisted;
       },
       (error) => {
         setToast({ variant: "danger", title: `${targetLabel} 저장에 실패했습니다 · ${describeForUser(error)}` });
@@ -555,7 +606,7 @@ export function AppShell() {
   const handleEvidenceOpen = () => {
     const targetId = isBuyerDetail ? "buyer-content" : "detail-log";
     const target = document.getElementById(targetId);
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+    scrollIntoViewRespectingMotion(target, { block: "center" });
     window.requestAnimationFrame(() => target?.focus());
   };
   const openCrossMatch = () => {
@@ -608,6 +659,11 @@ export function AppShell() {
         <div className="masthead-actions">
           <Button className="f1-topbar__intake" variant="secondary" icon={<MicrophoneIcon />} aria-controls="f2-modal" aria-describedby="topbar-intake-help" onClick={() => setIntakeOpen(true)}>음성메모 입력</Button>
           <span id="topbar-intake-help" className="pf-v6-screen-reader">음성을 분석해 매도의뢰는 매물장, 매수문의는 구입장에 신규 행으로 추가합니다.</span>
+          {/* 달력 버튼과 아침 일정 브리핑 창을 함께 소유한다. 상단바는 위치만 정한다. */}
+          <TimeKeeperNotification enabled={ledgerEnabled} />
+          {/* 월간 캘린더. 자기 일정 CRUD와 장부 읽기 전용 일정을 함께 보여준다(F4-CAL). */}
+          <CalendarView requestedEvent={chatbotCalendarEvent} onOpenChange={setCalendarOpen} />
+          {/* F1 알림 센터(F1-AL-04)의 자리. 아직 동작하지 않는다. */}
           <Button variant="plain" aria-label="알림" icon={<BellIcon />} />
           <Button variant="plain" aria-label="도움말" icon={<HelpIcon />} />
           <Button variant="plain" aria-label="사용자 메뉴" icon={<UserIcon />} />
@@ -659,7 +715,6 @@ export function AppShell() {
         {activeNav === "매물장" ? <div className="f1-control-strip">
           <div className="f1-control-strip__top-row">
             <div className="f1-control-strip__left-group">
-              <div className="ledger-tabs" role="tablist" aria-label="장부 유형">{["아파트", "상가", "주택", "재건축"].map((tab, index) => <button key={tab} id={`ledger-tab-${index}`} role="tab" aria-selected={index === 0} aria-controls="ledger-grid-panel" aria-disabled={index !== 0} disabled={index !== 0} tabIndex={index === 0 ? 0 : -1} title={index !== 0 ? "현재 프로토타입에서 사용할 수 없는 장부 유형입니다" : undefined} className={index === 0 ? "active" : ""} type="button">{tab}</button>)}</div>
               {selectedRows.length ? <>
                 <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
                 <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
@@ -682,6 +737,7 @@ export function AppShell() {
 
           <div className="f1-control-strip__bottom-row">
             <div className="filter-row">
+              <Button variant="link" isInline icon={<AddCircleOIcon />} onClick={complexQuickAdd.open}>새 단지 추가</Button>
               <label className={`filter-control${complexFilter === "전체" ? "" : " active-filter"}`}><FilterIcon aria-hidden="true" /><span>단지</span><select value={complexFilter} onChange={(event) => setComplexFilter(event.target.value)}>{["전체", ...complexOptions.map((option) => option.name)].map((value) => <option key={value}>{value}</option>)}</select></label>
               <label className="filter-control"><span>저장 상태</span><select value={saveFilter} onChange={(event) => setSaveFilter(event.target.value)}>{["전체", "임시저장", "저장 완료"].map((value) => <option key={value}>{value}</option>)}</select></label>
               <Button variant="link" onClick={clearFilters} isDisabled={!searchQuery && complexFilter === "전체" && saveFilter === "전체" && viewState !== "filtered-empty"}>모든 필터 해제</Button>
@@ -690,13 +746,21 @@ export function AppShell() {
           </div>
         </div> : <div className="f1-control-strip f1-control-strip--buyer">
           <div className="f1-control-strip__left-group">
-            <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
+            {selectedRows.length ? <>
+              <strong role="status" aria-live="polite">{selectedRows.length}건 선택됨</strong>
+              <Button variant="link" onClick={clearSelection}>전체 선택 해제</Button>
+              <Button variant="secondary" isDanger onClick={() => requestDeleteRows(selectedRows, "grid")}>삭제</Button>
+            </> : <>
+              {/* 매물장과 같은 자리·같은 순서에 둔다. 장부를 오갈 때 행 추가를 다시 찾지 않게 한다. */}
+              <Button icon={<AddCircleOIcon />} onClick={handleAddBuyerRow}>행 추가</Button>
+              <Button variant="primary" icon={<SaveIcon />} isDisabled={pendingBuyerRows.length === 0 || isSavingPending} isLoading={isSavingPending} onClick={savePendingRows}>{pendingBuyerRows.length > 0 ? `변경 저장 · ${pendingBuyerRows.length.toLocaleString()}건` : "변경 저장"}</Button>
+            </>}
           </div>
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
 
-        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onAddRow={handleAddBuyerRow} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} periodMode={buyerPeriodMode} onPeriodModeChange={setBuyerPeriodMode} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} />}
-        <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
+        {activeNav === "구입장" ? <BuyerLedgerGrid searchQuery={searchQuery} onDisplayedCountChange={setBuyerFilteredCount} rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} /> : <LedgerGrid onDisplayedCountChange={setFilteredCount} rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} focusRowId={jumpFocus.id} focusToken={jumpFocus.token} />}
+        <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerFilteredCount.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>
 
@@ -705,6 +769,7 @@ export function AppShell() {
         row={detailRow}
         isOpen={Boolean(detailRow)}
         focusF2Request={f2FocusRequest}
+        currentUser={user}
         onClose={closeDetail}
         onDiscard={discardDetail}
         onDelete={deleteRowFromDetail}
@@ -718,6 +783,7 @@ export function AppShell() {
         row={detailRow}
         isOpen={Boolean(detailRow)}
         focusF2Request={f2FocusRequest}
+        currentUser={user}
         complexOptions={complexOptions}
         onCreateComplex={handleCreateComplex}
         onDeleteComplex={handleDeleteComplex}
@@ -775,6 +841,25 @@ export function AppShell() {
       </div>}</ModalBody>
       <ModalFooter><Button variant={messageCopied ? "secondary" : "primary"} isDisabled={!composerRecipients.length} onClick={async () => { try { if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable"); await navigator.clipboard.writeText(composerRecipients.map((recipient) => recipient.phone).join("\n")); setMessageCopied(true); setToast({ variant: "success", title: "번호 목록을 복사했습니다. 발송은 외부 도구에서 진행합니다." }); } catch { setMessageCopied(false); setToast({ variant: "warning", title: "번호를 복사하지 못했습니다. 번호 목록을 선택해 직접 복사해 주세요." }); } }}>{messageCopied ? "번호 목록 복사됨" : "번호 목록 복사"}</Button><Button variant="link" onClick={closeMessageComposer}>닫기</Button></ModalFooter>
     </Modal>
+    <Modal variant="small" isOpen={complexQuickAdd.isOpen} onClose={complexQuickAdd.close}>
+      <ModalHeader title="새 단지 추가" description="단지명은 필수이며 주소는 선택입니다." />
+      <ModalBody>
+        <label className="batch-edit-field"><span>단지명</span><TextInput
+          id="new-complex-name"
+          ref={complexQuickAdd.nameInputRef}
+          value={complexQuickAdd.name}
+          validated={complexQuickAdd.nameError ? "error" : "default"}
+          aria-describedby={complexQuickAdd.nameError ? "new-complex-name-error" : undefined}
+          onChange={(_event, value) => complexQuickAdd.setName(value)}
+        /></label>
+        <label className="batch-edit-field"><span>주소</span><TextInput id="new-complex-address" value={complexQuickAdd.address} onChange={(_event, value) => complexQuickAdd.setAddress(value)} /></label>
+        {complexQuickAdd.nameError && <Alert id="new-complex-name-error" className="workspace-alert" variant="danger" isInline isLiveRegion title="단지를 추가하지 못했습니다">{complexQuickAdd.nameError}</Alert>}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="primary" onClick={complexQuickAdd.submit} isLoading={complexQuickAdd.isSubmitting} isDisabled={complexQuickAdd.isSubmitting}>추가</Button>
+        <Button variant="link" onClick={complexQuickAdd.close} isDisabled={complexQuickAdd.isSubmitting}>취소</Button>
+      </ModalFooter>
+    </Modal>
     <Modal variant="small" isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
       <ModalHeader titleIconVariant="warning" title="삭제할까요?" description="삭제한 행은 장부 목록과 검색에서 즉시 사라집니다. 데이터는 서버에 남고 상담 로그·매물 이력도 보존되지만, 화면에서 되돌리는 기능은 없습니다. 되살리려면 관리자에게 요청해야 합니다." />
       <ModalBody>
@@ -810,6 +895,7 @@ export function AppShell() {
       <ModalFooter><Button variant="primary" onClick={() => { setScheduleSuggestion(null); setToast({ variant: "success", title: "F3 제안을 승인해 F1 일정으로 저장했습니다." }); }}>일정 저장</Button><Button variant="link" onClick={() => setScheduleSuggestion(null)}>취소</Button></ModalFooter>
     </Modal>
     {effectiveViewState === "loading" && <div className="global-progress" aria-label="그리드 데이터 불러오는 중"><Spinner size="md" /></div>}
+    {user && <Chatbot key={chatbotUserKey} userKey={chatbotUserKey} onAction={handleChatbotAction} onSessionExpired={markSessionExpired} suspended={Boolean(detailRow) || intakeOpen || calendarOpen} />}
     {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
   </div>;
 }

@@ -11,8 +11,24 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 | 파일 | 성격 | 하는 일 |
 |---|---|---|
 | `001_F3_SYNTHETIC_RESET.sql` | 쓰기 | 합성 사무소 1곳의 데이터만 지운다 |
-| `002_F3_SYNTHETIC_SEED.sql` | 쓰기 | 합성 사무소·사용자·AI 설정·장부·상담 로그를 만든다 |
-| `003_F3_SYNTHETIC_VERIFY.sql` | 읽기 전용 | 데이터가 의도한 모양인지 29가지를 점검한다 |
+| `002_F3_SYNTHETIC_SEED.sql` | 쓰기 | 합성 사무소·사용자·장부·상담 로그를 만든다 |
+| `model-profiles/*.sql` | 쓰기 | 선택한 Provider·모델 설정 두 건을 만든다 |
+| `003_F3_SYNTHETIC_VERIFY.sql` | 읽기 전용 | 데이터와 단일 허용 모델 프로필을 30가지로 점검한다 |
+
+## 모델 프로필
+
+관리 명령은 아래 고정 이름만 허용한다. SQL 경로나 provider·model 문자열은 입력받지 않는다.
+
+| 프로필 | Provider | 모델 | `endpoint_alias` | 사용 상태 |
+|---|---|---|---|---|
+| `local-openai` | `openai` | `gpt-5.6-luna` | `NULL` | 로컬 개발 기본값 |
+| `dev-bedrock-gpt56-luna` | `bedrock` | `global.openai.gpt-5.6-luna` | `general-dev-bedrock` | 공유 dev POC; doctor 후 명시 적용·합성 smoke 검증 |
+| `dev-qwen38-vllm-bnb` | `vllm` | `unsloth/Qwen3.8-27B-unsloth-bnb-4bit` | `general-dev-gpu` | 프로필만 구현; GPU runtime 전환 전 적용 금지 |
+| `dev-qwen38-llamacpp-gguf` | `llama_cpp` | `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M` | `general-dev-gpu` | 프로필만 구현; GPU runtime 전환 전 적용 금지 |
+
+두 Qwen 프로필은 모델 revision을 `model_version`에 고정한다. GGUF 프로필은 파일 SHA-256도
+함께 기록한다. 프로필마다 `POSITION_CARD`와 `BROKERAGE_JUDGMENT`를 하나씩 만들며 자동 fallback이나
+A/B 분배는 하지 않는다.
 
 ## 안전 범위
 
@@ -20,8 +36,11 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
   다른 개발 계정과 `seed-sample-ledger`가 만든 데이터는 건드리지 않는다.
 - 개인 로컬 합성 DB와 `infra/environments/dev`가 소유한 공유 dev에서만 사용한다. prod와 다른
   공유·운영 DB에는 적용하지 않는다.
-- 공유 dev 적용은 커밋된 세 파일을 고정 순서로 실행하고 29개 검사를 확인하는
-  `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
+- 공유 dev 적용은 Bedrock doctor 통과 후 커밋된
+  reset·data·`dev-bedrock-gpt56-luna` profile·verify를 고정 순서로 실행하고
+  30개 검사를 확인하는 `infra/justfile`의 `dev-seed-f3` 명령만 사용한다.
+  이후 합성 smoke를 실행하고, 실패하면 OpenAI key·runtime이 배포된 경우에만
+  `dev-seed-f3-openai`로 명시 복구한다. OpenAI가 준비되지 않았다면 Worker를 정지한다.
 - 실존 이름·연락처·주소·상담 원문을 변형해 쓰지 않았다. 전부 새로 지어낸 값이다.
 - 연락처는 프로젝트가 합성 fixture에 사용하는 `010-0000-XXXX` 테스트 형식만 쓴다.
 - API Key, 토큰, 비밀번호를 넣지 않는다. `app_user.password_hash`에 들어가는
@@ -29,37 +48,22 @@ seed 파일은 migration이 아니다. 실행기가 적용 여부를 관리하�
 
 ## 로컬 적용
 
-`docs/db/migrate/`의 migration을 먼저 끝까지 적용한 뒤 실행한다.
+`docs/db/migrate/`의 migration을 먼저 끝까지 적용하고 API와 Worker를 중지한 뒤 실행한다.
+`backend/.env`에는 로컬 PostgreSQL을 가리키는 `DB_URL`이 설정되어 있어야 한다.
 
-`infra/local/.env`의 로컬 DB 설정을 현재 셸에 불러온다. 아래 명령은 그 파일의
-`POSTGRES_USER`와 `POSTGRES_DB`를 사용하며 특정 계정·DB 이름을 고정하지 않는다.
-
-```bash
-set -a
-source infra/local/.env
-set +a
-```
+`backend/`에서 다음 관리 명령을 실행한다. `--confirm-reset`은 기존 합성 사무소의 장부와 실행
+결과를 지우고 재적재한다는 명시적 확인이며, 이 옵션 없이는 실행하지 않는다.
 
 ```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/001_F3_SYNTHETIC_RESET.sql
+cd backend
+uv run python src/manage.py seed-f3-synthetic --confirm-reset \
+  --model-profile local-openai
 ```
 
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/002_F3_SYNTHETIC_SEED.sql
-```
-
-```bash
-docker compose --env-file infra/local/.env -f infra/local/compose.yaml \
-  exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  < docs/db/seed/003_F3_SYNTHETIC_VERIFY.sql
-```
-
-두 파일을 순서대로 돌리면 몇 번을 반복해도 같은 상태가 된다. 검증 결과의 마지막 열이
-전부 `PASS`여야 다음 단계로 넘어간다.
+명령은 `APP_ENV=local`이고 `DB_URL` 호스트가 `localhost` 또는 loopback IP일 때만 동작한다.
+임의 SQL 경로는 받지 않고, 이 디렉터리의 `001` reset → `002` data → 선택한 model profile →
+`003` verify를 고정 순서로 실행한다. 30개 검사가 모두 `PASS`일 때만 성공 JSON에 `brokerage_id`, `user_id`, `login_id`,
+`verification_checks`를 출력한다. 몇 번을 반복해도 합성 사무소 ID와 같은 데이터 상태를 유지한다.
 
 ## 공유 dev 적용
 
@@ -76,9 +80,10 @@ just dev-seed-f3
 
 - 개인 `aws login` IAM 사용자와 같은 이름의 PostgreSQL 역할을 사용한다.
 - 태그로 제한된 app EC2의 SSM remote-host 터널과 15분 IAM DB 토큰을 프로세스 내부에서만 쓴다.
-- 실행 파일을 `001` reset → `002` seed → `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
+- 실행 파일을 `001` reset → `002` data → `dev-bedrock-gpt56-luna` profile →
+  `003` verify로 고정하고 임의 SQL 경로를 받지 않는다.
 - `app_owner` 역할로 실행하며 IAM token과 DB URL을 명령행·로그에 출력하지 않는다.
-- `003`의 29개 결과가 모두 `PASS`일 때만 완료로 보고한다.
+- `003`의 30개 결과가 모두 `PASS`일 때만 완료로 보고한다.
 
 확인 프롬프트는 기존 `F3_SYNTHETIC 합성중개사무소`의 실행 결과와 장부를 reset한 뒤 다시
 적재한다는 사실을 명시한다. 다른 사무소 데이터는 reset 대상이 아니지만, 공유 dev에서 실행 중인
@@ -91,7 +96,7 @@ F3 작업이 없을 때만 실행한다.
 
 ```dotenv
 AUTH_DEVELOPMENT_ENABLED=true
-AUTH_DEVELOPMENT_BROKERAGE_ID=<002 출력값>
+AUTH_DEVELOPMENT_BROKERAGE_ID=<brokerage_id 출력값>
 AUTH_DEVELOPMENT_LOGIN_ID=f3_synthetic_dev
 ```
 
@@ -117,15 +122,33 @@ Worker가 직접 만들어야 파이프라인 전체가 검증된다. 결과를 
 
 ## 케이스 구성
 
-양쪽 앵커를 모두 확인할 수 있게 매물 기준 3건과 구입장 기준 2건을 둔다.
+작은 회귀 케이스 A~E에 대량 케이스 F~I를 더한다. 전체 데이터는 단지 5개, 세대 36개,
+인물 87명, 매물 36건, 구입장 48건, 상담 로그 169건이다. 이 중 대량 확장분은 매물 30건과
+구입장 40건이며, 별도 합성 단지에 격리해 기존 A~E의 후보 수를 바꾸지 않는다.
 
 | 케이스 | 앵커 | `seed_key` | 기대 후보 수 | 무엇을 확인하나 |
 |---|---|---|---:|---|
 | A | 매물 (매매 28.8억) | `L1` | 3 | 강한·약한·기각 후보가 한 실행에 함께 나온다 |
 | B | 구입장 (매수 29억) | `R1` | 2 | 반대 방향 앵커도 같은 파이프라인을 탄다 |
-| C | 매물 (월세) | `L5` | 0 | 호환되는 구분의 구입장이 아예 없다 |
+| C | 매물 (월세) | `L5` | 0 | 해당 단지를 희망하는 월세 구입장이 없다 |
 | D | 구입장 (매도) | `R8` | 0 | 대응하는 매물 거래 유형이 없는 구분이다 |
 | E | 매물 (전세 21.5억) | `L4` | 1 | SQL은 통과하지만 시점이 결정적으로 어긋난다 |
+| F | 매물 (대량 매매) | `BL01` | 19 | 전체 후보 19건 중 상위 5건만 카드화한다 |
+| G | 구입장 (대량 매수) | `BR01` | 12 | 반대 방향에서도 다수 매물을 안정적으로 찾는다 |
+| H | 매물 (대량 전세) | `BL13` | 12 | 전세 보증금 가격 축으로 후보를 찾는다 |
+| I | 매물 (대량 월세) | `BL23` | 10 | 월세 보증금·월 차임 가격 축을 보존한다 |
+
+### 대량 케이스 분포
+
+| 단지 `seed_key` | 거래 유형 | 매물 | 구입장 | 장부 키 범위 |
+|---|---|---:|---:|---|
+| `C3` | 매매·매수 | 12 | 18 | `BL01`~`BL12`, `BR01`~`BR18` |
+| `C4` | 전세 | 10 | 12 | `BL13`~`BL22`, `BR19`~`BR30` |
+| `C5` | 월세 | 8 | 10 | `BL23`~`BL30`, `BR31`~`BR40` |
+
+대량 행은 `custom_fields.dataset = "BULK"` 또는 단지의 `extra_info.dataset = "BULK"`로도
+구분할 수 있다. 각 매물·구입장에는 합성 상담 로그가 2건씩 있으며, 번호에 따라 가격 유연성,
+입주 시점과 연락 가능성 표현이 달라진다.
 
 ### 케이스 A의 후보 3건
 
@@ -185,6 +208,7 @@ ORDER BY seed_key;
 
 - `status`가 `COMPLETED`인가
 - `candidate_selection.total_count`가 위 표의 기대 후보 수와 같은가
+- 케이스 F에서 `candidate_selection.total_count=19`이고 `selected_for_cards=true`가 5건인가
 - `anchor_card.evidence`에 저장된 상담 로그를 가리키는 근거가 있는가
 - `candidates[].match_grade`가 `STRONG`·`WEAK`·`REJECTED` 중 하나인가
 - `REJECTED` 후보에 `rejection_reason`이 있는가
@@ -195,15 +219,13 @@ ORDER BY seed_key;
 
 ## AI 모델 설정
 
-`002`가 `POSITION_CARD`와 `BROKERAGE_JUDGMENT` capability의 활성 설정을 함께 만든다.
-기본값은 `provider = 'openai'`, `model_name = 'gpt-4o-mini'`다.
+`002`는 합성 장부만 만들고 관리 명령이 선택한 정적 프로필 SQL이
+`POSITION_CARD`와 `BROKERAGE_JUDGMENT` 설정을 만든다. 임의 `UPDATE`, provider·model
+문자열, SQL 경로로 모델을 바꾸지 않는다. 새 모델은 provenance를 검토한 후
+allowlist 프로필과 검증 쿼리를 함께 추가한다.
 
-다른 모델을 쓰려면 seed 적용 후 값을 바꾼다. 구조화 출력을 지원하는 모델이어야 한다.
-
-```sql
-UPDATE ai_model_config
-SET provider = 'vllm', model_name = '<로컬 모델명>'
-WHERE brokerage_id = (SELECT id FROM brokerage WHERE name = 'F3_SYNTHETIC 합성중개사무소');
-```
-
-API Key는 SQL에 넣지 않는다. `ai/.env`에 둔다.
+API key나 클라우드 자격 증명은 SQL에 넣지 않는다. Bedrock 활성 환경 정책은
+[ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md),
+Qwen provenance와 비활성 비교 경로는
+[ADR-0026](../../../.agents/skills/project-wiki/references/decisions/ADR-0026-general-ai-provider-and-model-profiles.md)를
+따른다.

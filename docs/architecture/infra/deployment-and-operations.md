@@ -1,16 +1,19 @@
 ---
 status: 결정
-implementation: 기존 delivery 적용됨·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-27
+implementation: 적용 여부는 Infra resource-inventory.md 정본 참조; 실제 기동은 운영자 검증
+updated: 2026-09-07
 ---
 
 # 배포 및 운영 구조
 
+현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](../../../infra/serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
+
+
 ## 문서 안내
 
-- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md)
+- **관련 결정:** [프로젝트 ADR-0011](../../../.agents/skills/project-wiki/references/decisions/ADR-0011-dev-cicd-pipeline-modes.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0022](../../../.agents/skills/project-wiki/references/decisions/ADR-0022-sllm-release-v2-base-only.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0011](../../../.agents/skills/infra/references/decisions/ADR-0011-dev-delivery-implementation.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0018](../../../.agents/skills/infra/references/decisions/ADR-0018-runpod-bootstrap-secrets-monitoring.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md) · [프로젝트 ADR-0031](../../../.agents/skills/project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md) · [Infra ADR-0020](../../../.agents/skills/infra/references/decisions/ADR-0020-runpod-console-registration.md)
 - **실행 runbook:** [infra/delivery/README.md](../../../infra/delivery/README.md)
-- **현재 상태:** dev workload, DB migration과 `main` source의 기존 세 Pipeline은 적용됐다. `dev` source 전환, Verify/Build 분리, 환경 materialization과 전용 CI pgvector ECR 변경은 Terraform plan 검증 후 apply 승인 전이다. 아래 표는 승인된 목표 구성을 나타낸다.
+- **현재 적용 여부:** [Infra 인벤토리](../../../.agents/skills/infra/references/resource-inventory.md)를 정본으로 사용한다. 일상 절차는 [개발자 운영](../../../infra/operations/README.md), 실제 전원은 `just doctor`로 확인한다.
 
 ## Pipeline 구성
 
@@ -18,7 +21,7 @@ updated: 2026-08-27
 |---|---|---|---|---|
 | `dev-integrated` | 최종 전환 후 `dev` 자동 감지 | Backend+AI와 Frontend 병렬 | Backend image와 Frontend release 병렬 | migration → Backend/Worker → health → Frontend |
 | `dev-backend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | Backend+AI, disposable DB | Backend image | migration → Backend/Worker → health |
-| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | test:env·test:auth, typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
+| `dev-frontend` | 운영자 수동, 최신 `dev` 또는 전체 SHA | env·auth·오류 복구·F2·F3 계약, typecheck와 원장 테스트 | Vite release와 계약 검사 | 현재 Backend readiness → S3 → CloudFront |
 
 세 Pipeline은 CodePipeline V2 `QUEUED`다. 독립 Pipeline 실행 권한이 운영자 승인 역할을 하므로 내부 Manual approval은 두지 않는다. 통합 Pipeline도 별도 승인 없이 끝까지 진행한다. 애플리케이션 Pipeline은 Terraform을 실행하지 않는다.
 
@@ -82,15 +85,18 @@ Launch Template은 SSM, Docker, pinned Compose plugin, CodeDeploy agent와 Cloud
 | `ApplicationStart` | API와 Worker 시작 |
 | `ValidateService` | container health와 local `/health/ready` 확인 |
 
-runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. API에는 Backend·AI 공개 설정, F2용 vLLM LLM·STT key와 `DB_URL`, Worker에는 Backend·AI 공개 설정, 전체 Provider key와 `DB_URL`, migration에는 `DB_MIGRATION_URL`만 담긴 별도 env 파일을 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
+runtime DB credential은 전용 Secret에서 읽고 migration token은 EC2 role의 `app_migrator`용 `rds-db:connect` 권한으로 그때 생성한다. Parameter Store의 Backend·AI 공개 설정은 경로 아래 유효한 환경변수 이름을 동적으로 조립한다. `AI_LLM_ENDPOINTS`의 Bedrock 항목은 alias·provider·리전만 공개 설정으로 전달한다. API에는 F2 endpoint가 active일 때만 vLLM LLM·STT key를 넣고, Worker에는 존재하는 선택적 Provider key만 넣는다. Bedrock은 key를 주입하지 않고 EC2 Instance Role을 사용한다. API·Worker의 `DB_URL`과 migration 전용 `DB_MIGRATION_URL`은 별도 env 파일에 원자적으로 생성한다. host config directory와 env 파일은 각각 root `0700`, `0600`으로 유지해 컨테이너에 directory 전체를 노출하지 않는다. 공개 RDS CA 파일만 `/etc/ssl/certs/aws-rds-global-bundle.pem`으로 read-only mount한다. migration 실패 시 새 API·Worker를 시작하지 않는다.
 
 CodeDeploy deployment group은 ASG와 target group을 사용하고 실패 시 마지막 정상 revision으로 자동 rollback한다. rollback은 image와 application revision만 되돌리고 DB down migration을 실행하지 않는다.
 
-Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM cleanup만 수행하며 작업을 claim하지 않는다. F3 handler 코드는 `true`에서 RDS polling을 지원하지만 현재 배포 Parameter는 `WORKER_ENABLED=false`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=false`다. 검토된 합성 전용 환경에서 두 값을 모두 `true`로 명시하지 않으면 활성 Worker는 DB·Provider 접근과 claim 전에 기동을 거절한다. 운영 Provider 선택과 실사용 데이터 활성화는 별도 적용하며, 정지 신호를 받으면 현재 application 단계까지 마친 뒤 종료한다.
+Worker는 `WORKER_ENABLED=false`에서 DB readiness, health file과 SIGTERM cleanup만 수행하며 작업을 claim하지 않는다. 현재 공유 dev Parameter는 `WORKER_ENABLED=true`, `F3_ALLOW_SYNTHETIC_PROTOTYPE=true`이며 합성·비식별 데이터만 처리한다. Bedrock alias와 Instance Role이 준비되어도 Terraform이나 배포가 DB 활성 모델을 자동 변경하지 않는다. 정지 신호를 받으면 현재 application 단계까지 마친 뒤 종료한다.
 
 ## Frontend build와 배포
 
-Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm ci → test:env → test:auth → typecheck → 원장 테스트`만 실행하고 artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서 `npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
+Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는
+`npm ci → test:env → test:auth → test:root-error → typecheck → 원장 → F2 → F3 테스트`를 실행하고
+artifact를 만들지 않는다. 성공 뒤 Build project가 격리된 작업공간에서
+`npm ci → Vite build → release test`를 실행하고 `frontend/dist/client`만 artifact로 전달한다.
 
 배포별 `VITE_*` 공개값은 Terraform의 단일 Frontend build map에서 CodeBuild process env로 동적
 전달한다. CloudFront의 동일 origin routing을 사용하므로 API base는 절대 domain이 아니라 `/api`
@@ -105,16 +111,128 @@ Frontend는 runtime Dockerfile을 사용하지 않는다. Verify project는 `npm
 
 Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. 이전 Backend와 호환되는 단계적 변경이나 통합 Pipeline을 사용한다.
 
+## RunPod 공유 F2 서빙과 endpoint 전환
+
+학습 담당자는 Infra 권한 없이 SLLM v2 metadata bundle 하나만 전달한다. LoRA mode에는 adapter가 있고
+base mode에는 없으며, `verified` stage의 두 mode는 모두 tar bundle과 full 평가·승인을 사용한다. 평가
+dataset checksum, 실제 기반 모델 commit과 adapter checksum을 선택 모델에 결속하고 외부 전달용
+요약은 aggregate allowlist로 다시 만든다. Infra는 이를 private S3
+`releases/sllm/<release-id>/`에 불변 게시하고, private GHCR image가 한 GPU에서 `sllm`·`stt`를
+자동 기동한다. 현재 vLLM 버전의 외부 인증 완화를 위해 서비스별 key와 허용 경로를 검사하는 proxy를
+둔다. Team Template은 image·port·Secret·STT와 자원 기본값만 소유하며 SLLM 모델은 release manifest가
+소유한다.
+
+v2 S3 객체는 자기 checksum과 상대 객체 checksum을 metadata로 양방향 결속한다. 동일 내용의 부분
+게시만 재개하며 기존 v1 LoRA 객체는 과거 자기 checksum 형식으로 계속 읽는다. Pod는 필요할 때
+Secure Cloud에 생성하고 작업 종료 시 삭제한다. Volume·SSH는 사용하지 않으며 Pod에는 1시간
+presigned S3 URL만 전달한다. 기반 모델은 공개 Hugging Face의 불변 commit에서 받고 HF token 계열은
+Template과 자식 프로세스에서 제거한다. `/v1/models`가 각각 `sllm`, `stt`를 실제 반환한 뒤 SSM
+`AI_VLLM_ENDPOINT_SET`을
+`active`로, 삭제 전에는 `offline`으로 바꾸고 같은 Backend image의 API만 재생성한다. API의 F2 환경변수만 갱신하며 Worker·migration 설정은 보존한다.
+refresh 실패 시 이전 JSON을 복원한다.
+
+F2 smoke는 배포 bundle의 합성 음성만 사용해 개발 세션·CSRF를 거쳐 실제
+`POST /api/v1/f2/analyses`를 호출한다. 응답 body, 전사와 인증값은 운영 도구 출력에 복사하지 않는다.
+
+최초 Secret·GHCR registry·private Template은 Console에서 생성한다.
+`runpod-register-plan → 확인 → runpod-register`는 기존 자원을 검증하고 ID·digest만 SSM에 기록한다.
+등록·Console 설정 변경은 endpoint offline과 공유 Pod 부재에서만 수행한다. Pod 생성 전
+`runpod-create-plan`이 S3 release·control ready·공유 Pod 부재와 Backend API·Worker health를 확인한다.
+평가 전 개발 기동은 `dev-*` ID와 `not-evaluated` marker를 가진 `dev` stage로만 허용하며 일반 create가
+아닌 `runpod-create-dev-plan → runpod-create-dev`를 사용한다. 이 예외도 기반 commit·adapter checksum과
+동일한 health·offline 정리·삭제 계약을 유지하며 정식 품질 승격으로 간주하지 않는다.
+SSM 제어 문서는 registry·Template ID와 digest만 등록하며 generation·Secret version 동기화는 관리하지 않는다.
+현재 Template을 Pod 생성 전 다시 검증하고
+개인 `.env`나 영구 `runpodctl` 설정을 요구하지 않는다. 자체 감시 Lambda·주기 실행·RunPod 경보는
+제거하고 운영자가 시작·종료에 status·smoke와 Console 사용액을 확인한다. 실패 시 이전 active
+endpoint를 자동 복원하지 않고 offline으로 정리·재시도한다. 실행·회전·수동 reconcile 절차는
+[RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다. 자동 중지는 없고 생성 작업자가 종료 시
+정확한 Pod ID로 삭제한다. 모델 정본은 private S3에 남는다.
+
+## AWS GPU 검토와 RunPod 배포 경로 유지
+
+**사용자 요구(2026-09-07):** AWS GPU 배포 실패나 비용 부담 시 전환할 수 있도록 RunPod 배포
+경로를 유지한다. AWS 이전을 이유로 기존 RunPod Template·등록·생성·삭제·smoke 경로를 제거하지
+않는다. F2/general과 AWS/RunPod 통합 도구는 구현됐으며 정식 배포·왕복 검증 상태는 인벤토리를 따른다.
+이 요구만으로 ADR-0027의 현재 활성 모델을 변경하거나 GPU 자원을 생성하지 않는다.
+
+**구현 제안:** F2·F3별로 AWS 또는 RunPod 중 한 경로를 활성화하고 운영자가 명시적으로 전환한다.
+배포 환경별 endpoint·인증 설정을 분리하되 기능별 모델 revision·서빙 설정·smoke 기준은 공유한다.
+F2의 STT·SLLM은 함께 전환하고, F3는 endpoint alias와 DB 모델 프로필의 일치를 검증한다.
+신규 작업을 막고 진행 중 작업을 확인한 뒤 대상 환경을 준비·검증하고 설정을 전환한다.
+전환 후 실제 합성 추론이 성공하면 이전 AWS GPU는 정지하고 이전 RunPod는 삭제한다.
+자동 fallback이나 두 환경의 상시 대기는 추가하지 않는다. 일시적인 이중 실행 비용과
+모델 다운로드·기동 시간은 전환 비용에 포함하며 재시작 시 GPU 가용성을 보장하지 않는다.
+
+**요금 확인(2026-09-07, 약정 없는 On-Demand 기준):**
+
+| 상태 | 남는 요금 |
+|---|---|
+| AWS·RunPod 실행 중, 요청 없음 또는 컨테이너만 정지 | GPU 인스턴스·Pod 실행 요금 계속 발생 |
+| AWS EC2 정지 | GPU 실행 요금 없음, root·모델 EBS와 snapshot 등 보존 자원은 계속 과금 |
+| AWS Elastic IP 보유 | EC2 정지 여부와 관계없이 주소당 시간당 $0.005; 자동 할당 public IPv4는 EC2 정지 시 반환 |
+| RunPod 정지 | GPU 실행 요금 없음, container disk 과금 없음, volume disk는 $0.20/GB/월, network volume 별도 과금 |
+| RunPod 삭제, 별도 network volume 없음 | 해당 Pod의 GPU·disk 요금 없음; S3 모델 정본 등 외부 보존 자원은 별도 과금 |
+
+현재 F2 생성 요청은 `volumeInGb=0`이고 종료 시 Pod를 삭제한다. 이 방식을 유지하면 RunPod의
+배포 경로를 보존하는 것만으로 GPU·Pod 디스크 유휴 요금이 생기지 않는다. AWS EBS는 실제 파일
+사용량이 아닌 할당 용량 기준이므로 root·모델 디스크를 함께 산정한다. 장기 미사용 시에는 재생성
+가능한 모델 캐시와 EC2 제거를 별도로 검토한다. Capacity Reservation은 미사용 용량도 과금되며
+Savings Plans 등 약정은 인스턴스 정지로 취소되지 않으므로 이번 비용 비교는 약정 없는 구성을 기준으로 한다.
+공유 ALB·RDS·S3·Secrets Manager 등 기존 환경 요금은 GPU 전원과 별개다.
+
+공식 근거: [EC2 정지·시작](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html),
+[EBS 요금](https://aws.amazon.com/ebs/pricing/), [IPv4 요금](https://aws.amazon.com/vpc/pricing/),
+[Capacity Reservation 요금](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/capacity-reservations-pricing-billing.html),
+[RunPod 요금](https://docs.runpod.io/pods/pricing), [RunPod 정지·삭제](https://docs.runpod.io/pods/manage-pods).
+이는 공식 요금 정책 확인이며 실제 계정 잔존 자원·청구액 조회 결과는 아니다.
+
+## Bedrock 범용 모델 POC
+
+공유 dev Worker는 `general-dev-bedrock` alias로 서울 `bedrock-runtime`의
+`global.openai.gpt-5.6-luna`를 호출한다. EC2 role에는 해당 Global CRIS profile, 서울·global
+foundation model, 계정의 `project/default`에 대한 비스트리밍 `InvokeModel`과 profile 조회만
+허용한다. 정적 AWS credential과 Bedrock API key는 만들지 않는다.
+
+Docker bridge에서 Instance Role을 사용하도록 IMDSv2 token 필수 상태에서 hop limit을 2로 올린다.
+따라서 같은 앱 EC2의 다른 컨테이너도 role credential에 접근할 수 있다. 최소 권한 role과
+합성·비식별 dev 제한을 함께 적용하며 이 방식은 prod identity 결정으로 승격하지 않는다.
+
+ASG에는 자동 `instance_refresh`를 두지 않는다. 따라서 Terraform apply가 새 Launch Template을
+만들어도 이미 실행 중인 EC2는 hop limit 1로 남을 수 있다. plan/apply와 전원 전환을 동시에
+실행하지 않고, 공유 dev 중단 시간을 공지하고 실행 중인 배포·migration·API 요청·Worker 작업을
+종료한 뒤 다음 순서로 활성화한다.
+
+1. 승인한 Terraform plan을 apply한다.
+2. `just dev-stop` 뒤 `just dev-start`를 실행해 기존 EC2를 종료하고 최신 Launch Template으로
+   새 EC2를 만든다. 이 과정은 ASG뿐 아니라 RDS도 정지·재시작하므로 공유 dev 전체가 중단된다.
+3. 새 인스턴스가 `InService`, SSM `Online`이고 IMDSv2 token 필수·hop limit 2인지 확인한 뒤 해당
+   인스턴스에 Backend revision을 배포한다.
+4. `just bedrock-doctor`로 일회성 Worker 컨테이너의 IMDSv2와 profile 조회를 검증한다. 이 명령은
+   모델 추론을 수행하지 않는다.
+5. `just dev-seed-f3`로 `dev-bedrock-gpt56-luna`를 명시 적용한다.
+6. 합성 F3 smoke에서 JSON 로컬 검증과 repair를 확인한다.
+
+실패 시 기존 OpenAI key와 runtime이 배포된 환경에서만 `just dev-seed-f3-openai`로 DB를
+`local-openai` profile에 명시 복구한다. OpenAI가 준비되지 않았다면 Worker를 정지하고
+Bedrock 설정을 복구한다. 자동 fallback은 하지 않으며 GPU EC2·EBS 기반 llama.cpp·vLLM 비교
+Infra는 보류한다.
+
+향후 prod 명령은 `prod-apply` 전체 apply, `prod-start` / `prod-stop` 비용 자원
+시작·정지, `prod-destroy` snapshot 없는 전체 destroy로 구성한다. 실제 데이터가 있으면
+보존·삭제 정책 승인 전에 `prod-destroy`를 실행하지 않는다.
+
 ## IAM과 비밀값
 
 - Pipeline service role은 세 개로 나눈다.
 - admission, Backend Verify/image Build, Frontend Verify/release Build와 Frontend deploy CodeBuild role은 기능별로 분리한다.
 - CodeDeploy는 AWS 관리 service role을 사용한다.
-- EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write와 migration DB connect만 둔다.
+- EC2 role에는 artifact read, ECR pull, runtime Secret/Parameter read, CloudWatch write, migration DB connect와 Luna 전용 최소 Bedrock 권한만 둔다.
 - 운영자 policy는 `pipeline_operator_user_names`에 지정한 기존 IAM 사용자에게 직접 연결하고 `team-readonly`에는 쓰기 권한을 추가하지 않는다.
-- OpenAI·선택적 vLLM key와 Discord webhook은 Git에서 제외한 `secrets.auto.tfvars`에서 받는다.
-  Terraform ephemeral input과 Secrets Manager write-only version 인자로 전달해 plan·state에는 실제
-  값을 남기지 않는다. 회전할 때 각 secret version 번호를 함께 증가시킨다.
+- 선택적 OpenAI·vLLM key, delivery·Alarm Discord webhook, RunPod 운영 key의 정본은
+  AWS Secrets Manager다. Terraform은 컨테이너만 만들고 값은 TTY secret-rotate 명령이
+  AWSCURRENT로 관리한다. F2 active 시에는 SLLM·STT key 두 개가 모두 필요하다. Bedrock은
+  Instance Role SigV4를 사용하므로 Secret을 추가하지 않는다. GHCR credential은 RunPod Console에서만 관리한다. Alarm webhook은 기존 delivery webhook을 재사용하지 않는다.
 - RDS runtime 비밀번호와 migration IAM token은 서비스가 자동 생성하는 기존 경계를 유지한다.
 - state, Build log, artifact, release manifest와 Discord 메시지에 DB URL, IAM token, API key 또는 webhook을 기록하지 않는다.
 
@@ -122,13 +240,25 @@ Breaking API 변경은 Frontend 독립 Pipeline으로 배포하지 않는다. �
 
 CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 SNS topic에 게시한다. Lambda는 Pipeline 종류, revision, execution ID, 실패 action과 Console 링크를 Discord에 보낸다. CodeDeploy rollback creator도 구분한다.
 
+CloudWatch Alarm은 별도 SNS topic과 별도 Lambda를 사용한다. 기존 인프라 alarm 6개와
+`unhandled_request_error`, `ai_terminal_failure`에서 만든 애플리케이션 alarm 2개가 `ALARM`·`OK`
+상태를 게시한다. Lambda는 이름·`backend|ai|infra` 모듈·상태·전이 시각·제한된 사유와 Alarm·장애
+대응 Runbook 링크를 2,000자 이하·mention 비활성 메시지로 보낸다. 두 애플리케이션 알람에는
+미리 채운 Logs Insights 링크를 추가하고 `ALARM`에서만 전이 시각 ±10분의 안전 필드 1건을 최대
+2초 기다려 best-effort로 포함한다. 상세 로그는 직접 원인으로 확정하지 않으며 조회 실패는 기본 알림을
+막지 않는다. [장애 대응 Runbook](../../operations/cloudwatch-alarm-response.md)이 조사 순서를 정한다.
+
+이 Lambda는 새 Secrets Manager Secret에서 전용 webhook을 읽으며 기존 delivery notifier·Secret을
+수정하지 않는다. 이 경로는 코드와 fixture 테스트를 구현했지만 새 webhook을 넣은 saved plan의
+검토·승인·apply와 실제 alarm 검증 전에는 적용 상태로 간주하지 않는다.
+
 ## 단계적 적용
 
 1. 애플리케이션·Docker·Compose·ADR 변경을 작업 PR로 `dev`에 병합한다.
 2. 기존 IAM 운영자 목록과 최소 권한 Pipeline policy attachment를 승인한다.
 3. 통합 변경 감지 `false`, ASG health `EC2`로 plan과 apply를 승인한다.
-4. ignored `secrets.auto.tfvars`의 수동 비밀값과 version을 검토한 Terraform plan을 적용하고
-   Secrets Manager의 `AWSCURRENT`가 갱신됐는지 확인한다.
+4. Secret version 삭제·민감정보가 없는 Terraform saved plan을 적용하고 `secret-status`로
+   Secrets Manager 컨테이너의 AWSCURRENT 상태를 확인한다.
 5. Backend, Frontend, 통합 순서로 최초 수동 배포한다.
 6. 실패 주입으로 Backend rollback, Frontend index 복원과 알림을 검증한다.
 7. 별도 Terraform 변경으로 통합 감지를 `true`, ASG health를 `ELB`로 전환한다.
@@ -141,6 +271,5 @@ CodePipeline 완료 상태와 CodeDeploy 상태 변경은 EventBridge가 기존 
 - Deep 전환은 `plan → show → 승인 → saved-plan apply → 상태·drift 검증` 순서를 지키며, suspend 중 일반 `dev-plan`은 active edge 복구를 제안하므로 전용 drift 명령을 사용한다.
 - 도메인과 origin TLS가 없는 동안 합성·비식별 데이터만 사용한다.
 - Terraform은 계속 `preflight → fmt/validate → plan → 승인 → apply → 검증 → drift` 수동 절차를 따른다.
-- RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)의 기존 경계를 유지한다.
-- 로컬 F2 종단 간 검증의 Qwen·Whisper Pod 실행과 SSH tunnel 절차는
-  [RunPod F2 runbook](../../../infra/runpod/README.md)을 따른다.
+- RunPod 운영, 비용 종료일과 개인정보 제한은 [인프라 개요](overview.md)와 RunPod runbook의
+  경계를 유지한다.

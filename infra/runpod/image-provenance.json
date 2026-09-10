@@ -1,0 +1,25 @@
+{
+  "base_image": {
+    "repository": "runpod/pytorch",
+    "source_tag": "1.0.2-cu1281-torch280-ubuntu2404",
+    "index_digest": "sha256:0a360022e8de4375af99430f84e8b38951acc397252163a37ceac7204d01be35",
+    "linux_amd64_manifest_digest": "sha256:4d1721e62b56d345c83b4fd6090664be6daf9312caab5b2e76f23d8231941851",
+    "config_digest": "sha256:02b731f844d2fbc4dd0de87253081363864327c7931b1ae2b5daa60abc600c51",
+    "entrypoint": [
+      "/opt/nvidia/nvidia_entrypoint.sh"
+    ],
+    "default_cmd": [
+      "/start.sh"
+    ],
+    "verified_at": "2026-09-01"
+  },
+  "python": "3.12",
+  "transformers": "4.57.1",
+  "vllm": "0.11.0",
+  "model_revisions": {
+    "openai/whisper-large-v3-turbo": "41f01f3fe87f28c78e2fbf8b568835947dd65ed9"
+  },
+  "sllm_release_contract": "private S3 immutable bundle with exact base-model commit and PEFT adapter",
+  "http_security_boundary": "exact-route separate-key gateway; vLLM loopback only",
+  "target_platform": "linux/amd64"
+}

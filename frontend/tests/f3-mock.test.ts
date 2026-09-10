@@ -90,10 +90,10 @@ test("완료 결과는 카드화된 후보만 등급을 갖는다", () => {
   const graded = result.candidates.filter((candidate) => candidate.match_grade != null);
   const pending = result.candidates.filter((candidate) => candidate.match_grade == null);
 
-  // 첫 페이지는 20건이고 그중 15건이 카드화 대상이다.
+  // 첫 페이지는 20건이고 그중 5건이 카드화 대상이다.
   assert.equal(result.candidates.length, 20);
   assert.equal(graded.length, CARD_LIMIT);
-  assert.equal(pending.length, 5);
+  assert.equal(pending.length, result.candidates.length - CARD_LIMIT);
   assert.ok(pending.every((candidate) => candidate.selected_for_cards === false));
 
   const grades = new Set(graded.map((candidate) => candidate.match_grade));

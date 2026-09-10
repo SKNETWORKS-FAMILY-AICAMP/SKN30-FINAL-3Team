@@ -25,6 +25,10 @@ from domain.agent_execution.models import (
 )
 from domain.agent_execution.service import require_cross_judgment_run
 
+READABLE_CANDIDATE_SELECTION_SCHEMAS = frozenset(
+    {"candidate-selection:v2", CANDIDATE_SELECTION_SCHEMA_VERSION}
+)
+
 
 @dataclass(frozen=True)
 class CardView:
@@ -97,8 +101,8 @@ def _as_text(value: object) -> str | None:
 
 
 def _selection_entries(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    """현재 schema의 전체 SQL 후보 목록만 읽는다."""
-    if snapshot.get("schema") != CANDIDATE_SELECTION_SCHEMA_VERSION:
+    """현재 schema와 종료된 v2 실행의 전체 SQL 후보 목록을 읽는다."""
+    if snapshot.get("schema") not in READABLE_CANDIDATE_SELECTION_SCHEMAS:
         return []
     entries = snapshot.get("candidates")
     return (
@@ -148,7 +152,10 @@ def load_run_result(
         return _empty_result(run, limit, offset)
 
     card = repository.find_anchor_card_for_run(session, brokerage_id, run_id)
-    anchor_card = _card_view(session, card) if card is not None else None
+    if card is None:
+        # 무효 앵커에 의존하는 판정과 근거도 현재 결과로 공개하지 않는다.
+        return _empty_result(run, limit, offset)
+    anchor_card = _card_view(session, card)
 
     header = repository.find_match_evaluation_for_run(session, brokerage_id, run_id)
     if header is None:

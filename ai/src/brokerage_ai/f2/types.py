@@ -9,7 +9,7 @@ from brokerage_ai.core.types import ProviderDiagnostics
 
 
 class LedgerType(StrEnum):
-    """F2가 제안값을 만들 수 있는 현재 장부 종류."""
+    """F2 상담 유형에서 결정되는 추천 장부 종류."""
 
     PROPERTY = "매물장"
     BUYER = "구입장"
@@ -20,8 +20,7 @@ class ConsultationType(StrEnum):
 
     SELL_REQUEST = "매도의뢰"
     BUY_REQUEST = "매수문의"
-    CO_BROKERAGE = "공동중개"
-    SIMPLE_INQUIRY = "단순문의"
+    OTHER = "기타상담"
 
 
 class ProposalStatus(StrEnum):
@@ -59,7 +58,6 @@ class ConsultationAnalysis(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     consultation_type: ConsultationType
-    ledger_mismatch: bool = False
     fields: dict[str, str] = Field(default_factory=dict)
     evidence: dict[str, str] = Field(default_factory=dict)
     uncertainties: tuple[str, ...] = ()
@@ -79,7 +77,7 @@ class F2PipelineRequest(BaseModel):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     audio_path: Path
-    ledger_type: LedgerType
+    current_ledger_type: LedgerType | None = None
     current_fields: dict[str, str | None] = Field(default_factory=dict)
 
 
@@ -103,7 +101,7 @@ class F2PipelineResult(BaseModel):
 
     transcript: str
     transcription_model: str
-    ledger_type: LedgerType
+    ledger_type: LedgerType | None
     consultation_type: ConsultationType
     ledger_mismatch: bool
     proposals: tuple[FieldProposal, ...]

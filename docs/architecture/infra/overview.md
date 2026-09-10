@@ -1,24 +1,32 @@
 ---
 status: 결정
-implementation: workload·기존 delivery 적용·deep lifecycle와 dev source/Verify·Build/environment materialization 미적용
-updated: 2026-08-25
+implementation: 적용 여부는 Infra resource-inventory.md 정본 참조; 실제 기동은 운영자 검증
+updated: 2026-09-07
 ---
 
 # 개발·시연용 인프라 아키텍처
+
+현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](../../../infra/serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
+
 
 ## 문서 안내
 
 - **이 문서가 답하는 질문:** 공유 개발·시연 환경을 AWS와 RunPod에 어떤 자원과 경계로 배치하는가?
 - **대상 환경:** `ap-northeast-2` 단일 공유 환경
-- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md)
+- **관련 결정:** [프로젝트 ADR-0008](../../../.agents/skills/project-wiki/references/decisions/ADR-0008-dev-demo-runtime-and-delivery.md) · [프로젝트 ADR-0019](../../../.agents/skills/project-wiki/references/decisions/ADR-0019-minimal-error-observability.md) · [프로젝트 ADR-0020](../../../.agents/skills/project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md) · [프로젝트 ADR-0027](../../../.agents/skills/project-wiki/references/decisions/ADR-0027-bedrock-gpt56-luna-dev-poc.md) · [Infra ADR-0002](../../../.agents/skills/infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md) · [Infra ADR-0003](../../../.agents/skills/infra/references/decisions/ADR-0003-dev-storage-database-and-configuration.md) · [Infra ADR-0004](../../../.agents/skills/infra/references/decisions/ADR-0004-dev-runtime-and-observability-baseline.md) · [Infra ADR-0005](../../../.agents/skills/infra/references/decisions/ADR-0005-dev-frontend-origin-and-api-routing.md) · [Infra ADR-0014](../../../.agents/skills/infra/references/decisions/ADR-0014-dev-deep-power-lifecycle.md) · [Infra ADR-0015](../../../.agents/skills/infra/references/decisions/ADR-0015-cloudwatch-alarm-discord-delivery.md) · [Infra ADR-0017](../../../.agents/skills/infra/references/decisions/ADR-0017-runpod-ephemeral-sllm-serving.md) · [Infra ADR-0019](../../../.agents/skills/infra/references/decisions/ADR-0019-bedrock-luna-dev-poc.md) · [프로젝트 ADR-0031](../../../.agents/skills/project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md) · [Infra ADR-0020](../../../.agents/skills/infra/references/decisions/ADR-0020-runpod-console-registration.md)
 - **배포·운영:** [배포 및 운영 구조](deployment-and-operations.md)
-- **적용 범위:** 네트워크·보안·S3·ECR·RDS·설정, EC2·ALB·ASG·관측성, private S3·CloudFront, DB migration과 기존 세 delivery Pipeline은 적용됐다. deep lifecycle, Verify/Build 분리는 plan 검증 후 apply 승인 전이고 RunPod Terraform은 보류 상태다.
+- **현재 적용 여부:** [Infra 인벤토리](../../../.agents/skills/infra/references/resource-inventory.md)를 정본으로 사용한다. 일상 절차는 [개발자 운영](../../../infra/operations/README.md), 실제 전원은 `just doctor`로 확인한다.
 
 ## 결정 요약
 
 1차 런타임은 `EC2 Backend + 설치형 brokerage-ai + RunPod Pod 추론`이다. EC2 한 대에서 API와 Worker를 별도 프로세스로 실행하되 같은 배포 이미지와 호스트를 사용한다. Backend는 `brokerage-ai`를 Python 라이브러리로 설치해 프레임워크 중립 DTO와 실행 facade를 호출한다.
 
-LLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 하나의 Pod에 함께 둘지 여러 Pod로 나눌지는 모델별 VRAM·처리량 평가 후 정하며 현재는 미확정이다. OpenAI와 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
+SLLM·STT·Embedding은 설정, endpoint, 오류와 관측 항목을 논리적으로 분리한다. 공유 F2 dev 서빙은 GPU 한 개의 단일 Pod에서 `sllm`·`stt` vLLM 두 프로세스를 실행한다. 실제 SLLM 기반 모델 ID·불변 commit과 선택적 LoRA adapter는 private S3 release v2가, STT 모델은 Template이 소유한다. base-only도 adapter 없는 metadata bundle을 사용하고 기반 가중치는 공개 Hugging Face에서 받는다. Embedding과 학습·개인 실험은 이 운영 범위에 포함하지 않는다. OpenAI, Bedrock과 RunPod는 Provider adapter 뒤에 두므로 이 선택 때문에 공개 API·DTO를 변경하지 않는다.
+
+범용 생성 모델의 첫 공유 dev POC는 기존 앱 EC2의 Worker가 서울
+`bedrock-runtime`에서 `global.openai.gpt-5.6-luna`를 호출한다. 정적 Bedrock key 없이
+Instance Role과 SigV4를 사용하며, Global cross-Region 처리 때문에 합성·비식별 데이터만 허용한다.
+GPU EC2 llama.cpp·vLLM 비교 경로는 코드·seed 후보만 남기고 Infra 구축을 보류한다.
 
 AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용한다. 이 계정에서는 AWS Budget·Cost Anomaly Detection을 사용할 수 없어 해당 자원을 만들지 않으며 자동 알림·차단도 전제하지 않는다. RunPod와 OpenAI는 각각 2개월 합계 USD 300으로 분리한다.
 
@@ -26,39 +34,42 @@ AWS는 2026-09-23까지 누적 300,000원을 운영 참고 상한으로 사용�
 
 `결정`은 채택된 구조, `계획됨`은 아직 생성되지 않은 자원, `조건부`는 측정 또는 선행 결정 후 도입할 자원, `제외`는 1차 범위에서 만들지 않을 자원, `미확정`은 구체 값이 남은 항목이다.
 
-| 영역 | 자원 | 선택 상태 | 구현 상태 | 비고 |
-|---|---|---|---|---|
-| 네트워크 | VPC, Internet Gateway, route table | 결정 | 적용됨 | NAT 없이 개발·시연용 public egress 사용 |
-| 네트워크 | ALB용 서로 다른 AZ의 public subnet 2개 | 결정 | 적용됨 | ALB 활성화를 위한 기본 배치 |
-| 네트워크 | EC2 app public subnet | 결정 | 적용됨 | public IPv4는 Launch Template 단계에서 연결 |
-| 네트워크 | RDS private subnet 2개와 DB subnet group | 결정 | 적용됨 | 서로 다른 AZ를 포함하되 DB 인스턴스는 Single-AZ |
-| 네트워크 | ALB·App·DB security group | 결정 | 적용됨 | ALB HTTP는 CloudFront origin-facing prefix만, App은 ALB SG만, DB는 App SG만 허용 |
-| 네트워크 | S3 Gateway Endpoint | 결정 | 적용됨 | app route table의 S3 트래픽에 사용 |
-| 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | 적용됨 | AL2023 x86_64, t3.small, gp3 40 GiB, 현재 EC2 health |
-| 컴퓨팅 | ALB, target group, health check | 결정 | 적용됨·deep lifecycle 미적용 | `/health/ready`; deep suspend는 ALB를 제거하고 target group은 유지 |
-| 운영 접속 | SSM Session Manager | 결정 | 적용됨 | SSH·22번 차단, IMDSv2 강제 |
-| 이미지 | ECR | 결정 | 적용됨 | immutable tag, untagged image만 7일 후 만료 |
-| 데이터베이스 | RDS PostgreSQL 15.18 Single-AZ, pgvector | 결정 | 적용됨 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일; vector는 최초 migration에서 활성화 |
-| 파일 | Frontend private S3 origin | 결정 | 적용됨 | OAC distribution SourceArn만 object read, public website 금지 |
-| 파일 | 임시 음성 S3 | 결정 | 적용됨 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
-| 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | 적용됨 | `releases/`는 2026-09-24 00:00 UTC 만료 |
-| CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | 적용됨·deep lifecycle 미적용 | deep suspend는 ID·기본 도메인을 유지한 채 distribution 비활성화·ALB origin 제거 |
-| 보안 | Secrets Manager, Parameter Store | 결정 | 기존 container 적용됨·값 materialization 미적용 | 현재 수동 외부 주입; AI·Discord ignored tfvars→write-only 전환은 plan·apply 전 |
-| 관측 | CloudWatch logs·metrics·alarms, SNS | 결정 | 적용됨 | log group 5개 14일, alarm 6개; deep suspend는 ALB alarm 2개 제거, SNS 구독 없음 |
-| 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
-| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | 기존 main source 적용됨·dev/분리 변경 미적용 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
-| 전달 | CodeBuild, CodeDeploy | 결정 | 기존 구조 적용됨·분리 변경 미적용 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |
-| 전달 | Pipeline artifact 전용 S3 | 결정 | 적용됨 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
-| DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
-| 비동기 작업 | SQS, DLQ | 조건부 | 미확정 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |
-| AI 분리 | ECS Fargate, Cloud Map | 조건부 | 미확정 | 경합·지연·독립 배포·장애 격리 필요성이 측정될 때 |
-| RunPod | 공용 Pod Template, 개발자별 Pod | 결정 | 보류 | 운영 구조는 유지하되 Terraform 소유 범위는 재개 전 결정 |
-| RunPod | custom image, Network Volume | 조건부 | 미확정 | 기본 vLLM·일반 다운로드·로컬 volume으로 부족할 때 |
-| 1차 제외 | GitHub Actions OIDC | 제외 | 제외 | AWS Developer Tools 전달 경로를 사용 |
-| 1차 제외 | NAT Gateway, Multi-AZ RDS | 제외 | 제외 | 공유 개발·시연 예산 우선 |
-| 1차 제외 | WAF, ElastiCache, AWS Backup | 제외 | 제외 | 부하·보존 요구가 확인되면 별도 결정 |
-| 1차 제외 | EKS, Step Functions | 제외 | 제외 | MVP 복잡도 대비 효익 부족 |
-| 1차 제외 | Terraform 배포 Pipeline | 제외 | 제외 | Terraform은 수동 승인 절차 유지 |
+| 영역 | 자원 | 선택 상태 | 비고 |
+|---|---|---|---|
+| 네트워크 | VPC, Internet Gateway, route table | 결정 | NAT 없이 개발·시연용 public egress 사용 |
+| 네트워크 | ALB용 서로 다른 AZ의 public subnet 2개 | 결정 | ALB 활성화를 위한 기본 배치 |
+| 네트워크 | EC2 app public subnet | 결정 | public IPv4는 Launch Template 단계에서 연결 |
+| 네트워크 | RDS private subnet 2개와 DB subnet group | 결정 | 서로 다른 AZ를 포함하되 DB 인스턴스는 Single-AZ |
+| 네트워크 | ALB·App·DB security group | 결정 | ALB HTTP는 CloudFront origin-facing prefix만, App은 ALB SG만, DB는 App SG만 허용 |
+| 네트워크 | S3 Gateway Endpoint | 결정 | app route table의 S3 트래픽에 사용 |
+| 컴퓨팅 | EC2, Launch Template, ASG `desired=1` | 결정 | AL2023 x86_64, t3.small, gp3 40 GiB, 현재 EC2 health |
+| 컴퓨팅 | ALB, target group, health check | 결정 | `/health/ready`; deep suspend는 ALB를 제거하고 target group은 유지 |
+| 운영 접속 | SSM Session Manager | 결정 | SSH·22번 차단, IMDSv2 강제 |
+| 이미지 | ECR | 결정 | immutable tag, untagged image만 7일 후 만료 |
+| 데이터베이스 | RDS PostgreSQL 15.18 Single-AZ, pgvector | 결정 | `db.t4g.small`, gp3 20→50 GiB, 백업 7일; vector는 최초 migration에서 활성화 |
+| 파일 | Frontend private S3 origin | 결정 | OAC distribution SourceArn만 object read, public website 금지 |
+| 파일 | 임시 음성 S3 | 결정 | 앱 삭제가 1차 통제, lifecycle 1일 안전망 |
+| 파일 | 데이터셋·평가·모델 artifact S3 | 결정 | `releases/`는 2026-09-24 00:00 UTC 만료 |
+| CDN | CloudFront, S3 OAC, ALB custom origin | 결정 | deep suspend는 ID·기본 도메인을 유지한 채 distribution 비활성화·ALB origin 제거 |
+| 보안 | Secrets Manager, Parameter Store | 결정 | Terraform은 AI·Discord·RunPod·GHCR Secret 컨테이너만 소유하고 TTY 운영 명령이 AWSCURRENT를 관리; endpoint/control 문서는 비민감 |
+| 관측 | CloudWatch logs·metrics·alarms, SNS·Lambda | 결정 | RunPod 자체 감시는 제거하고 운영자가 시작·종료 확인; 기존 Backend·AI 오류 알림 유지 |
+| 비용 | AWS Budget, Cost Anomaly Detection | 제외 | 계정에서 사용 불가; 누적 300,000원은 참고 상한 |
+| 전달 | GitHub CodeConnections, CodePipeline V2 | 결정 | Terraform 적용 후 통합 dev 자동, Backend·Frontend 수동, QUEUED |
+| 전달 | CodeBuild, CodeDeploy | 결정 | Verify/Build 분리, 승인 단계 없음, migration·rollback·health |
+| 전달 | Pipeline artifact 전용 S3 | 결정 | non-versioned, 14일 만료; 업무용 S3·Terraform state와 분리 |
+| DNS·TLS | Route 53, ACM, ALB HTTPS | 제외 | 현재 도메인 없음; 실제 개인정보 사용 금지 |
+| 비동기 작업 | SQS, DLQ | 조건부 | RDS 작업 polling이 독립 재시도·확장 요구를 충족하지 못할 때 |
+| AI 분리 | ECS Fargate, Cloud Map | 조건부 | 경합·지연·독립 배포·장애 격리 필요성이 측정될 때 |
+| RunPod | shared F2 Pod, private Team Template | 결정 | Secure Cloud, GPU 1개, create/delete, Volume·SSH 없음 |
+| RunPod | private GHCR image, private S3 SLLM release | 결정 | 고정 digest·lock, presigned bundle, `verified|dev` stage, `sllm`·`stt` 자동 감독 |
+| RunPod | Console registration, manual observation | 결정 | Console 검증·SSM ID/digest 등록, Secrets Manager runtime 값 정본, 운영자 확인·offline 복구 |
+| Bedrock | GPT-5.6 Luna Global profile | 결정 | 공개 alias 설정, 비스트리밍 Responses, Instance Role SigV4, 합성 dev 전용 |
+| GPU EC2 | F2/general host·암호화 EBS | 결정 | Infra ADR-0022의 통합 lifecycle; 명시적 선택과 capacity plan으로 생성 |
+| 1차 제외 | GitHub Actions OIDC | 제외 | AWS Developer Tools 전달 경로를 사용 |
+| 1차 제외 | NAT Gateway, Multi-AZ RDS | 제외 | 공유 개발·시연 예산 우선 |
+| 1차 제외 | WAF, ElastiCache, AWS Backup | 제외 | 부하·보존 요구가 확인되면 별도 결정 |
+| 1차 제외 | EKS, Step Functions | 제외 | MVP 복잡도 대비 효익 부족 |
+| 1차 제외 | Terraform 배포 Pipeline | 제외 | Terraform은 수동 승인 절차 유지 |
 
 ## 전체 시스템
 
@@ -82,8 +93,9 @@ flowchart LR
     end
 
     subgraph external["외부 모델 실행"]
-        runpod["RunPod Pods\nLLM · STT · Embedding"]
+        runpod["RunPod shared F2 Pod\nsllm · stt"]
         openai["OpenAI API"]
+        bedrock["Amazon Bedrock\nGPT-5.6 Luna Global"]
     end
 
     github -->|"dev 자동 또는 수동 SHA"| pipeline
@@ -99,6 +111,7 @@ flowchart LR
     ec2 --> dataS3
     ec2 -->|"HTTPS model request"| runpod
     ec2 -->|"HTTPS model request"| openai
+    ec2 -->|"SigV4 HTTPS · 합성 dev"| bedrock
     secret --> ec2
     ec2 --> obs
     alb --> obs
@@ -169,6 +182,8 @@ flowchart TB
 | EC2 → 임시 음성 S3 | 업로드 음성 | 전용 암호화 bucket | 성공·취소 시 즉시 삭제, 실패 시 1시간 이내 삭제 작업; S3 Lifecycle은 보조 안전망 |
 | EC2 → 데이터·모델 S3 | 비식별 데이터셋, 평가 보고서, 승인된 artifact | 전용 bucket과 prefix·IAM 분리 | 승인된 release artifact는 2026-09-23까지 유효하며 종료 후 만료·삭제 |
 | EC2 → RunPod/OpenAI | 모델 실행에 필요한 최소 입력 | 외부 장기 저장을 전제로 하지 않음 | 원문·개인정보 전송은 별도 승인 전 금지, 요청·응답 원문 로깅 금지 |
+| EC2 → Bedrock Global profile | 합성·비식별 모델 입력 | `store=false`; Global 상용 리전에서 처리 가능 | 실제 개인정보 금지, 원문 요청·응답 로깅 금지 |
+| EC2 → 범용 GPU EC2 | 합성·비식별 모델 입력 | 계획 보류 | private 추론 경로·TLS·인증 설계 전 실제 개인정보 금지 |
 | 서비스 → CloudWatch | 가명 식별자, 지연·오류·비용 메타데이터 | log group별 14일 보존 | 토큰·인증 헤더·음성·전사·전체 프롬프트 금지 |
 | RDS 자동 백업 | DB snapshot/PITR 데이터 | RDS 관리 백업 7일 | deletion protection을 유지하고 종료 시 final snapshot 생성; 최종 폐기는 별도 승인 |
 
@@ -222,8 +237,9 @@ flowchart LR
 
 - 도메인, Route 53 hosted zone과 ACM 인증서
 - `t3.small`·gp3 40 GiB 기본값을 다시 조정할 부하 임계값
-- LLM·STT·Embedding의 실제 모델, GPU, Pod 통합 또는 분리 배치와 RunPod Terraform 소유 범위
+- Embedding 모델과 F2 외 workload의 GPU·Pod 배치
 - RDS polling에서 SQS·DLQ로 전환할 측정 임계값
 - 향후 ECS AI 내부 호출의 인증·암호화·재시도 방식
+- prod 범용 모델의 품질·지연·비용 통과 기준과 개인정보 보존·삭제 기간
 
 미확정 항목의 정본은 [프로젝트 미해결 질문](../../../.agents/skills/project-wiki/references/open-questions.md)과 [Infra 미해결 질문](../../../.agents/skills/infra/references/open-questions.md)이다.

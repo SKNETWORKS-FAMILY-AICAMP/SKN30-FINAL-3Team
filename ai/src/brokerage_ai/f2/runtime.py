@@ -56,8 +56,8 @@ def create_f2_runtime(
     *,
     sync_client_factory: SyncClientFactory = OpenAI,
 ) -> F2Runtime:
-    if config.vllm.llm is None:
-        raise ProviderConfigurationError("F2 requires AI_VLLM_LLM_BASE_URL")
+    if config.vllm.sllm is None:
+        raise ProviderConfigurationError("F2 requires AI_VLLM_SLLM_BASE_URL")
     if config.vllm.stt is None:
         raise ProviderConfigurationError("F2 requires AI_VLLM_STT_BASE_URL")
 
@@ -73,7 +73,7 @@ def create_f2_runtime(
             ),
             analyzer=LlmConsultationAnalyzer(
                 provider=llm_provider,
-                route=ModelRoute(provider=ProviderKind.VLLM, model=config.f2.llm_model),
+                route=ModelRoute(provider=ProviderKind.VLLM, model=config.f2.sllm_model),
             ),
         )
         return F2Runtime(

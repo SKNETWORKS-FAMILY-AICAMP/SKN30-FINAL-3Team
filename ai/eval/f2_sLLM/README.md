@@ -28,7 +28,7 @@ ai/eval/f2_sLLM/
 ## 평가 데이터 형식
 
 각 줄이 하나의 JSON 객체인 JSONL 파일을 사용한다. 현재 평가는 상담 유형만 비교하는
-`classification`과 기존 분류·필드 추출을 함께 비교하는 `full` 두 가지 모드를 지원한다.
+`classification`과 분류·유형별 필드 추출을 함께 비교하는 `full` 두 가지 모드를 지원한다.
 
 ### 상담 유형 분류
 
@@ -44,7 +44,7 @@ ai/eval/f2_sLLM/
 ```
 
 - `scenario_id`, `transcript`, `label`은 필수다.
-- `label`은 `매도의뢰`, `매수문의`, `공동중개`, `단순문의` 중 하나다.
+- `label`은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다.
 - 정확도, macro F1, 클래스별 precision·recall·F1, 혼동 행렬을 계산한다.
 - JSON 파싱 실패와 허용되지 않은 라벨 출력은 제외하지 않고 오답으로 계산한다.
 
@@ -70,8 +70,11 @@ ai/eval/f2_sLLM/
 }
 ```
 
-- `sample_id`, `transcript`, `ledger_type`, `expected`는 필수다.
-- `consultation_type`은 `매도의뢰`, `매수문의`, `공동중개`, `단순문의` 중 하나다.
+- `sample_id`, `transcript`, `ledger_type`, `expected`는 원천 데이터의 필수값이다.
+  `ledger_type`은 기존 정답의 정합성 확인에만 쓰며 모델 입력에는 넣지 않는다.
+- 기존 장부와 상담 유형이 불일치한 행은 필드 정답이 비어 있으므로 단일 입력 자동 장부 추천
+  모델 평가에서 제외한다. 장부 추천과 상세 화면의 불일치 보호는 pipeline 테스트가 검증한다.
+- `consultation_type`은 `매도의뢰`, `매수문의`, `기타상담` 중 하나다.
 - `fields`에는 음성에서 확인된 값만 넣는다.
 - 합성 데이터도 정답과 근거를 사람이 검수한 뒤 평가 릴리스로 발행한다.
 - 최종 테스트 릴리스는 프롬프트 수정이나 QLoRA 학습에 사용하지 않는다.
@@ -93,6 +96,7 @@ uv pip install \
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
   --dataset data/f2_llm/releases/0.2.0/test.jsonl \
+  --dataset-release f2-0.2.0 \
   --task classification
 ```
 
@@ -101,6 +105,7 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
   --dataset data/f2_llm/releases/0.1.0/test.jsonl \
+  --dataset-release f2-0.1.0 \
   --task full
 ```
 
@@ -109,6 +114,7 @@ VRAM이 부족하면 같은 양자화 조건을 모든 모델에 적용한다.
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
   --dataset data/f2_llm/releases/0.2.0/test.jsonl \
+  --dataset-release f2-0.2.0 \
   --task classification \
   --quantization 4bit
 ```
@@ -118,18 +124,43 @@ ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
 ```bash
 ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
   --dataset data/f2_llm/releases/0.2.0/test.jsonl \
+  --dataset-release f2-0.2.0 \
   --task classification \
   --models Qwen/Qwen3-0.6B Qwen/Qwen3-1.7B
 ```
+
+QLoRA 학습 결과는 기반 모델 하나와 어댑터 경로를 함께 지정한다. 이때 평가 환경에도
+`peft`가 설치되어 있어야 한다.
+
+```bash
+ai/eval/f2_sLLM/.venv/bin/python ai/eval/f2_sLLM/evaluate.py \
+  --dataset data/f2_llm/releases/<version>/test.jsonl \
+  --dataset-release f2-<version> \
+  --task classification \
+  --models Qwen/Qwen3-4B \
+  --model-revision <40자리-Hugging-Face-commit> \
+  --quantization 4bit \
+  --adapter-path /workspace/models/f2-qwen3-4b-qlora-v1/adapter
+```
+
+release 승격을 위한 단일 모델 평가는 `--model-revision`에 학습 metadata 또는 승인 대상의 40자리
+Hugging Face commit을 전달한다. 이 옵션은 모델 하나에만 사용할 수 있으며 실제로 해석된 commit이
+요청값과 다르면 평가를 중단한다.
 
 ## 결과와 판단 기준
 
 실행마다 `results/<run-id>/`에 다음 파일이 생성된다.
 
 - `<model-name>.jsonl`: 사례별 예측, 오류, 지연시간
-- `summary.json`: 모델별 자동 지표와 실행 조건
+- `summary.json`: 모델별 자동 지표와 실행 조건, dataset release/checksum,
+  `release_mode=base|lora`, 실제 해석된 Hugging Face commit과 adapter tree checksum
 
 자동 지표는 JSON 파싱 성공률, 상담 유형 정확도·macro F1, 장부 불일치 정확도, 추출 필드
 precision·recall·F1, 원문과 일치하지 않는 근거 수, 평균·p95 지연시간과 최대 CUDA 메모리다. 요약과
 불명확 값 처리 품질은 예측 파일을 모델명 없이 섞어 사람이 검수한다. 합격선은 아직 정하지
 않으며, 품질 요구를 만족하는 후보 중 가장 작은 모델을 우선 선택한다.
+
+`summary.json`에는 재현 검증용 로컬 dataset·adapter 경로가 남을 수 있으므로 그대로 Infra에
+전달하지 않는다. `package_release.py`가 aggregate metric allowlist만 다시 구성하고 경로·예측 원문을
+제거한 공개용 평가 요약을 bundle에 넣는다. base 평가는 `--adapter-path` 없이, LoRA 평가는 정확히
+한 모델과 adapter 경로로 실행한다.

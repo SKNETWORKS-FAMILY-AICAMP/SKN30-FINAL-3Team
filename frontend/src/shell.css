@@ -41,7 +41,7 @@ button, input, select, textarea { font: inherit; }
 .f1-ledger-switch button { min-width: 72px; padding: 0 14px; border: 0; border-bottom: 3px solid transparent; color: #94a3b8; background: transparent; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
 .f1-ledger-switch button:hover { color: #f1f5f9; background: rgba(255,255,255,0.04); }
 .f1-ledger-switch button.active { border-bottom-color: #38bdf8; color: #ffffff; font-weight: 700; }
-.f1-ledger-switch button:focus-visible, .f1-quick-nav button:focus-visible, .ledger-tabs button:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
+.f1-ledger-switch button:focus-visible, .f1-quick-nav button:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
 
 .f1-topbar .jump-control { flex: 0 0 230px; width: 230px; height: 32px; margin: 0; display: flex; align-items: center; gap: 4px; }
 .f1-topbar .jump-control input { height: 32px; min-width: 0; flex: 1; padding: 0 10px; border: 1px solid #334155; border-radius: 6px; background: #1e293b; color: #f8fafc; font-size: 12px; transition: border-color 0.15s; outline: none; }
@@ -89,11 +89,6 @@ button, input, select, textarea { font: inherit; }
 .f1-control-strip__left-group, .f1-control-strip__right-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .f1-control-strip__bottom-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 42px; padding: 4px 16px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
 
-.ledger-tabs { display: inline-flex; align-items: center; height: 34px; padding: 2px; border-radius: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; }
-.ledger-tabs button { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: #64748b; cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; transition: all 0.15s ease; line-height: 1; }
-.ledger-tabs button.active { background: #ffffff; color: #0284c7; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-.ledger-tabs button:disabled { color: #94a3b8; background: transparent; cursor: not-allowed; opacity: 0.6; }
-
 .f1-control-strip .pf-v6-c-button,
 .f1-control-strip .pf-v6-c-menu-toggle { display: inline-flex !important; align-items: center !important; justify-content: center !important; height: 34px !important; min-height: 34px !important; max-height: 34px !important; margin: 0 !important; padding: 0 12px !important; border-radius: 6px !important; font-size: 13px !important; font-weight: 500 !important; line-height: 1 !important; white-space: nowrap !important; }
 .f1-control-strip .pf-v6-c-button__icon,
@@ -136,13 +131,14 @@ button, input, select, textarea { font: inherit; }
 .message-composer__recipients { display: grid; gap: 8px; max-height: 220px; margin: 0; padding: 12px; overflow: auto; border: 0; border-top: 1px solid #d2d2d2; }
 .message-composer__recipients legend { padding: 0 4px; color: #4f5255; font-size: 12px; font-weight: 700; }
 .complex-picker { position: relative; }
-.complex-picker__toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 6px 10px; color: #151515; text-align: left; background: #fff; border: 1px solid #8a8d90; border-bottom-color: #151515; border-radius: 3px; cursor: pointer; font: inherit; }
-.complex-picker__toggle:focus-visible { outline: 2px solid #0066cc; outline-offset: 1px; }
+.complex-picker__input { display: block; width: 100%; padding: 6px 10px; color: #151515; text-align: left; background: #fff; border: 1px solid #8a8d90; border-bottom-color: #151515; border-radius: 3px; font: inherit; }
+.complex-picker__input:focus-visible { outline: 2px solid #0066cc; outline-offset: 1px; }
 .complex-picker__menu { position: absolute; z-index: 30; top: calc(100% + 2px); left: 0; right: 0; max-height: 280px; overflow: auto; background: #fff; border: 1px solid #d2d2d2; border-radius: 4px; box-shadow: 0 4px 12px rgba(3, 3, 3, 0.16); }
 .complex-picker__menu ul { margin: 0; padding: 4px; list-style: none; }
 .complex-picker__menu li { display: flex; align-items: center; gap: 4px; border-radius: 3px; }
 .complex-picker__menu li:hover, .complex-picker__menu li:focus-within { background: #f0f7ff; }
 .complex-picker__menu li.is-selected { font-weight: 700; }
+.complex-picker__menu li.is-active { background: #f0f7ff; }
 .complex-picker__pick { flex: 1; padding: 8px 10px; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; }
 /*
  * 삭제 버튼은 항상 렌더한다. visibility: hidden으로 감추면 Tab 순서에서 빠져

@@ -5,7 +5,7 @@
 1. models.yaml에서 Qwen3 모델 ID와 공통 생성 설정을 읽는다.
 2. 평가용 JSONL에서 STT 텍스트와 사람이 검수한 정답을 읽는다.
 3. Qwen3 모델을 한 번에 하나씩 로드해 모든 사례를 추론한다.
-4. 분류·필드 추출·장부 불일치·근거·지연시간 지표를 계산한다.
+4. 분류·유형별 필드 추출·근거·지연시간 지표를 계산한다.
 5. 모델별 상세 예측과 전체 비교용 summary.json을 저장한다.
 
 네 모델을 동시에 GPU에 올리는 코드가 아니다. 모델 하나의 평가가 끝나면 메모리에서
@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -34,12 +35,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 # 모델마다 프롬프트가 달라지면 크기에 따른 성능을 공정하게 비교할 수 없으므로
 # 모든 후보가 이 프롬프트를 공통으로 사용한다.
 SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
-입력으로 STT 상담 텍스트와 현재 장부 종류만 받습니다.
+입력으로 STT 상담 텍스트만 받습니다.
 
 반드시 다음 규칙을 지키세요.
-- 상담 유형은 매도의뢰, 매수문의, 공동중개, 단순문의 중 하나로 분류합니다.
-- 매물장에서 매수문의이거나 구입장에서 매도의뢰이면 ledger_mismatch를 true로 둡니다.
-- ledger_mismatch가 true이면 fields와 evidence는 빈 객체로 둡니다.
+- 매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류합니다.
+- 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류합니다.
+- 매도의뢰이면 매물장 필드만, 매수문의이면 구입장 필드만 추출합니다.
+- 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
 - 원문에서 명확히 확인된 값만 fields에 넣습니다.
 - 불명확한 숫자, 날짜, 동, 호 또는 충돌하는 값은 확정하지 말고 uncertainties에 적습니다.
 - 기존 장부 값을 추측하거나 자동으로 덮어쓰지 않습니다.
@@ -48,8 +50,7 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
 
 출력 형식:
 {
-  "consultation_type": "매도의뢰|매수문의|공동중개|단순문의",
-  "ledger_mismatch": false,
+  "consultation_type": "매도의뢰|매수문의|기타상담",
   "fields": {"필드명": "값"},
   "evidence": {"필드명": "원문 근거"},
   "uncertainties": ["불명확하거나 충돌한 내용"],
@@ -59,9 +60,10 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
 CLASSIFICATION_SYSTEM_PROMPT = """당신은 부동산 상담 유형 분류기입니다.
 입력으로 STT 상담 텍스트만 받습니다.
 
-상담 유형을 매도의뢰, 매수문의, 공동중개, 단순문의 중 하나로 분류하세요.
+매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류하세요.
+그 밖의 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류하세요.
 설명이나 마크다운 없이 다음 형식의 JSON 객체 하나만 출력하세요.
-{"consultation_type": "매도의뢰|매수문의|공동중개|단순문의"}"""
+{"consultation_type": "매도의뢰|매수문의|기타상담"}"""
 
 
 @dataclass(frozen=True)
@@ -76,11 +78,86 @@ class ModelSpec:
     label: str
 
 
+COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
+ALLOWED_ADAPTER_FILES = {
+    "README.md",
+    "adapter_config.json",
+    "adapter_model.safetensors",
+    "added_tokens.json",
+    "chat_template.jinja",
+    "generation_config.json",
+    "merges.txt",
+    "special_tokens_map.json",
+    "tokenizer.json",
+    "tokenizer.model",
+    "tokenizer_config.json",
+    "vocab.json",
+}
+IGNORED_TRAINING_FILES = {"training_args.bin"}
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def adapter_tree_sha256(root: Path) -> str:
+    digest = hashlib.sha256()
+    files: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise ValueError(f"adapter contains a symlink: {path.relative_to(root)}")
+        if not path.is_file():
+            continue
+        relative_path = path.relative_to(root)
+        if any(part.startswith("checkpoint-") for part in relative_path.parts):
+            raise ValueError(f"adapter contains a checkpoint: {relative_path}")
+        if path.name in IGNORED_TRAINING_FILES:
+            continue
+        if relative_path.as_posix() not in ALLOWED_ADAPTER_FILES:
+            raise ValueError(f"adapter contains an unapproved file: {relative_path}")
+        files.append(path)
+    for path in files:
+        relative = path.relative_to(root).as_posix().encode()
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        digest.update(bytes.fromhex(file_sha256(path)))
+    return digest.hexdigest()
+
+
+def resolved_model_revision(model: Any, tokenizer: Any) -> str:
+    model_revision = getattr(model.config, "_commit_hash", None)
+    tokenizer_revision = getattr(tokenizer, "init_kwargs", {}).get("_commit_hash")
+    if not isinstance(model_revision, str) or COMMIT_PATTERN.fullmatch(model_revision) is None:
+        raise ValueError("model did not resolve to an immutable Hugging Face commit")
+    if tokenizer_revision is not None and tokenizer_revision != model_revision:
+        raise ValueError("model and tokenizer resolved to different Hugging Face commits")
+    return model_revision
+
+
+def validate_requested_model_revision(value: str | None, model_count: int) -> str | None:
+    if value is None:
+        return None
+    if model_count != 1:
+        raise ValueError("--model-revision 사용 시 --models로 모델 하나만 지정해야 합니다")
+    if COMMIT_PATTERN.fullmatch(value) is None:
+        raise ValueError("--model-revision은 40자리 소문자 Hugging Face commit이어야 합니다")
+    return value
+
+
 def parse_args() -> argparse.Namespace:
     """데이터셋, 비교 모델, 양자화와 결과 저장 위치를 CLI 인자로 받는다."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True, help="평가 JSONL 경로")
+    parser.add_argument(
+        "--dataset-release",
+        required=True,
+        help="평가 데이터 release 식별자(package_release 입력과 동일해야 함)",
+    )
     parser.add_argument(
         "--task",
         choices=("classification", "full"),
@@ -99,6 +176,10 @@ def parse_args() -> argparse.Namespace:
         help="실행할 모델 ID 목록(기본: 설정의 전체 모델)",
     )
     parser.add_argument(
+        "--model-revision",
+        help="단일 모델 평가에 사용할 40자리 Hugging Face commit",
+    )
+    parser.add_argument(
         "--quantization",
         choices=("none", "4bit"),
         default="none",
@@ -111,6 +192,11 @@ def parse_args() -> argparse.Namespace:
         help="실행 결과 루트",
     )
     parser.add_argument("--limit", type=int, help="구조 확인용 최대 사례 수")
+    parser.add_argument(
+        "--adapter-path",
+        type=Path,
+        help="평가할 PEFT/LoRA 어댑터 경로(--models로 기반 모델 하나를 지정해야 함)",
+    )
     return parser.parse_args()
 
 
@@ -137,7 +223,8 @@ def load_dataset(
     """평가 JSONL을 한 줄씩 읽고 필수 필드가 있는지 검사한다.
 
     각 줄은 하나의 상담 사례다. classification은 transcript만 입력하고 label을 정답으로
-    사용한다. full은 transcript와 ledger_type을 입력하고 expected를 정답으로 사용한다.
+    사용한다. full은 transcript만 입력하고 expected에서 장부 불일치
+    사례를 제외한 뒤 유형별 필드를 정답으로 사용한다.
     어느 모드에서도 정답은 모델 프롬프트에 넣지 않는다.
     """
 
@@ -167,6 +254,8 @@ def load_dataset(
                     raise ValueError(f"{path}:{line_number}: label must be one of {allowed_types}")
             elif not isinstance(sample["expected"], dict):
                 raise ValueError(f"{path}:{line_number}: expected must be an object")
+            if task == "full" and sample["expected"].get("ledger_mismatch") is True:
+                continue
             samples.append(sample)
             if limit is not None and len(samples) >= limit:
                 break
@@ -219,14 +308,12 @@ def model_load_kwargs(quantization: str) -> dict[str, Any]:
 
 
 def build_user_prompt(sample: dict[str, Any], task: str) -> str:
-    """현재 장부 종류와 STT 결과만 모델의 사용자 입력으로 만든다.
+    """STT 결과만 모델의 사용자 입력으로 만든다.
 
     평가 정답 expected가 입력에 섞이면 모델이 답을 미리 보게 되므로 포함하지 않는다.
     """
 
-    if task == "classification":
-        return f"STT 상담 텍스트:\n{sample['transcript']}"
-    return f"현재 장부 종류: {sample['ledger_type']}\nSTT 상담 텍스트:\n{sample['transcript']}"
+    return f"STT 상담 텍스트:\n{sample['transcript']}"
 
 
 def extract_json(text: str) -> dict[str, Any]:
@@ -322,7 +409,7 @@ def percentile(values: list[float], fraction: float) -> float | None:
 def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> dict[str, Any]:
     """한 모델의 모든 사례를 모아 최종 비교 지표를 계산한다.
 
-    분류는 네 상담 유형의 클래스별 F1과 Macro F1을 계산한다. 필드 추출은 모든 사례의
+    분류는 세 상담 유형의 클래스별 F1과 Macro F1을 계산한다. 필드 추출은 모든 사례의
     TP·FP·FN을 합산해 Precision·Recall·F1을 계산한다. JSON 파싱 실패는 숨기지 않고
     json_parse_rate에서 실패로 반영한다.
     """
@@ -336,8 +423,7 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
     true_positive: Counter[str] = Counter()
     false_positive: Counter[str] = Counter()
     false_negative: Counter[str] = Counter()
-    mismatch_correct = 0
-    field_tp = field_fp = field_fn = unsupported_fields = 0
+    field_tp = field_fp = field_fn = 0
     evidence_grounding_violations = 0
 
     for row in parsed:
@@ -354,9 +440,6 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
             elif expected_class == label and predicted_class != label:
                 false_negative[label] += 1
 
-        if prediction.get("ledger_mismatch") is expected.get("ledger_mismatch"):
-            mismatch_correct += 1
-
         # 필드명과 정규화된 값이 모두 일치해야 올바른 추출로 인정한다.
         expected_fields = field_pairs(expected.get("fields", {}))
         predicted_fields = field_pairs(prediction.get("fields", {}))
@@ -366,9 +449,6 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
         field_fp += len(predicted_fields - expected_fields)
         field_fn += len(expected_fields - predicted_fields)
         evidence_grounding_violations += row["evidence_grounding_violations"]
-        # 장부가 맞지 않을 때 fields를 제안하면 금지 동작으로 집계한다.
-        if expected.get("ledger_mismatch") is True:
-            unsupported_fields += len(predicted_fields)
 
     class_f1: dict[str, float] = {}
     for label in allowed_types:
@@ -394,12 +474,10 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
         "classification_accuracy": safe_divide(class_correct, len(parsed)),
         "classification_macro_f1": statistics.fmean(class_f1.values()) if class_f1 else 0.0,
         "classification_f1_by_class": class_f1,
-        "ledger_mismatch_accuracy": safe_divide(mismatch_correct, len(parsed)),
         "field_precision": field_precision,
         "field_recall": field_recall,
         "field_f1": safe_divide(2 * field_precision * field_recall, field_precision + field_recall),
         "evidence_grounding_violations": evidence_grounding_violations,
-        "unsupported_field_proposals_on_mismatch": unsupported_fields,
         "mean_latency_seconds": statistics.fmean(latencies) if latencies else None,
         "p95_latency_seconds": percentile(latencies, 0.95),
     }
@@ -483,6 +561,8 @@ def run_model(
     output_path: Path,
     allowed_types: list[str],
     task: str,
+    adapter_path: Path | None = None,
+    requested_model_revision: str | None = None,
 ) -> dict[str, Any]:
     """Qwen 모델 하나를 불러와 모든 평가 사례를 실행한다.
 
@@ -503,12 +583,27 @@ def run_model(
 
     # 1. spec.model_id에 맞는 토크나이저를 자동 선택한다.
     # Qwen 전용 클래스를 직접 지정하지 않아도 AutoTokenizer가 config를 보고 결정한다.
-    tokenizer = AutoTokenizer.from_pretrained(spec.model_id)
+    source_kwargs = (
+        {"revision": requested_model_revision} if requested_model_revision is not None else {}
+    )
+    tokenizer = AutoTokenizer.from_pretrained(spec.model_id, **source_kwargs)
 
     # 2. 실제 Qwen 가중치를 다운로드/캐시에서 읽어 메모리에 올린다.
     # AutoModelForCausalLM은 config.json의 model_type을 확인해 내부적으로 적절한
     # Qwen CausalLM 클래스를 선택한다. 따라서 코드에 Qwen3ForCausalLM 이름이 없어도 된다.
-    model = AutoModelForCausalLM.from_pretrained(spec.model_id, **model_load_kwargs(quantization))
+    model = AutoModelForCausalLM.from_pretrained(
+        spec.model_id,
+        **source_kwargs,
+        **model_load_kwargs(quantization),
+    )
+    model_revision = resolved_model_revision(model, tokenizer)
+    if requested_model_revision is not None and model_revision != requested_model_revision:
+        raise ValueError("model did not resolve to the requested Hugging Face commit")
+    adapter_hash = adapter_tree_sha256(adapter_path) if adapter_path is not None else None
+    if adapter_path is not None:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, adapter_path)
 
     # Dropout 같은 학습 전용 동작을 끄고 평가 모드로 전환한다.
     model.eval()
@@ -612,6 +707,9 @@ def run_model(
         {
             "model_id": spec.model_id,
             "label": spec.label,
+            "resolved_model_revision": model_revision,
+            "adapter_path": str(adapter_path.resolve()) if adapter_path else None,
+            "adapter_sha256": adapter_hash,
             "load_seconds": load_seconds,
             "peak_cuda_memory_bytes": (
                 torch.cuda.max_memory_allocated() if torch.cuda.is_available() else None
@@ -641,6 +739,15 @@ def main() -> None:
     # 3. models.yaml의 네 후보를 ModelSpec 목록으로 만든다.
     # --models를 지정했다면 그중 요청된 모델만 남는다.
     specs = select_models(config, args.models)
+    requested_model_revision = validate_requested_model_revision(
+        args.model_revision,
+        len(specs),
+    )
+    if args.adapter_path is not None:
+        if len(specs) != 1:
+            raise ValueError("--adapter-path 사용 시 --models로 기반 모델 하나만 지정해야 합니다")
+        if not args.adapter_path.is_dir():
+            raise FileNotFoundError(args.adapter_path)
     generation = config["generation"]
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_dir = args.output_dir / run_id
@@ -661,6 +768,8 @@ def main() -> None:
                 output_path,
                 allowed_types,
                 args.task,
+                args.adapter_path,
+                requested_model_revision,
             )
         )
 
@@ -668,10 +777,15 @@ def main() -> None:
     # 데이터 경로와 생성 설정을 함께 남겨 같은 조건으로 다시 실행할 수 있게 한다.
     summary = {
         "run_id": run_id,
+        "release_mode": "lora" if args.adapter_path else "base",
         "dataset": str(args.dataset.resolve()),
+        "dataset_release": args.dataset_release,
+        "dataset_sha256": file_sha256(args.dataset),
         "sample_count": len(samples),
         "task": args.task,
         "quantization": args.quantization,
+        "adapter_path": str(args.adapter_path.resolve()) if args.adapter_path else None,
+        "adapter_sha256": adapter_tree_sha256(args.adapter_path) if args.adapter_path else None,
         "generation": generation,
         "models": summaries,
     }

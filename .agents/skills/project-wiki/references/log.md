@@ -1,10 +1,97 @@
 ---
 status: 구현됨
-updated: 2026-08-27
+updated: 2026-09-09
 ---
 
 # 위키 변경 로그
 
+- 2026-09-09: Infra의 실패 후 offline endpoint/동일 Pod 재사용 계약을 구체화하고, F2 앱 smoke에 현재 Backend ledger_type 응답 계약 및 스키마 일치 회귀를 반영했다.
+
+- 2026-09-09: 기존 ADR-0008의 app_owner migration 계약을 delivery Compose에 반영하고, API·Worker에는 역할 전환을 주입하지 않는 회귀 검증을 추가했다.
+
+- 2026-09-09: 승인된 공유 dev 기동 중 maintenance의 API 정지와 CodeDeploy ALB health 대기 충돌을 확인했다. Infra ADR-0024·운영 정본에 maintenance WITHOUT_TRAFFIC_CONTROL과 automatic 기존 트래픽 제어의 경계를 명시하고, Terraform 적용·drift 및 같은 앱 산출물의 CodeDeploy 재시도 성공을 확인했다. 전체 앱 기동 검증과는 구분한다.
+
+- 2026-09-09: 사용자 요청에 따라 챗봇 노트북·데스크톱 패널 폭을 20% 축소했다. 전체 높이·오버레이와 모바일 전체 폭은 유지한다.
+
+- 2026-09-09: 챗봇 조회 결과의 항목명·값을 가까운 두 열로 정렬하고 반복 매물의 세로 여백을 줄였다.
+
+- 2026-09-09: 사용자 입력창 참조에 따라 챗봇 저장·기억 안내를 헤더 도움말 팝오버로 이동하고 자동 높이·원형 전송 버튼을 갖춘 간결한 입력 영역으로 변경했다. PatternFly 국소 스타일 예외와 포커스·팝오버 Escape 동작을 frontend 정본에 기록했다.
+
+- 2026-09-09: 사용자 요청에 따라 챗봇 검색 조건의 토글·개수 제목을 제거하고 제목·조건 칩·초기화를 항상 한 줄로 표시하도록 변경했다. 넘치는 조건은 칩 영역에서 가로 스크롤한다.
+
+- 2026-09-09: 사용자 요청에 따라 챗봇을 메인 배치를 유지하는 오른쪽 전체 높이 오버레이 사이드 패널로 변경했다. 노트북·데스크톱은 36~48rem 가변 폭, 좁은 화면은 전체 폭으로 표시하고 화면·프론트엔드 정본에 반영했다.
+
+- 2026-09-09: F4 챗봇의 추천 질문·검색 조건·결과 가독성과 초안·재시도·이력 스크롤 동작을 개선하고 frontend 챗봇 정본에 기록했다. Windows Chrome의 합성 HTTP/SSE 11개 브라우저 검증을 통과했으며 API·DB·모델 계약은 변경하지 않았다.
+
+- 2026-09-09: 사용자 폐기 지시에 따라 #116·#117·#118을 역적용하고 ADR-0037로 ADR-0035를 대체했다. 기존 F3 요청 실행과 #119를 보존한다. DB·시드·배포 상태는 변경하지 않았다.
+
+- 2026-09-09: 사용자 확정 계획에 따라 공유 dev ai-select/SSM v2·적용 결과·통합 시작 계획·기존 RunPod Template API 조정·maintenance 배포·이전 검증 revision의 정확한 복원·명시 DB 대상 적용을 구현했다. Backend 단위 및 격리 PostgreSQL의 snapshot/원자성/이력 보존 검증과 운영 정본·ADR-0036/Infra ADR-0024를 연결했다. 공유 클라우드 적용·새 이미지 게시·GPU 기동/추론은 수행하지 않았고 사용자 검증으로 남긴다.
+
+- 2026-09-09: PR #113 sticky review를 대조해 ADR-0034의 사용자 구현 승인 출처·Worker/F2/endpoint 부분 대체 범위와 팀 병합 승인 상태를 구분했다. CodeDeploy 그룹 간 AND의 AWS 근거를 연결하고 최신 dev PR #114를 통합했다. 실제 서비스 기동·클라우드 적용은 수행하지 않았다.
+
+- 2026-09-09: PR #114 리뷰에서 합성 테스트·삭제된 마스킹 사례의 secret-like 오탐 근거를 확인하고 감지 규칙을 유지했다. 앵커 fixture 합성 표기를 명확히 하고 새 보고서 출처를 비식별 ID로 변경했다. 변경 fixture의 DB 검사 23개와 수정 후 브라우저 전체 17개 통과를 검증 기록에 반영했다.
+
+- 2026-09-09: 로컬 기능 점검을 근거로 Frontend 검색·상담 로그·F3 요청·캘린더 접근성 및 OpenAI 전송 스키마·챗봇 동의어 회귀를 보강했다. Frontend 빠른 테스트 자동 발견, 대형 파일 분리·Infra 중복 정리, 인증·F2 입력·평가 산식·HTTP/DB 연결 검사를 반영하고 모듈 정본과 검증 범위를 연결했다. AI ADR-0006은 사용자 개선 구현 승인·팀 검토 대기로 구분하며 외부 모델 재평가·공유 dev 배포 완료를 뜻하지 않는다.
+
+- 2026-09-09: infra 스킬·Compose·Worker·ASG·배포 스크립트를 대조해 별도 프로세스와 분산 선점 기반, 독립 배포의 미완료 범위를 문서화했다. 사용자 GPU 상시 운영 조건 아래 조건부 자동 판정+결과 목록을 우선하도록 검토안을 수정하고 F2/general GPU 공유 표현을 정정했다. OQ-F3-01·03 갱신과 OQ-F3-04 추가. AWS 상태 조회·실제 부하 검증·런타임 변경은 수행하지 않았다.
+
+- 2026-09-09: F3 독립 카드 조회 요청을 출처로 등록하고 코드 기준 저장/Worker/결과 현황, 신규 요구안, outbox·완료 판정 재사용, local/dev 자원·측정 제안을 연결했다. OQ-F3-01~03을 추가했으며 승인 ADR·런타임 코드·배포는 변경하지 않았다.
+
+- 2026-09-09: 위키 갱신 시 governance의 정본·인덱스·질문·ADR·로그·출처 등록과 ADR 대체 절차를 반드시 따르도록 project-wiki 스킬에 명시했다. 개발 전 목적에 맞는 아키텍처를 선택하고, 수작업 파일 1,000줄 기준 분리와 Python 구성 선택 원칙을 루트 지침에 추가했다.
+
+- 2026-09-09: 스킬 본문을 필수 경계와 조건부 읽기 중심으로 정리하고 위키 편집 절차를 governance에 통합했다. API·F3 AI 계약은 기존 의미와 상태를 보존해 작업별 문서로 분리하며, 공통 인덱스·Claude 어댑터·PR 리뷰의 파일 및 절 선택을 함께 정비했다.
+
+- 2026-09-08: PR #107 문서 통합에서 최신 dev의 workflow v3·scorer v2·교차 탭 UI 경합·Time Keeper 대응과 Qwen 프로필·재현 기록을 함께 보존했다. ADR-0032의 공식 FP8 선택·명시적 활성화 경계를 유지하고, 기존 Luna·Qwen 점수를 현재 workflow의 모델 성능으로 재해석하지 않는다. 원본 평가를 수정하거나 새 GPU·모델 평가를 수행한 기록이 아니다.
+
+- 2026-09-08: PR #101 문서 통합에서 dev의 workflow v3 고정 재생성·조건 근거 검증·scorer v2와 Time Keeper 재연락 제거 대응을 보존했다. 공통 셸·챗봇 이력·SSE·상세/F2 이동의 구현 상태를 공개 계약에 반영하고, 기존 모델·브라우저·delivery 기록을 최신 병합 검사와 구분했다. 실제 모델 재평가·공유 dev 배포를 완료한 것으로 표시하지 않는다.
+
+- 2026-09-08: F4 챗봇 공통 셸·대화 이력·SSE·상세/F2 이동을 통합했다. UI 12개·브라우저 8개와 기존 화면 회귀, 실제 Luna 연결을 검증하고 작성자와 다른 3개 담당자의 교차 검토를 반영했다. 조건 해석·HTTP 성능·미검증 배포 범위를 챗봇 구현·검증 문서에 구분해 기록했다. 기본 비활성, 공유 dev 미배포 상태다. 이후 격리 Node22·Python3.13 환경의 전체 delivery와 캐시 없는 Backend 이미지·UID 검증도 통과했으며 실제 근거를 같은 검증 문서에 추가했다.
+
+- 2026-09-08: F4 챗봇의 AI 계약과 Backend 저장·조회·HTTP/SSE를 구현하고 격리 PostgreSQL·실제 Luna로 검증했다. 전진 migration 019, 작성자 소유권·즉시 삭제·독립 실행·중단 수동 재시도, CHATBOT 전용 모델 설정을 반영했다. Qwen은 사용자 후속 지시로 보류하고 공유 dev DB·배포는 수행하지 않았다.
+
+- 2026-09-08: 사용자와 F4 챗봇 1차 설계를 합의해 메모리 전용안을 DB 저장·복원으로 대체했다. 사용자당 대화 1개·작성자 접근·삭제/환경 폐기까지 보존·운영 DB 즉시 전체 삭제·직전 2회 문맥·화면 종료 후 처리 지속을 요구사항·저장/HTTP·화면·개인정보 정책에 반영했다. OQ-CHAT-01·02 해소, 03은 후속 비차단으로 분리했으며 코드·SQL·DB 적용은 수행하지 않았다.
+
+- 2026-09-08: 챗봇 기획 요청과 기존 F2 화면 연결 선택을 출처로 등록하고 요구사항·화면·실행·SSE·공공 API 검토안을 연결했다. F3 연동은 개발 보류, 기능 소유권·MVP 편입·문맥/보존·시세 범위는 OQ-CHAT-01~03으로 남겼으며 승인 ADR·공개 계약은 변경하지 않았다.
+
+- 2026-09-08: RunPod 관련 ADR에 사용자 작업 승인·팀 병합 검토·외부 적용 범위를 분리하고, release 캐시 전체 파일 재해시와 게시 신뢰 경계를 운영 문서에 명시했다.
+
+- 2026-09-08: 최신 dev의 F2 단일 분석 계약과 GPU 동시 1건·취소 보호를 함께 유지하도록 통합했다. dev의 ADR-0028 번호를 보존하고 PR의 RunPod 운영 범위 문서는 ADR-0031로 재번호했다.
+
+- 2026-09-07: AWS GPU 오류·비용 부담에 대비해 RunPod 배포 경로를 유지하라는 사용자 요구와 정지·삭제 시 잔여 요금의 공식 근거를 배포·운영 문서에 기록했다. 기능별 수동 전환은 제안으로 구분했으며 AWS GPU·F3 RunPod 배포와 전환 도구는 아직 구현하지 않았다.
+
+- 2026-09-07: 사용자가 자체 RunPod 감시 제거·운영자 시작/종료 확인을 선택했다. 전용 Lambda·주기 실행·8개 경보·감시 key와 GraphQL Secret 조회를 제거하고 create/delete 실패를 이전 active 복원 대신 offline 정리·명시적 재시도로 단순화했다. 프로젝트 ADR-0029와 Infra ADR-0021에 기록했으며 외부 apply는 하지 않았다.
+
+- 2026-09-07: 사용자가 약 10명 규모의 부트캠프 팀 프로젝트·취업 포트폴리오라는 운영 기준을 명시했다. ADR-0031에 단일 GPU·API 점검 중단 허용을 반영하고 F2 동시 분석 1건·본문 파싱 전 429·수동 재시도, 취소 시 실제 종료 후 정리, 단일 API worker와 SLLM→STT 순차 기동을 구현했다. 실환경 GPU 검증은 미실행이며 runbook에 시연 합격·기록 기준을 추가했다.
+
+- 2026-09-07: 사용자 선택에 따라 RunPod 최초 구축을 Console 자원 검증·등록으로 단순화했다. ADR-0031에 GHCR Console 소유, 게시 단계 품질 검증, API 전용 F2 refresh와 Worker 설정 분리를 기록했다. 코드 구현·팀 검토 전·외부 미적용 상태다.
+- 2026-09-07: 구입장 생성 계약(`POST /api/v1/property-requirements`)에 `new_party`·`privacy_consent`를 추가해, 인물 검색 화면이 없는 클라이언트가 새 손님의 이름·전화·동의를 요청 한 번에 실어 인물까지 함께 만들 수 있게 했다(매물장 `parties`와 같은 구조). 기존 `party_id` 경로는 유지하되 지금 화면은 쓰지 않는다. `new_party` 사용 시 동의가 없으면 `PRIVACY_CONSENT_REQUIRED`로 거절하고 인물을 만들지 않는다. F1 구입장의 "새 손님 추가" 저장이 항상 실패하던 문제(인물 생성 경로 부재)를 해소했다.
+- 2026-09-07: ADR-0028을 승인해 F2 신규 음성 접수에서 현재 장부를 생략하고 STT·sLLM 분석 한 번으로 상담 유형과 유형별 필드를 추출한 뒤, pipeline이 매도의뢰→매물장·매수문의→구입장을 추천하도록 변경했다. 모델 입력은 STT 원문만 포함하고 유형별 허용 필드 경계는 pipeline 검증이 강제한다. 기존 상세는 `current_ledger_type`과 추천 장부의 불일치 보호를 유지하며, 응답 `ledger_type`은 추천 대상 장부를 뜻한다. OQ-010과 Frontend 2회 분석 결정을 종료했다.
+- 2026-09-07: ADR-0026·0027의 부분 대체 범위에 renderer의 OpenAI key 강제 제거와 범용 endpoint 배포 설정 주입을 명시하고, 해당 항목의 현재 구현 상태는 ADR-0027을 따르도록 연결했다.
+- 2026-09-04: ADR-0024를 승인해 PR Policy Agent의 문서 디렉터리 재귀 포함을 결정적 정책 pack·Markdown 절 라우팅으로 대체하고, Luna 변경 모듈 leaf와 조건부 Terra 정책 중재를 분리했다. 표준 service tier, 실제 token category 기반 예상 USD 비용과 272K token 장기 컨텍스트 관측도 추가했다.
+- 2026-09-04: PR Policy Agent가 raw patch 분할 뒤 실제 JSON 직렬화·태그 escape·선택 정책을 포함한 컨텍스트를 재측정하고, 초과 chunk와 긴 단일 행을 결정적으로 재분할한 뒤 최종 chunk 상한을 다시 검증하도록 구현을 보정했다.
+- 2026-09-04: 최신 dev 동시 변경에서 중복된 프로젝트 ADR 번호를 최초 병합 순서대로 정규화했다. PR 리뷰 정책은 ADR-0024를 유지하고 캘린더 저장 소유권은 ADR-0025, 범용 Provider 정책은 ADR-0026, Bedrock Luna dev POC는 ADR-0027로 고유하게 연결한다. 결정 내용은 변경하지 않았다.
+- 2026-09-04: 범용 생성의 첫 공유 dev POC를 GPU EC2에서 Bedrock GPT-5.6 Luna로 전환하는 ADR-0027을 승인했다. local은 직접 OpenAI Luna, dev는 EC2 Instance Role SigV4와 Global cross-Region Luna를 사용한다. Bedrock Structured Outputs 부재는 JSON 지시·Pydantic 검증·기존 repair로 보완하고, IMDSv2 hop limit 2 위험과 Global 처리 위치 때문에 dev를 합성·비식별 입력으로 제한한다. 기존 Qwen llama.cpp·vLLM 코드와 seed는 비활성 비교 경로로 보존하며 prod Provider·평가·개인정보 승격은 OQ-007·014로 남겼다.
+- 2026-09-04: ADR-0026과 범용 Provider·seed 구현을 결정 인덱스와 출처 manifest에 반영하고, ADR-0027이 환경별 활성 Provider·GPU 우선순위·IMDS hop 조항만 부분 대체하도록 과거 결정을 보존했다.
+- 2026-09-03: 사용자 지시로 F4 기능 번호가 확정되어 이미 종료된 OQ-012가 미해결 목록에 남아 있던 불일치를 제거함.
+- 2026-09-03: 사용자 지시로 F4를 독립 기능으로 등록하고 Time Keeper를 그 안의 서비스로 정의해 `docs/requirements/f4/`와 `F4-CM`·`F4-TK` ID 체계를 신설함(OQ-012 종료). Time Keeper 일정 조회를 API 계약에 `제안`으로 등록하고, F1 장부의 날짜 컬럼에서 임대차 만기·구입 의뢰 만기·희망 입주일과 재연락·매물 조건 재확인을 종류별로 모으는 읽기 전용 조회와 상단바 알림·아침 브리핑 화면을 구현함. 계약·일정 테이블이 없어 계약 체결일, 지급일, 임장일, 신고 기한과 명도일은 제외하고 기준값·기능 번호·장기 미접촉 노출을 OQ-011~013으로 등록함.
+- 2026-09-03: `dev-f2-handwritten-v05-qwen3-4b-full-v1` bundle과 release manifest의 S3 불변 게시 및 양방향 cross-hash를 확인해 RunPod 문서 상태를 “S3 dev release 게시 완료·RunPod/Terraform 미적용”으로 갱신했다. AI suite 종료 지연과 Terraform provider handshake 실패는 제한된 sandbox의 thread·provider IPC 제약으로 확인했으며 정상 실행 환경에서 AI 212개 테스트와 두 Terraform root validate가 통과했다.
+- 2026-09-03: 평가 전 adapter의 공유 개발 기동을 위해 ADR-0023을 승인하고 `release_stage=dev`, `dev-*` ID, `evaluation.status=not-evaluated`인 metadata bundle과 `runpod-create-dev(-plan)` 전용 경로를 추가했다. 평가·승인 파일만 생략하며 기반 commit·adapter checksum, 불변 게시, health·rollback·삭제 계약은 유지하고 일반 create는 dev bundle을 거부한다.
+
+- 2026-09-02: SLLM `release.json:v2`와 `promotion-approval:v2`를 승인해 LoRA·base-only를 같은 metadata bundle로 전달하고 평가 dataset·실제 Hugging Face commit·adapter checksum을 결속했다. v2 S3 객체 양방향 cross-hash와 동일 checksum 부분 게시 재개, 모델명 health, 공개 HF 전용 token 차단, 비용 전 create plan, image generation guard, rollback reconcile과 삭제 후 offline 503 smoke를 구현했다. v1 LoRA bundle과 기존 S3 객체는 마이그레이션 없이 계속 읽으며 Backend HTTP·F2 응답 계약은 유지한다.
+- 2026-09-02: RunPod 감시 로그의 endpoint 상태를 `active`·`offline` allowlist로 제한하고 그 밖의 SSM 값을 고정 `invalid`로 일반화했다. 배포·운영 문서의 대체된 Infra ADR-0016 참조는 현재 정본인 ADR-0017·0018로 교체했다.
+- 2026-09-02: RunPod 제어면 API 장애를 Provider 정상으로 오인하지 않도록 감시 계약을 명확히 했다. 장애 주기에는 heartbeat와 API 도달 실패만 기록하고, 확인할 수 없는 endpoint 일치·Provider health·orphan·runtime·비용 metric은 발행하지 않는다.
+- 2026-09-02: ADR-0008의 EC2 Backend·설치형 AI·RunPod 추론 상위 구조는 유지하고, ADR-0020이 Infra ADR-0002의 개발자별 Pod·시연 기간 Pod 유지·조건부 Network Volume 조항만 부분 대체함을 양쪽 ADR과 인덱스에 명시했다. 런타임 인덱스의 GPU runtime 정본 링크도 ADR-0020으로 정규화했다.
+- 2026-09-02: SLLM 공유 dev 승격에 미확정 정량 임계값을 고정하지 않고, 파인튜닝 담당자가 `full` 평가 지표를 검토해 선택 모델·평가 실행·사유를 명시한 `promotion-approval:v1`을 승인하도록 ADR-0020을 구체화했다. 패키징 도구는 승인 상태와 평가 연결을 검증하며 비교 평가의 모든 모델 통과를 요구하지 않는다.
+- 2026-09-01: RunPod 최초 구축을 digest 기반 `plan → 확인 → bootstrap`으로 통합하고 운영 비밀값 정본을 AWS Secrets Manager로 옮겼다. Terraform은 Secret 컨테이너만 소유하고 기존 version은 값 삭제 없이 state에서 분리한다. 기본 30분 읽기 전용 감시와 8시간 실행 경고, 기존 Alarm Discord 경로와 기본 dry-run 수동 reconcile을 추가하되 자동 Pod 삭제·endpoint 전환과 기존 active/offline·Backend 503 계약 변경은 제외했다.
+- 2026-09-01: 학습자는 Infra 권한 없이 검증된 SLLM bundle만 전달하고 Infra가 private S3에 불변 게시하도록 경계를 확정했다. 공유 F2 RunPod는 Volume·SSH 없는 create/delete lifecycle과 `sllm`·`stt` 작업명, active/offline endpoint를 사용하며 offline F2 요청은 Backend 503으로 처리한다.
+
+- 2026-08-31: CloudWatch Alarm Discord 메시지에 검증된 `AlarmArn` 기반 Alarm 링크와 별도 장애 대응 Runbook을 추가하고, 정확한 Backend·AI 알람 두 개에는 미리 채운 Logs Insights 링크를 제공한다. 애플리케이션 `ALARM`만 전이 시각 ±10분의 허용 필드 1건을 최대 2초 best-effort 조회하며 시간 초과 쿼리는 중단한다. 조회 실패는 기본 알림을 막지 않고 Discord 전송 실패만 SNS 재시도하며, `source`는 라우팅이 아닌 선택적 기능 문맥으로 한정했다.
+- 2026-08-31: AI·Backend pre-commit Ruff 대상을 모듈 아래 Git 추적 Python 파일 전체로 넓혀 CodeBuild의 모듈 전체 검사와 일치시켰다. 에이전트는 Python 변경을 마치기 전에 루트 `AGENTS.md`의 모듈별 `ruff check --fix`와 `ruff format`을 실행하며, `ai/eval`·`ai/training`도 제외하지 않는다. Pyright의 기존 `src`·`tests` 검사 범위와 CodeBuild 최종 검증은 유지한다.
+- 2026-08-31: 개발 환경 오류 관측을 예상하지 못한 Backend 500과 F2·F3 AI 최종 실패 두 이벤트로 한정하고, `/api/v1` framework 404·405·422 envelope와 F2 안전 오류 문구·React 복구 경계를 정규화했다. 기존 CloudWatch·SNS·Discord만 사용하며 기존 delivery notifier는 유지하고, CloudWatch Alarm은 별도 SNS·Lambda와 새 Discord webhook Secret으로 전달한다. 외부 관측성 제품, 브라우저 telemetry, 전면 로그 스키마 이관과 token·queue·heartbeat 지표는 운영 비용을 고려해 제외했다.
+- 2026-08-31: F3-CR-01·02의 저장 트리거가 하는 일을 앵커 포지션 카드 생성까지로 줄이고 API 계약의 자동 접수·Worker 선점·상태 수명주기 절을 같은 범위로 대체했다. 저장이 만든 실행은 ANCHOR_READY에서 멈추고 Worker 선점·최대 시도 정리 대상에서 빠진다. 사용자가 QUEUED·RUNNING·ANCHOR_READY 어느 때 판정을 요청해도 같은 실행이 그 의도를 이어받으며, 주차 뒤의 계획된 첫 선점은 재시도 횟수를 쓰지 않는다. 앵커 카드를 다시 만들지 않으므로 요청 시 추가 카드 비용은 없다. 세대 상세의 액션 레일 [교차 판정]은 여닫기가 아니라 판정 요청으로 되돌렸고, 섹션의 [교차 판정 실행]과 같은 실행을 요청한다.
+- 2026-08-31: 상세 저장이 F3 후보 패널을 자동으로 열던 화면 동작을 없애고, 세대 상세에 [교차 판정] 섹션을 두고 실행과 여닫기를 분리했다. 섹션 안의 [교차 판정 실행]이 판정을 시작하고, 액션 레일의 [교차 판정]은 그 섹션을 여닫기만 한다. 패널을 여는 순간 화면도 실행을 확보하므로 저장마다 패널이 열리면 F3-CR-03·04를 버튼 실행으로 바꾼 이유가 저장 경로로 되살아난다. F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 그대로 유지한다.
+- 2026-08-31: 프로젝트 요청자가 F3-BR-12·13의 기존 상위 15건 규칙을 최초 카드화·AI 판정 상위 5건으로 대체하도록 승인했다. 승인 주체·결정일·대체 범위를 사용자 지시 출처 manifest와 요구사항 변경 이력에 기록하고 F3 AI 계약에 연결했다.
+- 2026-08-27: F3 최초 카드화·판정 상한을 상위 5건으로 조정했다. 전체 SQL 후보·순위·페이징은 유지하고 `candidate-selection:v3`의 상위 5건만 포지션 카드를 순차 생성해 앵커 1장과 후보 1~5장을 한 번에 판정한다. 화면은 상위 판정 건수와 전체 후보 건수를 구분해 표시한다. Worker 실패 로그에는 고정 단계·분류·예외 타입·시도 횟수를, 후보 카드 실패 로그에는 후보 순번·전체 건수를 남기되 예외 메시지·상담 본문·전체 프롬프트·모델 원문 응답은 기록하지 않는다.
 - 2026-08-27: 로컬 전용이던 검토된 F3 합성 reset·seed·verify 세 파일을 공유 dev에도 명시적으로 적용할 수 있도록 ADR-0017을 확장했다. 개인 IAM·SSM·15분 DB token을 사용하는 Infra `seed-f3 --apply`만 허용하고 대상 dev RDS·고정 파일 순서·`F3_SYNTHETIC` reset 범위·29개 전부 PASS를 강제하며 prod·임의 DB·임의 SQL 적용은 계속 금지한다.
 - 2026-08-27: F3-CR-03·04의 교차 판정 트리거를 상세 진입 자동 실행에서 상세의 [교차 판정] 버튼 실행으로 변경했다. 장부를 조회하기만 해도 불필요한 판정 비용이 생기는 것을 막으며, F3-CR-01·02의 저장 성공 후 Backend 자동 접수와 같은 입력 버전의 활성 실행 재사용은 유지한다.
 - 2026-08-27: F2 기능 플래그 제거와 Backend runtime 상시 초기화 결정에 맞춰 API 계약에서 비활성 상태를 제거하고, 필수 LLM·STT endpoint 누락은 시작 오류, 실행 중 Provider 사용 불가는 503 `F2_UNAVAILABLE`로 구분함.
@@ -73,3 +160,45 @@ updated: 2026-08-27
 - 2026-08-12: 브랜치·PR 정책 정본을 `.agents-rule/git.md`로 이동하고 `AGENTS.md`와 Claude import를 갱신함.
 - 2026-08-12: 백엔드의 선택적 DDD, 모듈러 모놀리스와 경계 기반 이벤트 설계를 제안으로 등록하고 기술 스택 승인 질문을 구체화함.
 - 2026-08-12: 프로젝트 ADR을 공통·모듈 간 결정으로 한정하고 백엔드 내부 결정 정본을 backend 스킬 references로 이동함.
+
+- 2026-09-07: F2 기존 release를 유지하는 캐시 런타임과 범용 Qwen 별도 이미지 게시 절차를 분리했다. GPU 호환성·배포는 미검증이며 local 기본 모델·dev 활성 모델 변경은 포함하지 않는다. [이미지 운영](../../../../infra/serving/README.md)
+
+- 2026-09-07: ADR-0030으로 local 개인 OpenAI·dev F2/general AWS·RunPod 전환과 모델 설정만 갱신하는 데이터 보존 정책을 반영. 실제 GPU 검증 전.
+
+- 2026-09-07: 사용자 승인으로 GPU 통합 기반 saved plan을 적용(9 생성·7 변경·16 삭제)하고 drift 없음을 확인. 감시 제거·SSM/IAM 반영, 앱/RDS 중지·GPU 0 및 기존 등록/저장소 보존. GPU 실배포는 후속 단계.
+
+- 2026-09-08: 범용 3모델 고정 프로필과 동일 조건 평가, 실제 가중치·배포 provenance 검증을 ADR-0032와 Infra 비교 기록에 연결했다. 공유 dev 미배포.
+
+- 2026-09-08: 사용자 최종 선택으로 세 번째 Qwen 비교 대상을 공식 `Qwen/Qwen3.8-27B-FP8`으로 변경했다. BnB는 기동 성공·품질 미평가 이력으로 보존하며 공유 활성 모델은 변경하지 않는다.
+
+- 2026-09-08: AWQ14B·AWQ32B·공식27B FP8의 각 240개 모델 평가와 36개 HTTP 검증을 완료했다. FP8 지원94%·멀티턴100%·HTTP36/36, 모호·미지원80%로 평가기 전체판정 미달을 기록했다. 평가 Pod 7개와 격리 로컬 DB 삭제를 확인했으며 공유 환경은 변경하지 않았다.
+
+- 2026-09-08: 사용자 요청으로 Qwen 검토 요약 재생성과 저장된 HTTP·모델·게시 이미지·삭제 근거 교차검증을 코드로 남겼다. 게시 태그 4개의 양자화별 CPU 검사·GPU 기동·평가·실패 상태와 불변 digest를 catalog로 기록했다.
+
+- 2026-09-08: Qwen 평가 이후 최신 dev의 재연락 제거를 통합하고 챗봇 Backend의 AgendaWindow 호출 및 과거 조건 미지원 안내를 맞췄다. 평가 프롬프트·fixture·점수는 보존하며 과거 재연락 2개 사례를 현재 지원 기능으로 해석하지 않는다.
+
+- 2026-09-08: PR #99의 AI–Backend 공개 DTO·실행 facade·read capability·오류·권한과 저장 책임을 contracts/chatbot-ai.md에 구현 상태로 정리했다. AI 내부 문서와 실행 설계에서 공통 정본을 연결하며 Backend·HTTP/SSE 구현 완료와 구분했다. ADR-0006은 유지한다.
+- 2026-09-08: PR #99의 실제 AI 의도 도구와 생성 조건 근거 검증을 공개 계약·실행 문서에 맞췄다. 후속 PR #100의 Backend 저장·HTTP/SSE 구현과 구분하고, AI 평가기 v2의 명시적 최근 정렬 비교 및 기존 평가 요약을 수정 후 모델 평가로 간주하지 않는 경계를 기록했다.
+- 2026-09-08: PR #100 문서에 병합된 PR #99의 workflow·scorer v2 조건 계약을 보존하고, Backend adapter·인증·저장·HTTP/SSE 구현과 후속 #101 화면 범위를 구분했다. 재생성 규칙의 AI 소유권과 기존 Luna 측정값을 수정 후 실제 모델 평가로 간주하지 않는 경계를 명시했다.
+
+- 2026-09-08: PR #101 교차 탭 대화 교체 시 이전 응답을 무효화하는 UI 경합 수정을 반영하고, 최신 매물의 사무소·세대 LATERAL 격리 회귀를 추가했다.
+
+- 2026-09-08: Qwen 평가·모델·이미지 JSON을 선행 PR로 분리했다. 활성화·배포 코드와 재현 도구는 후속 #107이며 기록 경계는 infra/serving/qwen-records.md를 따른다.
+
+- 2026-09-08: #107 HTTP 평가의 RunPod 제어면 이미지 digest 전후 검증과 미지원 endpoint 거절, 과거 평가 기록 경계를 ADR-0032·재현 절차에 반영.
+
+- 2026-09-09: 최신 dev 병합 후 F3 Repository·모델 조립·단계 선택을 분리하고 후보 생성 부분 실패 시 성공 카드 보존을 수정했다. [Backend 구현 정본](../../backend/references/f3-execution.md)에 범위·확장 제약을 기록하고 후보 병렬 생성 설명을 코드에 맞췄다.
+
+- 2026-09-09: PR #112 리뷰를 재현해 매물 직접 연결 상담의 당사자 경계를 보완하고 상담 scope를 v3로 갱신했다. 무효 앵커와 파생 결과의 공개를 차단하고 헤더 참조의 snapshot 우회를 막았다.
+
+- 2026-09-09: 개발자용 설정·클라우드 점검과 기동 후 합성 검증 명령을 추가했다. 적용 상태를 Infra 인벤토리로 모으고 Secret 값 소유권 설명을 후속 결정과 일치시켰다. 신규 consultation-v3를 기존 모델과 구분했으며 실제 기동은 사용자 수행, S3 전송은 승인 대기다. 개인 dotenv 경계·기본 모델은 유지한다.
+
+- 2026-09-09: 사용자 승인으로 환경변수 입력을 리팩토링했다. Worker F3 opt-in을 config에 합치고 공개·개인 파일의 주석과 선택 입력, F2 offline 기본값·embedding 기본 주소 제거, 소비 코드 기반 진단·문서 누락 검사를 ADR-0033과 개발자 환경변수 안내에 기록했다. 실제 기동·공유 배포는 미실행이다.
+
+- 2026-09-09: ADR-0034 — 모듈별 입력 단일 소유, provider/model enum, Worker/OpenAPI 내부화와 명시 모델 버전 적용 명령 구현. 클라우드 적용·실제 기동은 미실행.
+
+- 2026-09-09: 사용자 명시 승인 후 consultation-v3를 private S3에 게시하고 원격 본문·cross-hash를 검증했다. bootstrap 승인 plan 적용 결과 실제 2개 변경·생성/삭제 0개, AWS 정책 대조·drift 없음 확인. 앱·DB·GPU 기동과 모델 활성화는 미실행.
+
+- 2026-09-09: 로컬 OpenAI/shared dev vLLM 기본을 사용자 확정했다. 개인 키 충돌의 0600 백업 이전, shared provider/model 일치 검사, capability별 모델 선택, 최초 배포의 CodeDeploy maintenance 전환을 추가했다. F2 consultation-v3와 general 공식 FP8의 offline 선택만 저장했으며 실제 기동·DB 모델 활성화는 미실행이다.
+
+- 2026-09-09: PR #113 후속 리뷰를 재현해 최초 전환 saved plan의 실제 maintenance/대상 검증과 재귀 입력 fingerprint를 보완하고 공개 source override를 주석 처리했다. URL 검사·launcher import 지적은 공개 binder 및 깨끗한 설치 환경으로 대조했다. 검토 결과는 Infra change-review에 기록했으며 기존 saved plan은 재생성해야 한다.

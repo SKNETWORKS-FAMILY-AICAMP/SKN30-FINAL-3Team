@@ -24,6 +24,8 @@ export type ApiErrorKind =
   | "conflict"
   /** 입력값이 서버 검증을 통과하지 못했다(422 등). */
   | "validation"
+  /** 현재 처리 용량이 가득 찼다(429). 잠시 후 수동 재시도한다. */
+  | "rateLimited"
   /** 서버 내부 오류(5xx). */
   | "server"
   /** 응답이 계약과 다르다. 배포 불일치일 가능성이 높다. */
@@ -80,7 +82,38 @@ export function kindFromStatus(status: number): ApiErrorKind {
   if (status === 403) return "forbidden";
   if (status === 404) return "notFound";
   if (status === 409) return "conflict";
+  if (status === 429) return "rateLimited";
   if (status === 400 || status === 422) return "validation";
   if (status >= 500) return "server";
+  if (status >= 400) return "contract";
   return "server";
+}
+
+/**
+ * 오류 응답 본문에서 공통 envelope를 읽는다.
+ *
+ * multipart 요청도 오류 응답은 JSON API와 같은 계약을 사용한다. 전송 방식마다 이 파싱을
+ * 다시 만들면 `status`, `code`, `request_id` 중 일부가 조용히 사라지므로 응답 변환만 이 순수
+ * 진입점에서 공유한다. 서버 `message`는 진단용 `ApiError.message`에만 보관하고, 사용자 문구는
+ * 각 기능이 `kind`와 허용한 `code`로 결정한다(ADR-004).
+ */
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+  const kind = kindFromStatus(response.status);
+  let code: string | undefined;
+  let requestId: string | undefined;
+  let message = `요청이 실패했습니다 (HTTP ${response.status}).`;
+
+  try {
+    const body: unknown = await response.json();
+    if (typeof body === "object" && body !== null && !Array.isArray(body)) {
+      const record = body as Record<string, unknown>;
+      if (typeof record["code"] === "string") code = record["code"];
+      if (typeof record["request_id"] === "string") requestId = record["request_id"];
+      if (typeof record["message"] === "string") message = record["message"];
+    }
+  } catch {
+    // 오류 응답이 JSON이 아니어도 상태 코드 기반 분류는 유지한다.
+  }
+
+  return new ApiError({ kind, message, status: response.status, code, requestId });
 }

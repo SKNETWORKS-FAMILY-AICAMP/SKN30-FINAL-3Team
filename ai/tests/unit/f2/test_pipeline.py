@@ -27,10 +27,10 @@ class FakeTranscriber:
 class FakeAnalyzer:
     def __init__(self, analysis: ConsultationAnalysis) -> None:
         self.analysis = analysis
-        self.calls: list[tuple[str, LedgerType]] = []
+        self.calls: list[str] = []
 
-    async def analyze(self, *, transcript: str, ledger_type: LedgerType):
-        self.calls.append((transcript, ledger_type))
+    async def analyze(self, *, transcript: str):
+        self.calls.append(transcript)
         return self.analysis, None
 
 
@@ -55,13 +55,14 @@ async def test_connects_stt_to_analysis_and_builds_review_proposals() -> None:
     result = await pipeline.run(
         F2PipelineRequest(
             audio_path=Path("memo.wav"),
-            ledger_type=LedgerType.PROPERTY,
+            current_ledger_type=LedgerType.PROPERTY,
             current_fields={"단지": None, "동": "101", "호": "999", "매매가": ""},
         )
     )
 
-    assert analyzer.calls == [(transcript, LedgerType.PROPERTY)]
+    assert analyzer.calls == [transcript]
     assert result.transcript == transcript
+    assert result.ledger_type is LedgerType.PROPERTY
     assert result.ledger_mismatch is False
     assert [proposal.field_name for proposal in result.proposals] == ["단지", "동", "호", "매매가"]
     assert result.proposals[0].selected_by_default is True
@@ -76,9 +77,8 @@ async def test_ledger_mismatch_suppresses_all_field_proposals() -> None:
     analyzer = FakeAnalyzer(
         ConsultationAnalysis(
             consultation_type=ConsultationType.BUY_REQUEST,
-            ledger_mismatch=False,
-            fields={"단지": "한강아파트"},
-            evidence={"단지": "한강아파트"},
+            fields={"희망 단지": "한강아파트"},
+            evidence={"희망 단지": "한강아파트"},
             summary="한강아파트 매수 문의.",
         )
     )
@@ -88,11 +88,44 @@ async def test_ledger_mismatch_suppresses_all_field_proposals() -> None:
     )
 
     result = await pipeline.run(
-        F2PipelineRequest(audio_path=Path("memo.wav"), ledger_type=LedgerType.PROPERTY)
+        F2PipelineRequest(
+            audio_path=Path("memo.wav"),
+            current_ledger_type=LedgerType.PROPERTY,
+        )
     )
 
+    assert result.ledger_type is LedgerType.BUYER
     assert result.ledger_mismatch is True
     assert result.proposals == ()
+
+
+@pytest.mark.asyncio
+async def test_new_intake_routes_buy_request_and_recommends_buyer_fields_in_one_analysis() -> None:
+    transcript = "한강아파트 34평을 15억에 사고 싶어요."
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.BUY_REQUEST,
+            fields={"희망 단지": "한강아파트", "희망 평형": "34평", "금액 원문": "15억"},
+            evidence={
+                "희망 단지": "한강아파트",
+                "희망 평형": "34평",
+                "금액 원문": "15억",
+            },
+            summary="한강아파트 34평 15억 매수 문의.",
+        )
+    )
+    pipeline = F2Pipeline(transcriber=FakeTranscriber(transcript), analyzer=analyzer)
+
+    result = await pipeline.run(F2PipelineRequest(audio_path=Path("memo.wav")))
+
+    assert analyzer.calls == [transcript]
+    assert result.ledger_type is LedgerType.BUYER
+    assert result.ledger_mismatch is False
+    assert [proposal.field_name for proposal in result.proposals] == [
+        "희망 단지",
+        "희망 평형",
+        "금액 원문",
+    ]
 
 
 @pytest.mark.asyncio
@@ -111,7 +144,10 @@ async def test_filters_unknown_fields_and_evidence_not_found_in_transcript() -> 
     )
 
     result = await pipeline.run(
-        F2PipelineRequest(audio_path=Path("memo.wav"), ledger_type=LedgerType.PROPERTY)
+        F2PipelineRequest(
+            audio_path=Path("memo.wav"),
+            current_ledger_type=LedgerType.PROPERTY,
+        )
     )
 
     assert [proposal.field_name for proposal in result.proposals] == ["단지"]
@@ -120,9 +156,38 @@ async def test_filters_unknown_fields_and_evidence_not_found_in_transcript() -> 
 
 
 @pytest.mark.asyncio
+async def test_other_consultation_keeps_only_the_log_draft() -> None:
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.OTHER,
+            fields={"단지": "한강아파트"},
+            evidence={"단지": "한강아파트"},
+            summary="단순 시세 문의에 답변함.",
+        )
+    )
+    pipeline = F2Pipeline(
+        transcriber=FakeTranscriber("한강아파트 시세만 알려주세요."),
+        analyzer=analyzer,
+    )
+
+    result = await pipeline.run(
+        F2PipelineRequest(
+            audio_path=Path("memo.wav"),
+            current_ledger_type=LedgerType.PROPERTY,
+        )
+    )
+
+    assert result.consultation_type is ConsultationType.OTHER
+    assert result.ledger_type is None
+    assert result.ledger_mismatch is False
+    assert result.proposals == ()
+    assert result.consultation_log_draft == "단순 시세 문의에 답변함."
+
+
+@pytest.mark.asyncio
 async def test_stops_before_analysis_when_transcript_is_empty() -> None:
     analysis = ConsultationAnalysis(
-        consultation_type=ConsultationType.SIMPLE_INQUIRY,
+        consultation_type=ConsultationType.OTHER,
         summary="호출되지 않아야 함.",
     )
     analyzer = FakeAnalyzer(analysis)
@@ -136,6 +201,9 @@ async def test_stops_before_analysis_when_transcript_is_empty() -> None:
 
     with pytest.raises(EmptyTranscriptionError):
         await pipeline.run(
-            F2PipelineRequest(audio_path=Path("memo.wav"), ledger_type=LedgerType.BUYER)
+            F2PipelineRequest(
+                audio_path=Path("memo.wav"),
+                current_ledger_type=LedgerType.BUYER,
+            )
         )
     assert analyzer.calls == []

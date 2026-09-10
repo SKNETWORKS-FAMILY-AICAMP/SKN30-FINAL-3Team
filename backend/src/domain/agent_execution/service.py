@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import structlog
 from brokerage_ai.f3 import InputPrivacyMode
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session
@@ -17,6 +18,7 @@ from domain.agent_execution.models import (
     CROSS_JUDGMENT_RUN_TYPE,
     LEASE_EXPIRED_FAILURE_CODE,
     LEASE_EXPIRED_FAILURE_MESSAGE,
+    LEDGER_SAVE_TRIGGER_TYPE,
     QUEUED_STATUS,
     USER_REQUEST_TRIGGER_TYPE,
     AgentRun,
@@ -25,6 +27,8 @@ from domain.agent_execution.models import (
     LeaseNotHeldError,
     anchor_of,
 )
+
+logger = structlog.get_logger()
 
 # Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
 LEASE_DURATION_SECONDS = 300
@@ -119,6 +123,28 @@ def queue_cross_judgment_run(
             anchor.input_data_version,
         )
         if existing is not None:
+            # 저장이 만든 실행이 어느 단계에 있든 사용자 판정 요청을 기억한다. QUEUED면 첫
+            # Worker가 전체 실행을 하고, RUNNING이면 현재 Worker가 계속 가며, ANCHOR_READY면
+            # lease를 비운 뒤 같은 실행을 후보 조회부터 이어받는다.
+            if (
+                trigger_type != LEDGER_SAVE_TRIGGER_TYPE
+                and existing.trigger_type == LEDGER_SAVE_TRIGGER_TYPE
+            ):
+                previous_status = existing.status
+                changed = repository.resume_ledger_save_run(
+                    session, existing.id or 0, brokerage_id, trigger_type
+                )
+                session.commit()
+                session.refresh(existing)
+                if changed == 1:
+                    logger.info(
+                        "f3_ledger_save_run_resumed",
+                        run_id=existing.id,
+                        anchor_type=anchor_type.value,
+                        anchor_id=anchor_id,
+                        previous_status=previous_status,
+                    )
+                return existing
             session.commit()
             return existing
 
@@ -159,7 +185,7 @@ def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
     선점이 함께 취소되어 어중간한 상태가 남지 않는다.
     """
     try:
-        repository.fail_runs_over_attempt_limit(
+        terminal_count = repository.fail_runs_over_attempt_limit(
             session,
             MAX_CLAIM_ATTEMPTS,
             LEASE_EXPIRED_FAILURE_CODE,
@@ -175,6 +201,21 @@ def claim_next_run(session: Session, worker_id: str) -> AgentRun | None:
     except SQLAlchemyError:
         session.rollback()
         raise
+
+    if terminal_count > 0:
+        # The cleanup and claim share a transaction; log only after its commit succeeds.
+        logger.error(
+            "ai_terminal_failure",
+            component="ai",
+            source="f3",
+            status="FAILED_TERMINAL",
+            failure_stage="EXECUTION",
+            attempt=MAX_CLAIM_ATTEMPTS,
+            failure_category="LEASE",
+            error_code=LEASE_EXPIRED_FAILURE_CODE,
+            error_type="AttemptLimitExceeded",
+            terminal_count=terminal_count,
+        )
 
     return claimed
 

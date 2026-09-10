@@ -3,6 +3,8 @@
 # ==========================================
 .env
 .env.*
+# Explicit local provider migration keeps the complete private original at 0600.
+.env.migration-backup-*
 !.env.example
 !ai/.env.local
 !backend/.env.local
@@ -75,6 +77,9 @@ dist/
 .eggs/
 *.egg
 
+# Offline AI model artifacts are handed off through private storage, not Git.
+ai/training/*.tar.gz
+
 # Testing & Linting
 .pytest_cache/
 .hypothesis/
@@ -111,6 +116,7 @@ infra/.terraform/
 
 # Terraform plans and partial backend configuration
 *.tfplan
+*.plan-meta.json
 backend.hcl
 
 # Terraform variables file (contains sensitive values)

@@ -3,6 +3,9 @@
 F1과 F3는 별도 transaction이다. 호출자는 F1 commit이 끝난 뒤 이 모듈을 호출하며,
 F3 접수 실패는 이미 성공한 장부 저장이나 HTTP 응답을 바꾸지 않는다. 이 경계에서는
 모델을 호출하지 않고 기존 실행 접수 유스케이스로 ``agent_run``만 적재한다.
+
+이 경로로 만든 실행은 앵커 포지션 카드까지만 만들고 ``ANCHOR_READY`` 에서 멈춘다.
+후보 조회와 판정은 사용자가 상세에서 요청할 때 같은 실행이 이어서 돈다(F3-CR-01~04).
 """
 
 from __future__ import annotations
@@ -13,11 +16,10 @@ import structlog
 from sqlmodel import Session
 
 from domain.agent_execution import service
-from domain.agent_execution.models import AnchorType
+from domain.agent_execution.models import LEDGER_SAVE_TRIGGER_TYPE, AnchorType
 
 logger = structlog.get_logger()
 
-LEDGER_SAVE_TRIGGER_TYPE = "LEDGER_SAVE"
 
 # 매물에서 교차 판정 입력이 되는 필드. 메모와 담당자 같은 운영 필드는 제외한다.
 LISTING_TRIGGER_FIELDS = frozenset(

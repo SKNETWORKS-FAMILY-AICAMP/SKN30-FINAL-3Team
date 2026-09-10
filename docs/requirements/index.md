@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-17
+updated: 2026-09-09
 ---
 
 # 요구사항 인덱스
@@ -60,6 +60,8 @@ F2의 처리·필드·완료 기준 일부는 아직 독립 요구사항 ID가 �
 |---|---|
 | [개요·공통](f3/overview-and-common.md) | `F3-CM`, 구성 요소와 공통 원칙 |
 | [포지션 카드](f3/position-card.md) | `F3-PC`, 카드 규격·캐시 |
+| [카드 독립 조회 검토안](f3/position-card-delivery.md) | 신규 카드 API·상세 표시·최신성·생성 상태·판정 재사용. 2026-09-09 제안, 미구현 |
+| [자동 판정·결과 목록 검토안](f3/judgment-results-list.md) | 폐기됨: 2026-09-09 사용자 지시로 #116·#117·#118 확장 기능을 철회. 과거 검토 기록 |
 | [대리·중개 판정](f3/delegates-and-brokerage.md) | `F3-LA`, `F3-CA`, `F3-BR` |
 | [후보 추출·도구](f3/candidate-selection-and-tools.md) | `F3-SQ`, `F3-TL`, 코드 필터·공유 도구 |
 | [교차 판정](f3/cross-judgment.md) | `F3-CR`, 트리거·결과·사용자 행동 |
@@ -67,6 +69,23 @@ F2의 처리·필드·완료 기준 일부는 아직 독립 요구사항 ID가 �
 | [문안 생성·F1 연동](f3/generation-and-integration.md) | `F3-GN`, `F3-IF`, 로그·일정 쓰기 |
 | [신뢰·비기능·개인정보](f3/trust-nfr-privacy.md) | `F3-TR`, `F3-NF`, `F3-SE` |
 | [제외·수용·미해결](f3/scope-acceptance-open.md) | F3 제외 범위, 멀티 에이전트 검증, 질문 |
+
+## F4 업무 비서
+
+| 문서 | 주요 검색 의도·ID |
+|---|---|
+| [개요·구성·공통](f4/overview-and-common.md) | `F4-CM`, 구성 서비스, F1 알림 요구사항과의 대응 |
+| [Time Keeper 일정·할 일](f4/time-keeper.md) | `F4-TK`, 대상 일정, 조회 범위, 브리핑, 수용 기준 |
+| [캘린더](f4/calendar.md) | `F4-CAL`, 캘린더 일정 CRUD, Time Keeper 조회 통합, 월간 그리드 |
+| [제외·미착수·미해결](f4/scope-and-open-questions.md) | 뉴스·문자 초안·블로그 초안의 미착수 사유, F4 제외 범위 |
+
+F4의 Time Keeper와 캘린더는 구현됐다. 업무 챗봇은 사용자 설계 합의·구현 미착수이며 아래 문서가 정본이다. 뉴스·문자 초안·블로그 초안은 설계 전이므로 상세 문서를 미리 만들지 않는다.
+
+## F4 업무 챗봇
+
+| 문서 | 읽는 조건 |
+|---|---|
+| [범위·요구사항 검토안](chatbot/overview-and-scope.md) | 1차 조회 3종·F2 연결·사용자별 대화 1개·DB 저장/복원·직전 2회 문맥을 확인할 때. 사용자 설계 합의·구현 미착수 |
 
 ## 출처와 추적
 

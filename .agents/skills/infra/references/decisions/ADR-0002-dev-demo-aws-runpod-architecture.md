@@ -1,12 +1,15 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-09-02
 ---
 
 # ADR-0002: 개발·시연용 AWS·RunPod 인프라 구성
 
 - 상태: 부분 대체됨
 - 전달 세부 대체: [Infra ADR-0011](ADR-0011-dev-delivery-implementation.md)
+- RunPod 운영 대체: [프로젝트 ADR-0020](../../../project-wiki/references/decisions/ADR-0020-sllm-release-handoff.md)이
+  개발자별 Pod, 시연 기간 Pod 유지, 조건부 Network Volume 조항을 S3 release 기반 공유 Pod
+  create/delete와 Volume 미사용으로 대체한다.
 - 결정일: 2026-08-18
 - 보완 결정: [프로젝트 ADR-0009](../../../project-wiki/references/decisions/ADR-0009-dev-demo-operating-constraints.md)
 

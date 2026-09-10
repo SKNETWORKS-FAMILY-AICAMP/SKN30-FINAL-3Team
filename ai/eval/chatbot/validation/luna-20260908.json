@@ -1,0 +1,363 @@
+{
+  "artifact_kind": "chatbot_evaluation_reviewed_summary",
+  "schema_version": 1,
+  "creation_method": "manual_aggregation_and_review",
+  "verification_tool_version": "chatbot-summary-verifier:v1",
+  "aggregation_source": "ai/eval/chatbot/evaluate.py:summarize",
+  "creation_notes": "Manually assembled reviewed summary of the hash-bound raw evaluate.py output; aggregate and failure evidence is reproducible with verify_summary.py. Review notes and deferred-provider decisions are human/agent-reviewed annotations, not raw model output.",
+  "status": "COMPLETED",
+  "scope": "Synthetic model interpretation and guarded workflow; DB/API/browser performance separate",
+  "provenance": {
+    "route": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "endpoint_alias": null
+    },
+    "fixture_sha256": "89fe9386e88e1c2e80532471627549767ea689e148f8061fd4cbc218f7e4f652",
+    "started_at": "2026-09-08T01:58:22.523751+00:00",
+    "runtime_label": null,
+    "artifact_revision": null,
+    "artifact_sha256": null,
+    "evaluated_workflow_sha256": "004ff7483c96c2c344ad2b4ccf33430774b2b17c9a96821fed4d7cbf0a4adf9a",
+    "system_prompt_sha256": "638ffe745d3927d333a6e9ff041d46555b1ac225f5b9ce93e3e897974a10a686",
+    "current_workflow_sha256": "50235a81ecb8c84eeb8d78bc2d2187055be7abe72f508f57b31924fb1a2a2caf",
+    "observed_models": [
+      "gpt-5.6-luna"
+    ],
+    "raw_report_sha256": "30ec2e92d9df17f7f8e16c747ecf9e1b6b112ef31e45b0ab9d47b8ea079f94c6"
+  },
+  "warmup_ms": 2361.3175359996603,
+  "summary": {
+    "cases": 240,
+    "supported_accuracy": 0.9466666666666667,
+    "multiturn_accuracy": 1.0,
+    "attack_failures": 0,
+    "p95_interpretation_ms": 2883.897849999812,
+    "p95_first_progress_ms": 0.2098300001307507,
+    "model_calls": 177,
+    "errors": 0,
+    "ambiguous_unsupported_accuracy": 0.9666666666666667,
+    "basic_and_units_accuracy": 0.9333333333333333
+  },
+  "basic_and_units": {
+    "correct": 112,
+    "total": 120,
+    "accuracy": 0.9333333333333333
+  },
+  "multiturn": {
+    "correct": 30,
+    "total": 30,
+    "accuracy": 1.0
+  },
+  "ambiguity": {
+    "correct": 29,
+    "total": 30,
+    "accuracy": 0.9666666666666667
+  },
+  "rounds": {
+    "1": {
+      "cases": 80,
+      "supported_accuracy": 0.92,
+      "multiturn_accuracy": 1.0,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 3510.0503970006685,
+      "p95_first_progress_ms": 0.2356369996050489,
+      "model_calls": 59,
+      "errors": 0,
+      "basic_and_units": {
+        "correct": 36,
+        "total": 40,
+        "accuracy": 0.9
+      },
+      "multiturn": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "ambiguous_unsupported_accuracy": 1.0,
+      "basic_and_units_accuracy": 0.9
+    },
+    "2": {
+      "cases": 80,
+      "supported_accuracy": 0.94,
+      "multiturn_accuracy": 1.0,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 2332.7006579993395,
+      "p95_first_progress_ms": 0.28119099988543894,
+      "model_calls": 59,
+      "errors": 0,
+      "basic_and_units": {
+        "correct": 37,
+        "total": 40,
+        "accuracy": 0.925
+      },
+      "multiturn": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "ambiguous_unsupported_accuracy": 1.0,
+      "basic_and_units_accuracy": 0.925
+    },
+    "3": {
+      "cases": 80,
+      "supported_accuracy": 0.98,
+      "multiturn_accuracy": 1.0,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 3164.1258099998595,
+      "p95_first_progress_ms": 0.14963499961595517,
+      "model_calls": 59,
+      "errors": 0,
+      "basic_and_units": {
+        "correct": 39,
+        "total": 40,
+        "accuracy": 0.975
+      },
+      "multiturn": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "ambiguous_unsupported_accuracy": 0.9,
+      "basic_and_units_accuracy": 0.975
+    }
+  },
+  "failures": [
+    {
+      "id": "basic-17",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "60제곱미터 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "area_basis"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "59.5제곱미터 초과",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "60제곱미터 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "90제곱미터 이하",
+          "area_basis": "supply",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "area_basis"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "60제곱미터 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-06",
+      "round": 3,
+      "actual": {
+        "tool": "unsupported",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    }
+  ],
+  "post_evaluation_review": {
+    "change": "Previously blocked secrets are omitted from subsequent history/filter prompt data",
+    "model_case_inputs_compared": 59,
+    "changed_model_case_inputs": 0,
+    "comparison": "SHA256 of each serialized system/user message before and after security fix; current-question guards exclude the other 21 fixture cases before model generation",
+    "regression": "test_previously_blocked_secrets_are_not_forwarded_on_next_turn"
+  },
+  "qwen": {
+    "status": "NOT_RUN",
+    "reason": "User deferred GPU/RunPod startup on 2026-09-08"
+  },
+  "limitations": [
+    "First progress callback timing is not HTTP/SSE arrival timing",
+    "RecordingRead supplies no DB rows, counts, authorization or query evidence",
+    "Buyer area expressions may be interpreted but Backend clarifies unsupported area basis",
+    "Attack fixtures are blocked before model generation; model intrinsic injection resistance is not measured",
+    "Raw diagnostic reports stay untracked; this summary retains aggregate and failure evidence",
+    "The one ambiguous/unsupported mismatch returned unsupported instead of clarification unsupported_condition; no read capability was called."
+  ],
+  "diagnostic_subset": false
+}

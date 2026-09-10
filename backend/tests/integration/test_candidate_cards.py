@@ -20,7 +20,7 @@ from brokerage_ai.f3 import (
     ContactabilityAssessment,
     ContactabilityStatus,
     Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     NegotiationIntent,
@@ -33,6 +33,7 @@ from brokerage_ai.f3 import (
     PositionCondition,
     PriceAssessment,
     PriceKind,
+    QuoteEvidence,
     TimingAssessment,
     Urgency,
     UrgencyAssessment,
@@ -41,12 +42,13 @@ from brokerage_ai.f3 import (
 from sqlalchemy import text
 from sqlmodel import Session, create_engine
 
+from domain.agent_execution import candidate_cards as candidate_cards_module
 from domain.agent_execution.anchor_card import GenerationBinding, SourceChangedError
 from domain.agent_execution.candidate_cards import (
     generate_and_store_candidate_cards,
     plan_candidate_cards,
 )
-from domain.agent_execution.candidates import store_candidate_selection
+from domain.agent_execution.candidates import CANDIDATE_CARD_LIMIT, store_candidate_selection
 from domain.agent_execution.models import (
     ANCHOR_READY_STATUS,
     CANDIDATE_CARDS_READY_STATUS,
@@ -124,13 +126,12 @@ def _evidence(request: PositionCardGenerationRequest) -> tuple[Evidence, ...]:
     if request.consultation_logs:
         first = request.consultation_logs[0]
         return (
-            Evidence(
-                kind=EvidenceKind.QUOTE,
+            QuoteEvidence(
                 interaction_id=first.interaction_id,
                 quote_text=first.masked_content[:6],
             ),
         )
-    return (Evidence(kind=EvidenceKind.INFERENCE, note="전달된 상담 로그가 없다"),)
+    return (InferenceEvidence(note="전달된 상담 로그가 없다"),)
 
 
 def default_analysis(request: PositionCardGenerationRequest) -> PositionCardAnalysis:
@@ -151,12 +152,12 @@ def default_analysis(request: PositionCardGenerationRequest) -> PositionCardAnal
         flexible=(
             PositionCondition(
                 description="잔금일 조정",
-                evidence=(Evidence(kind=EvidenceKind.INFERENCE, note="정황"),),
+                evidence=(InferenceEvidence(note="정황"),),
             ),
         ),
         contactability=ContactabilityAssessment(
             status=ContactabilityStatus.GOOD,
-            evidence=(Evidence(kind=EvidenceKind.INFERENCE, note="정황"),),
+            evidence=(InferenceEvidence(note="정황"),),
         ),
     )
 
@@ -346,7 +347,7 @@ class Fixture:
                 "m": self.model_config_id,
                 "s": (
                     '{"provider": "vllm", "model_name": "fake-delegate", "model_version": null,'
-                    ' "config_key": "delegate", "config_version": 1}'
+                    ' "endpoint_alias": null, "config_key": "delegate", "config_version": 1}'
                 ),
             },
         )
@@ -545,7 +546,9 @@ def test_no_candidate_skips_the_model_and_still_advances() -> None:
 
 
 @requires_database
-def test_one_failed_candidate_does_not_advance_the_run() -> None:
+def test_one_failed_candidate_does_not_advance_the_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """일부 후보만 성공한 상태를 완료로 처리하지 않는다."""
     with db_session() as session:
         fixture = Fixture(session)
@@ -554,6 +557,13 @@ def test_one_failed_candidate_does_not_advance_the_run() -> None:
         run_id = fixture.prepared_run()
         # 점수가 높은 쪽이 먼저 처리되므로 두 후보 중 하나는 반드시 뒤에 온다.
         generator = FakeGenerator(fail_on_anchor_id=max(first, second))
+        events: list[tuple[str, dict[str, object]]] = []
+
+        class RecordingLogger:
+            def warning(self, event: str, **values: object) -> None:
+                events.append((event, values))
+
+        monkeypatch.setattr(candidate_cards_module, "logger", RecordingLogger())
 
         with pytest.raises(RuntimeError, match="provider is unavailable"):
             asyncio.run(
@@ -569,6 +579,18 @@ def test_one_failed_candidate_does_not_advance_the_run() -> None:
 
         assert fixture.stored_run(run_id)["status"] == CANDIDATES_READY_STATUS
         assert "candidate_cards" not in fixture.snapshot()
+        assert events == [
+            (
+                "f3_candidate_card_failed",
+                {
+                    "run_id": run_id,
+                    "attempt": ATTEMPT,
+                    "candidate_ordinal": 2,
+                    "candidate_count": 2,
+                    "error_type": "RuntimeError",
+                },
+            )
+        ]
 
 
 @requires_database
@@ -679,7 +701,7 @@ def test_a_lost_lease_stores_no_candidate_card() -> None:
 
 @requires_database
 def test_the_plan_only_covers_the_carded_top_candidates() -> None:
-    """상위 15건만 카드화 대상이고 나머지는 snapshot 에 남는다."""
+    """상위 5건만 카드화 대상이고 나머지는 snapshot 에 남는다."""
     with db_session() as session:
         fixture = Fixture(session)
         for index in range(18):
@@ -689,5 +711,58 @@ def test_the_plan_only_covers_the_carded_top_candidates() -> None:
         plan = plan_candidate_cards(session, run_id, WORKER, ATTEMPT)
 
         assert plan.candidate_side is AnchorType.REQUIREMENT
-        assert len(plan.candidate_ids) == 15
+        assert len(plan.candidate_ids) == CANDIDATE_CARD_LIMIT
         assert fixture.snapshot()["total_count"] == 18
+
+
+@requires_database
+@pytest.mark.parametrize("failed_ordinal", [0, 1])
+def test_retry_reuses_successful_cards_after_an_earlier_candidate_failure(
+    failed_ordinal: int,
+) -> None:
+    """선행 후보가 실패해도 후행 성공 카드를 저장하고 재시도는 누락분만 생성한다."""
+    with db_session() as session:
+        fixture = Fixture(session)
+        for index in range(3):
+            fixture.requirement(budget=3_000_000_000, party_name=f"합성손님{index}")
+        run_id = fixture.prepared_run()
+        plan = candidate_cards_module.plan_candidate_cards(session, run_id, WORKER, ATTEMPT)
+        failed_id = plan.candidate_ids[failed_ordinal]
+        generator = FakeGenerator(fail_on_anchor_id=failed_id)
+
+        with pytest.raises(RuntimeError, match="provider is unavailable"):
+            asyncio.run(
+                generate_and_store_candidate_cards(
+                    session,
+                    run_id=run_id,
+                    worker_id=WORKER,
+                    attempt_count=ATTEMPT,
+                    binding=binding_for(fixture, generator),
+                    as_of=AS_OF,
+                )
+            )
+
+        assert generator.calls == 3
+        assert {card["requirement_id"] for card in fixture.cards("REQUIREMENT")} == (
+            set(plan.candidate_ids) - {failed_id}
+        )
+        assert fixture.stored_run(run_id)["status"] == CANDIDATES_READY_STATUS
+        assert "candidate_cards" not in fixture.snapshot()
+
+        retry = FakeGenerator()
+        result = asyncio.run(
+            generate_and_store_candidate_cards(
+                session,
+                run_id=run_id,
+                worker_id=WORKER,
+                attempt_count=ATTEMPT,
+                binding=binding_for(fixture, retry),
+                as_of=AS_OF,
+            )
+        )
+
+        assert retry.calls == 1
+        assert retry.requests[0].anchor_id == failed_id
+        assert tuple(card.candidate_id for card in result.cards) == plan.candidate_ids
+        assert sum(card.cache_hit for card in result.cards) == 2
+        assert fixture.stored_run(run_id)["status"] == CANDIDATE_CARDS_READY_STATUS

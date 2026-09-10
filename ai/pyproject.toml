@@ -5,6 +5,9 @@ description = "Framework-neutral AI provider and workflow foundation for the bro
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "av>=18.1.0",
+    "botocore>=1.42.0",
+    "httpx>=0.28.1",
     "langgraph>=1.2.11",
     "openai>=3.1.0",
     "pydantic>=2.13.4",
@@ -17,6 +20,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "av==18.1.0",
     "pre-commit>=4.6.2",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
@@ -42,6 +46,7 @@ typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra"
 asyncio_mode = "auto"
 

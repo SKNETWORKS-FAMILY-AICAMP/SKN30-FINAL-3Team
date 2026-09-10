@@ -10,53 +10,35 @@ from typing import Any, cast
 
 import pytest
 from brokerage_ai.core.config import AiProfile
-from brokerage_ai.core.types import ProviderKind
-from brokerage_ai.f3 import InputPrivacyMode
-from brokerage_ai.providers.ports import LlmProvider
 from brokerage_ai.runtime import AiRuntime
 from sqlmodel import Session
 
+from conftest import config_values
+from core.config import bind_config
 from core.errors import ConfigurationError
 from domain.agent_execution.anchor_card import GenerationBindingError
-from domain.agent_execution.models import AgentRun, AiModelConfig
+from domain.agent_execution.models import AgentRun
 from worker import (
     WORKER_ID_MAX_LENGTH,
-    build_bindings,
     build_worker_id,
     process_run,
     require_ai_provider,
     require_synthetic_prototype_opt_in,
-    run_disabled_worker,
     run_enabled_worker,
     run_worker_loop,
-    worker_enabled,
 )
 
 
-def test_worker_enabled_parses_supported_boolean_spellings() -> None:
-    assert worker_enabled({}) is False
-    assert worker_enabled({"WORKER_ENABLED": "true"}) is True
-    assert worker_enabled({"WORKER_ENABLED": "1"}) is True
-    assert worker_enabled({"WORKER_ENABLED": "off"}) is False
-
-
-def test_worker_enabled_rejects_invalid_value() -> None:
-    with pytest.raises(ConfigurationError, match="WORKER_ENABLED"):
-        worker_enabled({"WORKER_ENABLED": "sometimes"})
-
-
-def test_enabled_worker_requires_explicit_synthetic_prototype_opt_in() -> None:
+@pytest.mark.parametrize("allowed", ["", "false", "off"])
+def test_enabled_worker_requires_explicit_synthetic_prototype_opt_in(allowed: str) -> None:
+    config = bind_config(config_values(F3_ALLOW_SYNTHETIC_PROTOTYPE=allowed))
     with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE=true"):
-        require_synthetic_prototype_opt_in({})
-    with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE=true"):
-        require_synthetic_prototype_opt_in({"F3_ALLOW_SYNTHETIC_PROTOTYPE": "false"})
-
-    require_synthetic_prototype_opt_in({"F3_ALLOW_SYNTHETIC_PROTOTYPE": "true"})
+        require_synthetic_prototype_opt_in(config)
 
 
-def test_synthetic_prototype_opt_in_rejects_invalid_value() -> None:
-    with pytest.raises(ConfigurationError, match="must be a boolean"):
-        require_synthetic_prototype_opt_in({"F3_ALLOW_SYNTHETIC_PROTOTYPE": "sometimes"})
+def test_enabled_worker_uses_resolved_opt_in() -> None:
+    config = bind_config(config_values(F3_ALLOW_SYNTHETIC_PROTOTYPE="true"))
+    require_synthetic_prototype_opt_in(config)
 
 
 def test_enabled_worker_checks_privacy_gate_before_db_or_provider(
@@ -77,28 +59,12 @@ def test_enabled_worker_checks_privacy_gate_before_db_or_provider(
 
     with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE=true"):
         run_enabled_worker(
-            config=cast(Any, object()),
+            config=bind_config(config_values()),
             stop_event=threading.Event(),
             ready_file=tmp_path / "worker-ready",
             worker_id="worker-test",
-            environ={"WORKER_ENABLED": "true"},
+            environ={},
         )
-
-
-def test_disabled_worker_checks_readiness_without_claiming(tmp_path: Path) -> None:
-    ready_file = tmp_path / "worker-ready"
-    stop_event = threading.Event()
-    stop_event.set()
-    probes: list[str] = []
-
-    run_disabled_worker(
-        stop_event=stop_event,
-        ready_file=ready_file,
-        readiness_probe=lambda: probes.append("ready"),
-    )
-
-    assert probes == ["ready"]
-    assert not ready_file.exists()
 
 
 def test_worker_ids_are_unique_and_fit_the_lease_column() -> None:
@@ -107,54 +73,45 @@ def test_worker_ids_are_unique_and_fit_the_lease_column() -> None:
 
     assert first != second
     assert len(first) <= WORKER_ID_MAX_LENGTH
-    assert build_worker_id("x" * 200) == "x" * WORKER_ID_MAX_LENGTH
 
 
 def test_enabled_worker_requires_an_explicit_llm_provider() -> None:
-    with pytest.raises(ConfigurationError, match="LLM provider"):
+    with pytest.raises(ConfigurationError, match="general LLM endpoint"):
         require_ai_provider("test", {})
 
-    configured = require_ai_provider("test", {"AI_VLLM_LLM_BASE_URL": "http://localhost:8000/v1"})
-    assert configured.vllm.llm is not None
+    with pytest.raises(ConfigurationError, match="general LLM endpoint"):
+        require_ai_provider(
+            "test",
+            {
+                "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
+                "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
+            },
+        )
+
+    configured = require_ai_provider(
+        "test",
+        {
+            "AI_GENERAL_PROVIDER": "llama_cpp",
+            "AI_GENERAL_MODEL": "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M",
+            "AI_GENERAL_BASE_URL": "http://localhost:8080/v1",
+            "AI_GENERAL_API_KEY": "secret",
+        },
+    )
+    assert configured.llm_endpoints[0].alias == "general-dev-gpu"
 
 
 def test_enabled_worker_accepts_dev_ai_profile_from_process_environment() -> None:
     configured = require_ai_provider(
         "dev",
-        {"AI_VLLM_LLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1"},
+        {
+            "AI_VLLM_SLLM_BASE_URL": "https://pod-8001.proxy.runpod.net/v1",
+            "AI_VLLM_STT_BASE_URL": "https://pod-8002.proxy.runpod.net/v1",
+            "AI_GENERAL_API_KEY": "test-key",
+        },
     )
 
     assert configured.profile is AiProfile.DEV
-    assert configured.vllm.llm is not None
-
-
-def test_enabled_worker_merges_ai_local_files_without_mutating_process_environment(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import brokerage_ai.core.config as ai_config_module
-
-    (tmp_path / ".env.local").write_text(
-        "AI_REQUEST_TIMEOUT_SECONDS=10\nAI_VLLM_LLM_BASE_URL=http://localhost:8000/v1\n",
-        encoding="utf-8",
-    )
-    (tmp_path / ".env").write_text(
-        "AI_VLLM_LLM_API_KEY=personal-secret\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(ai_config_module, "AI_ROOT", tmp_path)
-    monkeypatch.delenv("AI_VLLM_LLM_API_KEY", raising=False)
-
-    config = require_ai_provider(
-        "local",
-        {"AI_REQUEST_TIMEOUT_SECONDS": "30"},
-    )
-
-    assert config.request_timeout_seconds == 30
-    assert config.vllm.llm is not None
-    assert config.vllm.llm.api_key is not None
-    assert config.vllm.llm.api_key.get_secret_value() == "personal-secret"
-    assert "AI_VLLM_LLM_API_KEY" not in os.environ
+    assert configured.vllm.sllm is not None
 
 
 class FakeSession:
@@ -232,113 +189,6 @@ def test_polling_drains_claimed_runs_and_stops_after_current_run(
     assert session.closed
 
 
-class FakeProvider:
-    kind = ProviderKind.VLLM
-
-
-class FakeRegistry:
-    def get_llm(self, kind: ProviderKind) -> LlmProvider:
-        if kind is not ProviderKind.VLLM:
-            raise AssertionError("unexpected provider")
-        return cast(LlmProvider, FakeProvider())
-
-
-class FakeRuntime:
-    providers = FakeRegistry()
-
-
-def _model_config(capability: str, config_id: int) -> AiModelConfig:
-    return AiModelConfig(
-        id=config_id,
-        brokerage_id=1,
-        capability=capability,
-        config_key=f"{capability.lower()}-default",
-        config_version=1,
-        provider="vllm",
-        model_name="prototype-model",
-    )
-
-
-def test_bindings_use_separate_capabilities_and_explicit_synthetic_mode(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import worker
-
-    configs = {
-        "POSITION_CARD": _model_config("POSITION_CARD", 7),
-        "BROKERAGE_JUDGMENT": _model_config("BROKERAGE_JUDGMENT", 9),
-    }
-    monkeypatch.setattr(
-        worker.repository,
-        "find_active_model_config",
-        lambda _session, _brokerage_id, capability: configs[capability],
-    )
-
-    card_bindings = build_bindings(
-        cast(Session, object()),
-        cast(AiRuntime, FakeRuntime()),
-        AgentRun(
-            brokerage_id=1,
-            run_group_id="018f7c9e-0f2f-7c1e-9a3b-2f7c9e0f2f7c",  # type: ignore[arg-type]
-            run_type="CROSS_JUDGMENT",
-            agent_type="BROKERAGE_WORKFLOW",
-            status="RUNNING",
-            trigger_type="USER_REQUEST",
-            requested_by=1,
-        ),
-    )
-    monkeypatch.setattr(worker, "_judgment_required", lambda *_args: True)
-    judgment_bindings = build_bindings(
-        cast(Session, object()),
-        cast(AiRuntime, FakeRuntime()),
-        AgentRun(
-            brokerage_id=1,
-            run_group_id="018f7c9e-0f2f-7c1e-9a3b-2f7c9e0f2f7c",  # type: ignore[arg-type]
-            run_type="CROSS_JUDGMENT",
-            agent_type="BROKERAGE_WORKFLOW",
-            status="CANDIDATE_CARDS_READY",
-            trigger_type="USER_REQUEST",
-            requested_by=1,
-        ),
-    )
-
-    assert card_bindings.card is not None
-    assert card_bindings.card.model_config_id == 7
-    assert card_bindings.judgment is None
-    assert card_bindings.card.input_privacy_mode is InputPrivacyMode.SYNTHETIC_PROTOTYPE
-    assert judgment_bindings.card is None
-    assert judgment_bindings.judgment is not None
-    assert judgment_bindings.judgment.model_config_id == 9
-    assert judgment_bindings.judgment.input_privacy_mode is InputPrivacyMode.SYNTHETIC_PROTOTYPE
-
-
-def test_zero_candidates_do_not_look_up_a_judgment_model(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import worker
-
-    monkeypatch.setattr(worker, "_judgment_required", lambda *_args: False)
-    monkeypatch.setattr(
-        worker.repository,
-        "find_active_model_config",
-        lambda *_args: (_ for _ in ()).throw(AssertionError("model config must not be read")),
-    )
-    run = AgentRun(
-        brokerage_id=1,
-        run_group_id="018f7c9e-0f2f-7c1e-9a3b-2f7c9e0f2f7c",  # type: ignore[arg-type]
-        run_type="CROSS_JUDGMENT",
-        agent_type="BROKERAGE_WORKFLOW",
-        status="CANDIDATE_CARDS_READY",
-        trigger_type="USER_REQUEST",
-        requested_by=1,
-    )
-
-    bindings = build_bindings(cast(Session, object()), cast(AiRuntime, FakeRuntime()), run)
-
-    assert bindings.card is None
-    assert bindings.judgment is None
-
-
 def test_missing_model_config_fails_only_the_claimed_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -355,7 +205,7 @@ def test_missing_model_config_fails_only_the_claimed_run(
         attempt_count=1,
     )
     monkeypatch.setattr(
-        worker,
+        worker.f3_runtime,
         "build_bindings",
         lambda *_args: (_ for _ in ()).throw(GenerationBindingError("missing config")),
     )
@@ -380,3 +230,22 @@ def test_missing_model_config_fails_only_the_claimed_run(
 
     assert outcome is worker.pipeline.StepOutcome.FAILED_TERMINAL
     assert recorded == [11]
+
+
+def test_internal_health_probe_rejects_stale_or_invalid_files(tmp_path, monkeypatch):
+    from core import worker_health
+
+    path = tmp_path / "ready"
+    monkeypatch.setattr(worker_health, "READY_FILE", path)
+    assert not worker_health.is_ready()
+    for content in ("invalid", "0", "-1"):
+        path.write_text(content)
+        assert not worker_health.is_ready()
+    path.write_text(str(os.getpid()))
+    assert worker_health.is_ready()
+
+    def missing_pid(_pid, _signal):
+        raise ProcessLookupError
+
+    monkeypatch.setattr(worker_health.os, "kill", missing_pid)
+    assert not worker_health.is_ready()

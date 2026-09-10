@@ -1,7 +1,7 @@
 """결정적 SQL 후보 추출의 수직 슬라이스.
 
 실제 PostgreSQL 에 붙는다. 확인하는 것은 넷이다. 어느 장부에서 후보를 찾는가, 무엇을
-조건으로 거르는가, 15건을 넘으면 나머지를 보존하는가, 그리고 사무소와 삭제 범위를
+조건으로 거르는가, 5건을 넘으면 나머지를 보존하는가, 그리고 사무소와 삭제 범위를
 지키는가. 모델은 이 단계에 등장하지 않는다 (F3-SQ-01).
 """
 
@@ -480,7 +480,7 @@ def test_no_candidate_is_a_normal_result_that_still_stores_the_criteria() -> Non
 
 @requires_database
 def test_more_than_the_card_limit_preserves_the_total_and_the_remainder() -> None:
-    """15건을 넘어도 컷이 아니라 페이징이다 (F3-BR-13, F3-BR-14)."""
+    """5건을 넘어도 컷이 아니라 페이징이다 (F3-BR-13, F3-BR-14)."""
     with db_session() as session:
         fixture = Fixture(session)
         for index in range(19):
@@ -497,17 +497,20 @@ def test_more_than_the_card_limit_preserves_the_total_and_the_remainder() -> Non
 
         assert selection.total_count == 20
         assert len(selection.carded) == CANDIDATE_CARD_LIMIT
-        assert selection.remaining_count == 5
+        assert selection.remaining_count == 20 - CANDIDATE_CARD_LIMIT
 
         header = fixture.header()
         snapshot = header["candidate_selection_snapshot"]
         assert header["candidate_count"] == CANDIDATE_CARD_LIMIT
         assert snapshot["total_count"] == 20
-        assert snapshot["remaining_count"] == 5
-        # 15건 이후를 조용히 지우지 않는다.
+        assert snapshot["remaining_count"] == 20 - CANDIDATE_CARD_LIMIT
+        # 5건 이후를 조용히 지우지 않는다.
         assert len(snapshot["candidates"]) == 20
         assert [item["rank"] for item in snapshot["candidates"]] == list(range(1, 21))
-        assert sum(1 for item in snapshot["candidates"] if item["selected_for_cards"]) == 15
+        assert (
+            sum(1 for item in snapshot["candidates"] if item["selected_for_cards"])
+            == CANDIDATE_CARD_LIMIT
+        )
 
 
 @requires_database

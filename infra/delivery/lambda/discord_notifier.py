@@ -67,7 +67,27 @@ def deployment_message(detail: dict[str, Any]) -> str:
     )
 
 
+def send(content: str) -> None:
+    request = urllib.request.Request(
+        secret_url(),
+        data=json.dumps(
+            {"content": content, "allowed_mentions": {"parse": []}}
+        ).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; SKN30-DiscordNotifier/1.0)",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        if response.status >= 300:
+            raise RuntimeError(f"Discord returned HTTP {response.status}")
+
+
 def handler(event: dict[str, Any], _context: Any) -> None:
+    if event.get("fixture") == "secret-rotation" and event.get("target") == "delivery-discord":
+        send("Delivery Discord webhook rotation fixture: OK")
+        return
     for record in event.get("Records", []):
         message = json.loads(record["Sns"]["Message"])
         detail_type = message.get("detail-type")
@@ -78,15 +98,4 @@ def handler(event: dict[str, Any], _context: Any) -> None:
             content = deployment_message(detail)
         else:
             content = f"Runtime alert: `{detail_type or 'SNS'}`"
-        request = urllib.request.Request(
-            secret_url(),
-            data=json.dumps({"content": content}).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (compatible; SKN30-DiscordNotifier/1.0)",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=10) as response:
-            if response.status >= 300:
-                raise RuntimeError(f"Discord returned HTTP {response.status}")
+        send(content)

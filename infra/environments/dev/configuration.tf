@@ -16,7 +16,18 @@ locals {
     }
     ai_provider = {
       name        = "/${local.name_prefix}/ai/provider-api-keys"
-      description = "AI provider API keys managed from the ignored secrets.auto.tfvars input"
+      description = "Container for flat AI_*_API_KEY JSON populated outside Terraform"
+    }
+  }
+
+  runpod_secret_names = {
+    operator_api_key = {
+      name        = "/${local.name_prefix}/runpod/operator-api-key"
+      description = "Container for the RunPod read-write operator API key populated outside Terraform"
+    }
+    ghcr_registry = {
+      name        = "/${local.name_prefix}/runpod/ghcr-registry"
+      description = "Read-only GHCR credentials for AWS GPU hosts; RunPod registry credentials remain Console-managed"
     }
   }
 
@@ -24,12 +35,9 @@ locals {
     backend = merge({
       APP_ENV                               = "dev"
       APP_HOST                              = "0.0.0.0"
-      APP_OPENAPI_ENABLED                   = "false"
       APP_PORT                              = "8000"
-      AUTH_CSRF_COOKIE_NAME                 = "brokerage_csrf"
       AUTH_DEVELOPMENT_ENABLED              = tostring(local.development_auth_enabled)
       AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "720"
-      AUTH_SESSION_COOKIE_NAME              = "brokerage_session"
       AUTH_SESSION_IDLE_TIMEOUT_MINUTES     = "30"
       AUTH_SESSION_LAST_SEEN_UPDATE_SECONDS = "300"
       DB_POOL_MAX_OVERFLOW                  = "5"
@@ -43,16 +51,36 @@ locals {
       HTTP_CORS_ALLOWED_ORIGINS    = "[]"
       LOG_FORMAT                   = "json"
       LOG_LEVEL                    = "INFO"
-      WORKER_ENABLED               = "true"
-      WORKER_READY_FILE            = "/tmp/brokerage-worker-ready"
       F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
     }, local.development_auth_identity_environment)
-    ai = {
-      AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
+    ai = merge({
+      # Shared provider/model choices are validated together in general-model.tf; restart after reviewed apply.
+      AI_GENERAL_PROVIDER        = var.general_model_selection.provider
+      AI_GENERAL_MODEL           = var.general_model_selection.model
       AI_REQUEST_TIMEOUT_SECONDS = "60"
-      AI_VLLM_LLM_BASE_URL       = "https://xkgavic14hanqr-8001.proxy.runpod.net/v1"
-      AI_VLLM_STT_BASE_URL       = "https://xkgavic14hanqr-8002.proxy.runpod.net/v1"
-    }
+      }, var.general_model_selection.provider == "bedrock" ? {
+      # Bedrock only: ap-northeast-2, matching this root's runtime role; omitted for API-key providers.
+      AI_GENERAL_AWS_REGION = var.general_model_selection.aws_region
+    } : {})
+  }
+
+  ai_vllm_endpoint_set_bootstrap = {
+    revision        = 0
+    status          = "offline"
+    pod_id          = null
+    sllm_release_id = null
+    sllm_base_url   = null
+    stt_base_url    = null
+    updated_at      = "1970-01-01T00:00:00Z"
+  }
+
+  runpod_control_set_bootstrap = {
+    schema_version   = 2
+    status           = "uninitialized"
+    registry_auth_id = null
+    template_id      = null
+    image            = null
+    updated_at       = "1970-01-01T00:00:00Z"
   }
 
   application_parameters = merge([
@@ -77,10 +105,24 @@ resource "aws_secretsmanager_secret" "application" {
   }
 }
 
-resource "aws_secretsmanager_secret_version" "ai_provider" {
-  secret_id                = aws_secretsmanager_secret.application["ai_provider"].id
-  secret_string_wo         = jsonencode(var.ai_provider_api_keys)
-  secret_string_wo_version = var.ai_provider_secret_version
+resource "aws_secretsmanager_secret" "runpod" {
+  for_each = local.runpod_secret_names
+
+  name                    = each.value.name
+  description             = each.value.description
+  recovery_window_in_days = 7
+
+  tags = {
+    Name = each.value.name
+  }
+}
+
+removed {
+  from = aws_secretsmanager_secret_version.ai_provider
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "aws_ssm_parameter" "application" {
@@ -97,9 +139,38 @@ resource "aws_ssm_parameter" "application" {
   }
 }
 
-moved {
-  from = aws_ssm_parameter.application["ai_openai_base_url"]
-  to   = aws_ssm_parameter.application["ai_ai_openai_base_url"]
+resource "aws_ssm_parameter" "ai_vllm_endpoint_set" {
+  name        = "/${local.name_prefix}/ai/AI_VLLM_ENDPOINT_SET"
+  description = "Operational container for the atomic ephemeral RunPod SLLM and STT endpoint set"
+  type        = "String"
+  value       = jsonencode(local.ai_vllm_endpoint_set_bootstrap)
+  tier        = "Standard"
+
+  lifecycle {
+    # The RunPod runbook owns this operational value so both URLs cut over atomically.
+    ignore_changes = [value]
+  }
+
+  tags = {
+    Name = "/${local.name_prefix}/ai/AI_VLLM_ENDPOINT_SET"
+  }
+}
+
+resource "aws_ssm_parameter" "runpod_control_set" {
+  name        = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
+  description = "Non-sensitive registration of Console-managed RunPod resource IDs and image digest"
+  type        = "String"
+  value       = jsonencode(local.runpod_control_set_bootstrap)
+  tier        = "Standard"
+
+  lifecycle {
+    # The reviewed RunPod operator commands own this resumable operational value.
+    ignore_changes = [value]
+  }
+
+  tags = {
+    Name = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
+  }
 }
 
 moved {
@@ -134,5 +205,8 @@ output "application_secret_arns" {
 
 output "application_parameter_names" {
   description = "런타임 설정 주입 구성이 참조할 비민감 SSM parameter 이름"
-  value       = { for setting, parameter in aws_ssm_parameter.application : setting => parameter.name }
+  value = merge(
+    { for setting, parameter in aws_ssm_parameter.application : setting => parameter.name },
+    { ai_ai_vllm_endpoint_set = aws_ssm_parameter.ai_vllm_endpoint_set.name },
+  )
 }

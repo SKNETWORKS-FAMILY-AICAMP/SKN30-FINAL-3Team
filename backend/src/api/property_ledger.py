@@ -391,7 +391,7 @@ def create_property_requirement(
     _: None = Depends(require_csrf),
 ) -> PropertyRequirementDetailResponse:
     requirement_id = service.create_property_requirement(
-        db, user.brokerage_id, changed_fields(payload)
+        db, user.brokerage_id, user.id, changed_fields(payload)
     )
     triggers.after_requirement_saved(db, user.brokerage_id, user.id, requirement_id)
     return get_property_requirement(requirement_id, user, db)

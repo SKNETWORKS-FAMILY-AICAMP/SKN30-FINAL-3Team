@@ -19,6 +19,11 @@ CROSS_JUDGMENT_RUN_TYPE = "CROSS_JUDGMENT"
 BROKERAGE_WORKFLOW_AGENT_TYPE = "BROKERAGE_WORKFLOW"
 USER_REQUEST_TRIGGER_TYPE = "USER_REQUEST"
 
+# F1 저장이 만든 실행. 이 실행은 앵커 포지션 카드까지만 만들고 `ANCHOR_READY` 에서 멈춘다.
+# 후보 조회와 판정은 사용자가 상세에서 요청할 때 이어서 돈다(F3-CR-01~04).
+# repository 의 선점 조건이 이 값을 읽어야 하므로 트리거 모듈이 아니라 여기에 둔다.
+LEDGER_SAVE_TRIGGER_TYPE = "LEDGER_SAVE"
+
 # 이 코드가 실제로 쓰는 상태만 상수로 둔다. 나머지 상태는 아직 구현되지 않았다.
 QUEUED_STATUS = "QUEUED"
 RUNNING_STATUS = "RUNNING"

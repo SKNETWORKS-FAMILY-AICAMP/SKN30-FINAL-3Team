@@ -13,11 +13,21 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import structlog
-from brokerage_ai.core.errors import ProviderError
+from brokerage_ai.core.errors import (
+    ProviderConfigurationError,
+    ProviderError,
+    ProviderOutputInvalidError,
+    ProviderRateLimitError,
+    ProviderRefusalError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 from brokerage_ai.f3 import BrokerageJudgmentContractError, PositionCardContractError
 from sqlmodel import Session
 
 from core.errors import NotFoundError
+from core.logging import exception_location
 from domain.agent_execution import repository
 from domain.agent_execution.anchor_card import (
     CachedCardUnavailableError,
@@ -31,6 +41,7 @@ from domain.agent_execution.candidate_cards import (
     generate_and_store_candidate_cards,
 )
 from domain.agent_execution.candidates import AnchorCardMissingError, store_candidate_selection
+from domain.agent_execution.execution_policy import ExecutionStep, next_step
 from domain.agent_execution.judgment import (
     JudgmentAlreadyStoredError,
     JudgmentBinding,
@@ -39,12 +50,8 @@ from domain.agent_execution.judgment import (
     judge_and_store,
 )
 from domain.agent_execution.models import (
-    ANCHOR_READY_STATUS,
-    CANDIDATE_CARDS_READY_STATUS,
-    CANDIDATES_READY_STATUS,
     FAILED_TERMINAL_STATUS,
-    JUDGING_STATUS,
-    RUNNING_STATUS,
+    LEDGER_SAVE_TRIGGER_TYPE,
     SUPERSEDED_FAILURE_CODE,
     SUPERSEDED_FAILURE_MESSAGE,
     SUPERSEDED_STATUS,
@@ -87,6 +94,33 @@ class StepOutcome(StrEnum):
     SKIPPED = "SKIPPED"
 
 
+class FailureStage(StrEnum):
+    """상담 본문 없이 실패 지점을 집계하는 안전한 단계 어휘."""
+
+    ANCHOR_CARD = "ANCHOR_CARD"
+    CANDIDATE_SELECTION = "CANDIDATE_SELECTION"
+    CANDIDATE_CARDS = "CANDIDATE_CARDS"
+    JUDGMENT = "JUDGMENT"
+    EXECUTION = "EXECUTION"
+
+
+class FailureCategory(StrEnum):
+    """Provider 원문·모델 출력을 남기지 않는 고정 실패 분류."""
+
+    LEASE = "LEASE"
+    INPUT_CHANGED = "INPUT_CHANGED"
+    CACHE_INVALIDATED = "CACHE_INVALIDATED"
+    OUTPUT_CONTRACT = "OUTPUT_CONTRACT"
+    PROVIDER_TIMEOUT = "PROVIDER_TIMEOUT"
+    PROVIDER_RATE_LIMIT = "PROVIDER_RATE_LIMIT"
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+    PROVIDER_REFUSAL = "PROVIDER_REFUSAL"
+    PROVIDER_RESPONSE = "PROVIDER_RESPONSE"
+    CONFIGURATION = "CONFIGURATION"
+    DATA_INTEGRITY = "DATA_INTEGRITY"
+    UNKNOWN = "UNKNOWN"
+
+
 @dataclass(frozen=True)
 class ExecutionBindings:
     """현재 단계에 필요한 생성 구성. 사용하지 않는 capability는 조회하지 않는다."""
@@ -107,6 +141,55 @@ def _card_binding(bindings: ExecutionBindings) -> GenerationBinding:
 def _judgment_binding(bindings: ExecutionBindings) -> JudgmentBinding | None:
     # 후보 0건이면 06번 유스케이스가 binding 없이 AI 호출을 생략한다.
     return bindings.judgment
+
+
+def failure_stage(status: str) -> FailureStage:
+    """DB 상태를 사용자 데이터가 없는 집계 단계로 바꿔 돌려준다."""
+    step = next_step(status)
+    if step is ExecutionStep.IDLE:
+        return FailureStage.EXECUTION
+    return FailureStage(step.value)
+
+
+def failure_category(error: BaseException) -> FailureCategory:
+    """예외 본문을 로그하지 않고 안정적인 소수 어휘로만 분류한다."""
+    if isinstance(error, LeaseNotHeldError):
+        return FailureCategory.LEASE
+    if isinstance(error, _SUPERSEDING_ERRORS):
+        return FailureCategory.INPUT_CHANGED
+    if isinstance(error, _RETRYABLE_ERRORS):
+        return FailureCategory.CACHE_INVALIDATED
+    if isinstance(error, ProviderOutputInvalidError):
+        return FailureCategory.OUTPUT_CONTRACT
+    if isinstance(error, ProviderTimeoutError):
+        return FailureCategory.PROVIDER_TIMEOUT
+    if isinstance(error, ProviderRateLimitError):
+        return FailureCategory.PROVIDER_RATE_LIMIT
+    if isinstance(error, ProviderUnavailableError):
+        return FailureCategory.PROVIDER_UNAVAILABLE
+    if isinstance(error, ProviderRefusalError):
+        return FailureCategory.PROVIDER_REFUSAL
+    if isinstance(error, ProviderResponseError):
+        return FailureCategory.PROVIDER_RESPONSE
+    if isinstance(error, ProviderConfigurationError | GenerationBindingError):
+        return FailureCategory.CONFIGURATION
+    if isinstance(
+        error,
+        PositionCardContractError
+        | BrokerageJudgmentContractError
+        | JudgmentEvidenceError
+        | JudgmentResultMismatchError,
+    ):
+        return FailureCategory.OUTPUT_CONTRACT
+    if isinstance(
+        error,
+        JudgmentAlreadyStoredError
+        | AgentRunAnchorError
+        | CandidateSelectionMissingError
+        | NotFoundError,
+    ):
+        return FailureCategory.DATA_INTEGRITY
+    return FailureCategory.UNKNOWN
 
 
 def classify(error: BaseException) -> StepOutcome:
@@ -134,8 +217,9 @@ async def _advance(
     """저장된 상태에 대응하는 application 유스케이스 하나를 실행한다."""
     run_id = run.id or 0
     attempt_count = run.attempt_count
+    step = next_step(run.status)
 
-    if run.status == RUNNING_STATUS:
+    if step is ExecutionStep.ANCHOR_CARD:
         await generate_and_store_anchor_position_card(
             session,
             run_id=run_id,
@@ -145,11 +229,29 @@ async def _advance(
         )
         return StepOutcome.ADVANCED
 
-    if run.status == ANCHOR_READY_STATUS:
+    if step is ExecutionStep.CANDIDATE_SELECTION:
+        # 저장이 만든 실행은 여기까지다. 앵커 포지션 카드만 만들어 두고 후보 조회와 판정은
+        # 사용자가 상세에서 요청할 때 돈다(F3-CR-01~04, ADR-0018).
+        #
+        # 여기서 읽은 `run` 은 이미 낡았을 수 있다. 앵커 카드를 저장한 뒤 이 지점에 오기까지
+        # 사용자 요청이 `trigger_type` 을 옮겼을 수 있기 때문이다. 그래서 조건부 UPDATE 로
+        # 주차하고 바뀐 행 수로 판단한다. 0행이면 그 사이 승격된 것이므로 주차하지 않고
+        # 후보 조회로 이어 간다. 낡은 값만 믿고 주차하면 그 요청이 다음 lease 만료까지
+        # 묻히고, 계획된 handoff 가 실패 재시도로 처리된다.
+        if run.trigger_type == LEDGER_SAVE_TRIGGER_TYPE:
+            parked = repository.park_ledger_save_run(
+                session, run_id, run.brokerage_id, worker_id, attempt_count
+            )
+            if parked == 1:
+                session.commit()
+                logger.info("f3_run_parked_after_anchor_card", run_id=run_id)
+                return StepOutcome.SKIPPED
+            session.rollback()
+            logger.info("f3_run_promoted_before_parking", run_id=run_id)
         store_candidate_selection(session, run_id, worker_id, attempt_count)
         return StepOutcome.ADVANCED
 
-    if run.status == CANDIDATES_READY_STATUS:
+    if step is ExecutionStep.CANDIDATE_CARDS:
         await generate_and_store_candidate_cards(
             session,
             run_id=run_id,
@@ -159,7 +261,7 @@ async def _advance(
         )
         return StepOutcome.ADVANCED
 
-    if run.status in {CANDIDATE_CARDS_READY_STATUS, JUDGING_STATUS}:
+    if step is ExecutionStep.JUDGMENT:
         # JUDGING 재선점은 06번 유스케이스가 최초 바인딩과 후보 집합을 다시 검증한다.
         await judge_and_store(
             session,
@@ -239,22 +341,42 @@ def advance_run(
         return loop.run_until_complete(_advance(session, run, worker_id, resolved))
     except BaseException as error:  # noqa: BLE001 - 실행 하나의 실패를 격리하는 경계다.
         outcome = classify(error)
+        stage = failure_stage(run.status).value
+        category = failure_category(error).value
+        location = exception_location(error)
         logger.warning(
             "f3_step_failed",
             run_id=run.id,
             status=run.status,
+            failure_stage=stage,
             attempt=run.attempt_count,
             outcome=outcome.value,
+            failure_category=category,
             error_type=type(error).__name__,
+            error_location=location,
         )
         if outcome is StepOutcome.LEASE_LOST:
             session.rollback()
             return outcome
         if outcome is StepOutcome.RETRY:
             return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
-        return (
-            outcome if record_failure(session, run, worker_id, outcome) else StepOutcome.LEASE_LOST
-        )
+        if not record_failure(session, run, worker_id, outcome):
+            return StepOutcome.LEASE_LOST
+        if outcome is StepOutcome.FAILED_TERMINAL:
+            # Emit the alarm signal only after FAILED_TERMINAL was durably committed.
+            logger.error(
+                "ai_terminal_failure",
+                component="ai",
+                source="f3",
+                run_id=run.id,
+                status=FAILED_TERMINAL_STATUS,
+                failure_stage=stage,
+                attempt=run.attempt_count,
+                failure_category=category,
+                error_type=type(error).__name__,
+                error_location=location,
+            )
+        return outcome
 
 
 def drive_run(

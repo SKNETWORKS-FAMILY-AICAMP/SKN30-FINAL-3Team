@@ -13,17 +13,30 @@ uv sync --frozen
 
 ## 환경 설정
 
-팀 공통 endpoint와 timeout은 Git에서 추적하는 [`.env.local`](.env.local)에 있습니다. 모델 API 비밀값과 개인별 재정의는 예제를 복사해 Git에서 제외되는 `.env`에 둡니다.
+AI 설정은 이 모듈의 `.env.local`(공개 기본값), `.env.example`(개인 입력/고급 예시),
+`.env`(개인 비밀·override)가 소유합니다. Backend 파일에 중복 선언하지 않습니다.
+로컬 API·Worker 실행은 Infra launcher가 AI 입력을 명시 주입합니다.
 
 ```bash
+# 최초에만 복사한 뒤 키를 입력합니다.
 cp .env.example .env
+chmod 600 .env
 ```
 
-`AiProfile.LOCAL`은 `.env.local`, 개인 `.env`, 실행 프로세스 환경변수 순서로 병합합니다.
-`AiProfile.DEV`, `AiProfile.TEST`, `AiProfile.PROD`는 dotenv 파일을 읽지 않고 CI·배포가 주입한
-프로세스 환경변수만 사용합니다. Backend의 F2 API와 Worker는 `APP_ENV`와 같은 이름의 AI profile을
-사용하므로 공유 AWS 개발 배포에서는 `dev` 설정으로 조립됩니다. 실제 비밀값은 `.env.example`,
-`.env.local` 또는 다른 추적 파일에 기록하지 않습니다.
+`AI_GENERAL_PROVIDER`와 `AI_GENERAL_MODEL`의 허용값·조합은
+[model_catalog.py](src/brokerage_ai/core/model_catalog.py)의 enum과 `.env.local` 주석을 따릅니다.
+연결 registry는 내부에서 구성합니다. Bedrock은 region과 AWS role을 사용하고,
+OpenAI/vllm/llama_cpp는 선택한 연결에 `AI_GENERAL_API_KEY`를 사용합니다.
+등록되지 않은 route는 다른 provider로 우회하지 않습니다.
+
+F2는 SLLM/STT URL이 모두 없으면 미구성(503), 일부만 있으면 설정 오류입니다.
+서버 alias `sllm`/`stt`, 언어 `ko`도 enum입니다. 실제 파인튜닝 버전은 Infra release로 구분합니다.
+미사용 embedding 주소의 암묵적 기본값은 없습니다.
+
+`load_ai_config(local)`은 AI 파일을 읽고, test/dev/prod는 process env만 사용합니다.
+`bind_ai_config`는 주입된 값을 검증하며 파일·AWS·DB를 읽지 않습니다.
+우선순위·개인 파일 이전·DB 모델 버전 반영과 실행 명령은
+[환경변수 관리](../docs/development/environment-variables.md)를 따릅니다.
 
 ## F2 음성메모 파이프라인
 

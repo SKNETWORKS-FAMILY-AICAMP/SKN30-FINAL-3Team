@@ -5,7 +5,7 @@ updated: 2026-08-27
 
 # ADR-0004: F2 runtime 상시 초기화
 
-- 상태: 승인됨
+- 상태: 부분 대체됨 ([ADR-0005](ADR-0005-offline-f2-runtime.md))
 - 결정일: 2026-08-27
 
 ## 맥락

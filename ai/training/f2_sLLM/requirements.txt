@@ -1,0 +1,8 @@
+accelerate>=1.10,<2
+bitsandbytes>=0.46,<1; platform_system == "Linux"
+datasets>=3,<5
+peft>=0.15,<1
+pyyaml>=6.0,<7
+torch>=2.7,<3
+transformers>=4.51,<5
+trl>=0.21,<2

@@ -41,6 +41,8 @@ async def test_chat_completions_uses_pydantic_response_format() -> None:
     assert await_args is not None
     assert await_args.kwargs["response_format"] is Answer
     assert await_args.kwargs["max_tokens"] == 64
+    # Qwen3 thinking을 켜둔 채로 부르면 잘린 응답이 구조화 파싱을 실패시킨다.
+    assert await_args.kwargs["extra_body"] == {"chat_template_kwargs": {"enable_thinking": False}}
 
 
 @pytest.mark.asyncio

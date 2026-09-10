@@ -4,6 +4,9 @@
 
 | 문서 | 읽는 조건 |
 |---|---|
+| [f3-execution.md](f3-execution.md) | F3 Worker·모델 조립·Repository·상태 선택·부분 실패 재시도와 서버 확장을 변경할 때 |
+| [model-selection.md](model-selection.md) | 공유 dev 모델 대상 목록·검토 snapshot·명시 배치 적용·이력 보존을 변경할 때 |
+| [chatbot.md](chatbot.md) | F4 챗봇의 저장·실행·조회·모델 선택을 변경하거나 검증할 때 |
 | [architecture.md](architecture.md) | 내부 구조, 의존 방향, DDD, 트랜잭션, 이벤트 또는 배포 분리를 검토할 때 |
 | [testing-and-quality.md](testing-and-quality.md) | 동작 추가·수정, 버그 수정, 계약 또는 마이그레이션을 검증할 때 |
 | [decisions/index.md](decisions/index.md) | 백엔드 내부 구조·도구·개발 방식의 승인된 결정을 확인하거나 변경할 때 |

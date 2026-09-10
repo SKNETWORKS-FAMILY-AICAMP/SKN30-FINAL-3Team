@@ -101,6 +101,8 @@ def _store_completed_judgment(
     user_id: int,
     run_id: int,
     anchor_card_id: int,
+    *,
+    selection_schema: str = "candidate-selection:v3",
 ) -> int:
     party_id = session.execute(
         text(
@@ -131,7 +133,7 @@ def _store_completed_judgment(
     ).scalar_one()
     selection = json.dumps(
         {
-            "schema": "candidate-selection:v2",
+            "schema": selection_schema,
             "criteria": {
                 "candidate_side": "REQUIREMENT",
                 "price_kind": "SALE",
@@ -302,6 +304,27 @@ def test_completed_result_contains_all_sql_candidates_and_judgment(config: Confi
 
 
 @requires_database
+def test_completed_v2_candidate_result_remains_readable(config: Config) -> None:
+    """상한 조정 전에 완료된 판정 이력은 v3 배포 후에도 조회한다."""
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        anchor_card_id = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        _store_completed_judgment(
+            session,
+            brokerage_id,
+            user_id,
+            run["run_id"],
+            anchor_card_id,
+            selection_schema="candidate-selection:v2",
+        )
+
+        body = client.get(f"/api/v1/f3/runs/{run['run_id']}/result").json()
+
+        assert body["candidate_selection"]["total_count"] == 2
+        assert len(body["candidates"]) == 2
+
+
+@requires_database
 def test_candidate_judgment_id_is_usable_as_a_feedback_target(config: Config) -> None:
     """결과 조회의 ``judgment_id``가 관심없음 피드백의 ``target_id``와 같은 식별자다."""
     with ledger_client(config) as (client, session, brokerage_id, user_id):
@@ -459,3 +482,58 @@ def test_result_requires_authentication_but_not_csrf(config: Config) -> None:
         # X-CSRF-Token 없이도 상태를 변경하지 않는 GET은 허용된다.
         response = client.get(f"/api/v1/f3/runs/{run_id}/result")
         assert response.status_code == 200
+
+
+@requires_database
+@pytest.mark.parametrize("completed", [False, True], ids=["snapshot", "header"])
+def test_invalidated_anchor_hides_card_and_dependent_results(
+    config: Config, completed: bool
+) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        card_id = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        if completed:
+            _store_completed_judgment(session, brokerage_id, user_id, run["run_id"], card_id)
+        before = client.get(f"/api/v1/f3/runs/{run['run_id']}/result").json()
+        assert before["anchor_card"] is not None
+        session.execute(
+            text("UPDATE negotiation_position_analysis SET invalidated_at = now() WHERE id = :id"),
+            {"id": card_id},
+        )
+        session.commit()
+
+        response = client.get(f"/api/v1/f3/runs/{run['run_id']}/result")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == before["status"]
+        assert body["anchor_card"] is None
+        assert body["candidate_selection"] == {
+            "criteria": None,
+            "total_count": 0,
+            "carded_count": 0,
+            "remaining_count": 0,
+        }
+        assert body["candidates"] == []
+        assert body["candidates_total"] == 0
+
+
+@requires_database
+def test_invalid_header_card_cannot_fall_back_to_another_snapshot_card(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, user_id):
+        run, listing = _queue_listing_run(client, session, brokerage_id)
+        header_card = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        snapshot_card = _store_anchor_card(session, brokerage_id, run["run_id"], listing["id"])
+        assert snapshot_card != header_card
+        _store_completed_judgment(session, brokerage_id, user_id, run["run_id"], header_card)
+        session.execute(
+            text("UPDATE negotiation_position_analysis SET invalidated_at = now() WHERE id = :id"),
+            {"id": header_card},
+        )
+        session.commit()
+
+        response = client.get(f"/api/v1/f3/runs/{run['run_id']}/result")
+
+        assert response.status_code == 200
+        assert response.json()["anchor_card"] is None
+        assert response.json()["candidates"] == []

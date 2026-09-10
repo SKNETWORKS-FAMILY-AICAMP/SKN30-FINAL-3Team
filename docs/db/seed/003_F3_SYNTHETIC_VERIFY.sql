@@ -1,8 +1,8 @@
 -- PostgreSQL 15+
 -- F3 합성 장부의 자기 점검. 읽기 전용이며 어떤 행도 바꾸지 않는다.
 --
--- 002_F3_SYNTHETIC_SEED.sql 을 적용한 직후에 실행한다. Worker 를 켜기 전에 데이터가
--- 의도한 모양인지 먼저 확인하기 위한 파일이다.
+-- 002_F3_SYNTHETIC_SEED.sql 과 선택한 model-profiles/*.sql 하나를 적용한 직후에
+-- 실행한다. Worker 를 켜기 전에 데이터와 모델 프로필이 의도한 모양인지 확인한다.
 --
 -- 마지막 열이 전부 PASS 여야 한다. 하나라도 FAIL 이면 파이프라인을 돌리기 전에 seed 를
 -- 다시 적용한다.
@@ -26,9 +26,18 @@ ledger AS (
     SELECT
         t.brokerage_id,
         (SELECT id FROM property_complex   WHERE brokerage_id = t.brokerage_id AND extra_info->>'seed_key'   = 'C1') AS complex_c1,
+        (SELECT id FROM property_complex   WHERE brokerage_id = t.brokerage_id AND extra_info->>'seed_key'   = 'C2') AS complex_c2,
+        (SELECT id FROM property_complex   WHERE brokerage_id = t.brokerage_id AND extra_info->>'seed_key'   = 'C3') AS complex_c3,
+        (SELECT id FROM property_complex   WHERE brokerage_id = t.brokerage_id AND extra_info->>'seed_key'   = 'C4') AS complex_c4,
+        (SELECT id FROM property_complex   WHERE brokerage_id = t.brokerage_id AND extra_info->>'seed_key'   = 'C5') AS complex_c5,
         (SELECT id FROM property_listing   WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'L1') AS listing_l1,
         (SELECT id FROM property_listing   WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'L4') AS listing_l4,
-        (SELECT id FROM property_requirement WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'R1') AS requirement_r1
+        (SELECT id FROM property_listing   WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'L5') AS listing_l5,
+        (SELECT id FROM property_listing   WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'BL01') AS listing_bl01,
+        (SELECT id FROM property_listing   WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'BL13') AS listing_bl13,
+        (SELECT id FROM property_listing   WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'BL23') AS listing_bl23,
+        (SELECT id FROM property_requirement WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'R1') AS requirement_r1,
+        (SELECT id FROM property_requirement WHERE brokerage_id = t.brokerage_id AND custom_fields->>'seed_key' = 'BR01') AS requirement_br01
     FROM tenant t
 ),
 checks(sort_key, "검사", "기대", "실제") AS (
@@ -40,17 +49,59 @@ checks(sort_key, "검사", "기대", "실제") AS (
     UNION ALL SELECT 103, '활성 AI 모델 설정 수 (POSITION_CARD + BROKERAGE_JUDGMENT)', 2,
         (SELECT count(*) FROM ai_model_config c JOIN tenant t ON t.brokerage_id = c.brokerage_id
           WHERE c.is_active AND c.capability IN ('POSITION_CARD', 'BROKERAGE_JUDGMENT'))
-    UNION ALL SELECT 104, '단지 수', 2,
+    UNION ALL SELECT 110, '활성 AI 모델 설정이 허용된 단일 프로필과 완전 일치', 1, (
+        SELECT count(*) FROM (
+            SELECT c.config_key
+            FROM ai_model_config c
+            JOIN tenant t ON t.brokerage_id = c.brokerage_id
+            JOIN (VALUES
+                ('local-openai', 'openai', 'gpt-5.6-luna', NULL::varchar, NULL::varchar),
+                (
+                    'dev-bedrock-gpt56-luna',
+                    'bedrock',
+                    'global.openai.gpt-5.6-luna',
+                    NULL::varchar,
+                    'general-dev-bedrock'
+                ),
+                (
+                    'dev-qwen38-vllm-bnb',
+                    'vllm',
+                    'unsloth/Qwen3.8-27B-unsloth-bnb-4bit',
+                    '8aa5f05d26b7205477066e1449e0af13f762a299',
+                    'general-dev-gpu'
+                ),
+                (
+                    'dev-qwen38-llamacpp-gguf',
+                    'llama_cpp',
+                    'unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M',
+                    '4ca720788d1e01f1bff70c033e0d0028fd02e502@sha256:322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482',
+                    'general-dev-gpu'
+                )
+            ) AS p(config_key, provider, model_name, model_version, endpoint_alias)
+              ON c.config_key = p.config_key
+             AND c.provider = p.provider
+             AND c.model_name = p.model_name
+             AND c.model_version IS NOT DISTINCT FROM p.model_version
+             AND c.endpoint_alias IS NOT DISTINCT FROM p.endpoint_alias
+            WHERE c.is_active
+              AND c.config_version = 1
+              AND c.parameters = '{}'::jsonb
+              AND c.capability IN ('POSITION_CARD', 'BROKERAGE_JUDGMENT')
+            GROUP BY c.config_key
+            HAVING count(*) = 2 AND count(DISTINCT c.capability) = 2
+        ) valid_profile
+    )
+    UNION ALL SELECT 104, '단지 수', 5,
         (SELECT count(*) FROM property_complex x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
-    UNION ALL SELECT 105, '세대 수', 6,
+    UNION ALL SELECT 105, '세대 수', 36,
         (SELECT count(*) FROM property_unit x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
-    UNION ALL SELECT 106, '인물 수', 17,
+    UNION ALL SELECT 106, '인물 수', 87,
         (SELECT count(*) FROM party x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
-    UNION ALL SELECT 107, '매물 수', 6,
+    UNION ALL SELECT 107, '매물 수', 36,
         (SELECT count(*) FROM property_listing x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
-    UNION ALL SELECT 108, '구입장 수', 8,
+    UNION ALL SELECT 108, '구입장 수', 48,
         (SELECT count(*) FROM property_requirement x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
-    UNION ALL SELECT 109, '상담 로그 수', 29,
+    UNION ALL SELECT 109, '상담 로그 수', 169,
         (SELECT count(*) FROM client_interaction x JOIN tenant t ON t.brokerage_id = x.brokerage_id)
 
     -- ── 2. 실행 결과는 seed 하지 않는다 ──────────────────────────────────────
@@ -122,12 +173,34 @@ checks(sort_key, "검사", "기대", "실제") AS (
           )
     )
 
-    -- 케이스 C: 월세 앵커 L5 → 호환 구분은 '월세' 뿐인데 해당 구입장이 없다
+    -- 케이스 C: 월세 앵커 L5 → 월세 구입장은 있지만 해당 단지 C2를 희망하지 않는다
     UNION ALL SELECT 303, '케이스 C (월세 매물 앵커) 후보 구입장 수', 0, (
         SELECT count(*)
         FROM property_requirement r
-        JOIN tenant t ON t.brokerage_id = r.brokerage_id
-        WHERE r.is_deleted = FALSE AND r.status = 'ACTIVE' AND r.demand_type = '월세'
+        JOIN party p ON p.brokerage_id = r.brokerage_id AND p.id = r.party_id
+        JOIN ledger g ON g.brokerage_id = r.brokerage_id
+        WHERE r.is_deleted = FALSE
+          AND p.is_deleted = FALSE
+          AND r.status = 'ACTIVE'
+          AND r.demand_type = '월세'
+          AND (
+              r.max_budget_amount IS NULL
+              OR r.max_budget_amount >= trunc(
+                  (SELECT monthly_rent_deposit_amount FROM property_listing WHERE id = g.listing_l5) * 0.9
+              )
+          )
+          AND (
+              NOT EXISTS (
+                  SELECT 1 FROM property_requirement_complex rc
+                  WHERE rc.brokerage_id = r.brokerage_id AND rc.requirement_id = r.id
+              )
+              OR EXISTS (
+                  SELECT 1 FROM property_requirement_complex rc
+                  WHERE rc.brokerage_id = r.brokerage_id
+                    AND rc.requirement_id = r.id
+                    AND rc.complex_id = g.complex_c2
+              )
+          )
     )
 
     -- 케이스 D: 매도 구분 앵커 R8 → 대응하는 매물 거래 유형이 없다
@@ -194,22 +267,114 @@ checks(sort_key, "검사", "기대", "실제") AS (
         JOIN party p ON p.brokerage_id = r.brokerage_id AND p.id = r.party_id
         WHERE p.privacy_consent_at IS NULL
     )
-    UNION ALL SELECT 405, '상담 로그가 없는 앵커 (L1·L4·L5·R1·R8)', 0, (
+    UNION ALL SELECT 405, '상담 로그가 없는 활성 매물·구입장', 0, (
         SELECT count(*) FROM (
             SELECT l.id FROM property_listing l JOIN tenant t ON t.brokerage_id = l.brokerage_id
-            WHERE l.custom_fields->>'seed_key' IN ('L1', 'L4', 'L5')
+            WHERE l.status = 'RECEIVED' AND l.is_deleted = FALSE
               AND NOT EXISTS (SELECT 1 FROM client_interaction i WHERE i.listing_id = l.id AND i.is_voided = FALSE)
             UNION ALL
             SELECT r.id FROM property_requirement r JOIN tenant t ON t.brokerage_id = r.brokerage_id
-            WHERE r.custom_fields->>'seed_key' IN ('R1', 'R8')
+            WHERE r.status = 'ACTIVE' AND r.is_deleted = FALSE
               AND NOT EXISTS (SELECT 1 FROM client_interaction i WHERE i.requirement_id = r.id AND i.is_voided = FALSE)
         ) missing
     )
-    UNION ALL SELECT 406, '상담 로그가 없는 케이스 A·E 후보 (R1·R2·R3·R4)', 0, (
-        SELECT count(*) FROM property_requirement r
-        JOIN tenant t ON t.brokerage_id = r.brokerage_id
-        WHERE r.custom_fields->>'seed_key' IN ('R1', 'R2', 'R3', 'R4')
-          AND NOT EXISTS (SELECT 1 FROM client_interaction i WHERE i.requirement_id = r.id AND i.is_voided = FALSE)
+    UNION ALL SELECT 406, '대량 케이스 F·G·H·I 후보 수 불일치', 0, (
+        SELECT count(*)
+        FROM (
+            SELECT 'F' AS case_key, 19 AS expected, (
+                SELECT count(*)
+                FROM property_requirement r
+                JOIN party p ON p.brokerage_id = r.brokerage_id AND p.id = r.party_id
+                JOIN ledger g ON g.brokerage_id = r.brokerage_id
+                WHERE r.is_deleted = FALSE
+                  AND p.is_deleted = FALSE
+                  AND r.demand_type = '매수'
+                  AND r.status = 'ACTIVE'
+                  AND (
+                      r.max_budget_amount IS NULL
+                      OR r.max_budget_amount >= trunc(
+                          (SELECT sale_price FROM property_listing WHERE id = g.listing_bl01) * 0.9
+                      )
+                  )
+                  AND (
+                      NOT EXISTS (
+                          SELECT 1 FROM property_requirement_complex rc
+                          WHERE rc.brokerage_id = r.brokerage_id AND rc.requirement_id = r.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM property_requirement_complex rc
+                          WHERE rc.brokerage_id = r.brokerage_id
+                            AND rc.requirement_id = r.id
+                            AND rc.complex_id = g.complex_c3
+                      )
+                  )
+            ) AS actual
+            UNION ALL
+            SELECT 'G', 12, (
+                SELECT count(*)
+                FROM property_listing l
+                JOIN property_unit u ON u.brokerage_id = l.brokerage_id AND u.id = l.unit_id
+                JOIN ledger g ON g.brokerage_id = l.brokerage_id
+                WHERE l.is_deleted = FALSE
+                  AND u.is_deleted = FALSE
+                  AND l.is_sale_available = TRUE
+                  AND l.status = 'RECEIVED'
+                  AND u.complex_id = g.complex_c3
+                  AND (
+                      l.sale_price IS NULL
+                      OR l.sale_price <= trunc(
+                          (SELECT max_budget_amount FROM property_requirement WHERE id = g.requirement_br01) * 1.1
+                      )
+                  )
+            )
+            UNION ALL
+            SELECT 'H', 12, (
+                SELECT count(*)
+                FROM property_requirement r
+                JOIN party p ON p.brokerage_id = r.brokerage_id AND p.id = r.party_id
+                JOIN ledger g ON g.brokerage_id = r.brokerage_id
+                WHERE r.is_deleted = FALSE
+                  AND p.is_deleted = FALSE
+                  AND r.demand_type = '전세'
+                  AND r.status = 'ACTIVE'
+                  AND (
+                      r.max_budget_amount IS NULL
+                      OR r.max_budget_amount >= trunc(
+                          (SELECT jeonse_deposit_amount FROM property_listing WHERE id = g.listing_bl13) * 0.9
+                      )
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM property_requirement_complex rc
+                      WHERE rc.brokerage_id = r.brokerage_id
+                        AND rc.requirement_id = r.id
+                        AND rc.complex_id = g.complex_c4
+                  )
+            )
+            UNION ALL
+            SELECT 'I', 10, (
+                SELECT count(*)
+                FROM property_requirement r
+                JOIN party p ON p.brokerage_id = r.brokerage_id AND p.id = r.party_id
+                JOIN ledger g ON g.brokerage_id = r.brokerage_id
+                WHERE r.is_deleted = FALSE
+                  AND p.is_deleted = FALSE
+                  AND r.demand_type = '월세'
+                  AND r.status = 'ACTIVE'
+                  AND (
+                      r.max_budget_amount IS NULL
+                      OR r.max_budget_amount >= trunc(
+                          (SELECT monthly_rent_deposit_amount FROM property_listing WHERE id = g.listing_bl23) * 0.9
+                      )
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM property_requirement_complex rc
+                      WHERE rc.brokerage_id = r.brokerage_id
+                        AND rc.requirement_id = r.id
+                        AND rc.complex_id = g.complex_c5
+                  )
+            )
+        ) matrix
+        WHERE matrix.expected <> matrix.actual
     )
     UNION ALL SELECT 407, '최종 접촉 시각이 비어 있는 앵커 세대·구입장', 0, (
         SELECT count(*) FROM (

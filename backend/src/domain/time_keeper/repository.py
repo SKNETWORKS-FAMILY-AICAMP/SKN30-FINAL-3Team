@@ -1,0 +1,370 @@
+"""일정·할 일 대상 조회.
+
+여섯 개의 날짜 원천을 ``UNION ALL``로 합친 뒤 DB에서 정렬·페이지를 자른다. 원천별로 따로 읽어
+파이썬에서 합치면 전체를 메모리에 올려야 총 건수와 페이지가 맞는다. 다섯 개는 장부(세대·매물·
+구입장)에서 계산하는 갈래이고, 나머지 하나(``_calendar_event_members``)는 사용자가 캘린더
+화면에서 직접 만든 일정이다. 장부 갈래와 달리 조인 없이 표시값을 이미 들고 있다.
+
+날짜가 그대로 저장된 원천과, 매물 접수일에 재확인 주기를 더해 만드는 원천
+(``LISTING_REVALIDATION``)이 섞여 있다. 뒤쪽은 ``received_at`` 이 이미 ``DATE`` 라 시간대 변환
+없이 날짜끼리 더한다.
+
+모든 갈래의 ``WHERE``는 migration 002·009·017이 만든 부분 인덱스 조건과 **같은 모양**으로 둔다.
+조건이 어긋나면 인덱스를 두고도 전체 스캔이 된다. 두 가지를 지킨다.
+
+1. 주기로 만드는 갈래는 기한을 컬럼에서 계산하지 않고 상수 쪽으로 옮겨 원본 컬럼의 조건으로
+   쓴다. 컬럼에 연산이 붙으면 인덱스를 타지 못한다. 이 갈래는 아래쪽 경계가 없어 상한 하나만 건다.
+2. 삭제 조건은 ``is_deleted = FALSE`` 로 쓴다. ``IS FALSE`` 로 쓰면 PostgreSQL 이 부분 인덱스의
+   ``WHERE is_deleted = FALSE`` 와 같은 조건임을 증명하지 못해 인덱스를 후보에서 뺀다. 실제 계획을
+   비교해 확인한 차이다.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+from sqlalchemy import (
+    BigInteger,
+    String,
+    Subquery,
+    cast,
+    false,
+    func,
+    literal,
+    null,
+    select,
+    union_all,
+)
+from sqlmodel import Session, col
+
+from domain.calendar.models import CalendarEvent
+from domain.property_ledger.models import (
+    Party,
+    PropertyComplex,
+    PropertyListing,
+    PropertyRequirement,
+    PropertyUnit,
+)
+from domain.property_ledger.repository import Page
+from domain.time_keeper.models import (
+    AgendaCategory,
+    AgendaRow,
+    AgendaWindow,
+    RequirementAgendaDetail,
+    UnitAgendaDetail,
+    revalidation_received_deadline,
+)
+
+# 종료된 구입 의뢰와 내려간 매물의 일정은 알리지 않는다. F1이 아직 상태 값 목록을 확정하지
+# 않았으므로 서버가 신규 저장에 쓰는 기본값만 "진행 중"으로 본다. F3 후보 추출의 판단과 같은
+# 근거이며 (`domain/agent_execution/candidates.py`) 값 목록이 확정되면 함께 고친다.
+ACTIVE_REQUIREMENT_STATUSES = frozenset({"ACTIVE"})
+ACTIVE_LISTING_STATUSES = frozenset({"RECEIVED"})
+
+
+def _category(category: AgendaCategory) -> Any:
+    """UNION의 첫 분기가 컬럼 타입을 정하므로 문자열 상수에 타입을 명시한다."""
+    return cast(literal(category.value), String).label("category")
+
+
+def _member(
+    category: AgendaCategory,
+    due: Any,
+    *,
+    unit_id: Any,
+    listing_id: Any,
+    requirement_id: Any,
+    conditions: Sequence[Any],
+    window: AgendaWindow,
+    in_window: Any = None,
+) -> Any:
+    """한 갈래를 만든다.
+
+    ``due`` 는 화면에 보일 기한 표현식이고 ``in_window`` 는 창 안인지 가리는 조건이다. 저장된
+    날짜는 둘이 같지만, 주기로 만드는 갈래는 컬럼에 연산이 붙지 않도록 조건을 따로 받는다.
+
+    장부 갈래는 ``event_id``·``title``·``location``이 없다. 캘린더 갈래(``_calendar_event_members``)
+    만 채우고 나머지 갈래는 NULL을 실어 컬럼 모양을 맞춘다.
+    """
+    return select(
+        _category(category),
+        due.label("due_date"),
+        unit_id.label("unit_id"),
+        listing_id.label("listing_id"),
+        requirement_id.label("requirement_id"),
+        _no_id().label("event_id"),
+        _no_str().label("title"),
+        _no_str().label("location"),
+    ).where(
+        *conditions,
+        due.between(window.earliest, window.latest) if in_window is None else in_window,
+    )
+
+
+def _no_id() -> Any:
+    return cast(null(), BigInteger)
+
+
+def _no_str() -> Any:
+    return cast(null(), String)
+
+
+def _unit_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
+    live_unit = [
+        col(PropertyUnit.brokerage_id) == brokerage_id,
+        col(PropertyUnit.is_deleted) == false(),
+    ]
+    expiry = col(PropertyUnit.tenancy_expiry_date)
+    return [
+        _member(
+            AgendaCategory.TENANCY_EXPIRY,
+            expiry,
+            unit_id=col(PropertyUnit.id),
+            listing_id=_no_id(),
+            requirement_id=_no_id(),
+            conditions=[*live_unit, expiry.is_not(None)],
+            window=window,
+        ),
+    ]
+
+
+def _listing_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
+    received = col(PropertyListing.received_at)
+    member = _member(
+        AgendaCategory.LISTING_REVALIDATION,
+        received + window.revalidation_days,
+        unit_id=col(PropertyListing.unit_id),
+        listing_id=col(PropertyListing.id),
+        requirement_id=_no_id(),
+        conditions=[
+            col(PropertyListing.brokerage_id) == brokerage_id,
+            col(PropertyListing.is_deleted) == false(),
+            col(PropertyListing.status).in_(sorted(ACTIVE_LISTING_STATUSES)),
+            col(PropertyUnit.brokerage_id) == brokerage_id,
+            col(PropertyUnit.is_deleted) == false(),
+            received.is_not(None),
+        ],
+        window=window,
+        in_window=received <= revalidation_received_deadline(window),
+    )
+    return [
+        member.select_from(PropertyListing).join(
+            PropertyUnit,
+            (col(PropertyUnit.brokerage_id) == PropertyListing.brokerage_id)
+            & (col(PropertyUnit.id) == PropertyListing.unit_id),
+        )
+    ]
+
+
+def _requirement_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
+    live_requirement = [
+        col(PropertyRequirement.brokerage_id) == brokerage_id,
+        col(PropertyRequirement.is_deleted) == false(),
+        col(PropertyRequirement.status).in_(sorted(ACTIVE_REQUIREMENT_STATUSES)),
+    ]
+    client_tenancy = col(PropertyRequirement.current_tenancy_expiry_date)
+    stored: list[tuple[AgendaCategory, Any]] = [
+        (AgendaCategory.CLIENT_TENANCY_EXPIRY, client_tenancy),
+        (AgendaCategory.REQUEST_EXPIRY, col(PropertyRequirement.request_expiry_date)),
+        (AgendaCategory.MOVE_IN, col(PropertyRequirement.desired_move_in_date)),
+    ]
+    return [
+        _member(
+            category,
+            column,
+            unit_id=_no_id(),
+            listing_id=_no_id(),
+            requirement_id=col(PropertyRequirement.id),
+            conditions=[*live_requirement, column.is_not(None)],
+            window=window,
+        )
+        for category, column in stored
+    ]
+
+
+def _calendar_event_members(brokerage_id: int, window: AgendaWindow) -> list[Any]:
+    """사용자가 캘린더에서 직접 만든 일정. 종류가 열려 있어 문자열 컬럼을 그대로 싣는다.
+
+    조인 없이 표시에 필요한 값을 이미 들고 있으므로, 이 갈래만 ``title``·``location``이 채워진다.
+    ``F4-TK-07``처럼 앞뒤 창 양쪽에 경계를 둔다 — 재확인과 달리 날짜가 그대로 저장된 갈래이기
+    때문이다.
+    """
+    event_date = col(CalendarEvent.event_date)
+    return [
+        select(
+            cast(col(CalendarEvent.category), String).label("category"),
+            event_date.label("due_date"),
+            _no_id().label("unit_id"),
+            _no_id().label("listing_id"),
+            _no_id().label("requirement_id"),
+            col(CalendarEvent.id).label("event_id"),
+            col(CalendarEvent.title).label("title"),
+            col(CalendarEvent.location).label("location"),
+        ).where(
+            col(CalendarEvent.brokerage_id) == brokerage_id,
+            col(CalendarEvent.is_deleted) == false(),
+            event_date.between(window.earliest, window.latest),
+        )
+    ]
+
+
+def agenda_union(brokerage_id: int, window: AgendaWindow) -> Subquery:
+    return union_all(
+        *_unit_members(brokerage_id, window),
+        *_listing_members(brokerage_id, window),
+        *_requirement_members(brokerage_id, window),
+        *_calendar_event_members(brokerage_id, window),
+    ).subquery("time_keeper_agenda")
+
+
+def count_agenda(session: Session, brokerage_id: int, window: AgendaWindow) -> int:
+    combined = agenda_union(brokerage_id, window)
+    total = session.execute(select(func.count()).select_from(combined)).scalar_one()
+    return int(total)
+
+
+def count_agenda_by_category(
+    session: Session, brokerage_id: int, window: AgendaWindow
+) -> list[tuple[str, int]]:
+    """창 안에 실제로 존재하는 종류와 건수. 0건인 종류는 행 자체가 나오지 않는다.
+
+    종류별 상한을 적용하기 전의 값이다. 화면이 "임대차 만기 2건"처럼 참인 숫자를 쓰고, 상한에
+    걸려 잘린 나머지를 알릴 수 있어야 한다. 캘린더 갈래는 사용자가 정한 임의 문자열이라 고정
+    열거형으로 되돌려 파싱하지 않는다.
+    """
+    combined = agenda_union(brokerage_id, window)
+    statement = (
+        select(combined.c.category, func.count().label("total"))
+        .group_by(combined.c.category)
+        .order_by(combined.c.category.asc())
+    )
+    return [(row.category, int(row.total)) for row in session.execute(statement)]
+
+
+def _ordering(source: Any) -> list[Any]:
+    """같은 날짜에 걸리는 행이 흔하므로 종류와 식별자까지 정렬에 넣는다.
+
+    정렬이 흔들리면 페이지를 넘길 때 같은 행이 다시 나오거나 건너뛴다.
+    """
+    return [
+        source.c.due_date.asc(),
+        source.c.category.asc(),
+        source.c.unit_id.asc().nullslast(),
+        source.c.listing_id.asc().nullslast(),
+        source.c.requirement_id.asc().nullslast(),
+        source.c.event_id.asc().nullslast(),
+    ]
+
+
+def list_agenda(
+    session: Session, brokerage_id: int, window: AgendaWindow, page: Page
+) -> list[AgendaRow]:
+    """종류마다 앞에서 몇 건씩 떼어 기한이 이른 순으로 한 페이지를 읽는다.
+
+    상한을 전체에만 걸면 임박한 한 종류가 지면을 다 먹고 나머지 종류는 그날 아예 보이지 않는다.
+    ``ROW_NUMBER``로 종류 안에서 순위를 매긴 뒤 잘라 해당되는 종류가 모두 드러나게 한다.
+    """
+    combined = agenda_union(brokerage_id, window)
+    ranked = select(
+        combined.c.category,
+        combined.c.due_date,
+        combined.c.unit_id,
+        combined.c.listing_id,
+        combined.c.requirement_id,
+        combined.c.event_id,
+        combined.c.title,
+        combined.c.location,
+        func.row_number()
+        .over(partition_by=combined.c.category, order_by=_ordering(combined))
+        .label("category_rank"),
+    ).subquery("time_keeper_agenda_ranked")
+    statement = (
+        select(ranked)
+        .where(ranked.c.category_rank <= window.per_category_limit)
+        .order_by(*_ordering(ranked))
+        .limit(page.limit)
+        .offset(page.offset)
+    )
+    return [
+        AgendaRow(
+            category=row.category,
+            due_date=row.due_date,
+            unit_id=row.unit_id,
+            listing_id=row.listing_id,
+            requirement_id=row.requirement_id,
+            event_id=row.event_id,
+            title=row.title,
+            location=row.location,
+        )
+        for row in session.execute(statement).all()
+    ]
+
+
+def load_unit_details(
+    session: Session, brokerage_id: int, unit_ids: Sequence[int]
+) -> dict[int, UnitAgendaDetail]:
+    """페이지에 실린 세대의 표시값을 한 번에 읽는다."""
+    if not unit_ids:
+        return {}
+    statement = (
+        select(PropertyUnit, PropertyComplex)
+        .join(
+            PropertyComplex,
+            (col(PropertyComplex.brokerage_id) == PropertyUnit.brokerage_id)
+            & (col(PropertyComplex.id) == PropertyUnit.complex_id),
+        )
+        .where(
+            col(PropertyUnit.brokerage_id) == brokerage_id,
+            col(PropertyUnit.id).in_(list(unit_ids)),
+            col(PropertyUnit.is_deleted) == false(),
+        )
+    )
+    return {
+        unit.id or 0: UnitAgendaDetail(
+            unit_id=unit.id or 0,
+            complex_name=complex_row.name,
+            building_number=unit.building_number,
+            unit_number=unit.unit_number,
+            tenancy_status=unit.tenancy_status,
+            assigned_user_id=unit.assigned_user_id,
+            last_contact_at=unit.last_contact_at,
+        )
+        for unit, complex_row in session.execute(statement).all()
+    }
+
+
+def load_requirement_details(
+    session: Session, brokerage_id: int, requirement_ids: Sequence[int]
+) -> dict[int, RequirementAgendaDetail]:
+    """페이지에 실린 구입장 행의 표시값을 한 번에 읽는다."""
+    if not requirement_ids:
+        return {}
+    statement = select(PropertyRequirement).where(
+        col(PropertyRequirement.brokerage_id) == brokerage_id,
+        col(PropertyRequirement.id).in_(list(requirement_ids)),
+        col(PropertyRequirement.is_deleted) == false(),
+    )
+    return {
+        requirement.id or 0: RequirementAgendaDetail(
+            requirement_id=requirement.id or 0,
+            party_id=requirement.party_id,
+            demand_type=requirement.demand_type,
+            status=requirement.status,
+            assigned_user_id=requirement.assigned_user_id,
+            last_contact_at=requirement.last_contact_at,
+        )
+        for requirement in session.execute(statement).scalars().all()
+    }
+
+
+def load_parties(session: Session, brokerage_id: int, party_ids: Sequence[int]) -> dict[int, Party]:
+    """구입장 손님 본인. 세대 쪽 인물은 장부의 관계 조회가 이미 인물을 함께 돌려준다."""
+    if not party_ids:
+        return {}
+    statement = select(Party).where(
+        col(Party.brokerage_id) == brokerage_id,
+        col(Party.id).in_(list(party_ids)),
+        col(Party.is_deleted) == false(),
+    )
+    return {party.id or 0: party for party in session.execute(statement).scalars().all()}

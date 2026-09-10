@@ -63,28 +63,35 @@ ALLOWED_FIELDS = {
     LedgerType.BUYER: BUYER_FIELDS,
 }
 
-SYSTEM_PROMPT = """당신은 부동산 상담 음성메모의 텍스트를 분석하는 도구입니다.
-반드시 지정된 JSON 스키마만 출력하고 다음 규칙을 지키세요.
+SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
+입력으로 STT 상담 텍스트만 받습니다.
 
-- 상담 유형은 매도의뢰, 매수문의, 공동중개, 단순문의 중 하나입니다.
-- 매물장+매수문의 또는 구입장+매도의뢰이면 ledger_mismatch를 true로 둡니다.
-- 장부 불일치, 공동중개, 단순문의일 때 fields와 evidence는 빈 객체로 둡니다.
-- 현재 장부에 허용된 필드만 사용합니다.
-- 원문에서 명확히 확인되는 값을 원문 표현 그대로 추출합니다.
-- 음성에 없는 값은 추측하지 않습니다.
-- 불명확한 숫자·날짜·동·호와 충돌하는 값은 fields에 넣지 않고 uncertainties에 적습니다.
-- fields의 모든 항목에 STT 원문 안에 실제로 존재하는 evidence 문장을 제공합니다.
-- 개인정보 동의 여부는 사용자가 직접 확인하는 값이므로 fields에 제안하지 않습니다.
-- summary에는 핵심 내용, 확정 조건, 추가 확인 사항을 포함한 상담 로그 초안을 작성합니다.
-"""
+반드시 다음 규칙을 지키세요.
+- 매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류합니다.
+- 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류합니다.
+- 매도의뢰이면 매물장 필드만, 매수문의이면 구입장 필드만 추출합니다.
+- 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
+- 원문에서 명확히 확인된 값만 fields에 넣습니다.
+- 불명확한 숫자, 날짜, 동, 호 또는 충돌하는 값은 확정하지 말고 uncertainties에 적습니다.
+- 기존 장부 값을 추측하거나 자동으로 덮어쓰지 않습니다.
+- 각 fields 값에는 원문 그대로의 evidence 문장을 제공합니다.
+- 설명이나 마크다운 없이 JSON 객체 하나만 출력합니다.
+
+출력 형식:
+{
+  "consultation_type": "매도의뢰|매수문의|기타상담",
+  "fields": {"필드명": "값"},
+  "evidence": {"필드명": "원문 근거"},
+  "uncertainties": ["불명확하거나 충돌한 내용"],
+  "summary": "상담 로그 초안"
+}"""
 
 
-def build_user_prompt(*, transcript: str, ledger_type: LedgerType) -> str:
-    """정답이나 기존 장부값을 노출하지 않고 모델에 필요한 최소 입력만 만든다."""
+def build_user_prompt(*, transcript: str) -> str:
+    """SFT·평가와 동일하게 STT 원문만 전달한다.
 
-    allowed_fields = ", ".join(sorted(ALLOWED_FIELDS[ledger_type]))
-    return (
-        f"현재 장부 종류: {ledger_type.value}\n"
-        f"허용 필드: {allowed_fields}\n"
-        f"STT 상담 텍스트:\n{transcript}"
-    )
+    허용 필드 목록을 입력에 넣으면 학습 분포에서 벗어나 모델이 라벨 문자열을
+    필드명으로 되풀이한다. 유형별 허용 필드 경계는 pipeline이 검증한다.
+    """
+
+    return f"STT 상담 텍스트:\n{transcript}"

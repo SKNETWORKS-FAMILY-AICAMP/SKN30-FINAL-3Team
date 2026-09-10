@@ -29,7 +29,7 @@ from brokerage_ai.f3 import (
     ContactabilityStatus,
     DateSignals,
     Evidence,
-    EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     ListingAnchorContext,
@@ -42,6 +42,7 @@ from brokerage_ai.f3 import (
     PositionCardTarget,
     PositionCondition,
     PriceKind,
+    QuoteEvidence,
     RequirementAnchorContext,
     SourceIdentity,
     TimingAssessment,
@@ -49,7 +50,11 @@ from brokerage_ai.f3 import (
     UrgencyAssessment,
     validate_generation_result,
 )
-from brokerage_ai.f3.model_output import ModelPriceOpinion, PositionCardModelOutput
+from brokerage_ai.f3.model_output import (
+    ModelPriceOpinion,
+    ModelPriceOpinions,
+    PositionCardModelOutput,
+)
 from brokerage_ai.f3.prompts import build_position_card_messages
 from brokerage_ai.providers.ports import LlmProvider
 from brokerage_ai.providers.repair import REPAIR_MAX_ATTEMPTS
@@ -102,18 +107,18 @@ class ExplodingProvider:
 
 
 def quote(interaction_id: int = 12, text: str = NEW_QUOTE) -> Evidence:
-    return Evidence(kind=EvidenceKind.QUOTE, interaction_id=interaction_id, quote_text=text)
+    return QuoteEvidence(interaction_id=interaction_id, quote_text=text)
 
 
 def inference(note: str = "최근 접촉 이력이 짧다") -> Evidence:
-    return Evidence(kind=EvidenceKind.INFERENCE, note=note)
+    return InferenceEvidence(note=note)
 
 
 def model_output(**overrides: object) -> PositionCardModelOutput:
     values: dict[str, object] = {
         "intent": IntentAssessment(value=NegotiationIntent.PRESENT, evidence=(quote(),)),
         "urgency": UrgencyAssessment(value=Urgency.RELAXED, evidence=(quote(),)),
-        "price": (),
+        "price": ModelPriceOpinions(),
         "timing": TimingAssessment(),
         "contactability": ContactabilityAssessment(
             status=ContactabilityStatus.GOOD, evidence=(inference(),)
@@ -252,7 +257,7 @@ async def test_requirement_generation_calls_the_provider_exactly_once() -> None:
     assert result.target.negotiation_side is NegotiationSide.REQUIREMENT
 
 
-async def test_generation_is_deterministic_at_temperature_zero() -> None:
+async def test_generation_requests_temperature_zero() -> None:
     provider = FakeProvider()
 
     await generator(provider).generate_position_card(listing_request())
@@ -279,12 +284,11 @@ async def test_stated_price_is_copied_from_the_ledger_not_the_model() -> None:
     """모델이 추정만 내도 표기 금액은 요청 장부값이 그대로 들어가야 한다."""
     provider = FakeProvider(
         model_output(
-            price=(
-                ModelPriceOpinion(
-                    price_kind=PriceKind.SALE,
+            price=ModelPriceOpinions(
+                sale=ModelPriceOpinion(
                     estimated_amount=2_700_000_000,
                     basis=(quote(interaction_id=5, text=OLD_QUOTE),),
-                ),
+                )
             )
         )
     )
@@ -301,7 +305,7 @@ async def test_stated_price_is_copied_from_the_ledger_not_the_model() -> None:
 
 async def test_a_price_kind_the_ledger_does_not_offer_is_dropped() -> None:
     provider = FakeProvider(
-        model_output(price=(ModelPriceOpinion(price_kind=PriceKind.JEONSE, estimated_amount=1),))
+        model_output(price=ModelPriceOpinions(jeonse=ModelPriceOpinion(estimated_amount=1)))
     )
     request = listing_request()
 
@@ -354,6 +358,8 @@ def test_model_output_schema_has_no_server_owned_fields() -> None:
     assert not fields & forbidden
     assert "stated_amount" not in set(ModelPriceOpinion.model_fields)
     assert "stated_monthly_amount" not in set(ModelPriceOpinion.model_fields)
+    # 어느 거래 유형인지는 담기는 자리가 정한다. 모델이 고르지 않는다.
+    assert "price_kind" not in set(ModelPriceOpinion.model_fields)
 
 
 # --- 버전과 진단 ---------------------------------------------------------------
@@ -365,7 +371,7 @@ async def test_prompt_and_workflow_versions_are_always_recorded() -> None:
 
     result = await subject.generate_position_card(listing_request())
 
-    assert result.prompt_version == POSITION_CARD_PROMPT_VERSION == "position-card-prompt:v2"
+    assert result.prompt_version == POSITION_CARD_PROMPT_VERSION == "position-card-prompt:v5"
     assert result.workflow_version == POSITION_CARD_WORKFLOW_VERSION == "position-card-workflow:v1"
     # Backend 는 cache key 를 계산하기 전에 같은 값을 알 수 있어야 한다.
     assert subject.versions.prompt_version == result.prompt_version
@@ -435,7 +441,7 @@ async def test_prompt_states_the_evidence_unknown_and_isolation_rules() -> None:
         "최신 진술이 과거 진술을 이긴다",
         "개인정보를 생성하거나 복원하지 않는다",
         "inflexible",
-        "해당하지 않는 필드는 반드시 null",
+        "kind 가 형태를 정한다",
     ):
         assert rule in prompt
 
@@ -564,14 +570,20 @@ async def test_generator_rejects_a_deadline_outside_the_backend_date_signal() ->
         await generator(provider).generate_position_card(listing_request())
 
 
-def test_model_output_rejects_a_repeated_price_kind() -> None:
+def test_a_repeated_price_kind_is_not_representable() -> None:
+    """중복을 검증기로 막지 않는다. schema 에 자리가 하나뿐이라 표현 자체가 안 된다.
+
+    이전 계약은 `price` 가 `price_kind` 를 든 배열이라 같은 유형을 두 번 담을 수 있었고,
+    그 금지를 JSON schema 로 표현할 수 없어 프롬프트 문장에만 의존했다. 로컬 모델이
+    `["SALE", "SALE"]` 을 결정론적으로 반복해 되먹임 3회로도 못 고친 사례가 있다.
+    """
+    slots = set(ModelPriceOpinions.model_fields)
+    assert slots == {"sale", "jeonse", "monthly_rent", "budget"}
+
+    # 월 금액을 쓸 수 있는 자리는 monthly_rent 뿐이다. 나머지 타입에는 필드가 없다.
+    assert "estimated_monthly_amount" not in set(ModelPriceOpinion.model_fields)
     with pytest.raises(ValidationError):
-        model_output(
-            price=(
-                ModelPriceOpinion(price_kind=PriceKind.SALE),
-                ModelPriceOpinion(price_kind=PriceKind.SALE),
-            )
-        )
+        ModelPriceOpinions(sale=ModelPriceOpinion(estimated_monthly_amount=1))  # pyright: ignore[reportCallIssue]
 
 
 async def test_prompt_states_the_quote_rule_for_an_empty_log_set() -> None:

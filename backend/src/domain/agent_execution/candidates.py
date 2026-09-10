@@ -4,7 +4,7 @@ LLM 을 쓰지 않는다 (F3-SQ-01). 앵커 **카드의 추정값**을 조회 �
 반대편 장부에서 후보를 고르고, 가격 근접도·평형 일치·접수 최신성으로 점수를 낸다
 (F3-SQ-04). 이 점수는 **카드화 우선순위**일 뿐이며 중개 등급이 아니다.
 
-상위 15건만 카드화하지만 나머지를 버리지 않는다 (F3-BR-13, F3-BR-14). 전체 후보의 ID,
+상위 5건만 카드화하지만 나머지를 버리지 않는다 (F3-BR-13, F3-BR-14). 전체 후보의 ID,
 구성 점수, 정렬 순서와 사용한 조회 조건을 `match_evaluation.candidate_selection_snapshot`
 에 그대로 보존한다. 컷이 아니라 페이징이다.
 
@@ -35,8 +35,8 @@ from domain.agent_execution.models import (
 from domain.agent_execution.service import current_anchor_version
 
 # snapshot 구조가 바뀌면 올린다. 저장된 예전 snapshot 을 새 구조로 읽지 않기 위해서다.
-# v2 는 거래 유형·활성 상태 조건과 월세 두 축을 조회 조건에 함께 담는다.
-CANDIDATE_SELECTION_SCHEMA_VERSION = "candidate-selection:v2"
+# v3 는 최초 세부 판정 상한을 15건에서 5건으로 낮춰 선택 의미를 고정한다.
+CANDIDATE_SELECTION_SCHEMA_VERSION = "candidate-selection:v3"
 
 # ── 거래 유형 어휘 ─────────────────────────────────────────────────────────────
 #
@@ -72,7 +72,7 @@ ACTIVE_LISTING_STATUSES = frozenset({"RECEIVED"})
 ACTIVE_REQUIREMENT_STATUSES = frozenset({"ACTIVE"})
 
 # 우선 카드화하는 상위 건수 (F3-BR-13). 나머지는 snapshot 에 그대로 남는다.
-CANDIDATE_CARD_LIMIT = 15
+CANDIDATE_CARD_LIMIT = 5
 
 # 가격 밴드. 앵커 추정가에서 이 비율만큼 벗어난 후보까지 포함한다. 정확히 일치하는 값만
 # 남기면 "예산이 조금 모자란 손님"이 통째로 사라지는데, 그 손님이야말로 양보 지점을 물어볼
@@ -185,7 +185,7 @@ def _compared_axis(price_kind: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class CandidateSelection:
-    """후보 추출 결과. 상위 15건은 카드화 대상이고 나머지도 전부 보존한다."""
+    """후보 추출 결과. 상위 5건은 카드화 대상이고 나머지도 전부 보존한다."""
 
     criteria: CandidateCriteria
     ordered: tuple[CandidateScore, ...]
@@ -203,7 +203,7 @@ class CandidateSelection:
         return max(0, self.total_count - CANDIDATE_CARD_LIMIT)
 
     def snapshot(self, anchor: NegotiationPositionAnalysis) -> dict[str, object]:
-        """조회 조건과 **전체** 후보 집합. 15건 이후를 조용히 지우지 않는다."""
+        """조회 조건과 **전체** 후보 집합. 5건 이후를 조용히 지우지 않는다."""
         return {
             "schema": CANDIDATE_SELECTION_SCHEMA_VERSION,
             "anchor": {
@@ -240,7 +240,7 @@ def _quantize(value: Decimal) -> Decimal:
 def _price_proximity(anchor_amount: int | None, candidate_amount: int | None) -> Decimal:
     """가격 근접도. 금액을 알 수 없는 후보는 0 이라 뒤로 밀린다.
 
-    중립값 0.5 를 주면 금액을 아는 후보와 모르는 후보의 순서가 뒤섞인다. 카드화는 15장
+    중립값 0.5 를 주면 금액을 아는 후보와 모르는 후보의 순서가 뒤섞인다. 카드화는 5장
     한정이므로 판단 재료가 있는 후보를 먼저 세우는 쪽이 낫다.
     """
     if not anchor_amount or candidate_amount is None:

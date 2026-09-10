@@ -3,18 +3,20 @@ import {
   Alert,
   Button,
   Checkbox,
-  FormSelect,
-  FormSelectOption,
+  MenuToggle,
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
+  Select,
+  SelectList,
+  SelectOption,
   TextArea,
   TextInput,
 } from "@patternfly/react-core";
-import { SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
+import { MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
-import { describeForUser } from "./ledger/index.ts";
+import { carrySavedIdentity, describeForUser } from "./ledger/index.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import "./DetailWorkspace.css";
 
@@ -32,7 +34,9 @@ const EMPTY_BUYER = {
   content: "",
   stage: "",
   completion: "진행",
-  assignee: "김이순",
+  // 서버는 `assigned_user_id`를 받는다. 이름을 지어 넣으면 저장되지 않는 값이 화면에만 남는다.
+  assignee: "",
+  assigneeId: null,
   background: "",
   expiry: "",
   classification: "",
@@ -50,11 +54,23 @@ function Field({ id, label, value, onChange, type = "text", inputMode, autoCompl
   return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><TextInput id={id} type={type} inputMode={inputMode} autoComplete={autoComplete} placeholder={placeholder} value={value || ""} onChange={(_event, next) => onChange(next)} /></label>;
 }
 
+/*
+ * 네이티브 <select>(FormSelect)는 Windows에서 드롭다운이 열려 있을 때 바깥을 클릭하면
+ * OS 팝업을 닫기만 하고 그 클릭을 아래 요소(저장 버튼 등)로 전달하지 않는다. 거래 구분을
+ * 열어 본 뒤 곧바로 저장을 누르면 첫 클릭이 먹히지 않는 문제로 이어져, JS로 그리는
+ * PatternFly Select(비 네이티브 목록)로 대체한다.
+ */
 function SelectField({ id, label, value, options, onChange }) {
-  return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><FormSelect id={id} value={value} onChange={(_event, next) => onChange(next)}>{options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}</FormSelect></label>;
+  const [isOpen, setIsOpen] = useState(false);
+  const toggle = (toggleRef) => (
+    <MenuToggle ref={toggleRef} id={id} className="detail-field__select-toggle" onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
+      {value}
+    </MenuToggle>
+  );
+  return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><Select id={`${id}-menu`} isOpen={isOpen} selected={value} onSelect={(_event, next) => { onChange(next); setIsOpen(false); }} onOpenChange={setIsOpen} toggle={toggle}><SelectList>{options.map((option) => <SelectOption key={option} value={option} isSelected={option === value}>{option}</SelectOption>)}</SelectList></Select></label>;
 }
 
-export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0 }) {
+export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0, currentUser = null }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY_BUYER, ...(row || {}) }));
   const [f2Open, setF2Open] = useState(false);
   const [closeDecision, setCloseDecision] = useState(false);
@@ -104,6 +120,20 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
   const completionReady = Boolean(draft.buyer?.trim() && draft.category && (draft.complex?.trim() || draft.area?.trim()) && draft.budget?.trim());
   const consented = draft.consent === "동의";
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
+  /* 매물장 상세와 같은 제약이다. 직원 목록 API가 없어 id를 아는 사람은 본인뿐이다. */
+  const assignedToMe = currentUser != null && draft.assigneeId === currentUser.id;
+  const assignedToOther = draft.assigneeId != null && !assignedToMe;
+  const assigneeHint = currentUser == null
+    ? "로그인 세션이 없어 담당자를 배정할 수 없습니다"
+    : assignedToOther
+      ? `현재 담당: ${draft.assignee || "다른 담당자"} · 체크하면 본인으로 바뀝니다`
+      : "다른 담당자 배정은 직원 목록이 생긴 뒤 열립니다";
+  const assignToMe = (checked) => setDraft((current) => ({
+    ...current,
+    ...(checked && currentUser != null
+      ? { assigneeId: currentUser.id, assignee: currentUser.displayName }
+      : { assigneeId: null, assignee: "" }),
+  }));
 
   /*
    * 저장을 막는 사유.
@@ -120,12 +150,15 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
     if (!DEMAND_TYPES.includes(draft.category)) {
       blockers.push(`거래 구분: ${DEMAND_TYPES.join(" · ")} 중 하나를 골라 주세요.`);
     }
-    /* 계약상 구입장은 인물이 있어야 만들 수 있는데 인물 등록 API가 아직 없다. 저장 전에 알린다. */
-    if (draft.serverId == null && draft.partyId == null) {
-      blockers.push("손님 인물 연결: 새 손님은 아직 서버에 등록할 수 없습니다. 인물 등록 기능이 준비될 때까지 이 행은 화면에만 남습니다.");
+    /*
+     * 구입장은 인물이 있어야 만들 수 있다. 기존 인물을 고르는 검색이 없으므로 새 손님은
+     * 이름·별칭으로 인물을 함께 만든다(F1-DM-08). 이름이 없으면 요청 자체를 만들 수 없다.
+     */
+    if (draft.serverId == null && draft.partyId == null && !draft.buyer?.trim()) {
+      blockers.push("이름·별칭: 손님의 이름 또는 별칭을 입력해 주세요. 새 손님은 이름이 있어야 등록할 수 있습니다.");
     }
     return blockers;
-  }, [draft.category, draft.consent, draft.partyId, draft.serverId]);
+  }, [draft.buyer, draft.category, draft.consent, draft.partyId, draft.serverId]);
 
   /* 저장은 되지만 [저장 완료]로 남지 않는 칸. 무엇을 더 채우면 되는지 함께 알려준다. */
   const completionGaps = useMemo(() => [
@@ -147,9 +180,11 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
     const next = { ...draft, saveState: completionReady ? "저장 완료" : "임시저장", ledgerType: "buyer", rowKind: "buyer" };
     setIsSaving(true);
     try {
-      await onSave?.(next);
-      setDraft(next);
-      baselineRef.current = next;
+      const persisted = await onSave?.(next);
+      // 서버가 올린 row_version을 받아 둔다. 없으면 이 상세에서 두 번째 저장이 409가 된다.
+      const saved = carrySavedIdentity(next, persisted);
+      setDraft(saved);
+      baselineRef.current = saved;
       setError(null);
       setCloseDecision(false);
       if (closeAfter) onClose?.();
@@ -205,7 +240,7 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
           </Alert>
         </div>}
         <div className="detail-info-grid">
-          <section className="detail-info-column"><h3>손님과 접수</h3><Field id="buyer-name" label="이름·별칭" value={draft.buyer} onChange={(value) => update("buyer", value)} /><Field id="buyer-phone" label="전화번호" type="tel" inputMode="tel" autoComplete="tel" placeholder="010-0000-0000" value={draft.phone} onChange={(value) => update("phone", nextPhoneInput(draft.phone, value))} /><Field id="buyer-date" label="접수일" type="date" value={draft.date} onChange={(value) => update("date", value)} /><Field id="buyer-assignee" label="담당자" value={draft.assignee} onChange={(value) => update("assignee", value)} /></section>
+          <section className="detail-info-column"><h3>손님과 접수</h3><Field id="buyer-name" label="이름·별칭" value={draft.buyer} onChange={(value) => update("buyer", value)} /><Field id="buyer-phone" label="전화번호" type="tel" inputMode="tel" autoComplete="tel" placeholder="010-0000-0000" value={draft.phone} onChange={(value) => update("phone", nextPhoneInput(draft.phone, value))} /><Field id="buyer-date" label="접수일" type="date" value={draft.date} onChange={(value) => update("date", value)} /><div className="detail-field"><span className="detail-field__label" id="buyer-assignee-label">담당자</span><Checkbox id="buyer-assignee" label="나에게 배정" aria-labelledby="buyer-assignee-label buyer-assignee" isChecked={assignedToMe} isDisabled={currentUser == null} onChange={(_event, checked) => assignToMe(checked)} /><span className="detail-field__hint">{assigneeHint}</span></div></section>
           <section className="detail-info-column"><h3>희망 조건</h3><SelectField id="buyer-category" label="거래 구분" value={draft.category} options={DEMAND_TYPES} onChange={(value) => update("category", value)} /><Field id="buyer-complex" label="희망 단지·지역" value={draft.complex} onChange={(value) => update("complex", value)} /><Field id="buyer-area" label="희망 평형" value={draft.area} onChange={(value) => update("area", value)} /><Field id="buyer-budget" label="금액 조건" value={draft.budget} onChange={(value) => update("budget", value)} /><Field id="buyer-move-date" label="이사일" type="date" value={draft.moveDate} onChange={(value) => update("moveDate", value)} /></section>
           <section className="detail-info-column"><h3>진행 관리</h3><Field id="buyer-stage" label="진행 단계" value={draft.stage} onChange={(value) => update("stage", value)} /><SelectField id="buyer-completion" label="완료 여부" value={draft.completion} options={["진행", "완료"]} onChange={(value) => update("completion", value)} /><Field id="buyer-expiry" label="만기일" type="date" value={draft.expiry} onChange={(value) => update("expiry", value)} /><Field id="buyer-classification" label="분류" value={draft.classification} onChange={(value) => update("classification", value)} /><Field id="buyer-brokerage" label="관련 부동산" value={draft.brokerage} onChange={(value) => update("brokerage", value)} /></section>
         </div>
@@ -220,7 +255,8 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
       <div className="detail-workspace__action-row">
         <Button variant="primary" icon={<SaveIcon />} onClick={() => save()} isLoading={isSaving} isDisabled={isSaving}>저장</Button>
         <Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button>
-        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} aria-expanded={isCrossMatchOpen} aria-controls="cross-match-panel">교차 판정</Button>
+        <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button>
+        <Button className="buyer-detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button>
         <Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button>
       </div>
       <span className="buyer-detail-workspace__save-state" aria-live="polite">{dirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span>

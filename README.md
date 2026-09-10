@@ -109,7 +109,8 @@ flowchart LR
 | Database | PostgreSQL 15 | 결정·구현 |
 | Data | 재현 가능한 수집·정제·평가 파이프라인 | 계획 |
 | Infrastructure | Terraform 1.15.x, AWS Provider 6.x | 계정·공유 dev 기반 적용; 후속 변경 plan 대기 |
-| 운영 후보 | RunPod, AWS SQS, ECS Fargate | 미확정 또는 제안 |
+| 외부 모델 실행 | RunPod shared F2 Pod와 private Team Template | 결정·코드 구현, 외부 자원 미적용 |
+| 조건부 운영 후보 | AWS SQS, ECS Fargate | 미확정 또는 조건부 |
 
 ### 저장소 구조
 

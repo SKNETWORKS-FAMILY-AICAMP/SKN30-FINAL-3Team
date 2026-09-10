@@ -141,6 +141,7 @@ export function toBuyerRow(
 
     // 상담 로그는 별도 엔드포인트에서 가져온다.
     content: "",
+    savedInteractionContent: "",
     memo: textOrEmpty(dto.memo),
 
     brokerage: readCustomText(dto.custom_fields, CUSTOM_KEYS.brokerageName),
@@ -187,16 +188,27 @@ function requirementFields(row: BuyerRow) {
 /**
  * 구입장 생성 요청.
  *
- * `party_id`가 서버 필수값이다. 인물을 먼저 만들어야 구입장을 만들 수 있는데
- * 인물 생성 엔드포인트가 아직 계약에 없다. 인물 id가 없으면 null을 반환해
+ * `party_id`가 서버 필수값이지만 화면에는 기존 인물을 고르는 검색이 없다. 기존 연결이
+ * 없는 새 손님은 이름·전화와 동의를 `new_party`로 실어 보내 요청 한 번으로 인물까지 만든다
+ * (F1-DM-08 별칭 허용, F1-DM-16 동의 없이 저장 불가). 이름이나 동의가 없으면 null을 반환해
  * 호출부가 저장을 보류하고 사용자에게 알리게 한다.
  */
 export function toRequirementCreatePayload(row: BuyerRow): PropertyRequirementCreateDto | null {
-  if (row.partyId == null) return null;
   const demandType = toCode(DEMAND_TYPE, row.category);
   if (demandType == null) return null;
 
-  return { party_id: row.partyId, demand_type: demandType, ...requirementFields(row) };
+  if (row.partyId != null) {
+    return { party_id: row.partyId, demand_type: demandType, ...requirementFields(row) };
+  }
+
+  const name = row.buyer?.trim() ?? "";
+  if (name === "" || row.consent !== "동의") return null;
+  return {
+    new_party: { name, phone: emptyToNull(row.phone) },
+    privacy_consent: true,
+    demand_type: demandType,
+    ...requirementFields(row),
+  };
 }
 
 export function toRequirementUpdatePayload(row: BuyerRow): PropertyRequirementUpdateDto | null {
@@ -251,6 +263,7 @@ export function createBuyerDraftRow(localId: string): BuyerRow {
     assignee: "",
 
     content: "",
+    savedInteractionContent: "",
     memo: "",
 
     brokerage: "",

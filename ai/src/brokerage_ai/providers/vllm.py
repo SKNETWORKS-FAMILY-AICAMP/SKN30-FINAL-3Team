@@ -65,6 +65,10 @@ class VllmAdapter:
                 for message in request.messages
             ],
             "response_format": output_schema,
+            # Qwen3는 chat template에서 thinking이 기본으로 켜져 있어 추론 과정을 먼저 출력한다.
+            # 학습은 enable_thinking=False로 렌더링했고, 켠 채로 부르면 max_tokens에 걸려
+            # 잘린 응답이 구조화 파싱을 실패시킨다. 서버 플래그에 의존하지 않고 요청마다 끈다.
+            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
         }
         if request.temperature is not None:
             parameters["temperature"] = request.temperature

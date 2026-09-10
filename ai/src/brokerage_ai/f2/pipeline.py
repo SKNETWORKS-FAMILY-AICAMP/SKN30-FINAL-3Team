@@ -44,30 +44,29 @@ class F2Pipeline:
             raise EmptyTranscriptionError("STT 결과가 비어 있어 sLLM 분석을 중단했습니다.")
 
         # 기존 필드값은 모델에 전달하지 않는다. 분석 이후 제안 상태를 정할 때만 사용한다.
-        analysis, diagnostics = await self._analyzer.analyze(
-            transcript=transcript,
-            ledger_type=request.ledger_type,
-        )
+        analysis, diagnostics = await self._analyzer.analyze(transcript=transcript)
+        ledger_type = self._resolve_ledger_type(analysis.consultation_type)
         ledger_mismatch = self._is_ledger_mismatch(
-            request.ledger_type,
-            analysis.consultation_type,
+            request.current_ledger_type,
+            ledger_type,
         )
-        proposals, validation_notes = self._build_proposals(
-            analysis=analysis,
-            transcript=transcript,
-            ledger_type=request.ledger_type,
-            current_fields=request.current_fields,
-            allow_fields=self._allows_field_proposals(
-                ledger_type=request.ledger_type,
-                consultation_type=analysis.consultation_type,
-                ledger_mismatch=ledger_mismatch,
-            ),
-        )
+        if ledger_type is None:
+            proposals, validation_notes = (), self._suppressed_fields_note(analysis)
+        else:
+            proposals, validation_notes = self._build_proposals(
+                analysis=analysis,
+                transcript=transcript,
+                ledger_type=ledger_type,
+                current_fields=(
+                    request.current_fields if request.current_ledger_type is ledger_type else {}
+                ),
+                allow_fields=not ledger_mismatch,
+            )
 
         return F2PipelineResult(
             transcript=transcript,
             transcription_model=transcription.model,
-            ledger_type=request.ledger_type,
+            ledger_type=ledger_type,
             consultation_type=analysis.consultation_type,
             ledger_mismatch=ledger_mismatch,
             proposals=proposals,
@@ -77,29 +76,29 @@ class F2Pipeline:
         )
 
     @staticmethod
+    def _resolve_ledger_type(consultation_type: ConsultationType) -> LedgerType | None:
+        if consultation_type is ConsultationType.SELL_REQUEST:
+            return LedgerType.PROPERTY
+        if consultation_type is ConsultationType.BUY_REQUEST:
+            return LedgerType.BUYER
+        return None
+
+    @staticmethod
     def _is_ledger_mismatch(
-        ledger_type: LedgerType,
-        consultation_type: ConsultationType,
+        current_ledger_type: LedgerType | None,
+        recommended_ledger_type: LedgerType | None,
     ) -> bool:
         return (
-            ledger_type is LedgerType.PROPERTY and consultation_type is ConsultationType.BUY_REQUEST
-        ) or (
-            ledger_type is LedgerType.BUYER and consultation_type is ConsultationType.SELL_REQUEST
+            current_ledger_type is not None
+            and recommended_ledger_type is not None
+            and current_ledger_type is not recommended_ledger_type
         )
 
     @staticmethod
-    def _allows_field_proposals(
-        *,
-        ledger_type: LedgerType,
-        consultation_type: ConsultationType,
-        ledger_mismatch: bool,
-    ) -> bool:
-        if ledger_mismatch:
-            return False
-        return (
-            ledger_type is LedgerType.PROPERTY
-            and consultation_type is ConsultationType.SELL_REQUEST
-        ) or (ledger_type is LedgerType.BUYER and consultation_type is ConsultationType.BUY_REQUEST)
+    def _suppressed_fields_note(analysis: ConsultationAnalysis) -> tuple[str, ...]:
+        if not analysis.fields:
+            return ()
+        return ("기타상담의 필드 제안을 제외했습니다.",)
 
     @classmethod
     def _build_proposals(

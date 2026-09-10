@@ -13,6 +13,8 @@ import { formatPyeong, formatPyeongList, parsePyeong, parsePyeongList } from "..
 import { addYears, formatTimestampAsDate, parseDate } from "../src/features/ledger/model/dates.ts";
 import { formatPhone, formatPhoneInput, isSamePhone, maskPhone, nextPhoneInput, normalizePhone } from "../src/features/ledger/model/phone.ts";
 import { LIFECYCLE_STATUS, toCode, toLabel } from "../src/features/ledger/model/codes.ts";
+import { priceFieldPatch } from "../src/features/ledger/model/dealType.ts";
+import { carrySavedIdentity } from "../src/features/ledger/model/row.ts";
 import {
   applyServerIdentity,
   applyUnitDetail,
@@ -271,6 +273,94 @@ test("매물 건 요청은 금액을 원 단위로 되돌린다", () => {
   assert.equal(payload.is_jeonse_available, false);
 });
 
+test("거래유형을 고르지 않고 매매가만 적어도 금액이 살아남는다", () => {
+  // 상세의 거래유형 셀렉트가 빈 값을 '매매'처럼 보여줘, 유형을 안 고른 채 금액만 적는 일이 잦다.
+  // 그대로 두면 세 플래그가 모두 꺼져 나가 방금 적은 금액이 사라진다.
+  const draft = createPropertyDraftRow("DRAFT-1");
+  const patched = { ...draft, ...priceFieldPatch(draft, "salePrice", "28억 8,000만") };
+
+  assert.equal(patched.saleFlag, "Y");
+  assert.equal(patched.listingType, "매매");
+  assert.equal(patched.price, "28억 8,000만");
+
+  const payload = toListingCreatePayload(patched);
+  assert.equal(payload.is_sale_available, true);
+  assert.equal(payload.sale_price, 2_880_000_000);
+});
+
+test("이미 고른 거래유형은 다른 금액을 적어도 바뀌지 않는다", () => {
+  // 매매 건에 전세보증금을 참고로 적는 것만으로 매물이 전세로 뒤집히면 안 된다.
+  const sale = { ...createPropertyDraftRow("DRAFT-1"), saleFlag: "Y", listingType: "매매" };
+  const patched = { ...sale, ...priceFieldPatch(sale, "leaseDeposit", "12억") };
+
+  assert.equal(patched.listingType, "매매");
+  assert.equal(patched.leaseFlag, "");
+  assert.equal(patched.leaseDeposit, "12억");
+  // 대표 금액은 지금 고른 유형의 것만 따라간다.
+  assert.equal(patched.price, "");
+});
+
+test("금액을 지우는 입력은 거래유형을 켜지 않는다", () => {
+  const draft = createPropertyDraftRow("DRAFT-1");
+  const patched = { ...draft, ...priceFieldPatch(draft, "salePrice", "") };
+
+  assert.equal(patched.saleFlag, "");
+  assert.equal(patched.listingType, "");
+});
+
+test("월세 금액은 현재 임대차 보증금·차임으로 덮이지 않는다", () => {
+  // deposit·rent는 지금 살고 있는 세입자의 조건이다. 내놓는 매물 조건과 다른 값이다.
+  const monthly = {
+    ...createPropertyDraftRow("DRAFT-1"),
+    monthlyFlag: "Y",
+    listingType: "월세",
+    deposit: "9억 4,500만",
+    rent: "380만",
+  };
+
+  const filled = toListingCreatePayload({ ...monthly, rentCondition: "2억 / 150만" });
+  assert.equal(filled.monthly_rent_deposit_amount, 200_000_000);
+  assert.equal(filled.monthly_rent_amount, 1_500_000);
+
+  // 매물 조건을 적지 않았으면 비워 둔다. 현재 임대차 금액을 매물가로 지어내지 않는다.
+  const blank = toListingCreatePayload(monthly);
+  assert.equal(blank.monthly_rent_deposit_amount, null);
+  assert.equal(blank.monthly_rent_amount, null);
+});
+
+test("명도만 적은 세대도 매물 건을 만든다", () => {
+  // 명도는 property_listing.handover_condition이 소유한다. 매물 건을 만들지 않으면 갈 곳이 없다.
+  const row = { ...createPropertyDraftRow("DRAFT-1"), clearance: "즉시" };
+
+  assert.equal(hasListingValues(row), true);
+  assert.equal(toListingCreatePayload(row).handover_condition, "즉시");
+  // 거래유형 플래그는 꺼진 채다. F3 후보 조회가 유형별 available을 요구하므로 후보로 올라오지 않는다.
+  assert.equal(toListingCreatePayload(row).is_sale_available, false);
+});
+
+test("주차·세금은 custom_fields로 왕복한다", () => {
+  // 33 컬럼에 없는 확장 항목이라 전용 컬럼이 없다. 매퍼가 빠뜨리면 입력값이 통째로 사라진다.
+  const row = { ...createPropertyDraftRow("DRAFT-1"), complexId: 1, unit: "203", parking: "2대", tax: "양도세 비과세" };
+
+  const created = toUnitCreatePayload(row);
+  assert.ok(created != null);
+  assert.equal(created.custom_fields.parking, "2대");
+  assert.equal(created.custom_fields.tax_memo, "양도세 비과세");
+
+  const restored = toPropertyRow({ ...saleUnit(), custom_fields: created.custom_fields });
+  assert.equal(restored.parking, "2대");
+  assert.equal(restored.tax, "양도세 비과세");
+});
+
+test("세대 수정도 생성과 같은 custom_fields를 보낸다", () => {
+  const row = { ...toPropertyRow(saleUnit()), parking: "지하 1대", tax: "재산세 6월" };
+  const payload = toUnitUpdatePayload(row);
+
+  assert.ok(payload != null);
+  assert.equal(payload.custom_fields?.parking, "지하 1대");
+  assert.equal(payload.custom_fields?.tax_memo, "재산세 6월");
+});
+
 test("상담 로그는 바뀌었을 때만 새 로그로 보낸다", () => {
   // client_interaction은 추가 전용이므로 같은 내용이 중복 적재되면 안 된다.
   assert.equal(newInteractionContent("같음", "같음"), null);
@@ -307,20 +397,47 @@ test("희망 단지는 목록 응답에 없다", () => {
   assert.equal(toBuyerRow(dto).complex, "");
 });
 
-test("인물이 없는 구입장은 저장 요청을 만들지 않는다", () => {
-  // 계약상 party_id가 필수인데 인물 생성 엔드포인트가 없다.
+test("이름·동의가 없는 새 손님은 저장 요청을 만들지 않는다", () => {
+  // 이름이 비어 있으면 인물을 만들 이름이 없다.
   const draft = createBuyerDraftRow("BUYER-DRAFT-1");
   assert.equal(toRequirementCreatePayload(draft), null);
 
-  const withParty = { ...draft, partyId: 500, budget: "28억선", area: "25 33평" };
-  const payload = toRequirementCreatePayload(withParty);
+  // 이름은 있어도 동의가 없으면 여전히 막는다(F1-DM-16).
+  const named = { ...draft, buyer: "인천사모님" };
+  assert.equal(toRequirementCreatePayload(named), null);
+});
+
+test("이름·동의가 있는 새 손님은 new_party로 인물을 함께 만든다", () => {
+  // 화면에는 기존 인물을 고르는 검색이 없어 이름·전화·동의를 실어 요청 한 번으로 인물까지 만든다.
+  const draft = createBuyerDraftRow("BUYER-DRAFT-1");
+  const withNewParty = {
+    ...draft,
+    buyer: "인천사모님",
+    phone: "010-1234-5678",
+    consent: "동의",
+    budget: "28억선",
+    area: "25 33평",
+  };
+  const payload = toRequirementCreatePayload(withNewParty);
   assert.ok(payload != null);
-  assert.equal(payload.party_id, 500);
+  assert.equal(payload.party_id, undefined);
+  assert.deepEqual(payload.new_party, { name: "인천사모님", phone: "010-1234-5678" });
+  assert.equal(payload.privacy_consent, true);
   assert.equal(payload.demand_type, "BUY");
   // 원문과 파싱값이 함께 실린다
   assert.equal(payload.budget_raw_text, "28억선");
   assert.equal(payload.max_budget_amount, 28 * EOK);
   assert.deepEqual(payload.desired_pyeongs, [25, 33]);
+});
+
+test("기존 인물에 이어진 구입장은 party_id로 저장 요청을 만든다", () => {
+  const draft = createBuyerDraftRow("BUYER-DRAFT-1");
+  const withParty = { ...draft, partyId: 500, budget: "28억선", area: "25 33평" };
+  const payload = toRequirementCreatePayload(withParty);
+  assert.ok(payload != null);
+  assert.equal(payload.party_id, 500);
+  assert.equal(payload.new_party, undefined);
+  assert.equal(payload.demand_type, "BUY");
 });
 
 
@@ -394,4 +511,54 @@ test("서버에 저장된 행은 값이 비어 보여도 빈 행이 아니다", 
   // 이미 서버에 있는 레코드는 화면에서 조용히 지우면 안 된다. 삭제는 별도 경로다.
   const saved = { ...createPropertyDraftRow("DRAFT-1"), serverId: 42, rowVersion: 1 };
   assert.equal(isEmptyDraft(saved), false);
+});
+
+/*
+ * 저장 응답의 서버 신원 전달.
+ *
+ * 상세 화면은 열릴 때 복사한 작성값으로 저장한다. 저장 뒤 새 row_version을 받아 두지 않으면
+ * 같은 상세에서 두 번째 저장이 낡은 버전을 보내, 혼자 쓰고 있어도 409를 받는다.
+ */
+test("저장 응답의 row_version과 서버 id를 작성값이 이어받는다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 1, listingId: 3, listingRowVersion: 1 };
+  const persisted = { ...draft, serverId: 7, rowVersion: 2, listingId: 3, listingRowVersion: 2 };
+
+  const next = carrySavedIdentity(draft, persisted);
+
+  assert.equal(next.rowVersion, 2);
+  assert.equal(next.listingRowVersion, 2);
+  assert.equal(next.serverId, 7);
+});
+
+test("저장 중에 이어서 적은 값은 저장 응답으로 덮지 않는다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 1, memo: "저장 뒤에 더 적은 메모" };
+  const persisted = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 2, memo: "저장 시점의 메모" };
+
+  const next = carrySavedIdentity(draft, persisted);
+
+  assert.equal(next.memo, "저장 뒤에 더 적은 메모");
+  assert.equal(next.rowVersion, 2);
+});
+
+test("저장 응답이 없으면 작성값을 그대로 둔다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), serverId: 7, rowVersion: 1 };
+
+  assert.deepEqual(carrySavedIdentity(draft, undefined), draft);
+  assert.deepEqual(carrySavedIdentity(draft, null), draft);
+});
+
+test("저장된 상담 기준값은 이어받되 저장 중 추가 입력은 보존한다", () => {
+  const draft = { ...createPropertyDraftRow("DRAFT-1"), log: "저장 중 추가 입력", savedInteractionContent: "이전 상담" };
+  const persisted = { ...draft, log: "이번 저장 상담", savedInteractionContent: "이번 저장 상담" };
+  const carried = carrySavedIdentity(draft, persisted);
+  assert.equal(carried.log, "저장 중 추가 입력");
+  assert.equal(carried.savedInteractionContent, "이번 저장 상담");
+  assert.equal(newInteractionContent(carried.log, carried.savedInteractionContent), "저장 중 추가 입력");
+});
+
+test("목록의 기존 상담은 비고만 바꾸어도 신규 로그로 분류하지 않는다", () => {
+  const dto = createUnitRowDtos(1)[0]!;
+  const row = toPropertyRow({ ...dto, latest_interaction_content: "이미 저장된 상담" });
+  const edited = { ...row, memo: "비고만 변경" };
+  assert.equal(newInteractionContent(edited.log, edited.savedInteractionContent), null);
 });

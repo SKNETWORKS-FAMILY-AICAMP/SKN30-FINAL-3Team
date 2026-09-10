@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-27
+updated: 2026-09-07
 ---
 
 # 결정 인덱스
@@ -14,16 +14,41 @@ updated: 2026-08-27
 | [ADR-0005](ADR-0005-requirements-management.md) | 승인됨 | 제품 요구사항을 분할 정본과 얇은 라우터로 관리 |
 | [ADR-0006](ADR-0006-ai-backend-boundary.md) | 승인됨 | AI와 Backend의 프레임워크·영속성 경계 분리 |
 | [ADR-0007](ADR-0007-terraform-iac.md) | 부분 대체됨 | Terraform IaC 정본과 초기 IAM 접근 사용 |
-| [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md) | 부분 대체됨 | EC2 Backend·설치형 AI·RunPod와 초기 전달 경로 사용 |
+| [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md) | 부분 대체됨 | EC2 Backend·설치형 AI·RunPod 상위 구조 유지; 전달은 ADR-0011, RunPod 운영은 ADR-0020 적용 |
 | [ADR-0009](ADR-0009-dev-demo-operating-constraints.md) | 부분 대체됨 | 2026-09-23 종료, CloudFront 동일 origin, Billing 미사용과 pgvector migration 경계 |
-| [ADR-0010](ADR-0010-pr-policy-ai-review-discord.md) | 부분 대체됨 | GitHub Actions 기반 결정적 분할·통합 PR AI 리뷰와 Discord 결과 전달 |
+| [ADR-0010](ADR-0010-pr-policy-ai-review-discord.md) | 부분 대체됨 | GitHub Actions 기반 결정적 분할 PR AI 리뷰와 Discord 결과 전달; 정책 선택·중재는 ADR-0024 적용 |
 | [ADR-0011](ADR-0011-dev-cicd-pipeline-modes.md) | 부분 대체됨 | dev 자동 통합과 Backend·Frontend 수동 독립 CodePipeline 운영 |
 | [ADR-0012](ADR-0012-retain-iam-access.md) | 승인됨 | Identity Center 전환을 폐기하고 기존 개인 IAM·MFA·역할 접근 유지 |
 | [ADR-0013](ADR-0013-dev-integration-pr-flow.md) | 승인됨 | `dev` 개발 통합, `main` 릴리스 PR과 Hong1008 기본 승인 책임 사용 |
 | [ADR-0014](ADR-0014-f3-prototype-synthetic-input.md) | 승인됨 | F3 프로토타입 합성 입력의 마스킹 생략과 실사용 데이터 연결 전 종료 조건 |
-| [ADR-0015](ADR-0015-environment-configuration-ownership.md) | 승인됨 | tracked `.env.local`, 개인 `.env`, Terraform 공개 설정과 write-only 비밀값의 소유권 분리 |
+| [ADR-0015](ADR-0015-environment-configuration-ownership.md) | 부분 대체됨 | tracked `.env.local`, 개인 `.env`, Terraform 공개 설정과 초기 write-only 비밀값 소유권 분리 |
 | [ADR-0016](ADR-0016-pr-review-cross-chunk-evidence.md) | 승인됨 | 제한된 PR head 전체 파일·동일 PR 정책 근거 공유와 명시적 `high` 오탐 기각 |
 | [ADR-0017](ADR-0017-shared-dev-development-session.md) | 승인됨 | 공유 AWS를 애플리케이션 dev로 분류하고 합성 고정 계정의 개발 세션만 허용 |
+| [ADR-0018](ADR-0018-f3-save-trigger-anchor-card-scope.md) | 승인됨 | F1 저장 트리거를 앵커 포지션 카드까지로 한정하고 후보 조회·판정은 사용자 요청이 같은 실행을 이어받아 수행 |
+| [ADR-0019](ADR-0019-minimal-error-observability.md) | 승인됨 | Backend 미처리 500과 AI 최종 실패만 기존 AWS 경로로 알리고 공개 오류·Frontend 복구 경계를 정규화 |
+| [ADR-0020](ADR-0020-sllm-release-handoff.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | 학습자의 bundle 전달, Infra의 private S3 승격, RunPod create/delete와 F2 offline 계약 사용; release 계약은 ADR-0022 적용 |
+| [ADR-0021](ADR-0021-runpod-operations-and-secret-ownership.md) | 부분 대체됨·코드 구현, 외부 자원 미적용 | bootstrap·GHCR 소유권은 ADR-0031, 자체 감시·복구 정책은 ADR-0029로 대체 |
+| [ADR-0022](ADR-0022-sllm-release-v2-base-only.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | 평가 provenance를 결속한 LoRA·base release v2, S3 cross-hash와 비용 전 preflight 사용; dev 예외는 ADR-0023 적용 |
+| [ADR-0023](ADR-0023-sllm-dev-unevaluated-release.md) | 승인됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | `dev-*` 미평가 metadata bundle과 명시적 RunPod dev create 경로 사용 |
+| [ADR-0024](ADR-0024-pr-review-policy-routing-and-arbitration.md) | 승인됨·코드 구현 | 결정적 정책 pack·Markdown 절 라우팅, Luna 모듈 leaf와 조건부 Terra 정책 중재, 예상 비용 기록 |
+| [ADR-0025](ADR-0025-calendar-storage-ownership.md) | 승인됨 | 캘린더 일정 저장은 F4가 소유(F1-SC 아님)하고, Time Keeper "다가오는 일정" 조회가 캘린더 일정을 여덟 번째 union 갈래로 통합 |
+| [ADR-0026](ADR-0026-general-ai-provider-and-model-profiles.md) | 부분 대체됨·seed와 Provider runtime 구현, GPU Infra 보류 | 범용 Provider alias routing과 신뢰된 Qwen 양자화 seed 프로필 유지; 활성 Provider는 ADR-0027 적용 |
+| [ADR-0027](ADR-0027-bedrock-gpt56-luna-dev-poc.md) | 승인됨·코드 구현, AWS 미적용 | local OpenAI Luna와 합성 dev Bedrock Luna SigV4 POC 사용, GPU Infra 보류 |
+| [ADR-0028](ADR-0028-f2-single-pass-auto-ledger-routing.md) | 승인됨·코드 구현 | F2 신규 음성을 한 번 분석하고 상담 유형에서 추천 장부와 그 장부 필드를 함께 반환 |
+| [ADR-0029](ADR-0029-runpod-manual-observation.md) | 사용자 명시 선택·구현 및 기반 제거 적용 승인·2026-09-07 감시 제거 적용 확인·팀 병합 검토 대기 | RunPod 자체 감시 제거, 운영자 시작·종료 확인, 실패 시 offline 정리·재시도 |
+| [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md) | 부분 대체됨(ADR-0036)·사용자 구현·기반 적용 승인·AWS/RunPod 후보 합성 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료 | local 개인 OpenAI 유지, dev F2/general 독립 AWS·RunPod 전환, alias·업무 데이터 보존 |
+| [ADR-0031](ADR-0031-runpod-junior-operations.md) | 사용자 구현 승인·코드 구현·팀 병합 검토 대기. Console 등록과 후속 감시 제거의 적용 기록은 Infra validation 참조; F2 정식 앱 배포는 미완료 | 약 10명 부트캠프 시연: Console 등록, 게시 품질 검증, API 전용 refresh·F2 동시 1건, 단일 GPU·점검 중단 허용 |
+
+| [ADR-0032](ADR-0032-general-model-comparison-profiles.md) | 사용자 구현·평가 승인·코드 구현·팀 검토 대기 | 범용 3모델 고정 프로필·실제 가중치 검증·명시 선택과 동일 조건 비교 |
+
+| [ADR-0033](ADR-0033-environment-input-maintenance.md) | 사용자 구현 승인·구현됨·팀 검토 전 | env 파일 역할·주석·Worker config 통일·F2 명시 연결·진단 기준 |
+
+| [ADR-0034](ADR-0034-module-owned-environment.md) | 부분 대체됨(ADR-0036)·사용자 명시 구현 승인·코드 구현·팀 병합 검토 전·기동 미실행 | 모듈 소유 입력·enum 선택·로컬 주입·Worker/F2/endpoint 입력의 명시적 부분 대체 |
+
+| [ADR-0036](ADR-0036-shared-dev-serving-selection.md) | 사용자 계획 구현 승인·코드/자동 검증·공유 적용/기동 미수행 | SSM 공유 선택·정지 후 변경·명시 DB 대상/이력·사용자 검증 |
+
+| [ADR-0035](ADR-0035-f3-conditional-automation-results.md) | 대체됨(ADR-0037) | F3 자동 판정·저장 결과 조회 폐기 |
+| [ADR-0037](ADR-0037-f3-expansion-retirement.md) | 사용자 폐기 결정·코드 롤백 | #116·#117·#118 역적용, 기존 수동 F3 유지, DB/배포 별도 |
 
 이 인덱스에는 프로젝트 공통 및 모듈 간 ADR만 둔다. 모듈 내부 결정은 각 모듈 스킬의 `references/decisions/index.md`에서 관리한다.
 

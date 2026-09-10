@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from core.config import Config
-from domain.agent_execution import triggers
+from domain.agent_execution import service, triggers
 from domain.agent_execution.triggers import (
     LISTING_TRIGGER_FIELDS,
     REQUIREMENT_TRIGGER_FIELDS,
@@ -21,7 +21,8 @@ def stored_runs(session: Session, brokerage_id: int) -> list[dict]:
     rows = session.execute(
         text(
             "SELECT id, status, trigger_type, target_listing_id, target_requirement_id,"
-            " input_data_version, requested_by FROM agent_run WHERE brokerage_id = :brokerage_id"
+            " input_data_version, requested_by, attempt_count, lease_owner, lease_expires_at"
+            " FROM agent_run WHERE brokerage_id = :brokerage_id"
             " ORDER BY id"
         ),
         {"brokerage_id": brokerage_id},
@@ -223,7 +224,8 @@ def test_same_value_with_stale_version_is_still_a_conflict(config: Config) -> No
 
 
 @requires_database
-def test_screen_request_reuses_run_created_by_save(config: Config) -> None:
+def test_screen_request_promotes_queued_run_created_by_save(config: Config) -> None:
+    """Worker 선점 전 버튼을 눌러도 같은 실행이 전체 판정 요청을 기억한다."""
     with ledger_client(config) as (client, session, brokerage_id, _user_id):
         complex_id = create_complex(client, session, brokerage_id, "재사용단지")
         listing = create_listing(client, complex_id)
@@ -236,7 +238,84 @@ def test_screen_request_reuses_run_created_by_save(config: Config) -> None:
 
         assert response.status_code == 202, response.text
         assert response.json()["run_id"] == automatic["id"]
-        assert len(stored_runs(session, brokerage_id)) == 1
+        runs = stored_runs(session, brokerage_id)
+        assert len(runs) == 1
+        assert runs[0]["status"] == "QUEUED"
+        assert runs[0]["trigger_type"] == "USER_REQUEST"
+        assert runs[0]["requested_by"] == automatic["requested_by"]
+
+
+@requires_database
+def test_screen_request_promotes_running_run_without_replacing_its_lease(config: Config) -> None:
+    """앵커 카드를 만드는 중이면 현재 Worker가 같은 lease에서 판정을 계속한다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, "진행중이어받기단지")
+        listing = create_listing(client, complex_id)
+        automatic = stored_runs(session, brokerage_id)[0]
+        session.execute(
+            text(
+                "UPDATE agent_run SET status = 'RUNNING', attempt_count = 2,"
+                " lease_owner = 'worker-before-request',"
+                " lease_expires_at = now() + interval '5 minutes' WHERE id = :run_id"
+            ),
+            {"run_id": automatic["id"]},
+        )
+        session.commit()
+
+        response = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        )
+
+        assert response.status_code == 202, response.text
+        stored = stored_runs(session, brokerage_id)[0]
+        assert stored["status"] == "RUNNING"
+        assert stored["trigger_type"] == "USER_REQUEST"
+        assert stored["requested_by"] == automatic["requested_by"]
+        assert stored["attempt_count"] == 2
+        assert stored["lease_owner"] == "worker-before-request"
+
+
+@requires_database
+def test_user_request_resumes_the_run_parked_after_the_anchor_card(config: Config) -> None:
+    """앵커 카드에서 멈춘 저장 실행을 사용자 요청이 이어받는다 (F3-CR-01~04).
+
+    새 실행을 만들지 않는다. 새로 만들면 앵커 카드 단계를 다시 지나므로 저장이 이미
+    치른 비용을 한 번 더 쓴다. `requested_by`는 최초 접수자를 유지한다.
+    """
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        complex_id = create_complex(client, session, brokerage_id, "이어받기단지")
+        listing = create_listing(client, complex_id)
+        automatic = stored_runs(session, brokerage_id)[0]
+        assert automatic["trigger_type"] == "LEDGER_SAVE"
+
+        # Worker가 앵커 카드를 저장한 뒤 멈춘 상태를 만든다.
+        session.execute(
+            text("UPDATE agent_run SET status = 'ANCHOR_READY' WHERE id = :run_id"),
+            {"run_id": automatic["id"]},
+        )
+        session.commit()
+
+        response = client.post(
+            "/api/v1/f3/runs",
+            json={"anchor_type": "LISTING", "anchor_id": listing["id"]},
+        )
+
+        assert response.status_code == 202, response.text
+        assert response.json()["run_id"] == automatic["id"]
+
+        runs = stored_runs(session, brokerage_id)
+        assert len(runs) == 1
+        resumed = runs[0]
+        # 옮겨진 뒤에야 Worker가 후보 조회부터 이어서 진행한다.
+        assert resumed["trigger_type"] == "USER_REQUEST"
+        assert resumed["status"] == "ANCHOR_READY"
+        assert resumed["requested_by"] == automatic["requested_by"]
+
+        claimed = service.claim_next_run(session, "worker-after-request")
+        assert claimed is not None and claimed.id == automatic["id"]
+        # 계획된 이어받기는 실패 재시도가 아니므로 횟수를 추가로 쓰지 않는다.
+        assert claimed.attempt_count == automatic["attempt_count"]
 
 
 @requires_database

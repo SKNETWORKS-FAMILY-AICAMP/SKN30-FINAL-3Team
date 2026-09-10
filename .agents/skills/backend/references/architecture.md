@@ -19,6 +19,12 @@
 
 ## 설계 단위와 의존성
 
+현재 F2의 시연용 예외는 [프로젝트 ADR-0031](../../project-wiki/references/decisions/ADR-0031-runpod-junior-operations.md)을 따른다.
+API는 한 프로세스로 실행하고 요청 진입부에서 F2 한 건만 허용한다. 실행 중인 task의 강한 참조를
+app state에 두고 클라이언트 취소와 실제 pipeline 종료를 분리한다. 종료 시 임시 파일과 슬롯을
+정리하고 lifespan은 진행 중 작업을 기다린 뒤 runtime을 닫는다. 다중 프로세스·인스턴스나
+영속 대기열을 지원하는 제한기로 해석하지 않는다.
+
 - 기능 응집도와 변경 이유를 기준으로 경계를 찾고 실제 도메인 이름을 공통 스킬에 미리 고정하지 않는다.
 - 새 기능은 하나의 모듈러 모놀리스 안에서 기능 단위로 응집시킨다. 루트 모듈 또는 배포 서비스를 추가하는 것으로 시작하지 않는다.
 - 복잡성이 이를 정당화할 때 `domain`, `application`, `adapters`, `bootstrap` 역할을 구분한다. 단순 기능에 빈 계층이나 전달만 하는 클래스를 만들지 않는다.
@@ -27,6 +33,7 @@
 - `application`이 유스케이스, 권한 확인, 트랜잭션 경계와 port 호출을 조율하게 한다. 도메인 불변식을 application에 복제하지 않는다.
 - `adapters`가 HTTP·CLI·배치·메시지 입력과 DB·외부 API·큐 출력을 변환하게 한다.
 - `bootstrap`에서 설정을 읽고 구현체를 조립한다. 설정 접근을 도메인 또는 application 코드에 흩뜨리지 않는다.
+- Backend의 `core/config.py`에서 Backend·AI 설정 입력의 환경변수 병합 로직을 공유한다. AI 설정의 타입·기본값·검증은 공개 `brokerage_ai.bind_ai_config`에 위임하며 별도 Backend AI 설정 파일을 만들지 않는다.
 
 ## 선택적 DDD
 

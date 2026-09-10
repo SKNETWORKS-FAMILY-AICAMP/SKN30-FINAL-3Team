@@ -28,7 +28,7 @@ export const STAGES: readonly { at: number; status: string }[] = [
 ];
 
 /** 서버가 카드화하는 상위 후보 수. 나머지는 등급 없이 목록에만 남는다. */
-export const CARD_LIMIT = 15;
+export const CARD_LIMIT = 5;
 /** 페이지네이션이 실제로 보이도록 기본 페이지(20)보다 많게 만든다. */
 export const TOTAL_CANDIDATES = 23;
 
@@ -71,8 +71,8 @@ function isoAt(epochMs: number): string {
 /** 등급은 순위대로 나눈다. 카드화 밖 후보는 판정이 없다. */
 export function gradeFor(rank: number): string | null {
   if (rank > CARD_LIMIT) return null;
-  if (rank <= 4) return "STRONG";
-  if (rank <= 10) return "WEAK";
+  if (rank <= 2) return "STRONG";
+  if (rank <= 4) return "WEAK";
   return "REJECTED";
 }
 

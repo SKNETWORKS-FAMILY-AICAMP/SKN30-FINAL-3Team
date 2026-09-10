@@ -12,14 +12,15 @@ from brokerage_ai.f3.judgment_contracts import (
 
 # v2: `each_candidate_appears_once` 가 강제하던 "같은 후보를 두 번 판정하지 않는다"를 규칙 2에
 # 명시했다. JSON schema 로 표현할 수 없어 모델이 그 존재를 알 방법이 없었다.
-BROKERAGE_JUDGMENT_PROMPT_VERSION = "brokerage-judgment-prompt:v2"
+BROKERAGE_JUDGMENT_PROMPT_VERSION = "brokerage-judgment-prompt:v4"
 
 _ROLE = (
     "너는 중개 판정자다. 한쪽을 대리하지 않는다. 앵커 포지션 카드 1장과 반대편 후보 카드 "
     "여러 장을 한꺼번에 놓고, 어느 후보를 어떤 순서로 먼저 보여줄지와 그 이유를 정한다."
 )
 
-_RULES = """규칙을 모두 지킨다.
+_RULES = (
+    """규칙을 모두 지킨다.
 
 1. 출력 언어는 한국어다. 현업 표기(경신·월환·명도·붙박이)를 그대로 쓴다.
 2. 받은 후보를 **전부** 판정한다. 하나도 빠뜨리지 않고, 받지 않은 후보를 만들지 않는다.
@@ -53,10 +54,13 @@ _RULES = """규칙을 모두 지킨다.
     성명, 전화번호, 이메일, 생년월일을 출력에 넣지 않는다.
 13. 법률 판단이나 공식 가격 감정으로 표현하지 않는다. 두 포지션을 놓고 본 중개 판단이다.
 14. 발송 문안을 만들지 않는다. message 는 무슨 말을 꺼낼지에 대한 한 문장 제안이다.
-15. 근거의 네 필드는 항상 모두 출력하되 해당하지 않는 필드는 null 로 둔다.
-    - kind=QUOTE 이면 interaction_id 와 quote_text 를 채우고 note 는 null 이다.
-    - kind=INFERENCE 이면 note 만 채우고 interaction_id 와 quote_text 는 null 이다.
-    해당하지 않는 필드는 반드시 null 로 출력하고 임의 값을 채우지 않는다."""
+15. 근거는 kind 가 형태를 정한다. 고른 형태에 없는 필드는 아예 존재하지 않는다.
+    - kind=QUOTE 이면 interaction_id 와 quote_text 를 쓴다.
+    - kind=INFERENCE 이면 note 를 쓴다.
+    QUOTE 를 고르기 전에 그 문장이 제시된 본문에 **글자 그대로** 있는지 먼저 확인한다.
+    확인되지 않으면 QUOTE 를 쓰지 말고 INFERENCE 로 적는다. 인용문을 지어내지 않는다."""
+    ""
+)
 
 
 def _card_payload(card: JudgmentCard) -> dict[str, object]:
