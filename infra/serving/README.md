@@ -44,12 +44,14 @@ image/profile별 `cpu_only`, `startup_only`, `evaluated` 근거를 확인한다.
   adapter만 사용한다. 다운로드·해시 검증·엔진 로딩 실패를 구분해 확인한다.
 - F2 선택 이미지는 하드웨어 catalog, general 이미지는 게시 이미지 catalog가 고정 digest로 관리한다.
   AWS와 RunPod가 같은 선택 이미지를 소비하며 AWS가 RunPod control 문서에서 이미지를 가져오지 않는다.
-- 현재 F2 `ca2cfefb…`와 general `801473c8…` pin은 새 identity/VRAM 계측 이전 이미지다.
-  이 이미지로 강화된 검증을 실행하면 계측을 확인할 수 없어 실패한다. `image-publish f2 dev`와
-  `image-publish general dev`의 artifact를 검토한 뒤 F2 `hardware-profiles.json:f2_image`,
-  general `published-images.json`·기본 image ID를 갱신하고 정지 상태의 `ai-select`로 새 pin을 저장한다.
-  이번 구현은 이미지 게시를 실행하지 않았다. 코드·테스트 완료는 실제 기동 완료를 뜻하지 않는다. `python3`·vLLM 버전별 시작 인자를
-  이미지 빌드에서 검증하며 F2와 general 옵션을 혼용하지 않는다.
+- F2 공백 제한과 identity/VRAM 계측을 포함한 새 이미지의 게시·artifact 대조·catalog 및
+  정지 상태의 `ai-select` 저장 근거는 [2026-09-10 적용 기록](image-rollout-validation-2026-09-10.md)에 있다.
+  공식 `dev-start`·`dev-verify`의 직접 추론·앱 합성 요청과 identity 검증을 통과했다.
+  VRAM 관측 및 RunPod REST의 GPU 식별 제한·GraphQL 보완 확인은 같은 기록에 구분하며,
+  품질 평가를 승계하지 않는다.
+  새 게시 때도 artifact를 검토하고 F2 `hardware-profiles.json:f2_image`, general
+  `published-images.json`·기본 image ID를 갱신한 뒤 정지 상태의 `ai-select`로 pin을 저장한다.
+  `python3`·vLLM 버전별 시작 인자를 이미지 빌드에서 검증하며 F2와 general 옵션을 혼용하지 않는다.
 
 ## 전원·배포의 내부 경계
 

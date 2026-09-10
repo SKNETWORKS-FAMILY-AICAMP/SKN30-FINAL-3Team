@@ -137,7 +137,12 @@ class SelectionCatalog(unittest.TestCase):
             self.assertEqual(result["release_id"], "consultation-v3")
             self.assertEqual(result["memory_budget"]["sllm_fraction"], 0.65)
             self.assertIn("not measured", result["memory_budget"]["meaning"])
-        general = catalog.validation_metadata("general", self.general())
+        general = catalog.validation_metadata(
+            "general",
+            self.general(
+                image="ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:801473c822b3536c58dd310f0768dfacf0aebd968c06a4ea427d0d9561f5c1e7"
+            ),
+        )
         self.assertEqual(general["image_profile_evidence"]["status"], "evaluated")
         self.assertEqual(general["status"], "pending-user-startup-check")
 

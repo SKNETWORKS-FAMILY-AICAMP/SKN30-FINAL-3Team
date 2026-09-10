@@ -32,6 +32,7 @@ Desktop.ini
 # AI Agent Workspaces / IDE Brain
 .gemini/
 .brain/
+/.worktrees/
 
 # ==========================================
 # Frontend - Node.js / React / Vite (`frontend/`)
