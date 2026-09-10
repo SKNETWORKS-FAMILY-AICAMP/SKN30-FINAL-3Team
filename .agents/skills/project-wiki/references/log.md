@@ -5,6 +5,8 @@ updated: 2026-09-09
 
 # 위키 변경 로그
 
+- 2026-09-10: F2 503의 로컬 RunPod 재현으로 JSON 공백 반복과 length 종료를 확인하고, Infra에 xgrammar 공백 제한 설정과 검증 경계를 기록했다.
+
 - 2026-09-09: Infra의 실패 후 offline endpoint/동일 Pod 재사용 계약을 구체화하고, F2 앱 smoke에 현재 Backend ledger_type 응답 계약 및 스키마 일치 회귀를 반영했다.
 
 - 2026-09-09: 기존 ADR-0008의 app_owner migration 계약을 delivery Compose에 반영하고, API·Worker에는 역할 전환을 주입하지 않는 회귀 검증을 추가했다.

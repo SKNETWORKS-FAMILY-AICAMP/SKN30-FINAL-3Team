@@ -21,6 +21,7 @@ updated: 2026-08-18
 | [aws-account-bootstrap.md](aws-account-bootstrap.md) | AWS 계정 인증, state bootstrap, 비용·IAM 기본 설정을 다룰 때 |
 | [decisions/index.md](decisions/index.md) | Infra 내부 구조나 운영 방식을 변경하기 전에 승인 결정을 확인할 때 |
 | [open-questions.md](open-questions.md) | 아직 승인되지 않은 배포·보안·운영 선택에 의존할 때 |
+| [F2 공백 반복 검증](../../../../infra/serving/f2-whitespace-validation-2026-09-10.md) | F2 503·출력 길이 종료의 로컬 재현과 서버 설정 변경 근거를 확인할 때 |
 | [Qwen JSON 기록](../../../../infra/serving/qwen-records.md) | 평가·이미지 JSON 선행 반영과 후속 #107의 구현 경계를 확인할 때 |
 | [AWS·RunPod LLM 운영](../../../../infra/serving/README.md) | f2/general 등록, local 연결, 전환, GPU 캐시·전원과 실제 검증을 수행할 때 |
 

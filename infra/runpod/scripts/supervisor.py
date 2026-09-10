@@ -185,6 +185,10 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         str(config.sllm_max_model_len),
         "--gpu-memory-utilization",
         str(config.sllm_gpu_memory_utilization),
+        # vLLM 0.11 V1 reads this from engine config, not per-request params.
+        # Unbounded JSON whitespace can exhaust F2 max_tokens before the closing brace.
+        "--structured-outputs-config",
+        json.dumps({"backend": "xgrammar", "disable_any_whitespace": True}),
         "--chat-template",
         str(SLLM_CHAT_TEMPLATE),
     ]
