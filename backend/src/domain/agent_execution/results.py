@@ -151,13 +151,13 @@ def load_run_result(
     if not _may_expose_prototype_content(run):
         return _empty_result(run, limit, offset)
 
-    card = repository.find_anchor_card_for_run(session, brokerage_id, run_id)
+    header = repository.find_match_evaluation_for_run(session, brokerage_id, run_id)
+    card = repository.find_anchor_card_from_context(session, brokerage_id, run, header)
     if card is None:
         # 무효 앵커에 의존하는 판정과 근거도 현재 결과로 공개하지 않는다.
         return _empty_result(run, limit, offset)
     anchor_card = _card_view(session, card)
 
-    header = repository.find_match_evaluation_for_run(session, brokerage_id, run_id)
     if header is None:
         empty = _empty_result(run, limit, offset)
         return RunResult(
@@ -171,11 +171,12 @@ def load_run_result(
         )
 
     snapshot = header.candidate_selection_snapshot
-    entries = _selection_entries(snapshot)
-    judgments = {
-        judgment.candidate_position_analysis_id: judgment
-        for judgment in repository.list_candidate_judgments(session, brokerage_id, header.id or 0)
-    }
+    entries = [
+        entry
+        for entry in _selection_entries(snapshot)
+        if isinstance(entry.get("candidate_id"), int)
+    ]
+    page_entries = entries[offset : offset + limit]
 
     # SQL 후보 장부 ID와 카드 ID를 잇는다. 판정 행은 후보 카드 ID를 참조한다.
     candidate_card_ids: dict[int, int] = {}
@@ -188,6 +189,17 @@ def load_run_result(
         if isinstance(candidate_id, int) and isinstance(position_analysis_id, int):
             candidate_card_ids[candidate_id] = position_analysis_id
 
+    page_card_ids = [
+        candidate_card_ids[entry["candidate_id"]]
+        for entry in page_entries
+        if entry["candidate_id"] in candidate_card_ids
+    ]
+    judgments = {
+        judgment.candidate_position_analysis_id: judgment
+        for judgment in repository.list_candidate_judgments(
+            session, brokerage_id, header.id or 0, candidate_card_ids=page_card_ids
+        )
+    }
     evidence_by_judgment: dict[int, list[MatchCandidateEvidence]] = {}
     for evidence in repository.list_candidate_judgment_evidence(
         session, brokerage_id, [judgment.id or 0 for judgment in judgments.values()]
@@ -195,7 +207,7 @@ def load_run_result(
         evidence_by_judgment.setdefault(evidence.match_candidate_evaluation_id, []).append(evidence)
 
     views: list[CandidateView] = []
-    for entry in entries:
+    for entry in page_entries:
         candidate_id = entry.get("candidate_id")
         if not isinstance(candidate_id, int):
             continue
@@ -222,12 +234,12 @@ def load_run_result(
         run=run,
         anchor_card=anchor_card,
         criteria=criteria if isinstance(criteria, dict) else None,
-        total_count=_as_int(snapshot.get("total_count"), len(views)),
+        total_count=_as_int(snapshot.get("total_count"), len(entries)),
         carded_count=_as_int(snapshot.get("carded_count")),
         remaining_count=_as_int(snapshot.get("remaining_count")),
         candidates=CandidatePage(
-            items=tuple(views[offset : offset + limit]),
-            total=len(views),
+            items=tuple(views),
+            total=len(entries),
             limit=limit,
             offset=offset,
         ),

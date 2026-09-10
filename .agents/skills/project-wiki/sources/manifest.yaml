@@ -1,7 +1,29 @@
 version: 1
-updated: "2026-09-09"
+updated: "2026-09-10"
 
 sources:
+  - id: "f3-linux-chrome-300s-2026-09-10"
+    type: "user-provided-direction"
+    location: "user-provided:f3-linux-chrome-and-300-second-polling"
+    received: "2026-09-10"
+    reflected_in:
+      - "references/contracts/api-f3.md"
+      - ".agents/skills/frontend/references/f3-execution.md"
+      - "docs/validation/f3-linux-chrome-2026-09-10.md"
+    scope: "Linux Chrome 검증 후속 요청 및 60초로 부족한 조회 대기 상한의 300초 확장. 기존 실행 GET 재개와 디자인 보존 유지."
+
+  - id: "f3-reliability-performance-2026-09-10"
+    type: "user-provided-direction"
+    location: "user-provided:f3-reliability-performance-2026-09-10"
+    received: "2026-09-10"
+    decision_status: "implementation-authorized; windows-validation-incomplete; team-review-pending"
+    reflected_in:
+      - "references/contracts/api-f3.md"
+      - ".agents/skills/frontend/references/f3-execution.md"
+      - ".agents/skills/backend/references/decisions/ADR-0006-f3-lease-renewal.md"
+      - "docs/validation/f3-reliability-performance-2026-09-10.md"
+    scope: "최신 dev 워크트리에서 기존 모델·수동 판정을 유지한 조회 복구·페이지 최적화·lease 갱신과 Windows Chrome 디자인 보존 검증 요청. 폐기 기능·배포·신규 schema 제외."
+
   - id: "local-functional-regression-report-2026-09-09"
     type: "user-provided-document"
     location: "user-provided:local-functional-regression-report-2026-09-09"

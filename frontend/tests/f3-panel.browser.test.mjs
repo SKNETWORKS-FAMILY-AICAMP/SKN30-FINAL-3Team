@@ -460,3 +460,29 @@ test("열린 패널의 외부 버전 갱신은 명시적 재판정 전까지 실
     await page.waitForFunction(() => document.querySelector("#lifecycle-count")?.textContent === "2");
   } finally { await page.close(); }
 });
+
+test("매물·구입 F3 패널을 키보드로 닫으면 실행 버튼으로 초점을 복원한다", { timeout: 60_000 }, async () => {
+  for (const kind of ["listing", "requirement"]) {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+    try {
+      const links = await openPropertyLedger(page);
+      if (kind === "listing") await links.nth(1).click();
+      else {
+        await page.getByRole("button", { name: "구입장", exact: true }).click();
+        await page.locator('.buyer-ledger-grid .ag-row [col-id="buyer"]').first().click();
+      }
+      const opener = page.getByRole("button", {
+        name: kind === "listing" ? "교차 판정 실행" : "교차 판정", exact: true,
+      });
+      await opener.focus();
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(() => document.activeElement?.id === "cross-match-panel-title");
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "교차 판정 Panel 닫기");
+      await page.keyboard.press("Enter");
+      await page.locator("#cross-match-panel").waitFor({ state: "hidden" });
+      await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "교차 판정 실행" || document.activeElement?.textContent?.trim() === "교차 판정");
+      assert.equal(await opener.evaluate(element => document.activeElement === element), true);
+    } finally { await page.close(); }
+  }
+});

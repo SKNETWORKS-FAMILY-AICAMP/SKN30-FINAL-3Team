@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # 프론트엔드 지식 인덱스
@@ -12,6 +12,8 @@ updated: 2026-09-09
 | [Frontend Design Guide](design/index.md) | UI 화면, 컴포넌트, 스타일 또는 상호작용을 만들거나 변경할 때 |
 | [결정 인덱스](decisions/index.md) | 프론트엔드 라이브러리, 구조 또는 개발 방식을 변경하기 전에 |
 | [Frontend 검증](../../../../frontend/TESTING.md) | 테스트 실행·추가 또는 저장·검색·모달 회귀를 확인할 때 |
+| [F3 Linux Chrome 검증](../../../../docs/validation/f3-linux-chrome-2026-09-10.md) | 실제 Linux Chrome 창·배율·300초 재개·키보드 초점과 알려진 제약을 확인할 때 |
+| [F3 조회 재개와 재판정](f3-execution.md) | F3 훅·조회 복구·입력/세션 변경과 패널 실행 동작을 변경할 때 |
 | [챗봇 화면 상태](chatbot.md) | F4 챗봇 사용자별 상태·SSE·삭제·복원·화면 이동과 검증을 변경할 때 |
 
 미확정 프론트엔드 내부 사항은 결정으로 가정하지 않고 작업 PR 또는 관련 결정 문서에서 명시한다.

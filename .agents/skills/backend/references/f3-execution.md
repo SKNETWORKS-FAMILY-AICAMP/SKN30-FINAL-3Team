@@ -1,6 +1,6 @@
 ---
 status: 구현됨
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # F3 실행 경계와 확장
@@ -68,10 +68,9 @@ API와 Worker는 동일 image를 쓰는 별도 프로세스·컨테이너다. �
 API·Worker를 함께 관리하며 독립 확장에는 SG/IAM·환경 주입·배포 검증과 GPU 동시성 관리가 필요하다.
 자세한 근거는 [Worker 배포 검토](../../../../docs/architecture/f3/worker-deployment-review.md)에 있다.
 
-고정 300초 lease·최대 claim 3회·heartbeat 부재도 그대로다. 다중 Worker에서 lease보다 오래
-모델이 실행되면 이전 결과 저장은 fencing으로 차단되지만 모델 호출 중복까지 막히지는 않는다.
-자동 실행량을 늘리거나 Worker 수를 늘리기 전 단계별 p95와 timeout/repair 예산을 측정하고
-lease 갱신·동시성 제한·대기열 우선순위를 설계해야 한다.
+2026-09-10 사용자 승인 개선에서 단계별 30초 heartbeat를 추가했다. 300초 lease·최대 claim 3회와
+DB fencing은 유지하며 [ADR-0006](decisions/ADR-0006-f3-lease-renewal.md)이 갱신·취소 경계의 정본이다.
+Worker 수·대기열 우선순위와 Provider 전체 동시성 제한은 변경하지 않았다.
 
 새 조건부 자동 판정·완료 결과 재사용·결과 목록·독립 카드 API는 이 리팩토링에 포함되지 않는다.
 제품 기준은 [조건부 자동 판정 제안](../../../../docs/architecture/f3/conditional-auto-judgment.md)과
@@ -126,3 +125,19 @@ source summary 일치, 헤더/snapshot의 무효 카드, 다른 유효 snapshot�
 리뷰 수정 후 `test_anchor_position_card`, `test_candidate_selection`, `test_brokerage_judgment`,
 `test_f3_results`, `test_position_card_cache_key`와 `tests/architecture/`를 실행해 **126 passed**를
 확인했다. Ruff·Pyright·스킬 문서 검사도 통과했다. 실제 외부 AI 호출은 실행하지 않았다.
+
+
+## 조회·계측 개선 (2026-09-10)
+
+결과 조회는 같은 run·판정 헤더를 재사용해 전체 JSONB snapshot 중복 조회를 제거한다.
+기존 유효 후보 판별·총건수·SQL 순서를 유지하며 현재 페이지의 View·판정·근거만 조립한다.
+매물 후보 SQL은 필요한 컬럼만 projection한다. 전체 snapshot 한 번 읽기와 후보 목록 순회는 남는다.
+
+`f3_timing`은 접수·상태·결과·Worker 단계의 run_id, wall_ms, sql_count/sql_ms를 남긴다.
+SQL 시간은 cursor 실행 시간이며 JSON 역직렬화·ORM 조립·응답 검증은 wall 시간에 포함된다.
+`f3_card_cache`는 후보 카드 hit/miss, `f3_model_call`은 공개 Provider port의 생성 task별
+호출 순번·시간·성공 여부를 기록한다. 같은 task의 후속 provider_attempt는 AI 내부 repair 호출이며
+새 Worker attempt와 구분한다. 요청·SQL·파라미터·상담·모델 원문은 기록하지 않는다.
+병렬 호출 시간의 합계는 처리 지연이 아니므로 stage wall_ms와 별도로 해석한다.
+
+측정 및 남은 병목은 [검증 보고서](../../../../docs/validation/f3-reliability-performance-2026-09-10.md)에 둔다.

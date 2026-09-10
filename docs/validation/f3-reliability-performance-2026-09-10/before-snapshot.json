@@ -1,0 +1,8 @@
+{
+  "snapshot_read": {
+    "samples": 30,
+    "p50_ms": 34.378,
+    "p95_ms": 49.301,
+    "json_bytes": 1028867
+  }
+}

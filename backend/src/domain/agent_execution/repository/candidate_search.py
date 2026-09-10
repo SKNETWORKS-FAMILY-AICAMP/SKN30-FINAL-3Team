@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, NamedTuple
 
 from sqlalchemy import literal, or_
+from sqlalchemy import select as sql_select
 from sqlmodel import Session, col, select
 
 from domain.property_ledger.models import (
@@ -179,7 +180,13 @@ def list_listing_candidates(
         conditions.append(col(PropertyUnit.complex_id).in_(list(complex_ids)))
 
     statement = (
-        select(PropertyListing, col(PropertyUnit.pyeong))
+        sql_select(
+            col(PropertyListing.id),
+            price,
+            col(monthly_column) if monthly_column is not None else literal(None),
+            col(PropertyUnit.pyeong),
+            col(PropertyListing.received_at),
+        )
         .join(
             PropertyUnit,
             (col(PropertyUnit.brokerage_id) == PropertyListing.brokerage_id)
@@ -189,15 +196,4 @@ def list_listing_candidates(
         .order_by(col(PropertyListing.id).asc())
     )
     # 금액은 위 매핑이 정한 컬럼에서만 읽는다. 조회 조건과 같은 한 곳을 쓴다.
-    return [
-        ListingCandidateRow(
-            listing_id=listing.id or 0,
-            price_amount=getattr(listing, amount_column.key),
-            monthly_amount=(
-                getattr(listing, monthly_column.key) if monthly_column is not None else None
-            ),
-            pyeong=pyeong,
-            received_at=listing.received_at,
-        )
-        for listing, pyeong in session.execute(statement).all()
-    ]
+    return [ListingCandidateRow(*row) for row in session.execute(statement).all()]

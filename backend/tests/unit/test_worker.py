@@ -11,7 +11,7 @@ from typing import Any, cast
 import pytest
 from brokerage_ai.core.config import AiProfile
 from brokerage_ai.runtime import AiRuntime
-from sqlmodel import Session
+from sqlmodel import Session, create_engine
 
 from conftest import config_values
 from core.config import bind_config
@@ -219,7 +219,7 @@ def test_missing_model_config_fails_only_the_claimed_run(
     loop = asyncio.new_event_loop()
     try:
         outcome = process_run(
-            cast(Session, object()),
+            Session(create_engine("postgresql+psycopg://unused")),
             run,
             "worker-test",
             cast(AiRuntime, object()),

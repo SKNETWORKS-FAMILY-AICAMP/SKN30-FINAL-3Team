@@ -1,0 +1,633 @@
+[
+  {
+    "label": "before",
+    "anchor_type": "LISTING",
+    "cache": "cold",
+    "repetition": 1,
+    "run_id": 1,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 45.48,
+    "pickup_ms": 71.23,
+    "total_ms": 51109.68,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 15127.82,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 36.19,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 20169.37,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 15683.4,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 15016.95
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 10564.79
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 11857.25
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 17899.75
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 9352.21
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 15586.01
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "LISTING",
+    "cache": "warm",
+    "repetition": 1,
+    "run_id": 2,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 18.68,
+    "pickup_ms": 34.43,
+    "total_ms": 14487.01,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 69.66,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 27.35,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 151.44,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 14186.65,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 14077.17
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "LISTING",
+    "cache": "cold",
+    "repetition": 2,
+    "run_id": 3,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 17.78,
+    "pickup_ms": 37.0,
+    "total_ms": 41810.76,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 10666.23,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 24.21,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 15831.2,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 15234.77,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 10585.77
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 8511.88
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 10964.95
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 15628.38
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 15157.58
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "LISTING",
+    "cache": "warm",
+    "repetition": 2,
+    "run_id": 4,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 22.14,
+    "pickup_ms": 42.14,
+    "total_ms": 19224.24,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 79.58,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 29.05,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 226.45,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 18826.8,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 18701.73
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "LISTING",
+    "cache": "cold",
+    "repetition": 3,
+    "run_id": 5,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 16.05,
+    "pickup_ms": 32.01,
+    "total_ms": 53929.31,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 17711.07,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 26.58,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 16892.98,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 19248.95,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 8194.39
+      },
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 9444.22
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 15550.86
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 15623.28
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 16700.72
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 19157.57
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "LISTING",
+    "cache": "warm",
+    "repetition": 3,
+    "run_id": 6,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 18.73,
+    "pickup_ms": 36.07,
+    "total_ms": 30058.76,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 62.33,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 26.09,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 170.69,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 29745.97,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 29658.87
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "REQUIREMENT",
+    "cache": "cold",
+    "repetition": 1,
+    "run_id": 7,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 15.22,
+    "pickup_ms": 28.08,
+    "total_ms": 36995.25,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 10697.5,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 43.27,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 9223.33,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 16986.76,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 10615.19
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 7651.17
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 8842.69
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 16844.18
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "REQUIREMENT",
+    "cache": "warm",
+    "repetition": 1,
+    "run_id": 8,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 16.68,
+    "pickup_ms": 34.27,
+    "total_ms": 19818.56,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 53.51,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 22.3,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 114.58,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 19579.59,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 19434.59
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "REQUIREMENT",
+    "cache": "cold",
+    "repetition": 2,
+    "run_id": 9,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 32.7,
+    "pickup_ms": 63.61,
+    "total_ms": 37540.71,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 14481.1,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 33.15,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 10181.15,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 12762.74,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 14378.46
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 9372.95
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 9985.26
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 12673.84
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "REQUIREMENT",
+    "cache": "warm",
+    "repetition": 2,
+    "run_id": 10,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 17.41,
+    "pickup_ms": 34.66,
+    "total_ms": 12954.1,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 77.7,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 31.84,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 152.68,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 12635.94,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 12538.71
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "REQUIREMENT",
+    "cache": "cold",
+    "repetition": 3,
+    "run_id": 11,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 20.54,
+    "pickup_ms": 39.95,
+    "total_ms": 45837.49,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 16673.89,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 24.83,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 13556.45,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 15525.0,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "wall_ms": 16608.08
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 7273.85
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "wall_ms": 13399.61
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 15437.24
+      }
+    ]
+  },
+  {
+    "label": "before",
+    "anchor_type": "REQUIREMENT",
+    "cache": "warm",
+    "repetition": 3,
+    "run_id": 12,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 17.19,
+    "pickup_ms": 32.66,
+    "total_ms": 12029.04,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 52.32,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 23.68,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 115.54,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 11790.84,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "wall_ms": 11710.14
+      }
+    ]
+  }
+]

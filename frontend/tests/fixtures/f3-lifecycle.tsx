@@ -16,7 +16,7 @@ function Harness() {
   return <>
     <button onClick={() => setEnabled(true)}>판정 열기</button>
     <button onClick={() => setVersion((current) => current + 1)}>외부 버전 갱신</button>
-    <button onClick={judgment.retry}>명시적 재판정</button>
+    <button onClick={judgment.rerun}>명시적 재판정</button>
     <output id="lifecycle-state">{judgment.state}</output>
     <output id="lifecycle-count">{submissions}</output>
   </>;

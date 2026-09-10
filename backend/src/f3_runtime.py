@@ -19,6 +19,7 @@ from domain.agent_execution import pipeline, repository
 from domain.agent_execution.anchor_card import GenerationBinding, GenerationBindingError
 from domain.agent_execution.execution_policy import ExecutionStep, next_step
 from domain.agent_execution.judgment import JudgmentBinding
+from domain.agent_execution.model_timing import TimedProvider
 from domain.agent_execution.models import (
     BROKERAGE_JUDGMENT_CAPABILITY,
     POSITION_CARD_CAPABILITY,
@@ -116,7 +117,9 @@ def build_bindings(
             raise GenerationBindingError("the position card provider is unavailable") from error
         card = GenerationBinding(
             generator=LlmPositionCardGenerator(
-                provider=card_provider,
+                provider=TimedProvider(
+                    card_provider, run.id or 0, run.attempt_count, POSITION_CARD_CAPABILITY
+                ),
                 route=card_route,
                 allow_synthetic_prototype=True,
             ),
@@ -134,7 +137,9 @@ def build_bindings(
             raise GenerationBindingError("the judgment provider is unavailable") from error
         judgment = JudgmentBinding(
             generator=LlmBrokerageJudgmentGenerator(
-                provider=judgment_provider,
+                provider=TimedProvider(
+                    judgment_provider, run.id or 0, run.attempt_count, BROKERAGE_JUDGMENT_CAPABILITY
+                ),
                 route=judgment_route,
                 allow_synthetic_prototype=True,
             ),
