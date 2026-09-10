@@ -5,7 +5,7 @@ updated: 2026-09-08
 
 # ADR-0025: 캘린더 일정 저장은 F4가 소유하고 Time Keeper 조회에 통합한다
 
-- 상태: 대체됨 — [ADR-0032](ADR-0032-remove-calendar-feature.md)에서 캘린더 기능 자체를 폐기하며 대체
+- 상태: 대체됨 — [ADR-0038](ADR-0038-remove-calendar-feature.md)에서 캘린더 기능 자체를 폐기하며 대체
 - 결정일: 2026-09-04
 - 승인 주체: 프로젝트 요청자
 - 대체 범위: [F4 제외 범위](../../../../../docs/requirements/f4/scope-and-open-questions.md)의 "일정

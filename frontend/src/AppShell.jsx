@@ -10,7 +10,7 @@ import {
   UserIcon,
 } from "@patternfly/react-icons";
 import { useBuyerLedger, useComplexOptions, useComplexQuickAdd, usePropertyLedger } from "./features/ledger/index.ts";
-import { describeForUser, isEmptyDraft } from "./features/ledger/index.ts";
+import { describeForUser, isEmptyDraft, loadSavedBuyer, loadSavedProperty } from "./features/ledger/index.ts";
 import { isMockSource } from "./config/env.ts";
 import { PROTOTYPE_ASSUMPTIONS } from "./config/prototypeAssumptions.js";
 import { COLUMN_PRESETS, LedgerGrid } from "./features/LedgerGrid.jsx";
@@ -21,6 +21,8 @@ import { CrossMatchSection, resetCrossJudgmentCache } from "./features/f3/index.
 import { CampaignWorkspace } from "./features/CampaignWorkspace.jsx";
 import { HomeScreen } from "./features/HomeScreen.tsx";
 import { TimeKeeperNotification } from "./features/timeKeeper/index.ts";
+import { Chatbot } from "./features/chatbot/index.ts";
+import { ApiError } from "./shared/api/index.ts";
 import VoiceMemoModal from "./features/VoiceMemoModal.jsx";
 import { currentUser, useAuth } from "./features/auth/index.ts";
 
@@ -104,6 +106,9 @@ export function AppShell() {
   // 로그인 여부는 AuthGate가 이미 걸렀다. 여기서는 헤더 표시와 로그아웃만 다룬다.
   const { state: authState, isSubmitting: authSubmitting, signOut, markSessionExpired } = useAuth();
   const user = currentUser(authState);
+  const chatbotUserKey = user ? `${user.brokerageId}:${user.id}` : "anonymous";
+  const chatbotActionRequest = useRef(null);
+  useEffect(() => () => chatbotActionRequest.current?.abort(), [chatbotUserKey]);
   // 장부 데이터는 features/ledger가 소유한다. mock/API 전환은 VITE_LEDGER_SOURCE가 정한다.
   const ledgerEnabled = isMockSource() || user != null;
   const ledgerQuery = useMemo(() => ({}), []);
@@ -202,16 +207,8 @@ export function AppShell() {
     setCrossMatchOpen(false);
   }, [detailRow?.id]);
 
-  const filteredCount = useMemo(() => {
-    if (viewState === "filtered-empty") return 0;
-    const query = searchQuery.trim().toLowerCase();
-    return rows.filter((row) => {
-      const textMatch = !query || [row.complex, row.building, row.unit, row.owner, row.phone, row.log]
-        .some((value) => String(value || "").toLowerCase().includes(query));
-      return textMatch && (complexFilter === "전체" || row.complex === complexFilter)
-        && (saveFilter === "전체" || row.saveState === saveFilter);
-    }).length;
-  }, [rows, searchQuery, complexFilter, saveFilter, viewState]);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [buyerFilteredCount, setBuyerFilteredCount] = useState(0);
 
   const updateRow = (nextRow) => {
     const ledger = nextRow?.ledgerType === "buyer" || nextRow?.rowKind === "buyer" ? buyerLedger : propertyLedger;
@@ -525,6 +522,27 @@ export function AppShell() {
     setCrossMatchOpen(false);
     setDetailRow(null);
   };
+  const handleChatbotAction = async (action) => {
+    chatbotActionRequest.current?.abort();
+    const controller = new AbortController();
+    chatbotActionRequest.current = controller;
+    if (action.type === "open_f2") {
+      setIntakeOpen(true);
+      return;
+    }
+    try {
+      const row = action.type === "open_property"
+        ? await loadSavedProperty(action.target_id, controller.signal)
+        : await loadSavedBuyer(action.target_id, controller.signal);
+      if (controller.signal.aborted) return;
+      setCrossMatchOpen(false);
+      setDetailRow(row);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof ApiError && error.kind === "unauthorized") markSessionExpired();
+      else setToast({ variant: "warning", title: `상세를 열지 못했습니다 · ${describeForUser(error)}` });
+    }
+  };
   const discardDetail = () => {
     if (detailRow?.ledgerType === "buyer" || detailRow?.rowKind === "buyer") buyerLedger.discardRow(detailRow);
     else if (detailRow) propertyLedger.discardRow(detailRow);
@@ -550,7 +568,10 @@ export function AppShell() {
       : `${savedRow.building || "미입력"}동 ${savedRow.unit || "미입력"}호`;
 
     // 낙관적 반영 후 서버에 보낸다. 실패하면 행의 sync 상태가 남고 사용자에게 알린다.
-    updateRow(savedRow);
+    setCrossMatchOpen(false);
+    const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
+    // Keep the detail draft stable until this save settles; changing its prop can reset saving state.
+    ledger.patchRow(savedRow.id, () => savedRow);
     /*
      * 저장은 패널을 열지 않는다.
      *
@@ -560,7 +581,6 @@ export function AppShell() {
      * 결과를 볼 시점은 상세의 [교차 판정] 섹션에서 사용자가 정한다(F3-CR-03·04).
      * 그때 보내는 실행 요청은 저장이 접수한, 같은 입력 버전의 활성 실행을 재사용한다.
      */
-    const ledger = isBuyerDetail ? buyerLedger : propertyLedger;
     // 상세 화면이 저장 중 표시와 오류 배너를 띄우려면 promise를 그대로 돌려줘야 한다.
     return ledger.saveRow(savedRow).then(
       (persisted) => {
@@ -729,8 +749,8 @@ export function AppShell() {
           <nav className="f1-quick-nav" aria-label="F1 보조 업무">{compactNavItems.map((item) => <button key={item} type="button" className={activeNav === item ? "active" : ""} onClick={() => navTo(item)}>{item}</button>)}</nav>
         </div>}
 
-        {activeNav === "구입장" ? <BuyerLedgerGrid rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} /> : <LedgerGrid rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} focusRowId={jumpFocus.id} focusToken={jumpFocus.token} />}
-        <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerRows.length.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
+        {activeNav === "구입장" ? <BuyerLedgerGrid searchQuery={searchQuery} onDisplayedCountChange={setBuyerFilteredCount} rows={buyerRows} onRowsChange={setBuyerRows} onOpenDetail={setDetailRow} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} assigneeFilter={buyerAssigneeFilter} onAssigneeFilterChange={setBuyerAssigneeFilter} /> : <LedgerGrid onDisplayedCountChange={setFilteredCount} rows={rows} onRowsChange={setRows} onOpenDetail={(row) => setDetailRow({ ...row, ledgerType: "property", rowKind: "property" })} onSelectionChange={setSelectedRows} selectedRowIds={selectedRowIds} selectionResetToken={selectionResetToken} viewState={effectiveViewState} searchQuery={searchQuery} complexFilter={complexFilter} saveFilter={saveFilter} columnPreset={columnPreset} onRetry={() => { setViewState("normal"); propertyLedger.reload(); }} onClearFilters={clearFilters} onAddRow={handleAddRow} readOnly={false} focusRowId={jumpFocus.id} focusToken={jumpFocus.token} />}
+        <footer className="grid-statusbar"><span>{activeNav === "매물장" ? filteredCount.toLocaleString() : buyerFilteredCount.toLocaleString()}건 표시</span><span>{selectedRows.length}건 선택</span><span>{viewState === "offline" ? "변경 내용 브라우저 보관" : "수정 내용은 임시저장"}</span><span className="statusbar-spacer" /><span>{activeNav === "매물장" ? "정렬: 동·호 오름차순" : "정렬: 최종접촉일"}</span><span>{activeNav === "매물장" ? "기본 (12) / 전체 (30)" : "구입장 17열"}</span><span>Enter 편집 · Space 선택 · Esc 취소</span></footer>
       </>}
     </main>
 
@@ -865,6 +885,7 @@ export function AppShell() {
       <ModalFooter><Button variant="primary" onClick={() => { setScheduleSuggestion(null); setToast({ variant: "success", title: "F3 제안을 승인해 F1 일정으로 저장했습니다." }); }}>일정 저장</Button><Button variant="link" onClick={() => setScheduleSuggestion(null)}>취소</Button></ModalFooter>
     </Modal>
     {effectiveViewState === "loading" && <div className="global-progress" aria-label="그리드 데이터 불러오는 중"><Spinner size="md" /></div>}
+    {user && <Chatbot key={chatbotUserKey} userKey={chatbotUserKey} onAction={handleChatbotAction} onSessionExpired={markSessionExpired} suspended={Boolean(detailRow) || intakeOpen} />}
     {toast && <Alert className="workspace-alert" variant={toast.variant} isInline isLiveRegion title={toast.title} actionClose={<Button variant="plain" aria-label="알림 닫기" onClick={() => setToast(null)} />} />}
   </div>;
 }

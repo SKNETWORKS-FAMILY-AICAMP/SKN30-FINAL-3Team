@@ -8,7 +8,7 @@ implementation: 제거됨 · 2026-09-08
 
 > **[대체됨 · 2026-09-08]** 캘린더 화면 자체가 사용자 요청으로 폐기되어 이 결정의 대상
 > (`frontend/src/features/calendar/`)이 삭제됐다. 프로젝트 ADR
-> [ADR-0032](../../../project-wiki/references/decisions/ADR-0032-remove-calendar-feature.md)가
+> [ADR-0038](../../../project-wiki/references/decisions/ADR-0038-remove-calendar-feature.md)가
 > 이 결정을 대체한다. 이하 내용은 과거 구현 근거를 추적하기 위해 보존한다.
 
 ## 맥락

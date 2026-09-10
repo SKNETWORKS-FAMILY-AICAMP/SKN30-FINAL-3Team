@@ -19,16 +19,17 @@ from conftest import Answer, embedding_request, generation_request
 
 @pytest.mark.asyncio
 async def test_structured_response_and_diagnostics_are_normalized() -> None:
-    parse = AsyncMock(
+    create = AsyncMock(
         return_value=SimpleNamespace(
-            output_parsed=Answer(value="ok"),
+            output_text='{"value":"ok"}',
+            status="completed",
             output=[],
             usage=SimpleNamespace(input_tokens=4, output_tokens=2, total_tokens=6),
             model="resolved-model",
             id="resp_123",
         )
     )
-    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(parse=parse)))
+    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(create=create)))
 
     result = await OpenAIAdapter(client).generate_structured(
         generation_request(ProviderKind.OPENAI), Answer
@@ -40,11 +41,12 @@ async def test_structured_response_and_diagnostics_are_normalized() -> None:
     assert result.diagnostics.request_id == "resp_123"
     assert result.diagnostics.usage is not None
     assert result.diagnostics.usage.total_tokens == 6
-    parse.assert_awaited_once()
-    await_args = parse.await_args
+    create.assert_awaited_once()
+    await_args = create.await_args
     assert await_args is not None
     call = await_args.kwargs
-    assert call["text_format"] is Answer
+    assert call["text"]["format"]["schema"]["required"] == ["value"]
+    assert call["text"]["format"]["strict"] is True
     assert call["store"] is False
     assert call["max_output_tokens"] == 64
 
@@ -89,8 +91,8 @@ async def test_invalid_embedding_indices_are_rejected() -> None:
 @pytest.mark.asyncio
 async def test_sdk_timeout_is_mapped_without_original_message() -> None:
     sdk_error = APITimeoutError(request=cast(Any, object()))
-    parse = AsyncMock(side_effect=sdk_error)
-    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(parse=parse)))
+    create = AsyncMock(side_effect=sdk_error)
+    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(create=create)))
 
     with pytest.raises(ProviderTimeoutError) as caught:
         await OpenAIAdapter(client).generate_structured(
@@ -120,22 +122,24 @@ async def test_contract_violating_output_is_retryable_and_keeps_its_cause() -> N
                 raise ValueError("hard_deadline requires at least one timing constraint")
             return self
 
-    with pytest.raises(ValidationError) as raised:
+    with pytest.raises(ValidationError):
         Deadline(hard_deadline="2028-07-26")
-    sdk_error = raised.value
-
-    parse = AsyncMock(side_effect=sdk_error)
-    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(parse=parse)))
+    create = AsyncMock(
+        return_value=SimpleNamespace(
+            output=[], status="completed", output_text='{"hard_deadline":"2028-07-26"}'
+        )
+    )
+    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(create=create)))
 
     with pytest.raises(ProviderOutputInvalidError) as caught:
         await OpenAIAdapter(client).generate_structured(
-            generation_request(ProviderKind.OPENAI), Answer
+            generation_request(ProviderKind.OPENAI), Deadline
         )
 
     assert caught.value.retryable is True
     # 무엇이 어긋났는지 남는다. 원인을 버리면 계측을 새로 붙이기 전에는 진단할 수 없다.
     assert "hard_deadline requires at least one timing constraint" in str(caught.value)
-    assert caught.value.__cause__ is sdk_error
+    assert isinstance(caught.value.__cause__, ValidationError)
 
 
 @pytest.mark.asyncio
@@ -157,14 +161,15 @@ async def test_validation_detail_does_not_carry_model_values() -> None:
 @pytest.mark.asyncio
 async def test_truncated_response_is_retryable() -> None:
     """잘린 응답은 계약 위반이 아니라 다시 부르면 될 수 있는 실패다."""
-    parse = AsyncMock(
+    create = AsyncMock(
         return_value=SimpleNamespace(
-            output_parsed=None,
+            output_text="",
+            status="incomplete",
             output=[],
             incomplete_details=SimpleNamespace(reason="max_output_tokens"),
         )
     )
-    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(parse=parse)))
+    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(create=create)))
 
     with pytest.raises(ProviderOutputInvalidError) as caught:
         await OpenAIAdapter(client).generate_structured(
@@ -176,16 +181,13 @@ async def test_truncated_response_is_retryable() -> None:
 
 
 @pytest.mark.asyncio
-async def test_wrong_schema_type_is_not_retryable() -> None:
-    """선언한 schema 와 다른 타입은 다시 불러도 같다. 재시도하지 않는다."""
-    parse = AsyncMock(
-        return_value=SimpleNamespace(output_parsed=SimpleNamespace(value="ok"), output=[])
-    )
-    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(parse=parse)))
+async def test_malformed_json_is_retryable() -> None:
+    create = AsyncMock(return_value=SimpleNamespace(output_text="{", status="completed", output=[]))
+    client = cast(AsyncOpenAI, SimpleNamespace(responses=SimpleNamespace(create=create)))
 
-    with pytest.raises(ProviderResponseError) as caught:
+    with pytest.raises(ProviderOutputInvalidError) as caught:
         await OpenAIAdapter(client).generate_structured(
             generation_request(ProviderKind.OPENAI), Answer
         )
 
-    assert caught.value.retryable is False
+    assert caught.value.retryable is True

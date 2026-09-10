@@ -21,6 +21,7 @@ from domain.agent_execution.models import (
     InputVersionChangedError,
     LeaseNotHeldError,
 )
+from domain.agent_execution.snapshot import build_anchor_snapshot
 
 requires_database = pytest.mark.skipif(
     not os.getenv("TEST_DB_URL"),
@@ -643,3 +644,55 @@ def test_summary_of_an_anchor_without_interactions_is_empty() -> None:
         )
 
         assert summary == repository.InteractionSummary(0, None, None)
+
+
+@requires_database
+def test_direct_listing_logs_still_enforce_party_and_side_boundaries() -> None:
+    """직접 연결도 상대 당사자·구입장·무효 로그를 매물 입력에 포함하지 않는다."""
+    with anchor_session() as session:
+        fixture = Fixture(session)
+        run_id = fixture.run()
+        expected: set[int] = set()
+        for party_id, requirement_id, voided, included in [
+            (fixture.owner_party_id, None, False, True),
+            (None, None, False, True),
+            (fixture.party_id, None, False, False),
+            (fixture.owner_party_id, fixture.requirement_id, False, False),
+            (fixture.owner_party_id, None, True, False),
+        ]:
+            interaction_id = scalar(
+                session,
+                "INSERT INTO client_interaction (brokerage_id, interaction_at,"
+                " interaction_content, listing_id, unit_id, party_id, requirement_id, is_voided)"
+                " VALUES (:b, now(), '합성 경계 검증', :l, :u, :p, :r, :v) RETURNING id",
+                b=fixture.brokerage_id,
+                l=fixture.listing_id,
+                u=fixture.unit_id,
+                p=party_id,
+                r=requirement_id,
+                v=voided,
+            )
+            if included:
+                expected.add(interaction_id)
+
+        scope = repository.build_interaction_scope(
+            session, fixture.brokerage_id, AnchorType.LISTING, fixture.listing_id
+        )
+        logs = repository.list_scoped_interactions(session, scope)
+        summary = repository.summarize_scoped_interactions(session, scope)
+        request = prepare(session, run_id).generation_request
+
+        assert {log.id for log in logs} == expected
+        assert summary.interaction_count == len(expected)
+        assert summary.max_interaction_id == max(expected)
+        assert request is not None
+        ai_request = build_anchor_snapshot(
+            session,
+            fixture.brokerage_id,
+            AnchorType.LISTING,
+            fixture.listing_id,
+            as_of=datetime.now(UTC),
+            input_privacy_mode=InputPrivacyMode.SYNTHETIC_PROTOTYPE,
+        ).request
+        assert {log.interaction_id for log in ai_request.consultation_logs} == expected
+        assert request.interaction_count == len(expected)

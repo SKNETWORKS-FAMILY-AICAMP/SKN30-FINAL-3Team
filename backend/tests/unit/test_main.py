@@ -123,11 +123,12 @@ def test_offline_f2_does_not_call_injected_runtime_factory(
     asyncio.run(run_lifespan())
 
 
-def test_f2_endpoints_do_not_call_runtime_factory_without_explicit_status(
+def test_missing_f2_urls_do_not_call_runtime_factory(
     make_config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = make_config({"APP_ENV": "dev", "DB_TARGET": "development"})
-    monkeypatch.delenv("AI_F2_PROVIDER_STATUS")
+    monkeypatch.delenv("AI_VLLM_SLLM_BASE_URL")
+    monkeypatch.delenv("AI_VLLM_STT_BASE_URL")
 
     def unexpected_factory() -> F2Runtime:
         raise AssertionError("F2 endpoints must not implicitly activate the runtime")

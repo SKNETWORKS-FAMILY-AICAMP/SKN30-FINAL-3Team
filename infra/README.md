@@ -1,5 +1,7 @@
 # Infra
 
+개발자 시작점은 [운영 안내](operations/README.md)입니다. `env-doctor → doctor → release-ready`로 준비하고, 기동 후 `dev-verify`로 확인합니다. 적용 여부의 정본은 [인벤토리](../.agents/skills/infra/references/resource-inventory.md)이며 날짜별 과거 검증과 구분합니다.
+
 현재 local·dev GPU 확장과 f2/general별 AWS·RunPod 전환은 [통합 LLM 운영](serving/README.md)을 따른다. 코드가 추가됐으며 실제 GPU 왕복 검증은 별도 완료 조건이다. 기존 F2 Console 운영 경로는 유지한다.
 
 
@@ -18,7 +20,7 @@ Git의 Terraform 코드 + S3 원격 state + 실제 AWS 자원
 ## 구조와 소유 범위
 
 - `bootstrap/`: 계정 password policy, 계정·bucket public access block, 호환용 비활성 Budget 블록, `TerraformOperatorRole`, `team-readonly` IAM 그룹과 `ReadOnlyAccess` 연결, state bucket
-- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 기존 dev 자원은 적용됐고 deep lifecycle과 이번 환경설정·delivery 변경은 plan·apply 전
+- `environments/dev/`: 계정 guard, 네트워크·보안, S3·ECR·RDS·설정, EC2·ALB·ASG, 관측성, private S3·CloudFront Frontend와 `team-db-tunnel` 개발 DB 터널 접근; 적용 여부는 인벤토리를 참조하고 현재 전원은 doctor로 조회
 - `justfile`: 반복되는 검증, plan/apply와 DB 운영 명령의 진입점
 - `scripts/setup-local.sh`: 새 PC의 AWS profile, 로컬 backend/dev 변수, Terraform init과 연결 검증
 - `scripts/preflight.sh`: 도구 버전, 임시 자격 증명, 계정과 리전 검증
@@ -97,7 +99,7 @@ Terraform 적용 뒤 `just secret-status`로 AWSCURRENT 존재를 확인하고
 `just secret-rotate <target>`에서 최초 값 또는 회전할 값을 TTY 비표시로 입력한다.
 RunPod 자원은 Console에서 만들고 `runpod-register-plan → runpod-register`로 검증·등록한다.
 AI Secret은 기존 renderer 호환 평면 `AI_*_API_KEY` JSON이며 F2 key 두 개는 RunPod Console과
-같은 값을 입력한다. GHCR credential은 Console에서만 관리하며 기존 AWS 컨테이너는 사용하지 않는다.
+같은 값을 입력한다. RunPod GHCR credential은 Console registry가, AWS GPU용 credential은 기존 AWS GHCR Secret이 소유한다.
 OpenAI key는 선택값이며 Bedrock은 EC2 Instance Role SigV4를 사용하므로 key를 생성·저장하지 않는다.
 실제 값과 PAT는 tfvars, 명령 인자, plan/state, 로그나 Discord에 넣지 않는다.
 구체적인 Console 설정·등록·일상 운영은 [RunPod runbook](runpod/README.md)을 따른다.
@@ -178,7 +180,7 @@ just dev-start
 3. EC2 `InService`와 SSM `Online` 상태를 기다린다.
 4. ALB target 상태를 결과에 포함한다.
 
-ASG 축소는 EC2 정지가 아니라 종료이며 다음 시작에는 Launch Template으로 새 인스턴스를 만든다. 로컬 root volume은 보존되지 않는다. 현재 delivery 구현 전에는 새 인스턴스에 애플리케이션이 자동 배포되지 않으므로 ALB target 상태는 정보로만 출력한다.
+ASG 축소는 EC2 정지가 아니라 종료이며 다음 시작에는 Launch Template으로 새 인스턴스를 만든다. 로컬 root volume은 보존되지 않는다. 새 코드의 최초 배포에는 dev-prepare-app 후 통합 Pipeline을 사용한다. 기존 dev-start의 마지막 성공 revision 복원은 최신 코드 배포를 대신하지 않는다.
 
 RDS 정지는 임시 개발 비용 절감 기능이다. 데이터, endpoint와 설정은 유지되지만 스토리지와 백업, ALB, public IPv4 등 잔여 비용은 계속 발생한다. RDS는 7일 연속 정지 후 자동으로 시작되므로 장기 휴무에는 상태를 다시 확인한다. 자세한 제한은 [AWS RDS 정지 문서](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html)를 따른다.
 
@@ -196,17 +198,16 @@ just dev-deep-drift
 
 `dev-deep-stop`은 먼저 ASG를 0으로 내리고 RDS를 정지한 다음, 검토한 `dev-deep-stop.tfplan`으로 CloudFront를 비활성화하고 ALB·listener·ALB alarm 두 개를 제거한다. CloudFront의 ALB origin과 API behavior, Backend `HTTP_ALLOWED_HOSTS`의 ALB DNS도 함께 제거되며 ALB service-managed public IPv4는 AWS가 자동 반납한다. 정상 active 상태라면 네 edge 자원이 `destroy`여야 한다. 이미 원격에서 수동 삭제된 자원은 refresh drift로 plan에서 생략될 수 있으므로 실제 존재 여부와 state 정리를 확인하고, 다른 add·change·destroy가 보이면 기존 미적용 root 변경이나 provider의 dependency 재계산인지 `show`에서 개별 검토한다.
 
-Deep start는 다음 순서로 실행한다.
+Deep start는 [개발자 운영 정본](operations/README.md)의 공통 계획·확인 절차를 사용한다.
 
 ```bash
-just dev-deep-start-plan
-just dev-deep-start-show
-just dev-deep-start
+just dev-start-plan --hours 2
+just dev-deep-start --hours 2
+just dev-verify
 just dev-deep-status
-just dev-drift
 ```
 
-`dev-deep-start`는 검토한 `dev-deep-start.tfplan`으로 ALB·listener·alarm을 만들고 새 ALB DNS를 CloudFront와 Backend 설정에 반영해 distribution 배포가 끝날 때까지 기다린 뒤 RDS·ASG·SSM을 복구한다. 정상 suspended 상태라면 같은 네 edge 자원이 `create`여야 하며, drift로 alarm만 남았다면 alarm은 새 ALB dimension으로 `update`될 수 있다. 새 ALB에는 새 service-managed public IPv4가 할당되며 이전 주소 보존을 전제로 하지 않는다.
+`dev-deep-start`는 `dev-start`를 통해 `dev-serving.tfplan`을 새로 생성하고 확인받는다. 공통 계획기가 선택에서 edge/GPU 활성 입력과 선택된 AWS GPU 생성 대상을 복원하고, saved plan·입력 fingerprint 검증 → 적용 → drift 확인 후 RDS·maintenance 호스트 준비로 진행한다. RunPod 선택은 AWS GPU를 자동 생성하지 않는다. 기존 `dev-deep-start-plan/show`는 저수준 검토용이며 해당 파일을 통합 시작에서 적용하지 않는다. 새 ALB의 DNS·public IPv4가 달라질 수 있으며 이전 주소 보존을 전제로 하지 않는다.
 
 Deep suspend 중에는 기본값이 active인 일반 `dev-plan`, `dev-apply`, `dev-drift`를 사용하지 않는다. 일반 plan은 ALB 재생성과 CloudFront 재활성화를 제안한다. suspended 상태 검증에는 `dev-deep-drift`를 사용하고, 통합·Backend·Frontend Pipeline과 DB migration도 실행하지 않는다. 중단이나 timeout이 발생하면 Console에서 임의로 생성·삭제하지 말고 `dev-deep-status`와 해당 모드의 새 plan을 확인한 뒤 실패한 단계만 재시도한다.
 

@@ -1,7 +1,37 @@
 version: 1
-updated: "2026-09-08"
+updated: "2026-09-09"
 
 sources:
+  - id: "local-functional-regression-report-2026-09-09"
+    type: "user-provided-document"
+    location: "user-provided:local-functional-regression-report-2026-09-09"
+    title: "로컬 기능 검증 — F2 제외"
+    baseline_commit: "4b5d002"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/validation/test-reliability-2026-09-09.md"
+      - "frontend/TESTING.md"
+      - ".agents/skills/ai/references/decisions/ADR-0006-openai-structured-output-schema.md"
+      - "references/contracts/chatbot-ai.md"
+      - ".agents/skills/ai/references/chatbot.md"
+      - ".agents/skills/frontend/references/index.md"
+    scope: "기준 4b5d002 로컬 기능 보고서의 OpenAI F3 스키마 거부, 상담 로그 중복, 저장 후 F3 자동 재접수, 만기 동의어, 장부 검색·건수와 캘린더 접근성 결함을 회귀 검증·수정 근거로 사용. 기존 실제 모델 결과·공유 환경 검증 완료를 이번 수정 후 결과로 재사용하지 않음."
+
+  - id: "chatbot-implementation-scope-2026-09-08"
+    type: "user-provided-direction"
+    location: "docs/requirements/sources/chatbot-implementation-scope-2026-09-08.md"
+    received: "2026-09-08"
+    decision_status: "user-implementation-authorized; local-validation; qwen-deferred; team-review-pending"
+    reflected_in:
+      - "docs/requirements/chatbot/overview-and-scope.md"
+      - "docs/architecture/chatbot/implementation-and-validation.md"
+      - "docs/architecture/chatbot/api-and-stream.md"
+      - "docs/architecture/chatbot/persistence.md"
+      - "docs/screen/chatbot.md"
+      - ".agents/skills/project-wiki/references/contracts/api.md"
+      - ".agents/skills/project-wiki/references/privacy/policy.md"
+    scope: "F4 1차 구현·독립 검토·로컬 검증·의존 PR 3개. 사용자 후속 지시로 Qwen 기동·실제 평가는 보류하고 Luna 사용. 공유 dev DB 변경·배포 제외. 팀원 사용성 평가는 비차단"
+
   - id: "chatbot-design-decisions-2026-09-08"
     type: "user-provided-direction"
     location: "docs/requirements/sources/chatbot-design-decisions-2026-09-08.md"
@@ -801,6 +831,15 @@ sources:
       - "references/decisions/ADR-0005-requirements-management.md"
     scope: "통합본의 기능 내용을 검색 의도별 문서로 분할하고 요구사항 관리·검색 경로를 구성함. 기능 요구사항 자체는 변경하지 않음."
 
+  - id: "module-owned-environment-approval-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 인프라 개선 대화: 모듈별 불필요 환경변수 제거안에 대한 '개선안을 진행해주세요'와 provider/model enum 구현 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0034-module-owned-environment.md"
+      - "docs/development/environment-variables.md"
+    scope: "사용자가 지목한 WORKER_ENABLED·AI_F2_PROVIDER_STATUS·AI_LLM_ENDPOINTS 등의 정리와 모듈 소유 입력·enum 구현 승인. 로컬 OpenAI/dev vLLM 선택. 팀 PR 병합 승인·서비스 기동 승인과 구분"
+
   - id: "local-dev-dual-cloud-serving-2026-09-07"
     type: "user-instruction"
     location: "Codex 대화: Local·dev를 구분한 AWS·RunPod LLM 운영 통합 구현 계획"
@@ -809,3 +848,46 @@ sources:
       - "references/decisions/ADR-0030-local-dev-dual-cloud-serving.md"
       - ".agents/skills/infra/references/decisions/ADR-0022-dual-cloud-gpu-lifecycle.md"
     scope: "f2/general 독립 배치, local OpenAI 유지, 명시적 전환·전원·캐시·SSM 권한과 실제 검증 완료 기준"
+
+  - id: "f3-position-card-review-2026-09-09"
+    type: "user-instruction"
+    location: "docs/requirements/sources/f3-position-card-review-2026-09-09.md"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/requirements/f3/position-card-delivery.md"
+      - "docs/architecture/f3/position-card-review.md"
+      - "docs/architecture/f3/position-card-events.md"
+      - "docs/architecture/f3/position-card-infrastructure.md"
+      - "references/open-questions.md"
+    scope: "F3 구현 현황·저장 부하·이벤트 분리·DB 결과 재사용 검토와 신규 독립 카드 요구안·local/dev 자원 제안. 구현·기술 채택 승인 아님"
+
+  - id: "f3-worker-auto-judgment-review-2026-09-09"
+    type: "user-instruction"
+    location: "docs/requirements/sources/f3-worker-auto-judgment-review-2026-09-09.md"
+    received: "2026-09-09"
+    reflected_in:
+      - "docs/architecture/f3/worker-deployment-review.md"
+      - "docs/architecture/f3/conditional-auto-judgment.md"
+      - "docs/requirements/f3/judgment-results-list.md"
+      - "references/open-questions.md"
+    scope: "별도 프로세스·서버 확장성 검토, GPU 상시 운영 조건과 사용자 대기를 반영한 조건부 자동 판정·결과 목록 우선 제안. 독립 배포·정책·기능 구현 승인 아님"
+  - id: "shared-dev-serving-selection-implementation-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 인프라 개선 대화: 공유 dev LLM 서빙 선택·기동 절차 통합 계획 전체에 대한 PLEASE IMPLEMENT THIS PLAN 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0036-shared-dev-serving-selection.md"
+      - ".agents/skills/infra/references/decisions/ADR-0024-shared-serving-selection-lifecycle.md"
+      - "infra/operations/README.md"
+      - "infra/operations/configuration.md"
+      - "infra/serving/README.md"
+    scope: "SSM 공유 선택·정지 후 변경·통합 계획/비용 확인·기존 Template API 조정·명시 DB 대상/이력·실패 자원 정리·사용자 기동 검증 구현 승인. F2 A5000/L4 24GB 및 general L40S48GB, CPU 전환 제외. 팀 병합·공유 적용·신규 이미지 게시·실제 기동 성공과 구분"
+
+  - id: "f3-expansion-retirement-2026-09-09"
+    type: "user-instruction"
+    location: "Codex 대화: #116 #117 #118 작업 롤백 및 해당 범위 기능 폐기 요청"
+    received: "2026-09-09"
+    reflected_in:
+      - "references/decisions/ADR-0037-f3-expansion-retirement.md"
+      - "docs/requirements/f3/judgment-results-list.md"
+    scope: "세 PR 코드·문서 역적용과 기능 폐기. 기존 미커밋 작업 및 #119 보존. 실제 DB·시드 데이터·배포 변경은 미수행"

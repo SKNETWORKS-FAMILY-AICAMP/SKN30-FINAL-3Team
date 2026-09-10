@@ -240,13 +240,10 @@
       "when": [
         { "prefixes": ["backend/src/api/", "frontend/src/shared/api/"] },
         { "contains": ["/api/"] },
-        { "files": [".agents/skills/project-wiki/references/contracts/api.md"] }
+        { "files": [".agents/skills/project-wiki/references/contracts/api.md", ".agents/skills/project-wiki/references/contracts/api-common.md"] }
       ],
       "files": [
-        {
-          "path": ".agents/skills/project-wiki/references/contracts/api.md",
-          "sections": ["기본 규칙", "모델 경계 후보", "초기 Backend 계약"]
-        }
+        ".agents/skills/project-wiki/references/contracts/api-common.md"
       ]
     },
     {
@@ -254,10 +251,12 @@
       "phases": ["leaf", "arbiter"],
       "requiresArbiter": true,
       "when": [
-        { "contains": ["property_ledger", "features/ledger", "BuyerLedger", "LedgerGrid"] }
+        { "contains": ["property_ledger", "features/ledger", "BuyerLedger", "LedgerGrid"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/api-f1.md"] }
       ],
       "files": [
-        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F1 장부 계약 (제안)"] }
+        ".agents/skills/project-wiki/references/contracts/api-common.md",
+        ".agents/skills/project-wiki/references/contracts/api-f1.md"
       ]
     },
     {
@@ -265,10 +264,12 @@
       "phases": ["leaf", "arbiter"],
       "requiresArbiter": true,
       "when": [
-        { "contains": ["/f2/", "features/f2", "f2.py", "f2_", "VoiceMemo", "smoke_f2"] }
+        { "contains": ["/f2/", "features/f2", "f2.py", "f2_", "VoiceMemo", "smoke_f2"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/api-f2.md"] }
       ],
       "files": [
-        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F2 음성 분석 계약 (구현됨 · 1차 연동)"] }
+        ".agents/skills/project-wiki/references/contracts/api-common.md",
+        ".agents/skills/project-wiki/references/contracts/api-f2.md"
       ]
     },
     {
@@ -276,11 +277,17 @@
       "phases": ["leaf", "arbiter"],
       "requiresArbiter": true,
       "when": [
-        { "contains": ["/f3/", "features/f3", "f3_runs", "f3_", "agent_execution", "CrossMatch"] }
+        { "contains": ["/f3/", "features/f3", "f3_runs", "f3_", "agent_execution", "CrossMatch"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/api-f3.md", ".agents/skills/project-wiki/references/contracts/f3-ai.md"] },
+        { "prefixes": [".agents/skills/project-wiki/references/contracts/f3-ai-"] }
       ],
       "files": [
-        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F3 실행 계약"] },
-        ".agents/skills/project-wiki/references/contracts/f3-ai.md",
+        ".agents/skills/project-wiki/references/contracts/api-common.md",
+        ".agents/skills/project-wiki/references/contracts/api-f3.md",
+        ".agents/skills/project-wiki/references/contracts/f3-ai-common.md",
+        ".agents/skills/project-wiki/references/contracts/f3-ai-position-card.md",
+        ".agents/skills/project-wiki/references/contracts/f3-ai-brokerage.md",
+        ".agents/skills/project-wiki/references/contracts/f3-ai-implementation.md",
         ".agents/skills/project-wiki/references/decisions/ADR-0018-f3-save-trigger-anchor-card-scope.md"
       ]
     },
@@ -289,10 +296,27 @@
       "phases": ["leaf", "arbiter"],
       "requiresArbiter": true,
       "when": [
-        { "contains": ["time_keeper", "timeKeeper", "TimeKeeper"] }
+        { "contains": ["time_keeper", "timeKeeper", "TimeKeeper"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/api-f4-timekeeper.md"] }
       ],
       "files": [
-        { "path": ".agents/skills/project-wiki/references/contracts/api.md", "sections": ["F4 Time Keeper 일정 계약 (제안)"] }
+        ".agents/skills/project-wiki/references/contracts/api-common.md",
+        ".agents/skills/project-wiki/references/contracts/api-f4-timekeeper.md"
+      ]
+    },
+    {
+      "id": "api-contract-f4-calendar",
+      "phases": ["leaf", "arbiter"],
+      "requiresArbiter": true,
+      "when": [
+        { "contains": ["/calendar/", "calendar.py", "calendar_", "Calendar", "test_calendar"] },
+        { "files": [".agents/skills/project-wiki/references/contracts/api-f4-calendar.md"] }
+      ],
+      "files": [
+        ".agents/skills/project-wiki/references/contracts/api-common.md",
+        ".agents/skills/project-wiki/references/contracts/api-f4-calendar.md",
+        ".agents/skills/project-wiki/references/contracts/api-f4-timekeeper.md",
+        ".agents/skills/project-wiki/references/decisions/ADR-0025-calendar-storage-ownership.md"
       ]
     },
     {

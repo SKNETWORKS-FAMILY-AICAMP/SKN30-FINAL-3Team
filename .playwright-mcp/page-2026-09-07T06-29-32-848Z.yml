@@ -1,0 +1,222 @@
+- generic [active] [ref=e1]:
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - strong [ref=e11]: 집크크
+        - generic [ref=e12]: beta
+      - heading [level=1] [ref=e475]: 매물장
+      - navigation [ref=e476]:
+        - button [ref=e477] [cursor=pointer]: 홈
+        - button [ref=e478] [cursor=pointer]: 매물장
+        - button [ref=e479] [cursor=pointer]: 구입장
+      - generic [ref=e199]:
+        - textbox [ref=e480]:
+          - /placeholder: 동·호 조회 예) 101 203
+        - button [disabled]:
+          - generic: 조회
+      - textbox [ref=e481]:
+        - /placeholder: 통합 검색 (성명·전화번호·로그)
+      - generic [ref=e206]:
+        - generic [ref=e207]: 필터 2건
+        - generic [ref=e208]: 전체 2건
+      - generic [ref=e17]:
+        - button [ref=e482] [cursor=pointer]:
+          - generic [ref=e23]: 음성메모 입력
+        - generic [ref=e24]: 음성을 분석해 매도의뢰는 매물장, 매수문의는 구입장에 신규 행으로 추가합니다.
+        - button [ref=e483] [cursor=pointer]:
+          - generic [ref=e26]: "6"
+        - button [ref=e484] [cursor=pointer]
+        - button [ref=e485] [cursor=pointer]
+        - button [ref=e486] [cursor=pointer]
+        - button [ref=e487] [cursor=pointer]
+        - button [ref=e488] [cursor=pointer]
+        - generic [ref=e489]: Developer
+        - button [ref=e490] [cursor=pointer]:
+          - generic [ref=e56]: 로그아웃
+    - generic [ref=e218]:
+      - generic [ref=e219]:
+        - generic [ref=e220]:
+          - tablist [ref=e491]:
+            - tab [selected] [ref=e492] [cursor=pointer]: 아파트
+            - tab [disabled] [ref=e493]: 상가
+            - tab [disabled] [ref=e494]: 주택
+            - tab [disabled] [ref=e495]: 재건축
+          - button [ref=e496] [cursor=pointer]:
+            - generic [ref=e233]: 행 추가
+          - button [disabled]:
+            - generic: 변경 저장
+        - generic [ref=e234]:
+          - button [ref=e497] [cursor=pointer]:
+            - generic [ref=e242]: 열 프리셋 · 전체 (30)
+          - button [ref=e498] [cursor=pointer]
+      - generic [ref=e250]:
+        - generic [ref=e251]:
+          - button [ref=e499] [cursor=pointer]:
+            - generic [ref=e259]: 새 단지 추가
+          - generic [ref=e260]:
+            - generic [ref=e264]: 단지
+            - combobox [ref=e500] [cursor=pointer]
+          - generic [ref=e266]:
+            - generic [ref=e267]: 저장 상태
+            - combobox [ref=e501] [cursor=pointer]
+          - button [disabled]:
+            - generic: 모든 필터 해제
+        - navigation [ref=e502]:
+          - button [ref=e503] [cursor=pointer]: 배치 캠페인
+    - tabpanel [ref=e504]:
+      - generic [ref=e505]:
+        - generic [ref=e273]:
+          - generic [ref=e274]: 값 목록 필터
+          - combobox [ref=e506]
+        - group [ref=e276]:
+          - generic [ref=e507] [cursor=pointer]: 값 필터 · 2개
+      - grid [ref=e508]:
+        - rowgroup [ref=e285]:
+          - row [ref=e509]:
+            - columnheader [ref=e510]:
+              - checkbox [ref=e511] [cursor=pointer]
+              - generic [ref=e289]: 선택
+            - columnheader [ref=e512]:
+              - generic [ref=e292]: 상태
+            - columnheader [ref=e513]:
+              - generic [aria-hidden] [ref=e295] [cursor=pointer]
+              - generic [ref=e296] [cursor=pointer]: 단지
+            - columnheader [ref=e514]:
+              - generic [aria-hidden] [ref=e299] [cursor=pointer]
+              - generic [ref=e300] [cursor=pointer]: 동
+              - generic [aria-hidden] [ref=e302] [cursor=pointer]: "1"
+            - columnheader [ref=e515]:
+              - generic [aria-hidden] [ref=e306] [cursor=pointer]
+              - generic [ref=e307] [cursor=pointer]: 호
+              - generic [aria-hidden] [ref=e309] [cursor=pointer]: "2"
+            - columnheader [ref=e516]:
+              - generic [aria-hidden] [ref=e313] [cursor=pointer]
+              - generic [ref=e314] [cursor=pointer]: 평형
+            - columnheader [ref=e517]:
+              - generic [aria-hidden] [ref=e317] [cursor=pointer]
+              - generic [ref=e318] [cursor=pointer]: 타입
+            - columnheader [ref=e518]:
+              - generic [aria-hidden] [ref=e321] [cursor=pointer]
+              - generic [ref=e322] [cursor=pointer]: 방향
+            - columnheader [ref=e519]:
+              - generic [aria-hidden] [ref=e325] [cursor=pointer]
+              - generic [ref=e326] [cursor=pointer]: 최근 통화일
+            - columnheader [ref=e520]:
+              - generic [aria-hidden] [ref=e329] [cursor=pointer]
+              - generic [ref=e330] [cursor=pointer]: 현상태
+            - columnheader [ref=e521]:
+              - generic [aria-hidden] [ref=e333] [cursor=pointer]
+              - generic [ref=e334] [cursor=pointer]: 보증(현)
+            - columnheader [ref=e522]:
+              - generic [aria-hidden] [ref=e337] [cursor=pointer]
+              - generic [ref=e338] [cursor=pointer]: 차임(현)
+            - columnheader [ref=e523]:
+              - generic [aria-hidden] [ref=e341] [cursor=pointer]
+              - generic [ref=e342] [cursor=pointer]: 융자
+            - columnheader [ref=e524]:
+              - generic [aria-hidden] [ref=e345] [cursor=pointer]
+              - generic [ref=e346] [cursor=pointer]: 만기일
+            - columnheader [ref=e525]:
+              - generic [aria-hidden] [ref=e349] [cursor=pointer]
+              - generic [ref=e350] [cursor=pointer]: 접수일
+            - columnheader [ref=e526]:
+              - generic [aria-hidden] [ref=e353] [cursor=pointer]
+              - generic [ref=e354] [cursor=pointer]: 거래유형
+            - columnheader [ref=e527]:
+              - generic [aria-hidden] [ref=e357] [cursor=pointer]
+              - generic [ref=e358] [cursor=pointer]: 명도
+          - row [ref=e528]:
+            - gridcell [ref=e529]:
+              - checkbox [ref=e530] [cursor=pointer]
+            - gridcell [ref=e531]:
+              - generic [ref=e363]: 저장 완료
+            - gridcell [ref=e532]:
+              - button [ref=e533] [cursor=pointer]:
+                - generic [ref=e366]: 연희 캐슬
+            - gridcell [ref=e534]: "101"
+            - gridcell [ref=e535]: "1"
+            - gridcell [ref=e536]: 31평
+            - gridcell [ref=e537]:
+              - generic [ref=e371]:
+                - generic [ref=e372]: T2
+                - generic [aria-hidden] [ref=e373]: ▾
+            - gridcell [ref=e538]:
+              - generic [ref=e375]:
+                - generic [ref=e376]: 북향
+                - generic [aria-hidden] [ref=e377]: ▾
+            - gridcell [ref=e539]:
+              - generic [ref=e379]: 2025-07-30
+            - gridcell [ref=e540]:
+              - generic [ref=e385]:
+                - generic [ref=e386]: 일반
+                - generic [aria-hidden] [ref=e387]: ▾
+            - gridcell [ref=e541]: 3억
+            - gridcell [ref=e542]: 2억
+            - gridcell [ref=e543]: 1억
+            - gridcell [ref=e544]:
+              - generic [ref=e392]: 2026-08-31
+            - gridcell [ref=e545]:
+              - generic [ref=e398]: 2026-08-12
+            - gridcell [ref=e546]:
+              - generic [ref=e404]:
+                - generic [ref=e405]: 매매
+                - generic [aria-hidden] [ref=e406]: ▾
+            - gridcell [ref=e547]:
+              - generic [ref=e408]: 즉시 협의
+          - row [ref=e548]:
+            - gridcell [ref=e549]:
+              - checkbox [ref=e550] [cursor=pointer]
+            - gridcell [ref=e551]:
+              - generic [ref=e417]: 저장 완료
+            - gridcell [ref=e552]:
+              - button [ref=e553] [cursor=pointer]:
+                - generic [ref=e420]: 헬로 시티
+            - gridcell [ref=e554]: "102"
+            - gridcell [ref=e555]: "201"
+            - gridcell [ref=e423]
+            - gridcell [ref=e424]:
+              - generic [aria-hidden] [ref=e426]: ▾
+            - gridcell [ref=e427]:
+              - generic [aria-hidden] [ref=e429]: ▾
+            - gridcell [ref=e556]:
+              - generic [ref=e431]: 2026-09-03
+            - gridcell [ref=e557]:
+              - generic [ref=e437]:
+                - generic [ref=e438]: 일반
+                - generic [aria-hidden] [ref=e439]: ▾
+            - gridcell [ref=e558]: 3억
+            - gridcell [ref=e559]: 150만
+            - gridcell [ref=e560]: 1억
+            - gridcell [ref=e561]:
+              - generic [ref=e444]: 2026-09-05
+            - gridcell [ref=e562]:
+              - generic [ref=e450]: 2026-08-04
+            - gridcell [ref=e563]:
+              - generic [ref=e456]:
+                - generic [ref=e457]: 매매
+                - generic [aria-hidden] [ref=e458]: ▾
+            - gridcell [ref=e564]:
+              - generic [ref=e460]: 즉시
+    - generic [ref=e468]:
+      - generic [ref=e469]: 2건 표시
+      - generic [ref=e470]: 0건 선택
+      - generic [ref=e471]: 수정 내용은 임시저장
+      - generic [ref=e472]: "정렬: 동·호 오름차순"
+      - generic [ref=e473]: 기본 (12) / 전체 (30)
+      - generic [ref=e474]: Enter 편집 · Space 선택 · Esc 취소
+  - dialog "장부 조회 챗봇" [ref=e567]:
+    - button "Close" [ref=e569] [cursor=pointer]
+    - banner [ref=e573]:
+      - heading "장부 조회 챗봇 (초기 시험판)" [level=1] [ref=e574]
+      - generic [ref=e575]: 매물장(F1) 데이터 범위 안에서만 정해진 질문에 답합니다. 아직 팀 승인 전인 로컬 시험판입니다.
+    - generic [ref=e577]:
+      - list [ref=e578]:
+        - listitem [ref=e579]: "안녕하세요. 매물장(F1) 데이터에 대해 물어보세요. 예: \"이번 달 만기 세대 몇 개야?\""
+        - listitem [ref=e584]: 이번 주 만기 세대 몇 개이고, 어디어디인지 알려줘
+        - listitem [ref=e585]: "전체 세대 2건입니다: 연희 캐슬 101동 1호, 헬로 시티 102동 201호"
+        - listitem [ref=e586]: 연희 캐슬 101동 1호는
+        - listitem [ref=e587]: "연희 캐슬 세대 1건입니다: 연희 캐슬 101동 1호"
+      - generic [ref=e580]:
+        - textbox "챗봇에게 질문" [ref=e581]:
+          - /placeholder: 예) 이번 달 만기 세대 몇 개야?
+        - button "보내기" [disabled]

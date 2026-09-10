@@ -1,12 +1,16 @@
 ---
 status: 미확정
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 # 미해결 질문
 
 | ID | 질문 | 현재 후보·맥락 | 영향 | 결정 주체 |
 |---|---|---|---|---|
+| OQ-F3-04 | Worker 독립 배포 전환 시점·역할별 자원 예산·lease/drain·GPU 전체 동시성은 어떻게 정할 것인가? | [Worker 검토](../../../../docs/architecture/f3/worker-deployment-review.md): 분산 선점 기반은 구현, 현재 배포는 단일 app ASG/호스트에 결합. 다중 host 검증 전 | 배포·복구·CPU/DB/GPU 용량·API 지연 | Backend·AI·Infra·팀 |
+
+
+
 | OQ-CHAT-03 | 후속 시세 착수 시 요약 범위·지역·단지·표본 기준을 어떻게 정할 것인가? | **1차 비차단·후속 착수 시 결정.** 사용자가 시세를 1차에서 제외했다. [공공 API 조사](../../../../docs/architecture/chatbot/public-market-data.md)의 후보·F4 가격 평가 제외와의 관계를 후속 단계에서 검토 | 외부 API, 데이터 품질, 후속 공수 | 기획·Backend·Data·팀 |
 | OQ-007 | 아직 확정되지 않은 개인정보의 보존 기간과 삭제 절차는 무엇인가? | 기능 및 법률 검토 후 결정. `agent_run.requested_by`와 `ai_decision_feedback.created_by`는 [개인정보 정책](privacy/policy.md)에서 확정했고 인물 성명·연락처, 상담 원문과 임시 음성이 남아 있다 | DB, 로그, 큐, 백업 | 기획·팀 |
 | OQ-009 | RDS 작업 polling에서 SQS·DLQ로 전환할 측정 조건과 소비·재시도 계약은 무엇인가? | 1차는 RDS polling이며 독립 재시도·지연 격리·Worker 확장이 어려워질 때만 SQS·DLQ 도입 | backend-ai 계약, 멱등성, DLQ, 배포 | 백엔드·에이전트·인프라 담당·팀 |
@@ -15,4 +19,6 @@ updated: 2026-09-08
 
 질문이 해결되면 관련 정본 문서 또는 ADR에 결과를 반영하고 이 표에서 제거한다. Git 이력은 토론의 과거 상태를 보존한다.
 
-OQ-CHAT-01·02는 2026-09-08 사용자 설계 합의로 해소했다. [F4 챗봇 요구사항](../../../../docs/requirements/chatbot/overview-and-scope.md), [저장 설계](../../../../docs/architecture/chatbot/persistence.md), [대화 보존 정책](privacy/policy.md)에 반영했으며 구현은 미착수·팀 병합 검토 전이다.
+OQ-CHAT-01·02는 2026-09-08 사용자 설계 합의로 해소했다. [F4 챗봇 요구사항](../../../../docs/requirements/chatbot/overview-and-scope.md), [저장 설계](../../../../docs/architecture/chatbot/persistence.md), [대화 보존 정책](privacy/policy.md)에 반영했으며 코드 구현·로컬 검증을 진행했으며 팀 병합 검토와 공유 dev 배포는 별도다. Qwen은 초기 구현에서 보류했으나 후속 승인으로 [3모델 비교](../../../../infra/serving/model-comparison-2026-09-08.md)를 수행한다. 해당 결과와 모델 채택 판단은 비교 기록을 따른다.
+
+OQ-F3-01·02·03은 [ADR-0037](decisions/ADR-0037-f3-expansion-retirement.md)의 확장 기능 폐기로 종료했다. OQ-F3-04 Worker 배포 검토는 별도 범위로 유지한다.

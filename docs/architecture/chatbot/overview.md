@@ -7,7 +7,7 @@ updated: 2026-09-08
 
 **권장안: 읽기 전용 자연어 조회, 기존 F2 화면 연결, SSE 진행 표시, 제한된 멀티턴부터 도입한다.**
 F3 연동은 사용자 요청대로 개발 보류하고, 공공 시세 기능은 선택 확장으로 둔다.
-기능 상세 정본은 [요구사항](../../requirements/chatbot/overview-and-scope.md)이다. [사용자 합의](../../requirements/sources/chatbot-design-decisions-2026-09-08.md)로 F4 소속·조회 3종·F2 연결·DB 저장/복원을 1차 범위에 포함했다. 구체 기술 설계는 제안이며 구현 미착수·팀 병합 검토 전이다.
+기능 상세 정본은 [요구사항](../../requirements/chatbot/overview-and-scope.md)이다. [사용자 합의](../../requirements/sources/chatbot-design-decisions-2026-09-08.md)와 [구현 요청](../../requirements/sources/chatbot-implementation-scope-2026-09-08.md)에 따라 1차 코드를 구현했다. 이 문서의 도입 효과·공수는 기획 당시의 추정이며, 현재 코드·Luna 평가·후속 Qwen 비교·배포 범위는 [구현·검증](implementation-and-validation.md)이 정본이다. 팀 병합 검토와 공유 dev 적용은 별도다.
 
 ## 도입 근거와 한계
 
@@ -81,6 +81,7 @@ local 비용은 실제 입력·출력·repair 토큰으로, dev는 GPU 가동 �
 | [화면](../../screen/chatbot.md) | 진입·첫 화면·결과·오류·F2 전환 |
 | [실행 구조](runtime.md)·[통신안](api-and-stream.md) | AI–Backend 책임·도구·SSE·복구 설계 |
 | [저장 설계](persistence.md) | 대화·메시지·요청 관계, 소유권·중복·상태 전이·삭제 경합 |
+| [구현·검증](implementation-and-validation.md) | 코드 구현·모델 평가·화면 검증·배포 범위의 현재 근거 |
 | [공공 API 조사](public-market-data.md) | 공식 출처·가능 범위·연동 조건 |
 | [project-wiki 질문](../../../.agents/skills/project-wiki/references/open-questions.md) | 후속 시세 기능 착수 시 정할 지역·단지·표본 등 |
 

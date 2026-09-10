@@ -6,7 +6,6 @@ from collections.abc import Mapping
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from tempfile import gettempdir
 from typing import TYPE_CHECKING, Any
 
 from dotenv import dotenv_values
@@ -18,7 +17,6 @@ if TYPE_CHECKING:
     from brokerage_ai import AiConfig
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_WORKER_READY_FILE = Path(gettempdir()) / "brokerage-worker-ready"
 
 
 class AppEnvironment(StrEnum):
@@ -38,7 +36,10 @@ class AppConfig(BaseModel):
     environment: AppEnvironment
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
-    openapi_enabled: bool = True
+
+    @property
+    def openapi_enabled(self) -> bool:
+        return self.environment in {AppEnvironment.LOCAL, AppEnvironment.TEST}
 
 
 class DbPoolConfig(BaseModel):
@@ -91,25 +92,40 @@ class HttpConfig(BaseModel):
     allowed_hosts: list[str]
 
 
+class LogLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class LogFormat(StrEnum):
+    CONSOLE = "console"
+    JSON = "json"
+
+
 class LogConfig(BaseModel):
-    level: str = "INFO"
-    format: str = "console"
-
-
-class WorkerConfig(BaseModel):
-    enabled: bool = False
-    ready_file: Path = DEFAULT_WORKER_READY_FILE
-    worker_id: str | None = None
-
-    @model_validator(mode="after")
-    def validate_ready_file(self) -> WorkerConfig:
-        if not self.ready_file.is_absolute():
-            raise ValueError("WORKER_READY_FILE must be an absolute path")
-        return self
+    level: LogLevel = LogLevel.INFO
+    format: LogFormat = LogFormat.CONSOLE
 
 
 class F2Config(BaseModel):
     max_audio_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
+
+
+class F3Config(BaseModel):
+    allow_synthetic_prototype: bool = False
+
+
+class ChatbotConfig(BaseModel):
+    """Opt-in synthetic chatbot; execution deadlines include model and query time."""
+
+    enabled: bool = False
+    request_timeout_seconds: int = Field(default=60, ge=1, le=60)
+    poll_interval_seconds: float = Field(default=0.25, ge=0.05, le=1)
+    heartbeat_seconds: int = Field(default=15, ge=1, le=30)
+    max_concurrent_requests: int = Field(default=1, ge=1, le=1)
 
 
 class Config(BaseModel):
@@ -118,8 +134,9 @@ class Config(BaseModel):
     auth: AuthConfig
     http: HttpConfig
     log: LogConfig
-    worker: WorkerConfig
     f2: F2Config
+    f3: F3Config = Field(default_factory=F3Config)
+    chatbot: ChatbotConfig = Field(default_factory=ChatbotConfig)
 
     @model_validator(mode="after")
     def validate_environment_boundaries(self) -> Config:
@@ -135,10 +152,10 @@ class Config(BaseModel):
             )
         if self.app.environment is AppEnvironment.PROD and self.auth.development.enabled:
             raise ValueError("development authentication is forbidden in production")
+        if self.app.environment is AppEnvironment.PROD and self.chatbot.enabled:
+            raise ValueError("chatbot requires the synthetic local/dev environment")
         if "*" in self.http.cors_allowed_origins:
             raise ValueError("credentialed CORS cannot use a wildcard origin")
-        if self.log.format not in {"console", "json"}:
-            raise ValueError("LOG_FORMAT must be console or json")
         return self
 
     @property
@@ -194,13 +211,22 @@ def _string_list(source: Mapping[str, str], name: str, default: list[str]) -> li
 
 
 def bind_config(source: Mapping[str, str]) -> Config:
+    removed = {
+        "APP_OPENAPI_ENABLED",
+        "WORKER_ENABLED",
+        "WORKER_READY_FILE",
+        "WORKER_ID",
+        "AUTH_SESSION_COOKIE_NAME",
+        "AUTH_CSRF_COOKIE_NAME",
+    } & source.keys()
+    if removed:
+        raise ConfigurationError("Removed Backend inputs: " + ", ".join(sorted(removed)))
     development_enabled = _boolean(source, "AUTH_DEVELOPMENT_ENABLED", False)
     return Config(
         app=AppConfig(
             environment=AppEnvironment(_required(source, "APP_ENV")),
             host=source.get("APP_HOST", "127.0.0.1"),
             port=_integer(source, "APP_PORT", 8000),
-            openapi_enabled=_boolean(source, "APP_OPENAPI_ENABLED", True),
         ),
         db=DbConfig(
             target=DatabaseTarget(_required(source, "DB_TARGET")),
@@ -223,8 +249,6 @@ def bind_config(source: Mapping[str, str]) -> Config:
                 login_id=_optional(source, "AUTH_DEVELOPMENT_LOGIN_ID"),
             ),
             session=SessionConfig(
-                cookie_name=source.get("AUTH_SESSION_COOKIE_NAME", "brokerage_session"),
-                csrf_cookie_name=source.get("AUTH_CSRF_COOKIE_NAME", "brokerage_csrf"),
                 idle_timeout_minutes=_integer(source, "AUTH_SESSION_IDLE_TIMEOUT_MINUTES", 1440),
                 absolute_timeout_minutes=_integer(
                     source, "AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES", 10080
@@ -242,16 +266,18 @@ def bind_config(source: Mapping[str, str]) -> Config:
             allowed_hosts=_string_list(source, "HTTP_ALLOWED_HOSTS", ["localhost", "127.0.0.1"]),
         ),
         log=LogConfig(
-            level=source.get("LOG_LEVEL", "INFO").upper(),
-            format=source.get("LOG_FORMAT", "console").lower(),
-        ),
-        worker=WorkerConfig(
-            enabled=_boolean(source, "WORKER_ENABLED", False),
-            ready_file=Path(source.get("WORKER_READY_FILE", str(DEFAULT_WORKER_READY_FILE))),
-            worker_id=_optional(source, "WORKER_ID"),
+            level=LogLevel(source.get("LOG_LEVEL", "INFO")),
+            format=LogFormat(source.get("LOG_FORMAT", "console")),
         ),
         f2=F2Config(
             max_audio_bytes=_integer(source, "F2_MAX_AUDIO_BYTES", 25 * 1024 * 1024),
+        ),
+        f3=F3Config(
+            allow_synthetic_prototype=_boolean(source, "F3_ALLOW_SYNTHETIC_PROTOTYPE", False),
+        ),
+        chatbot=ChatbotConfig(
+            enabled=_boolean(source, "CHATBOT_ENABLED", False),
+            request_timeout_seconds=_integer(source, "CHATBOT_REQUEST_TIMEOUT_SECONDS", 60),
         ),
     )
 
@@ -271,17 +297,20 @@ def _environment_values(
     """Resolve Backend-owned inputs without modifying the process environment."""
     values: dict[str, str] = {}
     if environment == AppEnvironment.LOCAL:
-        values.update(_dotenv_mapping(BACKEND_ROOT / ".env.local"))
-        values.update(_dotenv_mapping(BACKEND_ROOT / ".env"))
+        for filename in (".env.local", ".env"):
+            owned = _dotenv_mapping(BACKEND_ROOT / filename)
+            if any(key.startswith("AI_") for key in owned):
+                raise ConfigurationError("Move AI inputs from backend dotenv to ai/.env")
+            values.update(owned)
     values.update(os.environ if environ is None else environ)
     return values
 
 
 def load_ai_config(profile: str, environ: Mapping[str, str] | None = None) -> AiConfig:
-    """Use the same input precedence; AI owns parsing, defaults and validation."""
+    """Consume AI inputs explicitly injected by Infra; never read sibling/private files."""
     from brokerage_ai import bind_ai_config
 
-    return bind_ai_config(_environment_values(profile, environ), profile)
+    return bind_ai_config(dict(os.environ if environ is None else environ), profile)
 
 
 def load_config(

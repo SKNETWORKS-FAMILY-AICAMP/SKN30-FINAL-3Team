@@ -41,6 +41,7 @@ from domain.agent_execution.candidate_cards import (
     generate_and_store_candidate_cards,
 )
 from domain.agent_execution.candidates import AnchorCardMissingError, store_candidate_selection
+from domain.agent_execution.execution_policy import ExecutionStep, next_step
 from domain.agent_execution.judgment import (
     JudgmentAlreadyStoredError,
     JudgmentBinding,
@@ -49,13 +50,8 @@ from domain.agent_execution.judgment import (
     judge_and_store,
 )
 from domain.agent_execution.models import (
-    ANCHOR_READY_STATUS,
-    CANDIDATE_CARDS_READY_STATUS,
-    CANDIDATES_READY_STATUS,
     FAILED_TERMINAL_STATUS,
-    JUDGING_STATUS,
     LEDGER_SAVE_TRIGGER_TYPE,
-    RUNNING_STATUS,
     SUPERSEDED_FAILURE_CODE,
     SUPERSEDED_FAILURE_MESSAGE,
     SUPERSEDED_STATUS,
@@ -149,15 +145,10 @@ def _judgment_binding(bindings: ExecutionBindings) -> JudgmentBinding | None:
 
 def failure_stage(status: str) -> FailureStage:
     """DB 상태를 사용자 데이터가 없는 집계 단계로 바꿔 돌려준다."""
-    if status == RUNNING_STATUS:
-        return FailureStage.ANCHOR_CARD
-    if status == ANCHOR_READY_STATUS:
-        return FailureStage.CANDIDATE_SELECTION
-    if status == CANDIDATES_READY_STATUS:
-        return FailureStage.CANDIDATE_CARDS
-    if status in {CANDIDATE_CARDS_READY_STATUS, JUDGING_STATUS}:
-        return FailureStage.JUDGMENT
-    return FailureStage.EXECUTION
+    step = next_step(status)
+    if step is ExecutionStep.IDLE:
+        return FailureStage.EXECUTION
+    return FailureStage(step.value)
 
 
 def failure_category(error: BaseException) -> FailureCategory:
@@ -226,8 +217,9 @@ async def _advance(
     """저장된 상태에 대응하는 application 유스케이스 하나를 실행한다."""
     run_id = run.id or 0
     attempt_count = run.attempt_count
+    step = next_step(run.status)
 
-    if run.status == RUNNING_STATUS:
+    if step is ExecutionStep.ANCHOR_CARD:
         await generate_and_store_anchor_position_card(
             session,
             run_id=run_id,
@@ -237,7 +229,7 @@ async def _advance(
         )
         return StepOutcome.ADVANCED
 
-    if run.status == ANCHOR_READY_STATUS:
+    if step is ExecutionStep.CANDIDATE_SELECTION:
         # 저장이 만든 실행은 여기까지다. 앵커 포지션 카드만 만들어 두고 후보 조회와 판정은
         # 사용자가 상세에서 요청할 때 돈다(F3-CR-01~04, ADR-0018).
         #
@@ -259,7 +251,7 @@ async def _advance(
         store_candidate_selection(session, run_id, worker_id, attempt_count)
         return StepOutcome.ADVANCED
 
-    if run.status == CANDIDATES_READY_STATUS:
+    if step is ExecutionStep.CANDIDATE_CARDS:
         await generate_and_store_candidate_cards(
             session,
             run_id=run_id,
@@ -269,7 +261,7 @@ async def _advance(
         )
         return StepOutcome.ADVANCED
 
-    if run.status in {CANDIDATE_CARDS_READY_STATUS, JUDGING_STATUS}:
+    if step is ExecutionStep.JUDGMENT:
         # JUDGING 재선점은 06번 유스케이스가 최초 바인딩과 후보 집합을 다시 검증한다.
         await judge_and_store(
             session,

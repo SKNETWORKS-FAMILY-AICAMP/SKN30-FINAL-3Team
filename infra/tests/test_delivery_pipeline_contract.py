@@ -1,7 +1,9 @@
 import json
 import os
+import shlex
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -10,7 +12,12 @@ DELIVERY_ROOT = REPOSITORY_ROOT / "infra/delivery"
 
 
 def read(relative_path: str) -> str:
-    return (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+    text = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+    if relative_path == "infra/environments/dev/delivery.tf":
+        text += (
+            REPOSITORY_ROOT / "infra/environments/dev/delivery-build.tf"
+        ).read_text(encoding="utf-8")
+    return text
 
 
 class DeliveryPipelineContractTests(unittest.TestCase):
@@ -23,13 +30,46 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         )
         self.assertIn("export AWS_PROFILE := aws_profile", justfile)
         self.assertNotIn("$$(terraform", justfile)
-        self.assertEqual(
-            justfile.count(
-                'SLLM_MODEL_BUCKET="$(terraform -chdir=environments/dev output -raw '
-                'sllm_model_bucket_name)"'
-            ),
-            11,
+        candidates = [
+            shlex.split(line.strip())
+            for line in justfile.splitlines()
+            if "scripts/manage_runpod.py" in line
+            or "scripts/manage_sllm_artifact.py" in line
+        ]
+        commands = []
+        for command in candidates:
+            for script, prefix in (
+                ("scripts/manage_runpod.py", "pod-"),
+                ("scripts/manage_sllm_artifact.py", "publish"),
+            ):
+                if script in command and command[command.index(script) + 1].startswith(
+                    prefix
+                ):
+                    commands.append(command)
+        self.assertTrue(
+            commands, "RunPod and release commands must remain discoverable"
         )
+        for command in commands:
+            with self.subTest(command=command):
+                assignments = dict(
+                    token.split("=", 1)
+                    for token in command[: command.index("uv")]
+                    if "=" in token
+                )
+                bucket_source = assignments.get("SLLM_MODEL_BUCKET", "")
+                self.assertTrue(
+                    bucket_source.startswith("$(") and bucket_source.endswith(")")
+                )
+                self.assertEqual(
+                    shlex.split(bucket_source[2:-1]),
+                    [
+                        "terraform",
+                        "-chdir=environments/dev",
+                        "output",
+                        "-raw",
+                        "sllm_model_bucket_name",
+                    ],
+                )
 
     def test_runpod_image_publish_is_gated_before_digest_output(self) -> None:
         workflow = read(".github/workflows/runpod-image.yml")
@@ -88,12 +128,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         build_buildspec = read("infra/delivery/buildspec-frontend-build.yml")
 
         self.assertIn("npm run typecheck", verify_script)
-        self.assertIn("npm run test:ledger", verify_script)
-        self.assertIn("npm run test:env", verify_script)
-        self.assertIn("npm run test:auth", verify_script)
-        self.assertIn("npm run test:root-error", verify_script)
-        self.assertIn("npm run test:f2", verify_script)
-        self.assertIn("npm run test:f3", verify_script)
+        self.assertIn("npm run test:fast", verify_script)
         self.assertNotIn("npm run build", verify_script)
         self.assertNotIn("npm run test:release", verify_script)
         self.assertIn("npm run build", build_script)
@@ -144,6 +179,40 @@ class DeliveryPipelineContractTests(unittest.TestCase):
             '"https://${CLOUDFRONT_DOMAIN}${APP_READINESS_PATH}"', frontend_deploy
         )
         self.assertNotIn("${CLOUDFRONT_DOMAIN}/health/ready", frontend_deploy)
+
+    def test_frontend_maintenance_defers_readiness_but_other_modes_fail_closed(self):
+        source = read("infra/delivery/buildspec-frontend-deploy.yml")
+        command = textwrap.dedent(
+            source.split("      - |\n", 1)[1].split("  build:", 1)[0]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            curl = Path(directory) / "curl"
+            curl.write_text("#!/bin/sh\necho readiness-called\nexit 22\n")
+            curl.chmod(0o700)
+            for mode, expected, calls_readiness in (
+                ("maintenance", 0, False),
+                ("automatic", 22, True),
+                ("invalid", 1, False),
+                ("", 1, False),
+            ):
+                with self.subTest(mode=mode):
+                    result = subprocess.run(
+                        ["bash", "-eu", "-c", command],
+                        check=False,
+                        env={
+                            **os.environ,
+                            "PATH": directory + ":" + os.environ["PATH"],
+                            "APP_DEPLOYMENT_MODE": mode,
+                            "CLOUDFRONT_DOMAIN": "fixture.invalid",
+                            "APP_READINESS_PATH": "/health/ready",
+                        },
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(result.returncode, expected)
+                    self.assertEqual(
+                        "readiness-called" in result.stdout, calls_readiness
+                    )
 
     def test_app_instance_uses_valid_rds_db_user_arn(self) -> None:
         terraform = read("infra/environments/dev/runtime.tf")
@@ -386,6 +455,7 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         )
         self.assertIn(
             "dev-destroy-show:\n"
+            "    python3 scripts/plan_guard.py check environments/dev/dev-destroy.tfplan\n"
             "    terraform -chdir=environments/dev show dev-destroy.tfplan",
             justfile,
         )
@@ -495,6 +565,13 @@ class DeliveryPipelineContractTests(unittest.TestCase):
                 env=environment,
             )
             compose = json.loads(result.stdout)
+
+        self.assertEqual(
+            compose["services"]["migrate"]["environment"]["PGOPTIONS"],
+            "-c role=app_owner",
+        )
+        self.assertNotIn("PGOPTIONS", compose["services"]["api"]["environment"])
+        self.assertNotIn("PGOPTIONS", compose["services"]["worker"]["environment"])
 
         # Compose config escapes a literal runtime '$' as '$$'; losing raw mode
         # would interpolate '$literal' before this canonical representation.

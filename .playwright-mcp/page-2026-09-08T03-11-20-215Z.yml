@@ -1,0 +1,122 @@
+- generic [active] [ref=f2e1]:
+  - navigation [ref=f2e2]:
+    - generic [ref=f2e3]:
+      - link "메인 페이지로 이동" [ref=f2e5] [cursor=pointer]:
+        - /url: index.html
+        - img "집크크" [ref=f2e6]
+      - generic [ref=f2e7]:
+        - link "Features" [ref=f2e8] [cursor=pointer]:
+          - /url: index.html
+        - link "How it works" [ref=f2e9] [cursor=pointer]:
+          - /url: page-1.html
+        - link "Pricing" [ref=f2e10] [cursor=pointer]:
+          - /url: "#"
+        - link "Contact Us" [ref=f2e11] [cursor=pointer]:
+          - /url: "#"
+      - button "무료로 시작하기" [ref=f2e12] [cursor=pointer]
+  - main [ref=f2e13]:
+    - generic [ref=f2e14]:
+      - heading "통화가 끝나면, 장부 정리가 시작됩니다" [level=1] [ref=f2e15]
+      - paragraph [ref=f2e16]: 공인중개사를 위한 가장 똑똑한 AI 상담 비서, 집크크 AI. 통화 기록부터 장부 저장까지 한 번에.
+      - generic [ref=f2e17]:
+        - generic [ref=f2e18]:
+          - generic [ref=f2e19]: mic
+          - generic [ref=f2e20]: STT 전사
+        - generic [ref=f2e21]: arrow_forward
+        - generic [ref=f2e22]:
+          - generic [ref=f2e23]: psychology
+          - generic [ref=f2e24]: 정보 추출
+        - generic [ref=f2e25]: arrow_forward
+        - generic [ref=f2e26]:
+          - generic [ref=f2e27]: fact_check
+          - generic [ref=f2e28]: 사용자 검토
+        - generic [ref=f2e29]: arrow_forward
+        - generic [ref=f2e30]:
+          - generic [ref=f2e31]: save
+          - generic [ref=f2e32]: 장부 저장
+      - button "무료로 시작하기" [ref=f2e34] [cursor=pointer]
+    - generic [ref=f2e35]:
+      - heading "주요 기능" [level=2] [ref=f2e36]
+      - generic [ref=f2e37]:
+        - generic [ref=f2e38]:
+          - generic [ref=f2e39]: AI Recording
+          - heading "상담 내용을 장부에 자동 기록" [level=3] [ref=f2e40]
+          - paragraph [ref=f2e41]: 통화 내용을 텍스트로 변환하고 핵심 정보를 구조화하여, 각 항목에 맞는 내용을 장부에 자동으로 입력합니다.
+          - generic [ref=f2e42]:
+            - generic [ref=f2e43]:
+              - generic [ref=f2e44]:
+                - generic [ref=f2e48]: REC 03:24
+                - generic [ref=f2e49]: 실시간 녹취 중
+              - generic [ref=f2e50]:
+                - generic [ref=f2e51]: sync
+                - generic [ref=f2e52]: AI 분석 대기 0초
+            - generic [ref=f2e69]:
+              - generic [ref=f2e70]:
+                - generic [ref=f2e71]: 손님
+                - generic [ref=f2e72]: “방배동 34평형 전세 15억 이하로 보고 있어요.”
+              - generic [ref=f2e73]:
+                - generic [ref=f2e74]: "[단지: 방배동]"
+                - generic [ref=f2e75]: "[평형: 34평형]"
+                - generic [ref=f2e76]: "[희망가: 전세 15억]"
+                - generic [ref=f2e77]:
+                  - generic [ref=f2e78]: check_circle
+                  - text: 자동 추출 완료
+        - generic [ref=f2e79]:
+          - generic [ref=f2e80]: DATABASE MANAGEMENT
+          - heading "매물장·구입장 통합 관리" [level=3] [ref=f2e81]
+          - paragraph [ref=f2e82]: 매도·임대 정보는 매물장에, 매수·임차 조건은 구입장에 구분하여 저장하고 필요한 정보를 쉽고 체계적으로 관리합니다.
+          - generic [ref=f2e83]:
+            - generic [ref=f2e84]:
+              - generic [ref=f2e85]: 매물장
+              - generic [ref=f2e86]: 등록 매물 128건
+            - generic [ref=f2e87]:
+              - generic [ref=f2e88]: 구입장
+              - generic [ref=f2e89]: 등록 고객 84명
+        - generic [ref=f2e90]:
+          - generic [ref=f2e91]: Mobile Sync
+          - heading "어디서나 접근" [level=3] [ref=f2e92]
+          - paragraph [ref=f2e93]: 모바일과 데스크톱이 실시간으로 동기화되어 외부 현장에서도 기록을 확인할 수 있습니다.
+          - generic [ref=f2e94]: devices
+        - generic [ref=f2e96]:
+          - generic [ref=f2e97]: AI Smart MATCHING
+          - heading "매물과 고객을 서로 맞춤 추천" [level=3] [ref=f2e98]
+          - paragraph [ref=f2e99]: 매도 고객의 매물에는 적합한 매수 고객을, 매수 고객에게는 조건에 맞는 매물을 찾아 연결합니다.
+          - generic [ref=f2e100]: sync_alt
+    - generic [ref=f2e102]:
+      - heading "다중 에이전트 아키텍처" [level=2] [ref=f2e103]
+      - generic [ref=f2e104]:
+        - generic [ref=f2e105]:
+          - img "Property Agent 아이콘" [ref=f2e107]
+          - heading "Property Agent" [level=4] [ref=f2e108]
+          - paragraph [ref=f2e109]: 매물의 가격·평형·거래 조건 분석
+        - generic [ref=f2e110]:
+          - img "Customer Agent 아이콘" [ref=f2e112]
+          - heading "Customer Agent" [level=4] [ref=f2e113]
+          - paragraph [ref=f2e114]: 고객의 예산·희망 조건 분석
+        - generic [ref=f2e115]:
+          - img "Matching Agent 아이콘" [ref=f2e117]
+          - heading "Matching Agent" [level=4] [ref=f2e118]
+          - paragraph [ref=f2e119]: 매물과 고객의 적합도 및 추천 근거 판정
+  - contentinfo [ref=f2e120]:
+    - generic [ref=f2e121]:
+      - generic [ref=f2e122]:
+        - img "집크크" [ref=f2e124]
+        - paragraph [ref=f2e125]: © 2026 ZIPKEKE. All rights reserved.
+      - generic [ref=f2e126]:
+        - heading "Legal" [level=4] [ref=f2e127]
+        - list [ref=f2e128]:
+          - listitem [ref=f2e129]:
+            - link "Privacy Policy" [ref=f2e130] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=f2e131]:
+            - link "Terms of Service" [ref=f2e132] [cursor=pointer]:
+              - /url: "#"
+      - generic [ref=f2e133]:
+        - heading "Connect" [level=4] [ref=f2e134]
+        - list [ref=f2e135]:
+          - listitem [ref=f2e136]:
+            - link "Security" [ref=f2e137] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=f2e138]:
+            - link "LinkedIn" [ref=f2e139] [cursor=pointer]:
+              - /url: "#"

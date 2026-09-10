@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from model_profiles import load_profile
+
 ROOT = Path("/opt/brokerage-gpu")
 DATA = Path("/srv/brokerage-gpu")
 
@@ -51,6 +53,9 @@ def main() -> None:
     ).exists():
         return
     selected = selected or {}
+    candidate = ROOT / "candidate.json"
+    if candidate.exists():
+        selected = json.loads(candidate.read_text())
     image = config["image"]
     DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
     (DATA / "models").mkdir(exist_ok=True)
@@ -85,6 +90,7 @@ def main() -> None:
     finally:
         run("docker", "logout", "ghcr.io")
     environment = {
+        "SERVING_IMAGE": image,
         "HF_HOME": "/cache/huggingface",
         "VLLM_NO_USAGE_STATS": "1",
         "XDG_CACHE_HOME": "/cache",
@@ -95,23 +101,27 @@ def main() -> None:
     }
     mounts = [f"{DATA}/models:/models:ro", f"{DATA}/cache:/cache"]
     if workload == "general":
+        profile_name = selected.get("model_profile")
+        if not profile_name:
+            raise ValueError("general model_profile must be explicitly selected")
+        profile = load_profile(profile_name)
         models = [
             {
-                "model": config["model"],
-                "revision": config["revision"],
+                "model": profile["model"],
+                "revision": profile["revision"],
+                "weights": profile["weights"],
                 "path": "/models/general",
             }
         ]
         environment.update(
             AI_GENERAL_API_KEY=keys["AI_GENERAL_API_KEY"],
             GENERAL_MODEL_PATH="/models/general",
+            GENERAL_MODEL_PROFILE=profile_name,
+            VLLM_ENABLE_CUDA_COMPATIBILITY="0",
         )
         ports = ["8000:8000"]
     else:
         # Candidate release is supplied by the operator in non-secret local metadata.
-        candidate = ROOT / "candidate.json"
-        if candidate.exists():
-            selected = json.loads(candidate.read_text())
         if selected["bucket"] != config["model_bucket"]:
             raise ValueError("release bucket does not match managed host configuration")
         release_id = selected["release_id"]

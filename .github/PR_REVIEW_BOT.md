@@ -138,7 +138,7 @@ AI Check는 Required Check로 지정하지 않는다. 안정화된 결정적 CI�
 ```bash
 node --check .github/scripts/pr-review-lib.mjs
 node --check .github/scripts/pr-policy-review.mjs
-node --test .github/scripts/tests/pr-review.test.mjs
+node --test .github/scripts/tests/pr-review*.test.mjs
 node --check .github/scripts/pr-comment-discord-lib.mjs
 node --check .github/scripts/pr-comment-discord.mjs
 node --test .github/scripts/tests/pr-comment-discord.test.mjs

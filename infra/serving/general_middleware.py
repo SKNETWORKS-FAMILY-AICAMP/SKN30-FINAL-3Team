@@ -1,9 +1,12 @@
 """Expose only authenticated inference and a small disk-status response."""
 
+import asyncio
 import hmac
 import json
 import os
 import shutil
+
+from gpu_metrics import safe_identity, sample_gpu
 
 
 class ServingRoutes:
@@ -28,9 +31,21 @@ class ServingRoutes:
             return await self.app(scope, receive, send)
         elif route == ("GET", "/ops/status"):
             usage = shutil.disk_usage(os.environ.get("HF_HOME", "/tmp"))
+            try:
+                metadata = json.loads(os.environ.get("GENERAL_MODEL_METADATA", "null"))
+            except ValueError:
+                metadata = None
+            identity = safe_identity(metadata)
+            identity.update(safe_identity({"image": os.environ.get("SERVING_IMAGE")}))
             status, body = (
                 200,
-                {"disk_total_bytes": usage.total, "disk_free_bytes": usage.free},
+                {
+                    "disk_total_bytes": usage.total,
+                    "disk_free_bytes": usage.free,
+                    "model": safe_identity(metadata),
+                    "identity": identity,
+                    "gpu": await asyncio.to_thread(sample_gpu),
+                },
             )
         else:
             status, body = 404, {"error": "not found"}

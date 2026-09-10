@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
@@ -27,10 +26,13 @@ from botocore.exceptions import BotoCoreError, ClientError
 INFRA = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INFRA / "deploy" / "scripts"))
 sys.path.insert(0, str(INFRA / "serving"))
+from model_profiles import load_profile
 from probe import probe, read_status
+from serving_cli import parser
 from serving_contract import (
+    DEFAULT_GENERAL_PROFILE,
+    GENERAL_CUDA_VERSIONS,
     GENERAL_KEY,
-    GENERAL_MODEL,
     POD_NAME,
     WORKLOADS,
     endpoint_urls,
@@ -38,6 +40,22 @@ from serving_contract import (
 
 ToolError = power.ToolError
 emit = power.emit
+
+
+def general_profile(spec: dict) -> dict:
+    if not spec.get("model_profile"):
+        raise ToolError("explicit general model_profile is required")
+    return load_profile(spec["model_profile"])
+
+
+def general_metadata(spec: dict) -> dict:
+    profile = general_profile(spec)
+    return {
+        "model_profile": spec.get("model_profile", DEFAULT_GENERAL_PROFILE),
+        "model": profile["model"],
+        "revision": profile["revision"],
+        "runtime_image": profile["runtime_image"],
+    }
 
 
 def f2_record(previous: dict, deployment: dict | None, release_id: str | None) -> dict:
@@ -102,17 +120,44 @@ class Serving:
             Overwrite=True,
         )
 
-    def selection(self) -> dict:
+    def selection_document(self) -> dict:
+        from serving_selection import document
+
         try:
-            result = self.read("serving/SELECTION")
+            raw = self.read("serving/SELECTION")
         except self.ssm.exceptions.ParameterNotFound:
-            return {"f2": None, "general": None}
-        if set(result) != set(WORKLOADS):
-            raise ToolError("serving selection must contain f2 and general")
-        for name, spec in result.items():
-            if spec is not None:
-                validate_selection(name, spec)
-        return result
+            raw = {"f2": None, "general": None}
+        return document(raw)
+
+    def selection(self) -> dict:
+        value = self.selection_document()
+        return {name: value[name] for name in WORKLOADS}
+
+    def managed_pods(self) -> list[dict]:
+        try:
+            return [
+                pod
+                for pod in self.runpod().pods()
+                if pod.get("name") in POD_NAME.values()
+            ]
+        except ClientError as error:
+            if (
+                error.response.get("Error", {}).get("Code")
+                == "ResourceNotFoundException"
+            ):
+                return []  # AWS-only installations need no RunPod operator Secret.
+            raise
+
+    def require_app_stopped(self) -> None:
+        instance = self.app_id()
+        if not instance:
+            return
+        self.command(
+            instance,
+            "test -f /opt/brokerage/serving-maintenance && "
+            'test -z "$(docker ps -q --filter label=com.docker.compose.project=brokerage-dev --filter label=com.docker.compose.service=api)" && '
+            'test -z "$(docker ps -q --filter label=com.docker.compose.project=brokerage-dev --filter label=com.docker.compose.service=worker)"',
+        )
 
     def secret(self, suffix: str) -> dict:
         return json.loads(
@@ -237,6 +282,7 @@ class Serving:
                 value = {
                     "status": "active",
                     **deployment,
+                    **general_metadata(spec),
                     "base_url": endpoint_urls(
                         deployment["cloud"],
                         deployment["resource_id"],
@@ -246,7 +292,7 @@ class Serving:
                 }
             self.write("ai/AI_GENERAL_ENDPOINT_SET", value)
 
-    def release(self, spec: dict) -> tuple[dict, str, str]:
+    def release(self, spec: dict, *, presign: bool = True) -> tuple[dict, str, str]:
         # Existing publisher validation is reused with an assumed-role subprocess environment.
         credentials = self.session.get_credentials().get_frozen_credentials()
         env = {
@@ -279,7 +325,20 @@ class Serving:
             raise ToolError(
                 "release stage does not match the explicit dev-release choice"
             )
-        return manifest, checksum, operations.presign(spec["release_id"])
+        catalog = json.loads((INFRA / "runpod/releases.json").read_text())["releases"]
+        record = next(
+            (r for r in catalog if r["release_id"] == spec["release_id"]), None
+        )
+        if record is None or record["bundle_sha256"] != checksum:
+            raise ToolError("S3 release checksum differs from the Git release catalog")
+        return (
+            manifest,
+            checksum,
+            operations.presign(spec["release_id"]) if presign else "",
+        )
+
+    def validate_release(self, spec: dict) -> None:
+        self.release(spec, presign=False)
 
     def prepare(self, workload: str, spec: dict) -> dict:
         # This is only an in-process cleanup receipt, never durable lifecycle state.
@@ -304,6 +363,7 @@ class Serving:
                         self.ec2.stop_instances(InstanceIds=[candidate["resource_id"]])
                     else:
                         self.runpod().delete(candidate["resource_id"])
+                    self.started_candidate = None
                 except (BotoCoreError, ClientError, f2.ToolError):
                     emit(
                         "candidate-cleanup-incomplete",
@@ -313,7 +373,9 @@ class Serving:
             raise
 
     def _prepare(self, workload: str, spec: dict) -> dict:
-        validate_selection(workload, spec)
+        from selection_catalog import normalize_spec
+
+        spec = normalize_spec(workload, spec)
         if spec["cloud"] == "aws":
             matches = self.instances(workload)
             if len(matches) != 1:
@@ -322,14 +384,16 @@ class Serving:
                 )
             instance = matches[0]
             iid = instance["InstanceId"]
-            suffix = "RUNPOD_CONTROL_SET" if workload == "f2" else "GENERAL_CONTROL_SET"
-            registered = self.read(f"runpod/{suffix}")
             tags = {tag["Key"]: tag["Value"] for tag in instance.get("Tags", [])}
-            if registered.get("status") != "ready" or tags.get(
-                "ServingImage"
-            ) != registered.get("image"):
+            from selection_catalog import load_catalog
+
+            hardware = load_catalog()["profiles"][spec["hardware_profile"]]
+            if (
+                tags.get("ServingImage") != spec["image"]
+                or instance["InstanceType"] != hardware["instance_type"]
+            ):
                 raise ToolError(
-                    "AWS GPU image must match the registered immutable RunPod image; review the GPU Terraform plan"
+                    "AWS GPU image/type differs from selected catalog profile; review Terraform plan"
                 )
             if workload == "f2":
                 self.release(spec)
@@ -359,7 +423,10 @@ class Serving:
             client = self.runpod()
             suffix = "RUNPOD_CONTROL_SET" if workload == "f2" else "GENERAL_CONTROL_SET"
             registered = self.read(f"runpod/{suffix}")
-            if registered.get("status") != "ready":
+            if (
+                registered.get("status") != "ready"
+                or registered.get("image") != spec["image"]
+            ):
                 raise ToolError("register the Console-managed RunPod Template first")
             source = json.loads(
                 (
@@ -387,14 +454,27 @@ class Serving:
                 raise ToolError(
                     "multiple managed Pods found; inspect exact IDs before retrying"
                 )
-            environment = {}
+            environment = {"SERVING_IMAGE": spec["image"]}
+            if getattr(self, "attempt_id", None):
+                environment["SERVING_ATTEMPT_ID"] = self.attempt_id
             if workload == "f2":
                 _, checksum, url = self.release(spec)
-                environment = {
-                    "F2_SLLM_RELEASE_ID": spec["release_id"],
-                    "F2_SLLM_BUNDLE_SHA256": checksum,
-                    "F2_SLLM_BUNDLE_URL": url,
-                }
+                environment.update(
+                    {
+                        "F2_SLLM_RELEASE_ID": spec["release_id"],
+                        "F2_SLLM_BUNDLE_SHA256": checksum,
+                        "F2_SLLM_BUNDLE_URL": url,
+                    }
+                )
+            else:
+                environment.update(
+                    {
+                        "GENERAL_MODEL_PROFILE": spec.get(
+                            "model_profile", DEFAULT_GENERAL_PROFILE
+                        ),
+                        "VLLM_ENABLE_CUDA_COMPATIBILITY": "0",
+                    }
+                )
             if matches:
                 details = client.pod(matches[0]["id"])
                 if (
@@ -411,6 +491,20 @@ class Serving:
                 ):
                     raise ToolError(
                         "existing F2 Pod uses a different release; delete it explicitly"
+                    )
+                if workload == "general" and details.get("env", {}).get(
+                    "GENERAL_MODEL_PROFILE", DEFAULT_GENERAL_PROFILE
+                ) != spec.get("model_profile", DEFAULT_GENERAL_PROFILE):
+                    raise ToolError(
+                        "existing general Pod uses a different model profile; delete it explicitly"
+                    )
+                if (
+                    workload == "general"
+                    and details.get("env", {}).get("VLLM_ENABLE_CUDA_COMPATIBILITY")
+                    != "0"
+                ):
+                    raise ToolError(
+                        "existing general Pod must explicitly disable CUDA compatibility; delete it explicitly"
                     )
                 if f2.pod_status(details) != "RUNNING":
                     raise ToolError(
@@ -432,11 +526,20 @@ class Serving:
                         "templateId": registered["template_id"],
                         "volumeInGb": 0,
                         "env": environment,
+                        **(
+                            {"allowedCudaVersions": list(GENERAL_CUDA_VERSIONS)}
+                            if workload == "general"
+                            else {}
+                        ),
                     },
                 )
             deployment = {"cloud": "runpod", "resource_id": f2.resource_id(details)}
             if not matches:
                 self.started_candidate = deployment
+        deployment["image"] = spec["image"]
+        deployment["hardware_profile"] = spec["hardware_profile"]
+        if workload == "general":
+            deployment.update(general_metadata(spec))
         deadline = time.monotonic() + 1800
         while time.monotonic() < deadline:
             try:
@@ -452,7 +555,12 @@ class Serving:
         if deployment["cloud"] == "aws":
             self.command(
                 deployment["resource_id"],
-                "python3 /opt/brokerage-gpu/probe.py",
+                "python3 /opt/brokerage-gpu/probe.py"
+                + (
+                    " --model " + shlex.quote(general_profile(deployment)["model"])
+                    if workload == "general"
+                    else ""
+                ),
                 timeout=300,
             )
         else:
@@ -462,14 +570,19 @@ class Serving:
                 probe(urls[0], keys["AI_VLLM_SLLM_API_KEY"], "sllm")
                 probe(urls[1], keys["AI_VLLM_STT_API_KEY"], "stt", stt=True)
             else:
-                probe(urls[0], keys[GENERAL_KEY], GENERAL_MODEL)
+                probe(urls[0], keys[GENERAL_KEY], general_profile(deployment)["model"])
 
     def application_smoke(self, workload: str) -> None:
         instance = self.app_id()
         if not instance:
             raise ToolError("application smoke requires a running app")
         script = "smoke_f2.sh" if workload == "f2" else "smoke_general.sh"
-        self.command(instance, f"/opt/brokerage/revision/scripts/{script}", timeout=600)
+        command = f"/opt/brokerage/revision/scripts/{script}"
+        if workload == "general":
+            command += " " + shlex.quote(
+                general_profile(self.endpoint(workload))["model"]
+            )
+        self.command(instance, command, timeout=600)
 
     def stop_resources(self, workload: str, *, keep: dict | None = None) -> None:
         errors = []
@@ -489,8 +602,7 @@ class Serving:
             except (BotoCoreError, ClientError):
                 errors.append(iid)
         try:
-            client = self.runpod()
-            for pod in client.pods():
+            for pod in self.managed_pods():
                 if pod.get("name") != POD_NAME[workload] or (
                     keep
                     and keep["cloud"] == "runpod"
@@ -498,7 +610,7 @@ class Serving:
                 ):
                     continue
                 try:
-                    client.delete(pod["id"])
+                    self.runpod().delete(pod["id"])
                 except f2.ToolError:
                     errors.append(pod["id"])
         except (BotoCoreError, ClientError, f2.ToolError):
@@ -507,84 +619,29 @@ class Serving:
             raise ToolError("GPU shutdown incomplete: " + ", ".join(errors))
 
     def switch(self, workload: str, cloud: str, *, apply: bool) -> None:
-        selection = self.selection()
-        previous = selection[workload]
-        if not previous:
-            raise ToolError("configure this workload before switching")
-        spec = {**previous, "cloud": cloud}
-        validate_selection(workload, spec)
-        self.no_deployment()
-        emit(
-            "ai-switch-plan",
-            workload=workload,
-            source=previous["cloud"],
-            target=cloud,
-            downtime="whole application",
-            aws_capacity="must be provisioned by reviewed Terraform plan",
-            standby="AWS stopped/EBS retained; RunPod deleted",
-            apply=apply,
-            model=GENERAL_MODEL
-            if workload == "general"
-            else "existing F2 SLLM + Whisper",
-            release=spec.get("release_id"),
-            runpod_gpu=spec["gpu_id"],
-            aws_type="g6.2xlarge" if workload == "f2" else "g6e.2xlarge",
-            billing="target GPU while preparing; old AWS EBS after switch; delete RunPod; account budget and live rate must be reviewed",
-        )
-        if not apply:
-            return
-        # Candidate failure does not change routing or the selected provider.
-        current = self.endpoint(workload)
-        if (
-            current.get("status") == "active"
-            and previous["cloud"] == cloud
-            and current.get("cloud", "runpod") == cloud
-        ):
-            self.application_smoke(workload)
-            emit("ai-switch-complete", workload=workload, cloud=cloud, changed=False)
-            return
-        deployment = self.prepare(workload, spec)
-        self.app("stop")
-        try:
-            self.activate(workload, spec, deployment)
-            self.app("start")
-            self.application_smoke(workload)
-            selection[workload] = spec
-            self.write("serving/SELECTION", selection)
-        except (ToolError, BotoCoreError, ClientError, OSError, ValueError):
-            self.app("stop")
-            self.activate(workload, spec, None)
-            raise ToolError(
-                "cutover failed; service remains in maintenance; rerun ai-switch for explicit recovery"
-            ) from None
-        self.stop_resources(workload, keep=deployment)
-        emit("ai-switch-complete", workload=workload, cloud=cloud)
+        from selection_catalog import default_hardware
+        from serving_selection import save
 
-    def start(self) -> None:
-        selection = self.selection()
-        self.no_deployment()
-        deployments = {}
-        if self.app_id():
-            self.app("stop")
-        # GPU endpoints are ready before an ASG replacement can start a worker.
-        for name, spec in selection.items():
-            if spec:
-                deployments[name] = self.prepare(name, spec)
-                self.activate(name, spec, deployments[name])
-        try:
-            self.power.start()
-            self.restore_application()
-            self.app("start")
-            for name in deployments:
-                self.application_smoke(name)
-        except (ToolError, BotoCoreError, ClientError, OSError, ValueError):
-            self.app("stop")
-            raise ToolError(
-                "dev-start failed; maintenance retained; inspect dev-status and retry dev-start"
-            ) from None
-        for name in WORKLOADS:
-            self.stop_resources(name, keep=deployments.get(name))
-        emit("dev-serving-start-complete", workloads=list(deployments))
+        previous = self.selection()[workload]
+        if not previous:
+            raise ToolError("ai-select this workload first")
+        spec = {
+            **previous,
+            "cloud": cloud,
+            "hardware_profile": default_hardware(workload, cloud),
+        }
+        spec.pop("gpu_id", None)
+        save(self, {workload: spec}, apply=apply)
+
+    def start(self, **options) -> None:
+        from serving_lifecycle import Lifecycle
+
+        Lifecycle(self).run(**options)
+
+    def prepare_deployment(self, **options) -> None:
+        from serving_lifecycle import Lifecycle
+
+        Lifecycle(self).run(prepare_only=True, **options)
 
     def capacity_config(self, candidate: str | None = None) -> None:
         selected = self.selection()
@@ -602,47 +659,11 @@ class Serving:
         )
         emit("gpu-capacity-input", workloads=sorted(workloads), applied=False)
 
-    def restore_application(self) -> None:
-        client = self.session.client("codedeploy")
-        name = f"{self.prefix}-backend"
-        group = client.get_deployment_group(
-            applicationName=name, deploymentGroupName=name
-        )["deploymentGroupInfo"]
-        last = group.get("lastSuccessfulDeployment", {}).get("deploymentId")
-        if not last:
-            raise ToolError(
-                "no successful Backend deployment exists; deploy the reviewed Backend revision first"
-            )
-        # ASG launch deployments can be in progress after capacity is healthy.
-        for deployment_id in client.list_deployments(
-            applicationName=name,
-            deploymentGroupName=name,
-            includeOnlyStatuses=["Created", "Queued", "InProgress", "Ready", "Baking"],
-        ).get("deployments", []):
-            client.get_waiter("deployment_successful").wait(deploymentId=deployment_id)
-        instance = self.app_id()
-        try:
-            self.command(
-                instance,
-                "test -s /opt/brokerage/revision/backend-image.env && test -x /opt/brokerage/revision/scripts/serving_maintenance.sh",
-            )
-            return
-        except ToolError:
-            revision = client.get_deployment(deploymentId=last)["deploymentInfo"][
-                "revision"
-            ]
-            result = client.create_deployment(
-                applicationName=name,
-                deploymentGroupName=name,
-                revision=revision,
-                description="Restore last successful app revision after dev-start",
-            )
-            client.get_waiter("deployment_successful").wait(
-                deploymentId=result["deploymentId"]
-            )
-
     def stop(self) -> None:
         self.no_deployment()
+        instance = self.app_id()
+        if instance:
+            self.command(instance, "touch /opt/brokerage/serving-maintenance")
         self.app("stop")
         errors = []
         for name in WORKLOADS:
@@ -677,6 +698,23 @@ class Serving:
     def status(self) -> None:
         self.power.status()
         selection = self.selection()
+        from selection_catalog import validation_metadata
+
+        desired = self.selection_document()
+        try:
+            applied = self.read("serving/APPLIED")
+        except self.ssm.exceptions.ParameterNotFound:
+            applied = {"status": "not-recorded"}
+        emit(
+            "serving-selection-status",
+            desired=desired,
+            last_apply=applied,
+            validation={
+                name: validation_metadata(name, spec)
+                for name, spec in selection.items()
+                if spec
+            },
+        )
         for name in WORKLOADS:
             instances = self.instances(name)
             ids = [
@@ -729,7 +767,7 @@ class Serving:
                 endpoint_status=endpoint_status,
                 costs="running (even idle): GPU + EBS + public IPv4; stopped: EBS; deleted: no GPU/EBS",
             )
-        pods = self.runpod().pods()
+        pods = self.managed_pods()
         runtime = []
         for pod in pods:
             if pod.get("name") not in POD_NAME.values():
@@ -758,7 +796,9 @@ class Serving:
                                 if name == "general"
                                 else "AI_VLLM_SLLM_API_KEY"
                             ],
-                            GENERAL_MODEL if name == "general" else "sllm",
+                            general_profile(selection[name] or {})["model"]
+                            if name == "general"
+                            else "sllm",
                         )
                     )
                     if name == "f2":
@@ -779,55 +819,12 @@ class Serving:
 
 
 def validate_selection(workload: str, spec: dict) -> None:
-    if (
-        workload not in WORKLOADS
-        or not isinstance(spec, dict)
-        or spec.get("cloud") not in {"aws", "runpod"}
-    ):
-        raise ToolError("invalid workload/cloud selection")
-    allowed = {"cloud", "gpu_id", "release_id", "bucket", "allow_dev_release"}
-    if set(spec) - allowed:
-        raise ToolError("unsupported selection fields")
-    if not isinstance(spec.get("gpu_id"), str) or not re.fullmatch(
-        r"[A-Za-z0-9 ._-]{3,100}", spec["gpu_id"]
-    ):
-        raise ToolError("an explicit RunPod GPU ID is required for recovery")
-    if workload == "f2" and (
-        not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,63}", str(spec.get("release_id", "")))
-        or not re.fullmatch(r"[a-z0-9.-]{3,63}", str(spec.get("bucket", "")))
-    ):
-        raise ToolError("F2 requires its published release ID and model bucket")
+    from selection_catalog import normalize_spec
 
-
-def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("--account-id", default=os.environ.get("TARGET_ACCOUNT_ID", ""))
-    result.add_argument("--profile", default="skn30-session")
-    result.add_argument("--project", default="skn30-final-3team")
-    commands = result.add_subparsers(dest="command", required=True)
-    for action in ("start", "stop", "status"):
-        p = commands.add_parser(action)
-        if action != "status":
-            p.add_argument("--apply", action="store_true")
-            p.add_argument("--workloads-stopped-confirmed", action="store_true")
-    activation = commands.add_parser("activate-general")
-    activation.add_argument("brokerage_id", type=int)
-    activation.add_argument("--apply", action="store_true")
-    activation.add_argument("--workloads-stopped-confirmed", action="store_true")
-    capacity = commands.add_parser("capacity-config")
-    capacity.add_argument("--candidate", choices=WORKLOADS)
-    for action in ("switch", "configure", "smoke"):
-        p = commands.add_parser(action)
-        p.add_argument("workload", choices=WORKLOADS)
-        if action != "smoke":
-            p.add_argument("cloud", choices=("aws", "runpod"))
-            p.add_argument("--apply", action="store_true")
-        if action == "configure":
-            p.add_argument("--gpu-id", required=True)
-            p.add_argument("--release-id")
-            p.add_argument("--bucket")
-            p.add_argument("--allow-dev-release", action="store_true")
-    return result
+    try:
+        normalize_spec(workload, spec)
+    except ValueError as error:
+        raise ToolError(str(error)) from None
 
 
 def main() -> int:
@@ -847,11 +844,35 @@ def main() -> int:
             raise ToolError("explicit account ID and valid project name are required")
         session = power.assume_operator(power.base_session(settings), settings)
         controller = Serving(session, settings)
-        if args.command in {"start", "stop"}:
+        if args.command in {"prepare-deployment", "start"}:
+            rates = {}
+            for value in args.hourly_usd:
+                name, rate = value.split("=", 1)
+                import math
+
+                if (
+                    name not in WORKLOADS
+                    or not math.isfinite(float(rate))
+                    or float(rate) <= 0
+                ):
+                    raise ToolError(
+                        "hourly rate must be f2=POSITIVE_USD or general=POSITIVE_USD"
+                    )
+                rates[name] = float(rate)
+            action = (
+                controller.prepare_deployment
+                if args.command == "prepare-deployment"
+                else controller.start
+            )
+            action(apply=args.apply, hours=args.hours, rates=rates)
+        elif args.command == "select":
+            from serving_selection import select
+
+            select(controller, args)
+        elif args.command == "stop":
             power.require_apply(args.apply, args.command)
-            if args.command == "stop":
-                power.require_stop_confirmation(args.workloads_stopped_confirmed)
-            getattr(controller, args.command)()
+            power.require_stop_confirmation(args.workloads_stopped_confirmed)
+            controller.stop()
         elif args.command == "capacity-config":
             controller.capacity_config(args.candidate)
         elif args.command == "activate-general":
@@ -860,29 +881,25 @@ def main() -> int:
             if args.brokerage_id < 1:
                 raise ToolError("positive brokerage ID required")
             controller.no_deployment()
-            controller.app("stop")
             instance = controller.app_id()
             if not instance:
-                raise ToolError("app instance unavailable")
+                raise ToolError(
+                    "app instance unavailable; model selection requires an existing maintenance host"
+                )
+            # The remote command verifies workloads are already stopped and uses the
+            # freshly rendered AI selection. Never restart or infer as a side effect.
             controller.command(
                 instance,
-                f"/opt/brokerage/revision/scripts/serving_maintenance.sh activate-general {args.brokerage_id}",
+                f"/opt/brokerage/revision/scripts/serving_maintenance.sh activate-general {args.brokerage_id} {shlex.quote(args.capability)}",
                 timeout=360,
             )
-            try:
-                controller.app("start")
-                controller.application_smoke("general")
-            except (ToolError, ClientError, BotoCoreError):
-                controller.app("stop")
-                raise ToolError(
-                    "model activation verification failed; maintenance retained; repair GPU and rerun ai-switch"
-                ) from None
+            emit(
+                "model-selection-complete",
+                capability=args.capability,
+                workloads="stopped",
+            )
         elif args.command == "configure":
             selection = controller.selection()
-            if controller.endpoint(args.workload).get("status") != "offline":
-                raise ToolError(
-                    "configure requires an offline workload; use ai-switch for active deployments"
-                )
             spec = {"cloud": args.cloud, "gpu_id": args.gpu_id}
             if args.workload == "f2":
                 spec.update(
@@ -890,18 +907,21 @@ def main() -> int:
                     bucket=args.bucket,
                     allow_dev_release=args.allow_dev_release,
                 )
-            validate_selection(args.workload, spec)
-            selection[args.workload] = spec
-            if args.apply:
-                controller.write("serving/SELECTION", selection)
-            emit(
-                "serving-configure",
-                workload=args.workload,
-                cloud=args.cloud,
-                apply=args.apply,
-            )
+            else:
+                spec["model_profile"] = args.model_profile or (
+                    selection["general"] or {}
+                ).get("model_profile", DEFAULT_GENERAL_PROFILE)
+            if args.workload == "f2" and args.model_profile is not None:
+                raise ToolError("model profile selection is only supported for general")
+            from serving_selection import save
+
+            save(controller, {args.workload: spec}, apply=args.apply)
         elif args.command == "switch":
             controller.switch(args.workload, args.cloud, apply=args.apply)
+        elif args.command == "verify":
+            from serving_verification import verify_running
+
+            verify_running(controller, args.workload)
         elif args.command == "smoke":
             controller.application_smoke(args.workload)
         else:

@@ -35,12 +35,9 @@ locals {
     backend = merge({
       APP_ENV                               = "dev"
       APP_HOST                              = "0.0.0.0"
-      APP_OPENAPI_ENABLED                   = "false"
       APP_PORT                              = "8000"
-      AUTH_CSRF_COOKIE_NAME                 = "brokerage_csrf"
       AUTH_DEVELOPMENT_ENABLED              = tostring(local.development_auth_enabled)
       AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "720"
-      AUTH_SESSION_COOKIE_NAME              = "brokerage_session"
       AUTH_SESSION_IDLE_TIMEOUT_MINUTES     = "30"
       AUTH_SESSION_LAST_SEEN_UPDATE_SECONDS = "300"
       DB_POOL_MAX_OVERFLOW                  = "5"
@@ -54,21 +51,17 @@ locals {
       HTTP_CORS_ALLOWED_ORIGINS    = "[]"
       LOG_FORMAT                   = "json"
       LOG_LEVEL                    = "INFO"
-      WORKER_ENABLED               = "true"
-      WORKER_READY_FILE            = "/tmp/brokerage-worker-ready"
       F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
     }, local.development_auth_identity_environment)
-    ai = {
-      AI_LLM_ENDPOINTS = jsonencode([
-        {
-          alias      = "general-dev-bedrock"
-          provider   = "bedrock"
-          aws_region = var.aws_region
-        },
-      ])
-      AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
+    ai = merge({
+      # Shared provider/model choices are validated together in general-model.tf; restart after reviewed apply.
+      AI_GENERAL_PROVIDER        = var.general_model_selection.provider
+      AI_GENERAL_MODEL           = var.general_model_selection.model
       AI_REQUEST_TIMEOUT_SECONDS = "60"
-    }
+      }, var.general_model_selection.provider == "bedrock" ? {
+      # Bedrock only: ap-northeast-2, matching this root's runtime role; omitted for API-key providers.
+      AI_GENERAL_AWS_REGION = var.general_model_selection.aws_region
+    } : {})
   }
 
   ai_vllm_endpoint_set_bootstrap = {
@@ -178,11 +171,6 @@ resource "aws_ssm_parameter" "runpod_control_set" {
   tags = {
     Name = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
   }
-}
-
-moved {
-  from = aws_ssm_parameter.application["ai_openai_base_url"]
-  to   = aws_ssm_parameter.application["ai_ai_openai_base_url"]
 }
 
 moved {

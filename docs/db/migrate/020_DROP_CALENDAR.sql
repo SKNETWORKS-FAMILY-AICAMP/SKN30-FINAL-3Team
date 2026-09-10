@@ -1,6 +1,6 @@
 -- PostgreSQL 15+
 -- 캘린더 기능 폐기에 따른 calendar_event 제거
--- depends: 018_CREATE_CALENDAR
+-- depends: 019_CREATE_CHATBOT
 
 
 -- 캘린더 화면(F4-CAL)을 통째로 제거하기로 하면서 이 테이블을 쓰는 코드(backend/src/domain/calendar,

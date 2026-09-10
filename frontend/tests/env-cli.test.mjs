@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const writableTempRoot = process.platform === "win32" ? tmpdir() : "/tmp";
@@ -77,4 +77,27 @@ test("Vite and release scripts use the approved env-file order", async () => {
       `${scriptName} must load the team env before the optional personal env`,
     );
   }
+});
+
+test("team defaults leave optional sources absent and inherit the selected ledger", () => {
+  const env = { ...process.env, VITE_LEDGER_SOURCE: "api" };
+  delete env.VITE_F3_SOURCE;
+  const schemaUrl = pathToFileURL(path.join(frontendRoot, "src/config/envSchema.ts")).href;
+  const result = spawnSync(
+    process.execPath,
+    [
+      `--env-file=${path.join(frontendRoot, ".env.local")}`,
+      "--input-type=module",
+      "-e",
+      `const { parseAppEnv } = await import(${JSON.stringify(schemaUrl)});
+       const parsed = parseAppEnv(process.env);
+       console.log(JSON.stringify([
+         Object.hasOwn(process.env, "VITE_F3_SOURCE"),
+         parsed.f3Source
+       ]));`,
+    ],
+    { encoding: "utf8", env },
+  );
+  assertSpawned(result);
+  assert.deepEqual(JSON.parse(result.stdout), [false, "api"]);
 });

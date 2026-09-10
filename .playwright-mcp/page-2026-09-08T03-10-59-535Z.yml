@@ -1,0 +1,259 @@
+- generic [active] [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link [ref=f1e4] [cursor=pointer]:
+        - /url: "#"
+        - img "집크크" [ref=f1e5]
+      - navigation [ref=f1e6]:
+        - link "Features" [ref=f1e7] [cursor=pointer]:
+          - /url: index.html
+        - link "How it works" [ref=f1e8] [cursor=pointer]:
+          - /url: page-1.html
+        - link "Pricing" [ref=f1e9] [cursor=pointer]:
+          - /url: "#"
+        - link "Contact Us" [ref=f1e10] [cursor=pointer]:
+          - /url: "#"
+      - link "무료로 시작하기" [ref=f1e12] [cursor=pointer]:
+        - /url: "#"
+  - main [ref=f1e14]:
+    - generic [ref=f1e15]:
+      - generic [ref=f1e17]:
+        - generic [ref=f1e18]: 집크크 AI 파이프라인 · How It Works
+        - heading "통화가 끝나면, 장부가 완성됩니다. AI 상담 자동화의 핵심 원리" [level=1] [ref=f1e21]
+        - paragraph [ref=f1e22]: 복잡한 상담 음성 데이터를 구조화된 매물장·구입장으로 자동 변환하고, 3대 전문 멀티 에이전트가 고객과 최적의 매물을 실시간 연결하는 전체 파이프라인 워크플로우를 소개합니다.
+        - generic [ref=f1e23]:
+          - generic [ref=f1e24]:
+            - generic [ref=f1e25]: timer
+            - generic [ref=f1e27]:
+              - generic [ref=f1e28]: 90% 단축
+              - generic [ref=f1e29]: 상담 기록 및 정리 시간
+          - generic [ref=f1e30]:
+            - generic [ref=f1e31]: verified
+            - generic [ref=f1e33]:
+              - generic [ref=f1e34]: 99.2%
+              - generic [ref=f1e35]: 한국 부동산 도메인 인식률
+          - generic [ref=f1e36]:
+            - generic [ref=f1e37]: hub
+            - generic [ref=f1e39]:
+              - generic [ref=f1e40]: 실시간 0.4초
+              - generic [ref=f1e41]: 매물-구입장 자동 매칭
+      - generic [ref=f1e43]:
+        - generic [ref=f1e44]:
+          - generic [ref=f1e45]:
+            - text: End-to-End Pipeline
+            - heading "상담 통화부터 자동 계약 매칭까지 4단계 워크플로우" [level=2] [ref=f1e46]
+          - paragraph [ref=f1e47]: 중개사가 통화 파일을 입력하면, 보이지 않는 백그라운드 엔진이 장부 작성과 분석을 스스로 처리합니다.
+        - generic [ref=f1e48]:
+          - generic [ref=f1e49]:
+            - generic [ref=f1e50]:
+              - generic [ref=f1e51]:
+                - generic [ref=f1e52]: STEP 01
+                - generic [ref=f1e53]: Live 실시간 변환
+              - heading "실시간 부동산 특화 STT (음성 인식)" [level=3] [ref=f1e55]
+              - paragraph [ref=f1e56]: 부동산 전문 트랜스포머 음성인식 엔진이 복잡한 단지명, 동호수, 면적(평·㎡), 보증금/월세, 대출 융자 조건 등 업계 전문 용어와 사투리 억양을 실시간 텍스트로 정밀 변환합니다.
+            - generic [ref=f1e57]:
+              - generic [ref=f1e59]:
+                - generic [ref=f1e60]: mic
+                - generic [ref=f1e61]: 통화 녹음 스트림 · 03:24
+              - generic [ref=f1e68]:
+                - generic [ref=f1e69]: "\"반포 래미안 원베일리 34평형 전세 18억 이하로 가을 입주 매물 찾아요.\""
+                - generic [ref=f1e70]:
+                  - generic [ref=f1e71]: "단지: 래미안 원베일리 34평"
+                  - generic [ref=f1e72]: "조건: 전세 18억 이하"
+          - generic [ref=f1e73]:
+            - generic [ref=f1e74]:
+              - generic [ref=f1e75]:
+                - generic [ref=f1e76]: STEP 02
+                - generic [ref=f1e77]: 자연어 이해 & 엔티티 추출
+              - heading "NLP 정형 데이터 자동 분류 & 스키마 매핑" [level=3] [ref=f1e78]
+              - paragraph [ref=f1e79]: 대화 맥락 속에서 고객의 매수·임차 의사결정 시점, 거래 유형, 선호 학군, 보증금 한도 및 융자 필요액을 120ms 내에 핀포인트로 식별하여 정형 DB 레코드로 자동 구조화합니다.
+            - generic [ref=f1e80]:
+              - generic [ref=f1e81]:
+                - generic [ref=f1e82]: SCHEMA_PARSER v2.4
+                - generic [ref=f1e83]: 처리속도 120ms
+              - generic [ref=f1e84]:
+                - generic [ref=f1e85]:
+                  - generic [ref=f1e86]: 거래 유형
+                  - generic [ref=f1e87]: 전세 (Lease)
+                - generic [ref=f1e88]:
+                  - generic [ref=f1e89]: 희망 단지/지역
+                  - generic [ref=f1e90]: 서초구 반포동 · 래미안 원베일리
+                - generic [ref=f1e91]:
+                  - generic [ref=f1e92]: 예산 한도
+                  - generic [ref=f1e93]: 18억원 이내
+                - generic [ref=f1e94]:
+                  - generic [ref=f1e95]: 희망 입주 시기
+                  - generic [ref=f1e96]: 가을 (1~2개월 내)
+          - generic [ref=f1e97]:
+            - generic [ref=f1e98]:
+              - generic [ref=f1e99]:
+                - generic [ref=f1e100]: STEP 03
+                - generic [ref=f1e101]: 신뢰도 98.7% 검증
+              - heading "원클릭 디지털 구입장·매물장 동기화" [level=3] [ref=f1e102]
+              - paragraph [ref=f1e103]: 통화 완료 즉시 요약 제안 카드가 화면에 생성됩니다. 번거로운 수기 타이핑 없이 단 한 번의 클릭으로 중개사 보유 매물 데이터베이스 및 구입 고객 명부에 안전하게 반영됩니다.
+            - generic [ref=f1e104]:
+              - generic [ref=f1e105]:
+                - generic [ref=f1e106]: 새 구입장 자동 생성
+                - generic [ref=f1e109]: AI 검증 98.7%
+              - generic [ref=f1e110]:
+                - generic [ref=f1e111]:
+                  - generic [ref=f1e112]: 반포동 전세 손님 (김*우 고객)
+                  - generic [ref=f1e113]: 매칭 후보 4건
+                - paragraph [ref=f1e114]: 래미안 원베일리 34평형 · 보증금 18억 이하 · 초등 도보 학군 희망
+              - button "check_circle 원클릭으로 중개 장부 저장하기" [ref=f1e116] [cursor=pointer]:
+                - generic [ref=f1e117]: check_circle
+                - text: 원클릭으로 중개 장부 저장하기
+          - generic [ref=f1e118]:
+            - generic [ref=f1e119]:
+              - generic [ref=f1e120]:
+                - generic [ref=f1e121]: STEP 04
+                - generic [ref=f1e122]: 실시간 교차 매칭 엔진
+              - heading "3대 AI 에이전트 자동 매칭 & 추천 송출" [level=3] [ref=f1e123]
+              - paragraph [ref=f1e124]: 장부에 등록되는 순간 Property 에이전트와 Customer 에이전트가 교차 연동되어 90% 이상 일치율을 가진 최적 매물을 도출하고, 즉시 발송 가능한 카카오 알림톡 추천 리포트를 준비합니다.
+            - generic [ref=f1e125]:
+              - generic [ref=f1e126]:
+                - img "Property Agent" [ref=f1e127]
+                - generic [ref=f1e128]: Property
+                - generic [ref=f1e129]: 매물 심층분석
+              - generic [ref=f1e130]:
+                - img "Customer Agent" [ref=f1e131]
+                - generic [ref=f1e132]: Customer
+                - generic [ref=f1e133]: 니즈 프로파일
+              - generic [ref=f1e134]:
+                - img "Matching Agent" [ref=f1e135]
+                - generic [ref=f1e136]: Matching
+                - generic [ref=f1e137]: 일치율 96%
+      - generic [ref=f1e139]:
+        - generic [ref=f1e140]:
+          - generic [ref=f1e141]:
+            - generic [ref=f1e142]: smart_toy
+            - text: 독자 개발 멀티 에이전트 시스템
+          - heading "각 분야를 전담하는 3대 AI 에이전트 구조" [level=2] [ref=f1e143]
+          - paragraph [ref=f1e144]: 단일 범용 모델이 아닌, 부동산 중개 실무의 각 영역에 맞추어 특화 튜닝된 3개의 독립 에이전트가 유기적으로 상호작용합니다.
+        - generic [ref=f1e145]:
+          - generic [ref=f1e146]:
+            - img "Property Agent" [ref=f1e148]
+            - generic [ref=f1e149]:
+              - generic [ref=f1e150]: AGENT 01
+              - heading "Property Agent" [level=3] [ref=f1e151]
+            - paragraph [ref=f1e152]: 매물 데이터 분석 & 권리 상태 검증
+            - paragraph [ref=f1e153]: 실시간 등록되는 매물의 동호수, 면적, 층수, 관리비, 즉시 입주 가능 여부를 분석합니다. 국토교통부 실거래가 및 최근 유사 평형 시세를 실시간 대조하여 적정 매물가 리포트를 생성합니다.
+            - generic [ref=f1e154]:
+              - generic [ref=f1e155]:
+                - generic [ref=f1e156]: check_circle
+                - generic [ref=f1e157]: 단지 실거래가 및 최근 매매/전세가율 대조
+              - generic [ref=f1e158]:
+                - generic [ref=f1e159]: check_circle
+                - generic [ref=f1e160]: 근저당·임차권 등 기본 권리 리스크 1차 스크리닝
+          - generic [ref=f1e161]:
+            - img "Customer Agent" [ref=f1e163]
+            - generic [ref=f1e164]:
+              - generic [ref=f1e165]: AGENT 02
+              - heading "Customer Agent" [level=3] [ref=f1e166]
+            - paragraph [ref=f1e167]: 고객 니즈 심층 프로파일링
+            - paragraph [ref=f1e168]: 상담 통화 중 흘러나오는 고객의 실제 자금 여력(자기자본+대출), 직장 통근 동선, 학부모 선호 학군, 반려동물 여부 등 18개 미세 세부 파라미터를 추출하여 선호도를 다각도로 수치화합니다.
+            - generic [ref=f1e169]:
+              - generic [ref=f1e170]:
+                - generic [ref=f1e171]: check_circle
+                - generic [ref=f1e172]: 18개 라이프스타일 가중치 자동 산출
+              - generic [ref=f1e173]:
+                - generic [ref=f1e174]: check_circle
+                - generic [ref=f1e175]: 이사 희망 일정 기반 타임라인 우선순위 배정
+          - generic [ref=f1e176]:
+            - generic [ref=f1e177]: CORE BRAIN
+            - img "Matching Agent" [ref=f1e179]
+            - generic [ref=f1e180]:
+              - generic [ref=f1e181]: AGENT 03
+              - heading "Matching Agent" [level=3] [ref=f1e182]
+            - paragraph [ref=f1e183]: 양방향 가중치 매칭 & 알림
+            - paragraph [ref=f1e184]: Property Agent와 Customer Agent가 축적한 정형 벡터 데이터를 기반으로 실시간 코사인 유사도 연산을 가동합니다. 조건 일치율 90% 돌파 시 공인중개사 모바일과 웹 화면에 원클릭 추천 리포트를 송출합니다.
+            - generic [ref=f1e185]:
+              - generic [ref=f1e186]:
+                - generic [ref=f1e187]: check_circle
+                - generic [ref=f1e188]: 양방향 다차원 적합도 90% 이상 필터링
+              - generic [ref=f1e189]:
+                - generic [ref=f1e190]: check_circle
+                - generic [ref=f1e191]: 고객 맞춤 카카오 알림톡/문자 초안 자동 작성
+      - generic [ref=f1e193]:
+        - generic [ref=f1e194]:
+          - generic [ref=f1e195]:
+            - text: Privacy & Trust
+            - heading "고객 정보, 이렇게 보호합니다" [level=2] [ref=f1e196]
+          - generic [ref=f1e197]:
+            - generic [ref=f1e198]: lock
+            - generic [ref=f1e199]: 모든 데이터 암호화 저장
+        - generic [ref=f1e200]:
+          - generic [ref=f1e201]:
+            - generic [ref=f1e202]: security
+            - heading "직원별 권한 관리" [level=4] [ref=f1e204]
+            - paragraph [ref=f1e205]: 담당자별 로그인과 역할에 따라 수정·삭제 권한을 다르게 부여하고, 고객 정보 열람·다운로드 기록도 남깁니다.
+          - generic [ref=f1e206]:
+            - generic [ref=f1e207]: record_voice_over
+            - heading "고객 동의와 민감정보 보호" [level=4] [ref=f1e209]
+            - paragraph [ref=f1e210]: 고객 정보는 동의 없이 저장되지 않으며, 주민등록번호·계좌번호처럼 민감한 정보가 감지되면 저장 전 미리 알려드립니다.
+          - generic [ref=f1e211]:
+            - generic [ref=f1e212]: format_image_left
+            - heading "안전한 저장과 보관 기간 관리" [level=4] [ref=f1e214]
+            - paragraph [ref=f1e215]: 장부·상담 기록은 암호화 저장하며, 통화 음성 파일은 분석 완료 직후~1시간 이내 삭제합니다.
+      - generic [ref=f1e217]:
+        - generic [ref=f1e218]: Start Transforming Your Brokerage Today
+        - heading "지금 집크크로 상담 업무의 효율을 극대화하세요" [level=2] [ref=f1e219]
+        - paragraph [ref=f1e220]: 하루 수십 번씩 반복되는 상담 메모와 정리 작업에서 벗어나세요. 첫 주 무료 체험으로 매물 계약 성공률의 차이를 직접 경험해 보실 수 있습니다.
+        - generic [ref=f1e221]:
+          - link "7일 무료 체험 시작하기 arrow_forward" [ref=f1e222] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=f1e223]: 7일 무료 체험 시작하기
+            - generic [ref=f1e224]: arrow_forward
+          - link "서비스 상세 데모 둘러보기" [ref=f1e225] [cursor=pointer]:
+            - /url: "#"
+        - generic [ref=f1e226]:
+          - generic [ref=f1e227]:
+            - generic [ref=f1e228]: check_circle
+            - generic [ref=f1e229]: 신용카드 등록 없이 즉시 시작
+          - generic [ref=f1e230]:
+            - generic [ref=f1e231]: check_circle
+            - generic [ref=f1e232]: 기존 장부 엑셀 데이터 원클릭 마이그레이션
+  - contentinfo [ref=f1e233]:
+    - generic [ref=f1e234]:
+      - generic [ref=f1e235]:
+        - generic [ref=f1e236]:
+          - generic [ref=f1e237]:
+            - img "Propeller AI Brand Logo" [ref=f1e238]
+            - generic [ref=f1e239]: 집크크
+          - paragraph [ref=f1e240]: 당신의 완벽한 공간을 위해 · 집크크
+          - paragraph [ref=f1e241]: 공인중개사의 업무 효율성과 고객 계약 성공률을 극대화하는 인공지능 기반 전문 상담 및 관리 솔루션입니다.
+        - generic [ref=f1e242]:
+          - heading "제품" [level=4] [ref=f1e243]
+          - link "서비스 소개" [ref=f1e244] [cursor=pointer]:
+            - /url: "#"
+          - link "How it works" [ref=f1e245] [cursor=pointer]:
+            - /url: page-1.html
+          - link "요금 안내" [ref=f1e246] [cursor=pointer]:
+            - /url: "#"
+          - link "엔터프라이즈 도입" [ref=f1e247] [cursor=pointer]:
+            - /url: "#"
+        - generic [ref=f1e248]:
+          - heading "기능 상세" [level=4] [ref=f1e249]
+          - link "상담 요약 & AI 분석" [ref=f1e250] [cursor=pointer]:
+            - /url: "#"
+          - link "디지털 구입장 및 매물 연동" [ref=f1e251] [cursor=pointer]:
+            - /url: "#"
+          - link "고객 맞춤형 매물 분석 추천" [ref=f1e252] [cursor=pointer]:
+            - /url: "#"
+          - link [ref=f1e253] [cursor=pointer]:
+            - /url: "#"
+        - generic [ref=f1e254]:
+          - heading "회사 및 규정" [level=4] [ref=f1e255]
+          - link "회사 소개" [ref=f1e256] [cursor=pointer]:
+            - /url: "#"
+          - link "보안 체계 및 인증" [ref=f1e257] [cursor=pointer]:
+            - /url: "#"
+          - link "개인정보처리방침" [ref=f1e258] [cursor=pointer]:
+            - /url: "#"
+          - link "서비스 이용약관" [ref=f1e259] [cursor=pointer]:
+            - /url: "#"
+      - generic [ref=f1e260]:
+        - generic [ref=f1e261]: Copyright © 2026 집크크 ZIPKEKE. All rights reserved.
+        - generic [ref=f1e262]:
+          - generic [ref=f1e263]: "개노사영크크 | 사업자등록번호: 123-45-67890"
+          - generic [ref=f1e264]: "통신판매업신고: 제2026-서울서초-0000호"

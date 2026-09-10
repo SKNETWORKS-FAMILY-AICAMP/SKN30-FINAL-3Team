@@ -1,6 +1,6 @@
 ---
 status: 제안
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 # 아키텍처 문서 안내
@@ -45,6 +45,7 @@ updated: 2026-09-08
 
 | 문서 | 언제 읽는가? | 다루는 범위 |
 |---|---|---|
+| [챗봇 구현·검증](chatbot/implementation-and-validation.md) | 활성화·실제 평가·검증 명령과 제한을 확인할 때 | Luna 실제 평가, Qwen 보류, 격리 DB·브라우저·HTTP/SSE 검증 |
 | [챗봇 도입 검토](chatbot/overview.md) | 도입 근거·구현 가능성·복잡성·공수·스택·확장 순서를 검토할 때 | 읽기 전용 자연어 조회·F2 연결, 현재 기반과 추가 작업 |
 | [챗봇 실행 구조](chatbot/runtime.md) | 도구·모델·멀티턴 구현을 검토할 때 | 제한된 조건 생성, Backend capability, local Luna·dev Qwen |
 | [챗봇 저장 설계](chatbot/persistence.md) | 대화 DB·상태·복구·삭제를 설계할 때 | 대화·메시지·요청 3테이블, 사용자별 1개, 영속 상태·즉시 삭제·경합 |
@@ -57,6 +58,11 @@ updated: 2026-09-08
 | [F2 프론트엔드 필드 반영](f2/frontend-voice-field-population.md) | 현재 프론트엔드에서 음성 분석 결과가 매물장·구입장 필드로 들어가는 과정을 확인할 때 | 진입, 업로드, 장부 판정, 필드 매핑, draft 반영, 최종 저장과 구현 제약 |
 | [F2 오프라인 데이터·학습·평가](f2/offline-data-training-evaluation.md) | 평가셋과 모델 개선·승격 기준을 논의할 때 | 합성 데이터, 분할, 평가 계층, 버전, 피드백 루프 |
 | [F3 개요](f3/overview.md) | F3 전체 흐름과 팀별 책임을 처음 파악할 때 | 핵심 교차 판정, 모듈 경계, SQL 후보와 하이브리드 로그 검색 |
+| [F3 카드 분리 현황 검토](f3/position-card-review.md) | 현재 저장 부하·Worker·반복 판정·카드 API 공백을 확인할 때 | 코드 기준 현황과 성능 미측정 범위 |
+| [F3 Worker 실행·확장 검토](f3/worker-deployment-review.md) | 스레드/프로세스/컨테이너·서버 분리·확장 준비도를 확인할 때 | 단일 EC2 배치, 분산 선점 기반과 독립 배포의 미완료 범위 |
+| [F3 조건부 자동 판정](f3/conditional-auto-judgment.md) | 상시 GPU에서 자동 사전 계산과 사용자 대기를 검토할 때 | 조건 gate·병합·후보 유입·우선순위·처리 용량과 효과 검증 |
+| [F3 이벤트·재사용 제안](f3/position-card-events.md) | outbox·최신성·완료 결과 재사용을 설계할 때 | 실패 의미, revision, 새 후보 유입, 카드 전용 작업 |
+| [F3 로컬·dev 자원 제안](f3/position-card-infrastructure.md) | 필요한 자원·SQS 도입 조건·검증 순서를 정할 때 | 기존 PostgreSQL·Worker 활용, 조건부 SQS·DLQ, 측정 계획 |
 | [F3 온라인 실행](f3/online-runtime.md) | 자동 트리거부터 최종 판정까지 구현 흐름을 논의할 때 | 영속 작업, 단계 공개, AI facade·Backend capability, 캐시·복구 |
 | [F3 오프라인 데이터·평가](f3/offline-data-evaluation.md) | 데이터셋과 멀티 에이전트 효과를 검증할 때 | 합성·비식별 데이터, 검색 비교, 단일 프롬프트 A/B, 성능셋 |
 

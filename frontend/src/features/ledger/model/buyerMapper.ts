@@ -141,6 +141,7 @@ export function toBuyerRow(
 
     // 상담 로그는 별도 엔드포인트에서 가져온다.
     content: "",
+    savedInteractionContent: "",
     memo: textOrEmpty(dto.memo),
 
     brokerage: readCustomText(dto.custom_fields, CUSTOM_KEYS.brokerageName),
@@ -262,6 +263,7 @@ export function createBuyerDraftRow(localId: string): BuyerRow {
     assignee: "",
 
     content: "",
+    savedInteractionContent: "",
     memo: "",
 
     brokerage: "",

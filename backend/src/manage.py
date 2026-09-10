@@ -72,10 +72,16 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="허용된 Provider·모델·endpoint 설정 프로필",
     )
-    subcommands.add_parser("smoke-general", help="합성 입력으로 범용 GPU의 포지션 카드·판정 검증")
+    from general_model import MODEL, MODEL_PROFILES
+
+    smoke = subcommands.add_parser(
+        "smoke-general", help="합성 입력으로 범용 GPU의 포지션 카드·판정 검증"
+    )
+    smoke.add_argument("--model", choices=MODEL_PROFILES, default=MODEL)
     activate = subcommands.add_parser(
         "activate-general-qwen", help="장부·실행 이력 보존, 범용 모델 설정만 전환"
     )
+    activate.add_argument("--model", choices=MODEL_PROFILES, default=MODEL)
     activate.add_argument("--brokerage-id", type=int, required=True)
     activate.add_argument("--apply", action="store_true")
     activate.add_argument("--shared-dev", action="store_true")
@@ -96,7 +102,9 @@ def main() -> None:
         try:
             if arguments.command == "smoke-general":
                 asyncio.run(
-                    smoke_general(load_ai_config(config.app.environment.value), general_route())
+                    smoke_general(
+                        load_ai_config(config.app.environment.value), general_route(arguments.model)
+                    )
                 )
                 print("general synthetic workflows: OK")
             else:
@@ -106,6 +114,7 @@ def main() -> None:
                     apply=arguments.apply,
                     shared_dev=arguments.shared_dev,
                     workloads_stopped=arguments.workloads_stopped_confirmed,
+                    model=arguments.model,
                 )
         except Exception:
             raise SystemExit(
