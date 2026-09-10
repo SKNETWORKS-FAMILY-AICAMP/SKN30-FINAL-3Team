@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { after, before, test } from "node:test";
 import { chromium } from "playwright";
+import { openEvidencePanel } from "./helpers/f3-evidence.mjs";
 
 /** 실제 사용자 데이터와 무관한 mock 설정. 지연을 0으로 두어 확인 시간을 줄인다. */
 const SERVER_ENV = {
@@ -88,6 +89,24 @@ before(async () => {
 after(async () => {
   await browser?.close();
   server?.kill();
+});
+
+test("매물·구입 판정의 내부 필드명은 제목과 설명에서 한국어로 표시된다", { timeout: 60_000 }, async () => {
+  for (const kind of ["listing", "requirement"]) {
+    const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+    try {
+      await openEvidencePanel(page, baseUrl, kind);
+      const panel = page.locator("#cross-match-panel");
+      assert.deepEqual(await panel.locator(".cross-match-panel__evidence-field").allTextContents(),
+        ["확정 기한", "일정 조건", "제시 금액", "판정 근거"]);
+      const text = await panel.innerText();
+      assert.doesNotMatch(text, /timing|hard_deadline|stated_amount|future\.internal_key/);
+      assert.match(text, /2027-05-07/);
+      assert.match(text, /8천만원/);
+      assert.match(text, /5천만원/);
+      assert.equal(await page.evaluate(() => window.evidenceSubmissions), 1);
+    } finally { await page.close(); }
+  }
 });
 
 /** 첫 화면은 홈이다. 장부 그리드를 보려면 상단바에서 매물장을 먼저 연다. */

@@ -10,6 +10,7 @@
 
 import { formatMoney } from "../../../shared/format/index.ts";
 import { labelFor } from "./candidateLabel.ts";
+import { evidenceFieldLabel, judgmentText } from "./evidenceText.ts";
 import type { LedgerIndex } from "./candidateLabel.ts";
 import type {
   AnchorType,
@@ -276,21 +277,21 @@ export function toCandidateView(
     phone: label.phone,
     budget: formatMoney(dto.price_amount),
     receivedAt: dto.received_at ?? "",
-    evaluationBasis: dto.evaluation_basis,
+    evaluationBasis: judgmentText(dto.evaluation_basis),
     evidence: dto.evidence.map(toEvidenceView),
-    blocker: dto.primary_obstacle,
-    concession: dto.possible_concession,
-    exclusionReason: dto.exclusion_reason,
-    recommendedAction: readActionMessage(dto.recommended_action),
+    blocker: judgmentText(dto.primary_obstacle),
+    concession: judgmentText(dto.possible_concession),
+    exclusionReason: judgmentText(dto.exclusion_reason),
+    recommendedAction: judgmentText(readActionMessage(dto.recommended_action)),
     feedbackTargetId: dto.judgment_id,
   };
 }
 
 function toEvidenceView(dto: EvidenceDto): EvidenceView {
   return {
-    fieldName: dto.field_name,
+    fieldName: evidenceFieldLabel(dto.field_name),
     quote: dto.quote_text,
-    note: dto.note,
+    note: judgmentText(dto.note),
     side: dto.evidence_side,
     interactionId: dto.interaction_id,
   };
