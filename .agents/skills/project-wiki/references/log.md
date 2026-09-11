@@ -5,6 +5,8 @@ updated: 2026-09-10
 
 # 위키 변경 로그
 
+- 2026-09-10: F3 판정 근거의 내부 영문 항목명·생성 설명을 Frontend 표시 경계에서 한국어로 변환했다. 상담 인용 원문·HTTP 계약·모델은 유지하며 모듈 정본과 Linux Chrome 전후 비교에 연결했다.
+
 - 2026-09-10: 최신 dev 코드 배포와 별개인 챗봇 활성화 설정 누락을 확인하고, [Infra 설정 재적용 기록](../../../../infra/operations/dev-feature-configuration-2026-09-10.md)에 사무소별 CHATBOT 모델·API 주입·SSE 및 최신 F3 배포 조건 감사를 연결했다. 실제 재기동·기능 검증 상태는 해당 기록에서 구분한다.
 
 - 2026-09-10: 새 F2/general 이미지의 정확한 소스·digest와 CI checkout/린트 수정, 공유 적용 및 공식 `dev-start`·`dev-verify` 통과를 [Infra 적용 기록](../../../../infra/serving/image-rollout-validation-2026-09-10.md)에 연결했다. 초기 RunPod 생성 500의 원인은 미확정이며 identity·VRAM 관측, REST GPU 식별 제한·GraphQL 보완 확인 및 품질 평가 경계를 구분한다.
