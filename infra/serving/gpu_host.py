@@ -13,6 +13,7 @@ from model_profiles import load_profile
 
 ROOT = Path("/opt/brokerage-gpu")
 DATA = Path("/srv/brokerage-gpu")
+CURRENT_STAGE = "initialization"
 
 
 def run(*args: str, data: str | None = None) -> str:
@@ -37,7 +38,17 @@ def write_private(path: Path, value: str) -> None:
         output.write(value)
 
 
+def record_stage(stage: str, status: str = "running") -> None:
+    global CURRENT_STAGE
+    CURRENT_STAGE = stage
+    write_private(
+        ROOT / "status.json",
+        json.dumps({"stage": stage, "status": status}, sort_keys=True) + "\n",
+    )
+
+
 def main() -> None:
+    record_stage("selection")
     config = json.loads((ROOT / "config.json").read_text())
     workload = config["workload"]
     prefix = config["prefix"]
@@ -60,6 +71,10 @@ def main() -> None:
     DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
     (DATA / "models").mkdir(exist_ok=True)
     (DATA / "cache").mkdir(exist_ok=True)
+    # The status middleware measures HF_HOME even when AWS snapshots are mounted
+    # directly from /models and Hugging Face never creates its cache directory.
+    (DATA / "cache" / "huggingface").mkdir(exist_ok=True)
+    record_stage("runtime-secrets")
     keys = json.loads(
         aws(
             "secretsmanager",
@@ -76,6 +91,7 @@ def main() -> None:
             f"/{prefix}/runpod/ghcr-registry",
         )["SecretString"]
     )
+    record_stage("image-pull")
     run(
         "docker",
         "login",
@@ -101,6 +117,7 @@ def main() -> None:
     }
     mounts = [f"{DATA}/models:/models:ro", f"{DATA}/cache:/cache"]
     if workload == "general":
+        record_stage("general-profile")
         profile_name = selected.get("model_profile")
         if not profile_name:
             raise ValueError("general model_profile must be explicitly selected")
@@ -121,6 +138,7 @@ def main() -> None:
         )
         ports = ["8000:8000"]
     else:
+        record_stage("f2-release")
         # Candidate release is supplied by the operator in non-secret local metadata.
         if selected["bucket"] != config["model_bucket"]:
             raise ValueError("release bucket does not match managed host configuration")
@@ -183,6 +201,7 @@ def main() -> None:
             "\n".join(f"{k}={v}" for k, v in environment.items()) + "\n",
         )
         try:
+            record_stage("f2-bootstrap")
             run(
                 "docker",
                 "run",
@@ -202,6 +221,7 @@ def main() -> None:
         environment.pop("F2_SLLM_BUNDLE_URL")
         mounts.append(f"{DATA}/releases:/opt/f2-models:ro")
         ports = ["8001:8001", "8002:8002"]
+    record_stage("model-download")
     (ROOT / "models.json").write_text(json.dumps(models))
     run(
         "docker",
@@ -219,6 +239,7 @@ def main() -> None:
         "/setup/download_models.py",
         "/setup/models.json",
     )
+    record_stage("compose-start")
     write_private(
         ROOT / "runtime.env",
         "\n".join(f"{k}={v}" for k, v in environment.items()) + "\n",
@@ -264,14 +285,16 @@ def main() -> None:
     )
     (ROOT / "prepare-candidate").unlink(missing_ok=True)
     (ROOT / "candidate.json").unlink(missing_ok=True)
+    record_stage("ready", "complete")
 
 
 if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, KeyError, RuntimeError):
-        print(
-            "GPU host preparation failed; no inference readiness claimed",
-            file=sys.stderr,
-        )
+        try:
+            record_stage(CURRENT_STAGE, "failed")
+        except OSError:
+            pass
+        print(json.dumps({"stage": CURRENT_STAGE, "status": "failed"}), file=sys.stderr)
         sys.exit(1)

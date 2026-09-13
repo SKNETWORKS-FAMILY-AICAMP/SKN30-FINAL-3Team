@@ -86,6 +86,46 @@ resource "aws_vpc_security_group_egress_rule" "gpu_https" {
   from_port         = 443
   to_port           = 443
 }
+
+data "archive_file" "gpu_bootstrap" {
+  type        = "tar.gz"
+  output_path = "${path.module}/.terraform/gpu-bootstrap.tar.gz"
+
+  source {
+    content  = file("${path.module}/../../serving/gpu_host.py")
+    filename = "gpu_host.py"
+  }
+  source {
+    content  = file("${path.module}/../../serving/gpu_metrics.py")
+    filename = "gpu_metrics.py"
+  }
+  source {
+    content  = file("${path.module}/../../serving/probe.py")
+    filename = "probe.py"
+  }
+  source {
+    content  = file("${path.module}/../../serving/download_models.py")
+    filename = "download_models.py"
+  }
+  source {
+    content  = file("${path.module}/../../serving/model_profiles.py")
+    filename = "model_profiles.py"
+  }
+  source {
+    content  = file("${path.module}/../../serving/model-profiles.json")
+    filename = "model-profiles.json"
+  }
+}
+
+resource "aws_s3_object" "gpu_bootstrap" {
+  bucket       = aws_s3_bucket.workload["data_model"].id
+  key          = "serving/bootstrap/${data.archive_file.gpu_bootstrap.output_sha256}.tar.gz"
+  source       = data.archive_file.gpu_bootstrap.output_path
+  source_hash  = data.archive_file.gpu_bootstrap.output_sha256
+  content_type = "application/gzip"
+  tags         = merge(local.runtime_tags, { Name = "${local.name_prefix}-gpu-bootstrap" })
+}
+
 resource "aws_iam_role" "gpu" {
   for_each           = var.gpu_profiles
   name               = "${local.name_prefix}-${each.key}-gpu"
@@ -102,7 +142,7 @@ resource "aws_iam_role_policy" "gpu_runtime" {
   policy = jsonencode({ Version = "2012-10-17", Statement = [
     { Effect = "Allow", Action = ["ssm:GetParameter"], Resource = [aws_ssm_parameter.serving_selection.arn] },
     { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [aws_secretsmanager_secret.application["ai_provider"].arn, aws_secretsmanager_secret.runpod["ghcr_registry"].arn] },
-    { Effect = "Allow", Action = ["s3:GetObject"], Resource = ["${aws_s3_bucket.workload["data_model"].arn}/releases/sllm/*"] }
+    { Effect = "Allow", Action = ["s3:GetObject"], Resource = ["${aws_s3_bucket.workload["data_model"].arn}/releases/sllm/*", aws_s3_object.gpu_bootstrap.arn] }
   ] })
 }
 resource "aws_iam_instance_profile" "gpu" {
@@ -120,12 +160,9 @@ resource "aws_instance" "gpu" {
   iam_instance_profile        = aws_iam_instance_profile.gpu[each.key].name
   user_data_replace_on_change = true
   user_data_base64 = base64gzip(templatefile("${path.module}/../../serving/user-data.sh.tftpl", {
-    host_script     = base64encode(file("${path.module}/../../serving/gpu_host.py"))
-    metrics_script  = base64encode(file("${path.module}/../../serving/gpu_metrics.py"))
-    probe_script    = base64encode(file("${path.module}/../../serving/probe.py"))
-    download_script = base64encode(file("${path.module}/../../serving/download_models.py"))
-    profiles_script = base64encode(file("${path.module}/../../serving/model_profiles.py"))
-    profiles_json   = base64encode(file("${path.module}/../../serving/model-profiles.json"))
+    bootstrap_bucket = aws_s3_object.gpu_bootstrap.bucket
+    bootstrap_key    = aws_s3_object.gpu_bootstrap.key
+    bootstrap_sha256 = data.archive_file.gpu_bootstrap.output_sha256
     config = base64encode(jsonencode({ workload = each.key, prefix = local.name_prefix, image = each.value.image, model_bucket = aws_s3_bucket.workload["data_model"].id,
     model = "unsloth/Qwen3.8-27B-unsloth-bnb-4bit", revision = "8aa5f05d26b7205477066e1449e0af13f762a299" }))
   }))
@@ -141,9 +178,25 @@ resource "aws_instance" "gpu" {
     delete_on_termination = true
     tags                  = merge(local.runtime_tags, { Name = "${local.name_prefix}-${each.key}-gpu-cache", ServingWorkload = each.key })
   }
+  lifecycle {
+    # EC2 releases an auto-assigned public IPv4 address while stopped. Bootstrap
+    # revisions also must not silently replace a retained host and delete its
+    # model cache; operators sync host scripts explicitly or replace capacity in
+    # a separately reviewed maintenance change. New instances still receive the
+    # current user data.
+    ignore_changes = [associate_public_ip_address, user_data_base64]
+  }
   tags       = merge(local.runtime_tags, { Name = "${local.name_prefix}-${each.key}-gpu", ServingWorkload = each.key, ServingImage = each.value.image })
   depends_on = [aws_iam_role_policy.gpu_runtime, aws_iam_role_policy_attachment.gpu_ssm]
 }
+
+check "gpu_user_data_encoded_size" {
+  assert {
+    condition     = alltrue([for instance in aws_instance.gpu : length(instance.user_data_base64) <= 25600])
+    error_message = "AWS EC2 encoded user-data must not exceed 25,600 bytes; move bootstrap payloads to the hashed S3 artifact."
+  }
+}
+
 output "gpu_instances" {
   description = "Managed GPU identities for guarded operations; no credentials or endpoint URLs"
   value       = { for name, instance in aws_instance.gpu : name => { instance_id = instance.id, image = var.gpu_profiles[name].image, root_volume_gb = var.gpu_profiles[name].root_volume_gb } }

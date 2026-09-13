@@ -70,6 +70,13 @@ class SupervisorTests(unittest.TestCase):
             commands = supervisor.build_commands(config, "vllm")
             self.assertIn("/models/sllm", commands["sllm"])
             self.assertIn("/models/stt", commands["stt"])
+            self.assertEqual(
+                supervisor._stt_identity(environment, config),
+                {
+                    "model": "openai/whisper-large-v3-turbo",
+                    "revision": "b" * 40,
+                },
+            )
         with (
             patch.object(supervisor.Path, "is_file", return_value=False),
             self.assertRaises(supervisor.ConfigurationError),
@@ -114,7 +121,8 @@ class SupervisorTests(unittest.TestCase):
                 sllm = commands["sllm"]
                 option = sllm.index("--structured-outputs-config")
                 self.assertEqual(
-                    json.loads(sllm[option + 1]), {"backend": "xgrammar", "disable_any_whitespace": True}
+                    json.loads(sllm[option + 1]),
+                    {"backend": "xgrammar", "disable_any_whitespace": True},
                 )
                 self.assertNotIn("--structured-outputs-config", commands["stt"])
 

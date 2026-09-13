@@ -249,6 +249,14 @@ def _proxy_environment(
     return result
 
 
+def _stt_identity(environment: dict[str, str], config: RuntimeConfig) -> dict[str, str]:
+    """Keep the logical model ID when inference reads a local snapshot path."""
+    return {
+        "model": environment.get("F2_STT_MODEL_ID", ""),
+        "revision": config.stt_model_revision,
+    }
+
+
 def _start(command: list[str], environment: dict[str, str]) -> subprocess.Popen[bytes]:
     return subprocess.Popen(command, env=environment, start_new_session=True)
 
@@ -361,7 +369,7 @@ def run() -> int:
             _proxy_environment(
                 environment,
                 config.stt_api_key,
-                {"model": config.stt_model_id, "revision": config.stt_model_revision},
+                _stt_identity(environment, config),
             ),
         )
         _wait_for_model(

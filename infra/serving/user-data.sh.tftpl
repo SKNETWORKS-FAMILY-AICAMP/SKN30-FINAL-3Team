@@ -2,12 +2,19 @@
 set -euo pipefail
 umask 077
 install -d -m 0700 /opt/brokerage-gpu
-printf '%s' '${host_script}' | base64 -d > /opt/brokerage-gpu/gpu_host.py
-printf '%s' '${download_script}' | base64 -d > /opt/brokerage-gpu/download_models.py
-printf '%s' '${metrics_script}' | base64 -d > /opt/brokerage-gpu/gpu_metrics.py
-printf '%s' '${probe_script}' | base64 -d > /opt/brokerage-gpu/probe.py
-printf '%s' '${profiles_script}' | base64 -d > /opt/brokerage-gpu/model_profiles.py
-printf '%s' '${profiles_json}' | base64 -d > /opt/brokerage-gpu/model-profiles.json
+bootstrap_archive=/tmp/brokerage-gpu-bootstrap.tar.gz
+for attempt in {1..30}; do
+  if aws s3api get-object --region ap-northeast-2 --bucket '${bootstrap_bucket}' --key '${bootstrap_key}' "$bootstrap_archive" >/dev/null; then
+    break
+  fi
+  rm -f "$bootstrap_archive"
+  sleep 5
+done
+test -s "$bootstrap_archive"
+printf '%s  %s\n' '${bootstrap_sha256}' "$bootstrap_archive" | sha256sum -c - >/dev/null
+tar -xzf "$bootstrap_archive" -C /opt/brokerage-gpu --no-same-owner --no-same-permissions
+chmod 0600 /opt/brokerage-gpu/*
+rm -f "$bootstrap_archive"
 printf '%s' '${config}' | base64 -d > /opt/brokerage-gpu/config.json
 # The reviewed DLAMI provides NVIDIA driver, container toolkit, Docker, AWS CLI and SSM.
 systemctl enable --now docker

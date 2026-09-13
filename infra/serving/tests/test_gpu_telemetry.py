@@ -4,6 +4,7 @@ import io
 import json
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -89,6 +90,48 @@ class GpuTelemetry(unittest.TestCase):
         self.assertEqual(result["identity_checks"], {"release_id": "unavailable"})
         self.assertIsNone(result["gpu"]["observed_peak_used_mib"])
         self.assertNotIn("secret", json.dumps(result))
+
+    def test_verified_local_snapshot_can_supply_missing_image_identity(self):
+        model = "openai/whisper-large-v3-turbo"
+        revision = "a" * 40
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory)
+            (snapshot / "config.json").write_text("{}")
+            (snapshot / ".serving-revision").write_text(f"{model}@{revision}")
+            fallback = probe.local_snapshot_identity(snapshot, model, revision)
+        with (
+            patch.object(
+                probe,
+                "read_telemetry",
+                return_value={"identity": {"revision": revision}, "gpu": None},
+            ),
+            patch.object(probe, "probe"),
+        ):
+            result = probe.verify(
+                "http://localhost/v1",
+                "secret",
+                "stt",
+                expected_identity={"model": model, "revision": revision},
+                fallback_identity=fallback,
+            )
+        self.assertTrue(result["passed"])
+        self.assertEqual(
+            result["identity_checks"], {"model": "match", "revision": "match"}
+        )
+
+    def test_local_snapshot_identity_rejects_missing_or_mismatched_marker(self):
+        model = "openai/whisper-large-v3-turbo"
+        revision = "a" * 40
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory)
+            (snapshot / "config.json").write_text("{}")
+            self.assertEqual(
+                probe.local_snapshot_identity(snapshot, model, revision), {}
+            )
+            (snapshot / ".serving-revision").write_text(f"{model}@{'b' * 40}")
+            self.assertEqual(
+                probe.local_snapshot_identity(snapshot, model, revision), {}
+            )
 
     def test_inference_sample_peak_is_observed_not_fabricated(self):
         identity = {"release_id": "consultation-v3"}

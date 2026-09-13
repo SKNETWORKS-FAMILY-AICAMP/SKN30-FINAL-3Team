@@ -105,7 +105,9 @@ DB 대상은 GPU 기동 전 RDS·maintenance 호스트에서 조회한다. 허�
 `POSITION_CARD`, `BROKERAGE_JUDGMENT`, `CHATBOT`이다. 명시하지 않은 대상과 업무 데이터·기존
 run snapshot은 보존한다. 같은 모델이면 버전을 추가하지 않으며 클라우드만 바뀌어도 DB 이력은 유지한다.
 
-대기·진행 요청이 있거나 선택하지 않은 비호환 활성 모델이 남으면 앱 기동을 차단한다.
+대기·진행 요청이 있어도 현재 활성 모델이 선택과 모두 호환되고 DB 변경 대상을 비워 두면 같은
+모델·endpoint로 Worker를 다시 시작해 영속 실행을 재개한다. DB 변경 대상을 하나라도 선택한 경우에는
+대기·진행 요청을 먼저 정리해야 한다. 선택하지 않은 비호환 활성 모델은 항상 앱 기동을 차단한다.
 대상을 추가해 다시 확인하거나 이전 모델을 선택한다. 확인한 DB snapshot이 바뀌면 다시 조회·확인한다.
 준비 중인 DB 변경은 Backend CLI의 단일 트랜잭션으로 적용하며 Infra가 직접 SQL을 쓰지 않는다.
 
@@ -124,6 +126,11 @@ run snapshot은 보존한다. 같은 모델이면 버전을 추가하지 않으�
 기록하지 않는다. DB 반영 후 후속 앱 검증이 실패해도 이전 버전을 삭제하거나 자동 되돌리지 않는다.
 
 ## 비용·deep 종료·검증 기록
+
+초기 기동처럼 Alarm 전이가 많이 발생할 수 있는 작업에서는 dev Terraform 입력
+`alarm_discord_notifications_enabled=false`를 별도 plan으로 먼저 적용해 CloudWatch Alarm의
+SNS→Discord Lambda 구독만 잠시 제거할 수 있다. Alarm·metric·로그와 전용 Secret은 유지된다.
+다시 알림을 받을 때는 값을 `true`로 되돌려 별도 plan/apply와 후속 drift를 확인한다.
 
 현재 공급자 견적을 확인해 `--hourly-usd f2=RATE --hourly-usd general=RATE --hours 2`로 전달한다.
 RATE는 USD/시간의 양수이며 생략하면 TTY에서 작업별 현재 견적을 묻고 계산 결과를 다시 보여준다.

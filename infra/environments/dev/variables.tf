@@ -57,6 +57,12 @@ variable "dev_edge_enabled" {
   default     = true
 }
 
+variable "alarm_discord_notifications_enabled" {
+  description = "CloudWatch Alarm의 SNS→Discord Lambda 전달 구독을 활성화할지 여부; alarm·metric·로그는 유지"
+  type        = bool
+  default     = true
+}
+
 variable "development_auth" {
   description = "공개 합성 dev 세션에 사용할 고정 계정; null이면 Backend 경로와 Frontend 버튼을 모두 비활성화"
   type = object({
