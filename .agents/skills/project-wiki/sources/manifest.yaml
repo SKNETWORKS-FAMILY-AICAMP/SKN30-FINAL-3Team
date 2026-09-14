@@ -2,6 +2,15 @@ version: 1
 updated: "2026-09-10"
 
 sources:
+  - id: "f3-korean-evidence-2026-09-10"
+    type: "user-provided-direction"
+    location: "user-provided:f3-evidence-internal-english-labels-improvement"
+    received: "2026-09-10"
+    reflected_in:
+      - ".agents/skills/frontend/references/f3-execution.md"
+      - "docs/validation/f3-evidence-korean-2026-09-10.md"
+    scope: "판정 근거의 내부 영문 항목명과 설명 속 내부 식별자 노출 개선. 기존 디자인·판정 내용·원문 인용 보존."
+
   - id: "f3-linux-chrome-300s-2026-09-10"
     type: "user-provided-direction"
     location: "user-provided:f3-linux-chrome-and-300-second-polling"
