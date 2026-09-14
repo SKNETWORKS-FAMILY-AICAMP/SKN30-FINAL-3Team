@@ -9,7 +9,7 @@ AI 기반 부동산 중개 장부 & 지능형 에이전트 시스템 집크크(Z
 
 | 경로 | 내용 |
 |---|---|
-| [index.html](index.html) | 현재 랜딩 페이지. Tailwind CDN 기반 단일 HTML. 빌드 없이 브라우저에서 바로 연다 |
+| [main.html](main.html) | 현재 랜딩 페이지. Tailwind CDN 기반 단일 HTML. 빌드 없이 브라우저에서 바로 연다 |
 | [prompts/how-it-works.md](prompts/how-it-works.md) | 상단 내비게이션 `How it works` 페이지를 UI 생성 AI로 만들기 위한 프롬프트 |
 | [assets/](assets/) | 집크크 로고와 에이전트 아이콘. 아래 표 참고 |
 
@@ -44,7 +44,7 @@ Property·Customer 아이콘의 원본은 1254px·1296px에 합계 1.5MB였다. 
 1. [prompts/how-it-works.md](prompts/how-it-works.md)의 `## 프롬프트 본문` 이후 전체를 복사한다.
 2. UI 생성 AI(v0, Stitch, Figma Make, Claude Artifacts 등)에 붙여넣어 단일 HTML을 받는다.
 3. 결과를 `site/how-it-works.html`로 저장한다.
-4. [index.html](index.html)의 내비게이션에서 `How it works` 링크 `href`를 `#`에서 `how-it-works.html`로 바꾼다.
+4. [main.html](main.html)의 내비게이션에서 `How it works` 링크 `href`를 `#`에서 `how-it-works.html`로 바꾼다.
    같은 링크의 클래스를 활성 상태(`text-secondary` + `font-bold` + `border-b-2 border-secondary`)로 옮기는 작업은 새 페이지 쪽에서 한다.
 5. 아래 점검 항목을 확인하고 커밋한다.
 
@@ -60,7 +60,7 @@ Property·Customer 아이콘의 원본은 1254px·1296px에 합계 1.5MB였다. 
 
 ## 알려진 정리 대상
 
-현재 [index.html](index.html)에 남아 있는 항목이며, 아직 손대지 않았다.
+현재 [main.html](main.html)에 남아 있는 항목이며, 아직 손대지 않았다.
 
 - `이동 중에도 접근` 카드의 "모바일과 데스크톱 실시간 동기화" 문구는 요구사항 문서에 근거가 없다.
 - `등록 매물 128건` `등록 고객 84명`은 예시값인데 실적처럼 읽힌다.
