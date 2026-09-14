@@ -329,6 +329,8 @@ uv run --locked --project backend pre-commit install
 
 상세 설계, 계약 명세 및 운영 가이드는 각 영역별 문서를 참조하십시오.
 
+[산출물](docs/deliverables)
+
 ### 아키텍처 및 요구사항
 - [현재 MVP 범위와 평가 기준](docs/requirements/common/mvp-scope-and-evaluation.md)
 - [공통 설계 원칙 및 책임 경계](docs/requirements/common/overview-and-principles.md)
