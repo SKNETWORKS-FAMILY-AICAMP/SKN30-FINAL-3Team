@@ -1,0 +1,64 @@
+name: Deploy introduction site to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy-site-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Verify introduction pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f site/main.html
+          test -f site/how-it-works.html
+          test -f site/contact-us.html
+          ! grep -R 'href="contact.html"' \
+            site/main.html site/how-it-works.html site/contact-us.html
+
+      - name: Prepare GitHub Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp site/main.html _site/index.html
+          cp site/main.html site/how-it-works.html site/contact-us.html _site/
+          cp -R site/assets _site/assets
+          touch _site/.nojekyll
+
+      - name: Upload introduction site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
