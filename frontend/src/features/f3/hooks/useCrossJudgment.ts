@@ -24,7 +24,7 @@ const FIRST_INTERVAL_MS = 1000;
 /** 길어지면 간격을 늘린다. 같은 답을 반복해서 받는 요청을 줄인다. */
 const MAX_INTERVAL_MS = 5000;
 /** 이 시간을 넘기면 자동 확인을 멈춘다. 실패로 바꾸지 않고 사용자에게 넘긴다. */
-const PAUSE_AFTER_MS = 60_000;
+const PAUSE_AFTER_MS = 300_000;
 
 /**
  * 확보한 실행의 화면 캐시.
@@ -36,6 +36,7 @@ const PAUSE_AFTER_MS = 60_000;
  * 수 있고 브라우저 저장소는 세션이 끝나도 남는다.
  */
 const runRegistry = new Map<string, number>();
+let sessionGeneration = 0;
 
 /**
  * 세션이 끝나면 확보한 실행 캐시를 비운다.
@@ -44,6 +45,7 @@ const runRegistry = new Map<string, number>();
  * 중개사무소 안에서만 유효하므로, 남겨 두면 앞 사용자의 실행을 조회해 404를 맞는다.
  */
 export function resetCrossJudgmentCache(): void {
+  sessionGeneration += 1;
   runRegistry.clear();
 }
 
@@ -92,8 +94,11 @@ export interface CrossJudgment {
   /** HTTP·계약 오류. 실행 실패와 다른 축이다. */
   error: ApiError | null;
   setOffset: (offset: number) => void;
-  /** 실패했거나 멈춘 뒤 다시 시작한다. */
-  retry: () => void;
+  /** 기존 실행을 GET으로 다시 확인한다. */
+  resume: () => void;
+  /** 사용자가 명시적으로 새 판정을 요청한다. */
+  rerun: () => void;
+  canResume: boolean;
 }
 
 interface Snapshot {
@@ -152,11 +157,13 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
 
     generation.current += 1;
     const mine = generation.current;
+    const sessionAtStart = sessionGeneration;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
 
-    const isCurrent = () => !stopped && generation.current === mine;
+    const isCurrent = () =>
+      !stopped && generation.current === mine && sessionGeneration === sessionAtStart;
 
     const publish = (next: Snapshot) => {
       if (isCurrent()) setSnapshot(next);
@@ -173,13 +180,13 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
         timer = setTimeout(resolve, ms);
       });
 
-    async function loadResult(runId: number, status: string): Promise<RunResultDto | null> {
+    async function loadResult(runId: number): Promise<RunResultDto | null> {
       const result = await f3Transport.getRunResult(runId, { limit, offset }, controller.signal);
       if (!isCurrent()) return null;
       publish({
         // 페이지 길이가 아니라 전체 건수로 본다. 뒷 페이지를 보는 중에 앞 페이지가 비면
         // 후보가 있는 실행을 "후보 없음"으로 그리게 된다.
-        state: toPanelState(status, result.candidates_total),
+        state: toPanelState(result.status, result.candidates_total),
         runId,
         result,
         error: null,
@@ -191,33 +198,18 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
     async function queueRun(): Promise<number> {
       publish({ state: "queueing", runId: null, result: null, error: null });
       const run = await f3Transport.createRun(anchor, controller.signal);
-      runRegistry.set(key as string, run.run_id);
+      if (isCurrent()) runRegistry.set(key as string, run.run_id);
       return run.run_id;
     }
 
-    /**
-     * 실행을 확보하고 현재 단계를 함께 읽는다.
-     *
-     * 캐시된 실행 식별자를 그대로 믿지 않는다. 실행은 중개사무소 안에서만 유효한데 registry는
-     * 브라우저 메모리에 남으므로, 계정이 바뀐 뒤 같은 앵커를 열면 서버가 404로 답한다. 그때는
-     * 캐시를 버리고 새로 접수한 뒤 **그 실행 식별자를 돌려준다.** 옛 식별자를 그대로 들고
-     * polling을 이어가면 이후 조회가 전부 없는 실행을 향한다.
-     */
+    /** 기존 실행의 404도 자동 POST로 바꾸지 않는다. 재판정은 사용자 동작이다. */
     async function resolveRun(): Promise<{ runId: number; status: string }> {
       const cached = runRegistry.get(key as string);
       if (cached == null) {
         const runId = await queueRun();
         return { runId, status: (await f3Transport.getRunStatus(runId, controller.signal)).status };
       }
-
-      try {
-        return { runId: cached, status: (await f3Transport.getRunStatus(cached, controller.signal)).status };
-      } catch (cause) {
-        if (!(cause instanceof ApiError) || cause.kind !== "notFound") throw cause;
-        runRegistry.delete(key as string);
-        const runId = await queueRun();
-        return { runId, status: (await f3Transport.getRunStatus(runId, controller.signal)).status };
-      }
+      return { runId: cached, status: (await f3Transport.getRunStatus(cached, controller.signal)).status };
     }
 
     async function drive() {
@@ -236,11 +228,12 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
 
           // 단계가 바뀔 때만 결과를 다시 읽는다.
           if (status !== lastStatus) {
-            lastStatus = status;
             // 방금 움직였으니 다음 단계도 곧 온다. 간격을 처음으로 되돌린다. 이것이 없으면
             // 마지막 대기가 상한까지 늘어난 채로 완료를 만나 결과가 최대 5초 늦게 보인다.
             interval = FIRST_INTERVAL_MS;
-            await loadResult(runId, status);
+            const result = await loadResult(runId);
+            if (result != null) status = result.status;
+            lastStatus = status;
             if (!isCurrent()) return;
           }
 
@@ -283,7 +276,11 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
     // offset과 limit이 바뀌면 실행을 새로 만들지 않고 registry의 같은 실행을 다시 읽는다.
   }, [key, anchorType, anchorId, enabled, attempt, limit, offset]);
 
-  const retry = useCallback(() => {
+  const resume = useCallback(() => {
+    if (key != null && runRegistry.has(key)) setAttempt((current) => current + 1);
+  }, [key]);
+
+  const rerun = useCallback(() => {
     requestedKey.current = key;
     if (key != null) runRegistry.delete(key);
     setAttempt((current) => current + 1);
@@ -309,6 +306,13 @@ export function useCrossJudgment(input: CrossJudgmentInput): CrossJudgment {
     failureMessage: result?.failure_message ?? null,
     error: snapshot.error,
     setOffset,
-    retry,
+    resume,
+    rerun,
+    canResume:
+      snapshot.runId != null &&
+      (snapshot.state === "paused" ||
+        (snapshot.error != null &&
+          snapshot.error.kind !== "notFound" &&
+          snapshot.state !== "superseded")),
   };
 }

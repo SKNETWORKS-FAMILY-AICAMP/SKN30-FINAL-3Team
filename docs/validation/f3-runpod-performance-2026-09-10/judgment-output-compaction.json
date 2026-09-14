@@ -1,0 +1,30 @@
+{
+  "scope": "synthetic-only local Docker DB to unchanged shared RunPod general endpoint",
+  "model": "Qwen/Qwen3.8-27B-FP8",
+  "server_concurrency_changed": false,
+  "max_output_tokens": 2048,
+  "baseline_l1": {
+    "judgment_input_tokens": 5101,
+    "judgment_output_tokens": 1326,
+    "judgment_seconds": 146.92,
+    "warm_total_seconds": 150.85
+  },
+  "compacted_l1": {
+    "judgment_input_tokens": 4557,
+    "judgment_output_tokens": 868,
+    "judgment_seconds": 61.84,
+    "warm_total_seconds": 61.10,
+    "cold_total_seconds": 407.91,
+    "status": "COMPLETED"
+  },
+  "max_candidate_pilot": [
+    {"output_tokens": 1451, "seconds": 100.73},
+    {"output_tokens": 1468, "seconds": 100.36},
+    {"output_tokens": 1468, "seconds": 103.15}
+  ],
+  "limitations": [
+    "three max-candidate samples are not a production p99",
+    "the cold run included one pre-existing position-card contract repair",
+    "quality acceptance and concurrent-client performance were not evaluated"
+  ]
+}

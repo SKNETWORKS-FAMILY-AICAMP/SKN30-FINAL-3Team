@@ -1,0 +1,14 @@
+{
+  "gpu_profiles": {
+    "f2": {
+      "ami_id": "ami-0097a4a30ec557269",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:03c275889e7372a0367e5ceff961d219414235751807c25a2dc28732523d1567",
+      "root_volume_gb": 160
+    },
+    "general": {
+      "ami_id": "ami-0097a4a30ec557269",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ec4531f35b46a300e2bcc223e9591b98c6c1aba8d1ef80fee453286d844129af",
+      "root_volume_gb": 160
+    }
+  }
+}

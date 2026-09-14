@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # AI 결정 인덱스
@@ -13,5 +13,7 @@ updated: 2026-09-09
 | [ADR-0004](ADR-0004-aliased-llm-endpoint-routing.md) | 부분 대체됨·코드 구현 | 범용 생성 endpoint를 provider·alias exact match로 routing하고 llama.cpp JSON Schema 출력을 로컬 재검증; Bedrock은 ADR-0005 적용 |
 | [ADR-0005](ADR-0005-bedrock-sigv4-structured-generation.md) | 승인됨·코드 구현, AWS 미검증 | Bedrock Responses를 Instance Role SigV4로 호출하고 schema 지시·Pydantic 재검증 적용 |
 | [ADR-0006](ADR-0006-openai-structured-output-schema.md) | 사용자 개선 구현 승인·코드 구현·팀 검토 대기, 실제 Provider 재검증 전 | OpenAI 전송 스키마의 판별 유니온을 정규화하고 원본 DTO로 재검증 |
+| [ADR-0007](ADR-0007-vllm-streaming-budget.md) | 사용자 개선 요청에 따른 구현·팀 검토 대기 | 범용 vLLM 스트리밍 수신·런타임별 대기 슬롯·범용 호출 한도 분리 |
+| [ADR-0008](ADR-0008-f3-compact-judgment-output.md) | 사용자 개선 요청에 따른 구현·팀 검토 대기 | F3 판정은 카드 근거 reference·reason code·제한된 자유 문구로 생성하고 공개 결과를 결정적으로 복원 |
 
 실제 모델, 역할별 route, 운영 Provider와 checkpoint는 [open-questions.md](../open-questions.md)에서 관리한다.

@@ -7,6 +7,7 @@ from sqlalchemy import CursorResult, func, update
 from sqlmodel import Session, col, select
 
 from domain.agent_execution.models import (
+    AgentRun,
     AiDecisionFeedback,
     MatchCandidateEvaluation,
     MatchCandidateEvidence,
@@ -132,15 +133,25 @@ def find_anchor_card_for_run(
 ) -> NegotiationPositionAnalysis | None:
     """실행이 확보한 활성 앵커만 조회한다. 헤더가 있으면 그 참조가 정본이다."""
     header = find_match_evaluation_for_run(session, brokerage_id, run_id)
+    run = find_root_cross_judgment_run(session, brokerage_id, run_id) if header is None else None
+    return find_anchor_card_from_context(session, brokerage_id, run, header)
+
+
+def find_anchor_card_from_context(
+    session: Session,
+    brokerage_id: int,
+    run: AgentRun | None,
+    header: MatchEvaluation | None,
+) -> NegotiationPositionAnalysis | None:
+    """Reuse already loaded result context instead of reading its full JSONB twice."""
     if header is not None:
+        if header.brokerage_id != brokerage_id:
+            return None
         position_analysis_id = header.anchor_position_analysis_id
     else:
-        # 후보 단계 전에는 헤더가 없으므로 실행 snapshot의 카드 ID를 쓴다.
-        # 헤더 카드가 무효일 때 다른 snapshot 카드로 판정 근거를 바꾸지 않는다.
-        run = find_root_cross_judgment_run(session, brokerage_id, run_id)
-        position_analysis_id = (
-            run.redacted_output_snapshot.get("position_analysis_id") if run is not None else None
-        )
+        if run is None or run.brokerage_id != brokerage_id:
+            return None
+        position_analysis_id = run.redacted_output_snapshot.get("position_analysis_id")
     if not isinstance(position_analysis_id, int):
         return None
     return (
@@ -157,7 +168,11 @@ def find_anchor_card_for_run(
 
 
 def list_candidate_judgments(
-    session: Session, brokerage_id: int, match_evaluation_id: int
+    session: Session,
+    brokerage_id: int,
+    match_evaluation_id: int,
+    *,
+    candidate_card_ids: Sequence[int] | None = None,
 ) -> list[MatchCandidateEvaluation]:
     """판정된 후보를 기각 후보까지 포함해 순위 순으로 조회한다."""
     statement = (
@@ -168,6 +183,14 @@ def list_candidate_judgments(
         )
         .order_by(col(MatchCandidateEvaluation.match_rank).asc())
     )
+    if candidate_card_ids is not None:
+        if not candidate_card_ids:
+            return []
+        statement = statement.where(
+            col(MatchCandidateEvaluation.candidate_position_analysis_id).in_(
+                list(candidate_card_ids)
+            )
+        )
     return list(session.execute(statement).scalars().all())
 
 

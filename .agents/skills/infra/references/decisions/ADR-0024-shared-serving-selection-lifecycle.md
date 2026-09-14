@@ -1,11 +1,11 @@
 ---
 status: 구현됨
-updated: 2026-09-09
+updated: 2026-09-11
 ---
 
 # ADR-0024: 공유 선택 기반 시작 계획·Template 조정·실패 복구
 
-- 상태: 기반 구현은 PR #119로 병합됐다. 사용자 기동 요청에 따라 공유 Terraform 적용과 기존 게시 이미지의 RunPod F2/general 준비·합성 요청을 확인했다. maintenance 트래픽 대기 수정은 후속 PR 검토 대상이며, 전체 앱 기동·사용자 검증 완료와 구분한다.
+- 상태: 기반 구현은 PR #119로 병합됐다. 2026-09-11 사용자 요청에 따라 F2/general AWS GPU 공유 선택, EBS 캐시 재사용, 동일 모델 pending 재개와 전체 앱 기동·직접 검증을 확인했다. 세부 근거는 AWS 공유 dev 검증 기록을 따른다.
 - 공통 정책: [프로젝트 ADR-0036](../../../project-wiki/references/decisions/ADR-0036-shared-dev-serving-selection.md).
 - 부분 대체: ADR-0020의 기존 Template 수동 수정, ADR-0022의 분리 선택/전환/시작 경로,
   ADR-0023의 별도 general_model_selection 입력과 최초 배포 뒤 automatic 복구 절차.
@@ -59,6 +59,11 @@ Backend readiness를 최종 앱 기동 뒤로 미룬다. automatic의 readiness 
 `app-deploy`는 명시적으로 실행한다. 최초/구 revision 호스트에는 CLI 준비를 위한 배포 선행 조건을
 표시한다. 이전 검증 근거가 있는 호스트 재생성은 아래의 정확한 revision 복원 경로를 사용한다.
 이후 RDS 대상 목록·사용자 확인·모델 준비·Backend 트랜잭션·최종 호환성 검사 뒤에만 앱을 시작한다.
+
+DB 모델 변경 대상을 하나라도 선택한 경우 대기·진행 요청이 있으면 전환을 차단한다. 변경 대상을
+비우고 현재 활성 모델이 선택과 모두 호환되면 같은 모델·endpoint로 Worker를 다시 시작해 영속 실행을
+재개할 수 있다. 선택하지 않은 비호환 활성 모델은 항상 앱 기동을 차단한다. 이는 dev-stop 도중 남은
+lease 실행을 같은 모델로 복구할 수 있게 하되, 실행 중 모델 snapshot을 전환하지 않는 경계다.
 
 `dev-start`의 앱 합성 검증 후 실제 테스트 호스트에 성공적으로 설치된 CodeDeploy S3 revision을
 확인한다. 배포 ID와 S3 version/eTag를 포함한 revision의 SHA-256을 `APPLIED.application_revision`에

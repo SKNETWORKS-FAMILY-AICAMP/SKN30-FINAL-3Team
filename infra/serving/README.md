@@ -44,12 +44,16 @@ image/profile별 `cpu_only`, `startup_only`, `evaluated` 근거를 확인한다.
   adapter만 사용한다. 다운로드·해시 검증·엔진 로딩 실패를 구분해 확인한다.
 - F2 선택 이미지는 하드웨어 catalog, general 이미지는 게시 이미지 catalog가 고정 digest로 관리한다.
   AWS와 RunPod가 같은 선택 이미지를 소비하며 AWS가 RunPod control 문서에서 이미지를 가져오지 않는다.
-- 현재 F2 `ca2cfefb…`와 general `801473c8…` pin은 새 identity/VRAM 계측 이전 이미지다.
-  이 이미지로 강화된 검증을 실행하면 계측을 확인할 수 없어 실패한다. `image-publish f2 dev`와
-  `image-publish general dev`의 artifact를 검토한 뒤 F2 `hardware-profiles.json:f2_image`,
-  general `published-images.json`·기본 image ID를 갱신하고 정지 상태의 `ai-select`로 새 pin을 저장한다.
-  이번 구현은 이미지 게시를 실행하지 않았다. 코드·테스트 완료는 실제 기동 완료를 뜻하지 않는다. `python3`·vLLM 버전별 시작 인자를
-  이미지 빌드에서 검증하며 F2와 general 옵션을 혼용하지 않는다.
+- F2 공백 제한과 identity/VRAM 계측을 포함한 새 이미지의 게시·artifact 대조·catalog 및
+  정지 상태의 `ai-select` 저장 근거는 [2026-09-10 적용 기록](image-rollout-validation-2026-09-10.md)에 있다.
+  공식 `dev-start`·`dev-verify`의 직접 추론·앱 합성 요청과 identity 검증을 통과했다.
+  VRAM 관측 및 RunPod REST의 GPU 식별 제한·GraphQL 보완 확인은 같은 기록에 구분하며,
+  품질 평가를 승계하지 않는다.
+- F2/general을 AWS GPU로 전환한 실제 공유 dev 기동, EBS 캐시 재사용, F3 pending 재개와
+  직접·앱 경유 검증 결과는 [2026-09-11 AWS 적용 기록](aws-shared-dev-validation-2026-09-11.md)에 있다.
+  새 게시 때도 artifact를 검토하고 F2 `hardware-profiles.json:f2_image`, general
+  `published-images.json`·기본 image ID를 갱신한 뒤 정지 상태의 `ai-select`로 pin을 저장한다.
+  `python3`·vLLM 버전별 시작 인자를 이미지 빌드에서 검증하며 F2와 general 옵션을 혼용하지 않는다.
 
 ## 전원·배포의 내부 경계
 
@@ -57,6 +61,13 @@ AWS 자원은 Terraform dev root가 소유한다. 검토한 AMI·EBS 프로필�
 선택 image·capacity·앱 provider/model을 같은 입력으로 만든다. RunPod는 최초 Console 자원을
 보존하고 기존 Template 차이만 검토·API 수정·재조회 후 SSM 등록한다. Secret 참조·registry 권한은
 기존 경계를 유지하고 자동 생성·회전하지 않는다.
+
+AWS GPU의 host·probe·모델 profile bootstrap 파일은 Terraform이 만든 hash 고정 tar.gz를 기존
+data-model S3 bucket의 `serving/bootstrap/`에 저장하고, 최소 권한 Instance Role로 받아 SHA-256을
+확인한 뒤 설치한다. EC2 user-data에는 artifact 위치·hash와 작은 공개 설정만 넣으며 25,600-byte
+encoded 제한을 plan-time check로 강제한다. 비밀값과 모델 가중치는 이 bootstrap artifact에 넣지 않는다.
+준비 실패 시에는 private `status.json`과 운영 SSM 결과에 단계 이름·성공 여부만 남기며 exception 원문,
+Secret, presigned URL과 모델 응답은 남기지 않는다.
 
 `dev-start`와 `dev-prepare-app`은 같은 선택·Terraform·Template·비용 계획을 쓴다.
 CodeDeploy maintenance 모드와 호스트 marker가 구/새 revision의 API·Worker 자동 기동을 막는다.
@@ -87,6 +98,13 @@ AWS는 고정 loopback 포트 18000/18001/18002의 SSM 터널을 유지하고 Ru
 사용한다. 키는 승인된 값을 TTY로 전달하며 공유 GPU 자동 기동·공유 DB 모델 변경은 하지 않는다.
 
 `local-config`로 설정을 확인하고 `local-model <사무소 ID> <capability>`로 로컬 DB 전후 입력을 확인한다.
+
+AWS GPU 인스턴스를 정지하면 EC2가 자동 할당 공인 IPv4를 반납하고 다음 시작에서 새 주소를 할당한다.
+Terraform은 이 일시적인 속성 변화를 교체 사유로 사용하지 않으며, 같은 인스턴스와 루트 EBS의
+`/srv/brokerage-gpu/models` 캐시를 재사용한다. 모델·AMI·instance type처럼 실제 실행 계약이
+바뀌면 기존 교체 규칙을 그대로 적용한다.
+bootstrap script 변경도 실행 중/정지 GPU를 자동 교체하지 않는다. 기존 호스트 script 갱신은
+별도 maintenance에서 명시적으로 동기화하고, 신규 인스턴스는 현재 hash 고정 S3 bootstrap을 받는다.
 API·Worker 중지 후에만 `--apply --workloads-stopped`를 사용한다. 기동은 `local-api`, `local-worker`다.
 개인 파일·주석 기준은 [환경변수 관리](../../docs/development/environment-variables.md)를 따른다.
 
@@ -99,4 +117,6 @@ API·Worker 중지 후에만 `--apply --workloads-stopped`를 사용한다. 기�
 [validation.md](validation.md)는 기존 GPU 검증 진입점,
 [RunPod 기록](remote-validation-2026-09-07.md)과 [AWS 사설 검증](aws-private-validation-2026-09-07.md)은
 그 시점의 후보 근거다. 이 기록을 이번 release의 성공으로 수정하지 않는다.
+[AWS 공유 dev 적용 기록](aws-shared-dev-validation-2026-09-11.md)은 현재 F2/general AWS 선택의
+기동·identity·앱 합성 검증 근거다.
 [비교 재현](comparison-reproduction.md)은 저장 근거 검사·동일 조건 평가의 별도 절차다.

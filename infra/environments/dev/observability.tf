@@ -208,6 +208,8 @@ resource "aws_lambda_permission" "cloudwatch_alarms" {
 }
 
 resource "aws_sns_topic_subscription" "cloudwatch_alarm_notifier" {
+  count = var.alarm_discord_notifications_enabled ? 1 : 0
+
   topic_arn = aws_sns_topic.cloudwatch_alarms.arn
   protocol  = "lambda"
   endpoint  = aws_lambda_function.cloudwatch_alarm_notifier.arn

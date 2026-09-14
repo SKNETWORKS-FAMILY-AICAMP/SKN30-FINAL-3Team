@@ -1,94 +1,80 @@
 # Data
 
-이 디렉터리는 프로젝트의 원천 데이터, 라벨링 중간 산출물, 검증된 학습·평가 데이터 릴리스를 관리한다. 하위 폴더마다 README를 반복하지 않고 이 문서를 공통 운영 규칙의 정본으로 사용한다.
+프로젝트의 AI 파이프라인(F2 상담 분석, F3 중개 판단)을 위한 원천 데이터, 합성 시나리오, 라벨링 산출물, 그리고 검증된 학습·평가 데이터셋 릴리스를 관리합니다.
 
-## 데이터셋 목록
+---
 
-데이터셋의 상태와 최신 릴리스는 [`registry.yaml`](registry.yaml)에서 확인한다.
+## 데이터셋 현황
 
-| 데이터셋 | 목적 | 현재 상태 |
-|---|---|---|
-| `f2_llm` | Qwen 3개 상담 유형 분류·필드 추출·요약 학습 및 평가 | 준비 중 |
-| `f2_sell_request` | F2 상담유형 분류를 위한 매도의뢰 합성 대화 | 작업 중, 발행된 릴리스 없음 |
+최신 데이터셋 목록 및 검증 상태는 [`registry.yaml`](registry.yaml)에서 관리합니다.
 
-## 공통 구조
+| 데이터셋 ID | 디렉터리 | 주요 목적 | 최신 릴리스 및 상태 |
+|---|---|---|---|
+| `f2-llm-analysis` | `f2_llm/` | Qwen SLLM 상담 유형 분류·필드 추출·요약 SFT 학습 및 평가 | `f2-handwritten-v0.5` (Train, Val, Test 분할 완료) |
+| `f2-sell-request-privacy-safe` | `f2_sell_request/` | F2 매도의뢰 대화 분석을 위한 합성 시나리오 | `v0.2.0` (비식별화 및 품질 검증 완료) |
+
+---
+
+## 디렉터리 구조
 
 ```text
 data/
 ├── README.md
-├── registry.yaml
-├── manifest.template.yaml
+├── registry.yaml                     # 데이터셋 등록 및 버전 관리 레지스트리
+├── manifest.template.yaml            # 신규 릴리스용 메타데이터 템플릿
+├── scripts/                          # 시나리오 생성, 병합, 데이터셋 분할 스크립트
+│   ├── generate_f2_sell_request_scenarios.py
+│   ├── generate_f2_buy_request_scenarios.py
+│   ├── generate_f2_auxiliary_intent_scenarios.py
+│   ├── generate_f2_handwritten_dialogue_scenarios.py
+│   ├── generate_f2_full_output_scenarios.py
+│   ├── merge_f2_intent_scenarios.py
+│   ├── merge_f2_full_output_scenarios.py
+│   └── split_f2_sllm_dataset.py
 ├── f2_llm/
-│   ├── working/
+│   ├── working/                      # 정제 및 검수 중인 중간 산출물
 │   └── releases/
+│       └── f2-handwritten-v0.5/      # 품질 검증 완료된 SFT 학습·평가 불변 릴리스
 └── f2_sell_request/
     ├── working/
     └── releases/
 ```
 
-- `working/`: 비식별화, 정제, 라벨 작성 및 검수 중인 산출물.
-- `releases/<version>/`: 품질 검증을 통과한 불변 산출물.
-- `manifest.template.yaml`: 새 데이터셋 버전을 발행할 때 복사하는 manifest 양식.
+---
 
-원본, 별도 스키마 또는 라벨 가이드가 실제로 필요해지면 그때 해당 파일이나 폴더를 추가한다.
+## 산출물 관리 원칙
 
-## 산출물 문서 세트
+Git에 관리되는 모든 데이터 산출물은 다음 세 가지 파일이 한 세트로 유지됩니다.
 
-Git에 두는 데이터 산출물은 릴리스 여부와 관계없이 같은 폴더에 다음 세 파일을 함께 둔다.
-
-| 파일 | 내용 |
+| 산출물 파일 | 설명 |
 |---|---|
-| `<name>.jsonl` 등 데이터 파일 | 사례와 라벨 |
-| `<name>.manifest.yaml` | 출처, 이용 조건, 계보, 건수와 분포, 분할, 개인정보 등급, 보존·삭제 조건, 검증 결과, 체크섬, 한계와 금지 용도 |
-| `<name>.privacy.md` | 생성 방식, 비식별 처리 내역, 저장 위치와 접근 주체, 자동 검증 방법과 결과, 남은 한계 |
+| `<name>.jsonl` | 대화 시나리오, 추출 정답, 증강 데이터셋 본문 |
+| `<name>.manifest.yaml` | 출처, 라이선스, 건수 및 분포, 데이터 분할(Split) 기준, 체크섬(SHA-256) |
+| `<name>.privacy.md` | 데이터 생성 방식, 비식별화(De-identification) 처리 내역, 개인정보 검증 결과 |
 
-- manifest는 `manifest.template.yaml`의 항목을 채우고 비워 두지 않는다. 확정되지 않은 항목은 `pending`으로 두고 미해결 질문 ID를 함께 적는다.
-- 세 파일이 갖춰지지 않은 산출물은 `working/`에 있더라도 Git에 추가하지 않는다. `data/.gitignore`의 추적 예외도 이 조건을 만족하는 파일 이름에만 적용한다.
-- 검증 결과를 기록할 때는 값과 함께 산출 방법을 적어 다른 사람이 같은 값을 재현할 수 있게 한다.
+---
 
-## 버전 규칙
+## 데이터셋 분할 및 누수 방지 원칙
 
-데이터셋 릴리스는 `MAJOR.MINOR.PATCH` 형식을 사용한다.
+1. **불변 식별자 (`sample_id`)**: 모든 데이터 레코드는 영구적이고 고유한 식별자를 가집니다.
+2. **그룹 기준 분할 (`source_group_id`)**: 동일한 원천에서 파생되거나 증강(Augmentation)된 시나리오는 반드시 동일한 데이터 분할(Train / Validation / Test)에 포함되어 데이터 누수(Data Leakage)를 방지합니다.
+3. **불변 릴리스**: 한 번 `releases/`에 발행된 버전은 내용을 수정하지 않으며, 수정이 필요한 경우 새 버전 번호를 부여합니다.
 
-- `PATCH`: 오타, 잘못된 라벨 또는 메타데이터를 수정한다. 스키마와 데이터 범위는 유지한다.
-- `MINOR`: 호환되는 형식으로 사례나 slice를 추가하고 분포를 보강한다.
-- `MAJOR`: 스키마 또는 라벨 의미를 호환되지 않게 변경한다.
+---
 
-한 번 발행한 `releases/<version>/`은 수정하지 않는다. 수정이 필요하면 새 버전을 발행하고 `registry.yaml`의 최신 버전을 갱신한다.
+## 주요 스크립트 실행
 
-## 사례 식별과 분할
+```bash
+# 1) 시나리오 병합
+python3 scripts/merge_f2_full_output_scenarios.py
 
-- 각 사례는 변하지 않는 식별자를 가진다. 기본 필드명은 `sample_id`이며, 다른 이름을 쓰는 데이터셋은 manifest의 `schema.record_id_field`에 실제 필드명을 기록한다.
-- 같은 원천에서 파생된 사례는 같은 `source_group_id`를 사용한다.
-- 같은 `source_group_id`의 원본과 증강본은 서로 다른 split에 넣지 않는다.
-- 최종 테스트 데이터는 학습과 튜닝 입력에서 제외한다.
-- 분할 방식, 그룹 키와 난수 시드는 릴리스 manifest에 기록한다.
+# 2) SFT 데이터셋 분할 (Train/Val/Test 분할 및 split-report 생성)
+python3 scripts/split_f2_sllm_dataset.py
+```
 
-## 릴리스 절차
+---
 
-1. 원천, 이용 조건, 개인정보 등급과 보존·삭제 조건을 등록한다.
-2. 필요한 경우 개인정보를 비식별화하고 처리 내역을 `<name>.privacy.md`에 기록한다.
-3. 합의한 데이터 형식에 맞게 변환하고 라벨을 작성한다.
-4. 사람이 정답과 근거를 검수한다.
-5. 중복, 누락, 허용 라벨, 참조, 분할 누수를 검사한다.
-6. 그룹 기준으로 train·validation·test를 분할한다.
-7. `manifest.template.yaml`을 바탕으로 manifest를 작성한다.
-8. 파일별 SHA-256 체크섬을 생성한다.
-9. 새 `releases/<version>/`을 만들고 `registry.yaml`을 갱신한다.
+## 개인정보 보호 원칙
 
-## Git 및 개인정보
-
-- 실제 고객 음성, 이름, 전화번호, 주소, 인증정보와 비밀값을 Git에 저장하지 않는다.
-- `working/` 산출물은 기본적으로 Git에서 제외하되, 실존 개인정보가 없음을 검증한 생성 평가용 JSONL은 `data/.gitignore` 예외로 추적할 수 있다.
-- 원본 음성과 대용량 파일은 팀이 승인한 접근 제한 저장소에서 관리한다.
-- 합성, 수작업, 증강, 실제 비식별 데이터의 출처 유형을 구분한다.
-- 원문 개인정보, 전체 프롬프트와 실제 상담 전문을 로그에 남기지 않는다.
-- 저장 위치, 접근 주체, 보존 기간과 삭제 방식이 정해지지 않은 실제 데이터는 수집하지 않는다.
-
-## 금지사항
-
-- 발행된 릴리스 덮어쓰기
-- 테스트 데이터를 학습 또는 프롬프트 튜닝에 사용
-- 원본과 증강본을 서로 다른 split으로 분리
-- 검수하지 않은 LLM 생성 결과를 골드 정답으로 지정
-- 실패한 품질 검사 사례를 기록 없이 삭제하거나 자동 수정
+- 실제 고객의 실명, 전화번호, 상세 주소(동·호수), 금융 정보는 절대 Git에 커밋하지 않습니다.
+- 모든 대화 데이터는 검증된 가상의 합성 데이터(Synthetic Data) 또는 엄격하게 비식별화된 데이터를 사용합니다.

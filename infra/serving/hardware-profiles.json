@@ -6,7 +6,7 @@
   },
   "profiles": {
     "runpod-a5000-24gb": {"cloud": "runpod", "gpu_id": "NVIDIA RTX A5000", "vram_gb": 24, "workloads": ["f2"], "evidence": "No exact A5000/release/image startup result; user validation pending."},
-    "runpod-rtx4090-24gb": {"cloud": "runpod", "gpu_id": "NVIDIA GeForce RTX 4090", "vram_gb": 24, "workloads": ["f2"], "evidence": "infra/serving/remote-validation-2026-09-07.md: previous F2 candidate and release only."},
+    "runpod-rtx4090-24gb": {"cloud": "runpod", "gpu_id": "NVIDIA GeForce RTX 4090", "vram_gb": 24, "workloads": ["f2"], "evidence": "infra/serving/image-rollout-validation-2026-09-10.md: consultation-v3 and image 4566d037 on RTX 4090; startup/inference only."},
     "runpod-l40s-48gb": {"cloud": "runpod", "gpu_id": "NVIDIA L40S", "vram_gb": 48, "workloads": ["general"], "evidence": "infra/serving/published-images.json: exact general image/profile evidence; quality acceptance is separate."},
     "aws-g6-2xlarge": {"cloud": "aws", "instance_type": "g6.2xlarge", "gpu": "NVIDIA L4", "vram_gb": 24, "workloads": ["f2"], "evidence": "infra/serving/aws-private-validation-2026-09-07.md: previous F2 candidate and release only."},
     "aws-g6e-2xlarge": {"cloud": "aws", "instance_type": "g6e.2xlarge", "gpu": "NVIDIA L40S", "vram_gb": 48, "workloads": ["general"], "evidence": "infra/serving/aws-private-validation-2026-09-07.md: candidate startup; shared deployment validation pending."}
@@ -16,10 +16,11 @@
     "general": {"minimum_vram_gb": 48, "model_profiles": ["qwen3-14b-awq", "qwen3-32b-awq", "qwen38-27b-bnb", "qwen38-27b-fp8"]}
   },
   "f2_image": {
-    "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:ca2cfefb47e97c4b664b388ff585ae4d512e7ae33d6718fe400dc2ebe486b769",
-    "workflow_run": 34305829152,
-    "source_revision_prefix": "ebd3cf9",
-    "status": "pending-user-startup-check"
+    "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:4566d037a02911902aa3cd624d2ff48d88125114cbbae9a2e922fc24eb262628",
+    "workflow_run": 34434463130,
+    "source_revision_prefix": "d5556dc",
+    "status": "startup_only",
+    "validation_record": "infra/serving/image-rollout-validation-2026-09-10.md"
   },
   "f2_image_history": [
     {
@@ -27,7 +28,14 @@
       "workflow_run": 34305829152,
       "source_revision_prefix": "ebd3cf9",
       "status": "pending-user-startup-check"
+    },
+    {
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/f2-serving@sha256:4566d037a02911902aa3cd624d2ff48d88125114cbbae9a2e922fc24eb262628",
+      "workflow_run": 34434463130,
+      "source_revision_prefix": "d5556dc",
+      "status": "startup_only",
+      "validation_record": "infra/serving/image-rollout-validation-2026-09-10.md"
     }
   ],
-  "general_default_image_id": "official-fp8-evaluated"
+  "general_default_image_id": "runtime-metrics-20260910"
 }

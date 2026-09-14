@@ -401,10 +401,12 @@ function FailureState({
   state,
   message,
   onRetry,
+  canResume,
 }: {
   state: PanelState;
   message: string | null;
   onRetry: () => void;
+  canResume: boolean;
 }) {
   if (state === "paused") {
     return (
@@ -438,7 +440,7 @@ function FailureState({
         {message || "F3만 실패했습니다."} 상세의 편집, 저장, 닫기는 계속 사용할 수 있습니다.
       </Alert>
       <Button variant="secondary" icon={<SyncAltIcon />} onClick={onRetry}>
-        판정 다시 시도
+        {canResume ? "다시 확인" : "판정 다시 시도"}
       </Button>
     </div>
   );
@@ -735,7 +737,9 @@ export function CrossMatchPanel({
     failureMessage,
     error,
     setOffset,
-    retry,
+    resume,
+    rerun,
+    canResume,
   } = judgment;
 
   const hiddenGrades = hiddenGradesFor(parentContext);
@@ -908,9 +912,14 @@ export function CrossMatchPanel({
                   </>
                 )}
 
-                {state === "empty" && <EmptyState criteria={criteria} onRetry={retry} />}
+                {state === "empty" && <EmptyState criteria={criteria} onRetry={rerun} />}
                 {showsFailure && (
-                  <FailureState state={state} message={failureMessage} onRetry={retry} />
+                  <FailureState
+                    state={state}
+                    message={failureMessage}
+                    canResume={canResume}
+                    onRetry={canResume ? resume : rerun}
+                  />
                 )}
               </>
             )}

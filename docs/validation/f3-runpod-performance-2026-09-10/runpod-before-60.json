@@ -1,0 +1,35 @@
+[
+  {
+    "label": "runpod-before-60",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 60.0,
+    "anchor_type": "LISTING",
+    "cache": "cold",
+    "repetition": 1,
+    "run_id": 1,
+    "outcome": "RETRY",
+    "status": "RUNNING",
+    "candidates": 0,
+    "carded": 0,
+    "intake_ms": 38.66,
+    "pickup_ms": 62.94,
+    "total_ms": 61037.83,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 60974.85,
+        "outcome": "RETRY"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": false,
+        "input_chars": 3978,
+        "error_type": "ProviderTimeoutError",
+        "wall_ms": 60916.77
+      }
+    ]
+  }
+]

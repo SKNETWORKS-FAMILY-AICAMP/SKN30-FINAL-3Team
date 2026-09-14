@@ -410,7 +410,11 @@ class Serving:
             payload = shlex.quote(json.dumps(spec))
             self.command(
                 iid,
-                f"set -eu; umask 077; printf '%s' {payload} > /opt/brokerage-gpu/candidate.json; touch /opt/brokerage-gpu/prepare-candidate; systemctl restart brokerage-gpu.service",
+                f"set -eu; umask 077; printf '%s' {payload} > /opt/brokerage-gpu/candidate.json; "
+                "touch /opt/brokerage-gpu/prepare-candidate; "
+                "systemctl restart brokerage-gpu.service || { "
+                "test ! -s /opt/brokerage-gpu/status.json || cat /opt/brokerage-gpu/status.json >&2; "
+                "exit 1; }",
                 timeout=2700,
             )
             instance = self.instances(workload)[0]

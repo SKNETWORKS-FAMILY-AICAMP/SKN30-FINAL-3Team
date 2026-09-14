@@ -32,6 +32,24 @@ def test_local_precedence_literal_and_secret_redaction(tmp_path, monkeypatch):
     assert source == {"AI_REQUEST_TIMEOUT_SECONDS": "30"}
 
 
+def test_general_timeout_override_preserves_common_timeout():
+    config = bind_ai_config(
+        {"AI_REQUEST_TIMEOUT_SECONDS": "60", "AI_GENERAL_REQUEST_TIMEOUT_SECONDS": "300"}, "test"
+    )
+    assert config.general_timeout_seconds == 300
+    assert config.request_timeout_seconds == 60
+    assert (
+        bind_ai_config({"AI_REQUEST_TIMEOUT_SECONDS": "12.5"}, "test").general_timeout_seconds
+        == 12.5
+    )
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "invalid"])
+def test_general_timeout_requires_finite_positive_number(value):
+    with pytest.raises(ConfigurationError):
+        bind_ai_config({"AI_GENERAL_REQUEST_TIMEOUT_SECONDS": value}, "test")
+
+
 @pytest.mark.parametrize("provider", list(ProviderKind))
 @pytest.mark.parametrize("model", list(GeneralModel))
 def test_provider_model_matrix(provider, model):
@@ -171,3 +189,17 @@ def test_real_templates_are_valid_and_all_enum_values_are_documented(tmp_path, m
     assert config.openai is None and config.vllm.sllm is None and config.vllm.embedding is None
     assert all(choice.value in public for choice in GeneralModel)
     assert all(choice.value in public for choice in ProviderKind)
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "nan", "invalid"])
+def test_general_vllm_in_flight_requires_positive_integer(value):
+    with pytest.raises(ConfigurationError):
+        bind_ai_config({"AI_GENERAL_VLLM_MAX_IN_FLIGHT": value}, "test")
+
+
+def test_general_vllm_in_flight_default_and_override():
+    assert bind_ai_config({}, "test").general_vllm_max_in_flight == 1
+    assert (
+        bind_ai_config({"AI_GENERAL_VLLM_MAX_IN_FLIGHT": "4"}, "test").general_vllm_max_in_flight
+        == 4
+    )

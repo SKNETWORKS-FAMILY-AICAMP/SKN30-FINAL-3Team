@@ -560,6 +560,9 @@ def test_one_failed_candidate_does_not_advance_the_run(
         events: list[tuple[str, dict[str, object]]] = []
 
         class RecordingLogger:
+            def info(self, event: str, **values: object) -> None:
+                pass  # Failure assertions below inspect warnings.
+
             def warning(self, event: str, **values: object) -> None:
                 events.append((event, values))
 

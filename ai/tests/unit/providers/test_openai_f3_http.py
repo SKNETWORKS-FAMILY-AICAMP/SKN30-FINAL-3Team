@@ -81,21 +81,23 @@ async def test_actual_f3_schema_crosses_sdk_http_boundary_and_revalidates(
                     "card_id": 2,
                     "grade": "WEAK",
                     "rank": 1,
-                    "comparison_basis": "조건 추가 확인 필요",
-                    "primary_obstacle": None,
-                    "possible_concession": None,
+                    "comparison_reason": "OVERALL_FIT",
+                    "comparison_detail": "조건 추가 확인 필요",
+                    "obstacle_reason": "NONE",
+                    "obstacle_detail": None,
+                    "concession_reason": "ADDITIONAL_CONFIRMATION",
+                    "concession_detail": None,
                     "recommended_action": None,
                     "rejection_reason": None,
-                    "evidence": [
-                        {
-                            "evidence_side": "LISTING",
-                            "field_name": None,
-                            "source": payload["intent"]["evidence"][0],
-                        }
-                    ],
+                    "rejection_detail": None,
+                    "evidence_refs": [1],
                 }
             ]
         }
+        if outcome == "missing_quote":
+            del payload["candidates"][0]["evidence_refs"]
+        elif outcome == "mixed_evidence":
+            payload["candidates"][0]["evidence"] = [payload["candidates"][0]["evidence_refs"]]
 
     def respond(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/responses"
@@ -107,15 +109,16 @@ async def test_actual_f3_schema_crosses_sdk_http_boundary_and_revalidates(
         assert wire["strict"] is True
         assert_wire_schema(wire["schema"])
         definitions = wire["schema"]["$defs"]
-        evidence = (
-            definitions["IntentAssessment"]["properties"]["evidence"]["items"]
-            if output_schema is PositionCardModelOutput
-            else definitions["JudgmentEvidence"]["properties"]["source"]
-        )
-        assert evidence["anyOf"] == [
-            {"$ref": "#/$defs/QuoteEvidence"},
-            {"$ref": "#/$defs/InferenceEvidence"},
-        ]
+        if output_schema is PositionCardModelOutput:
+            evidence = definitions["IntentAssessment"]["properties"]["evidence"]["items"]
+            assert evidence["anyOf"] == [
+                {"$ref": "#/$defs/QuoteEvidence"},
+                {"$ref": "#/$defs/InferenceEvidence"},
+            ]
+        else:
+            candidate = definitions["ModelCandidateJudgment"]["properties"]
+            assert "evidence_refs" in candidate
+            assert "evidence" not in candidate
         content = (
             {"type": "refusal", "refusal": "synthetic refusal"}
             if outcome == "refusal"
@@ -168,7 +171,7 @@ async def test_actual_f3_schema_crosses_sdk_http_boundary_and_revalidates(
                 assert isinstance(result.output.urgency.evidence[0], InferenceEvidence)
             else:
                 assert isinstance(result.output, BrokerageJudgmentModelOutput)
-                assert isinstance(result.output.candidates[0].evidence[0].source, QuoteEvidence)
+                assert result.output.candidates[0].evidence_refs == (1,)
             assert result.diagnostics.usage is not None
             assert result.diagnostics.usage.total_tokens == 30
         else:

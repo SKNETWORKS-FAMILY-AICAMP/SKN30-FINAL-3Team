@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.request
 import wave
+from pathlib import Path
 
 from gpu_metrics import safe_identity
 
@@ -138,6 +139,21 @@ def read_telemetry(base_url: str, key: str) -> dict:
         return {"identity": {}, "gpu": None}
 
 
+def local_snapshot_identity(path: Path, model: str, revision: str) -> dict:
+    """Return identity only for a complete snapshot recorded by download_models."""
+    expected = {"model": model, "revision": revision}
+    if safe_identity(expected) != expected:
+        return {}
+    try:
+        if not (path / "config.json").is_file():
+            return {}
+        if (path / ".serving-revision").read_text() != f"{model}@{revision}":
+            return {}
+    except OSError:
+        return {}
+    return expected
+
+
 def verify(
     base_url: str,
     key: str,
@@ -145,6 +161,7 @@ def verify(
     *,
     stt: bool = False,
     expected_identity: dict | None = None,
+    fallback_identity: dict | None = None,
     sample_interval: float = 0.25,
 ) -> dict:
     """Run synthetic inference with bounded status sampling and no response text.
@@ -157,6 +174,9 @@ def verify(
     expected = safe_identity(expected_identity or {})
     if expected != (expected_identity or {}):
         raise ValueError("expected identity contains unsupported fields or values")
+    fallback = safe_identity(fallback_identity or {})
+    if fallback != (fallback_identity or {}) or not set(fallback) <= set(expected):
+        raise ValueError("fallback identity must be a safe subset of expected identity")
     if sample_interval < 0.05 or sample_interval > 10:
         raise ValueError("sample interval must be between 0.05 and 10 seconds")
     snapshots = [read_telemetry(base_url, key)]
@@ -179,7 +199,7 @@ def verify(
         done.set()
         worker.join(timeout=6)
     snapshots.append(read_telemetry(base_url, key))
-    identity = snapshots[-1]["identity"]
+    identity = {**fallback, **snapshots[-1]["identity"]}
     checks = {
         name: (
             "unavailable"
@@ -190,7 +210,10 @@ def verify(
         )
         for name, value in expected.items()
     }
-    changed = any(row["identity"] and row["identity"] != identity for row in snapshots)
+    changed = any(
+        row["identity"] and {**fallback, **row["identity"]} != identity
+        for row in snapshots
+    )
     samples = [row["gpu"] for row in snapshots if row["gpu"] is not None]
     return {
         "passed": error is None
@@ -290,6 +313,11 @@ if __name__ == "__main__":
                         "stt",
                         stt=True,
                         expected_identity=stt_expected,
+                        fallback_identity=local_snapshot_identity(
+                            Path("/srv/brokerage-gpu/models/stt"),
+                            env["F2_STT_MODEL_ID"],
+                            env["F2_STT_MODEL_REVISION"],
+                        ),
                     )
                 )
             passed = all(row["passed"] for row in services)

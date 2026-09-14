@@ -286,6 +286,12 @@ class DeliveryPipelineContractTests(unittest.TestCase):
         checks = read("infra/environments/dev/checks.tf")
 
         self.assertIn("application_environment = {", configuration)
+        self.assertRegex(
+            configuration, r'AI_GENERAL_REQUEST_TIMEOUT_SECONDS\s*=\s*"300"'
+        )
+        self.assertRegex(
+            configuration, r'AI_GENERAL_VLLM_MAX_IN_FLIGHT\s*=\s*"1"'
+        )
         self.assertIn(
             "for namespace, values in local.application_environment", configuration
         )

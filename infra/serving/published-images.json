@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "verified_at": "2026-09-08",
+  "verified_at": "2026-09-10",
   "deployment_rule": "Resolve tags for discovery; deploy the immutable image digest. GENERAL_MODEL_PROFILE is required to select the intended model. No model weights are baked into these images.",
   "status_meanings": {
     "evaluated": "Full F4 synthetic 240-case and HTTP 36-case evaluation completed; this does not imply acceptance passed.",
@@ -158,6 +158,41 @@
           "quantization": "fp8",
           "status": "evaluated",
           "note": "Full F4 synthetic 240-case and HTTP 36-case evaluation completed; this does not imply acceptance passed."
+        }
+      },
+      "profiles_sha256": "4e4c8937b0c4cceb0f31d5f9ff564d3cce370e9caea7c3e75dfd591a8e6d87f9"
+    },
+    {
+      "id": "runtime-metrics-20260910",
+      "tag": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving:git-f336dead312cc842207f0dd365c7d5ec719be6cd",
+      "image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:7d9598e8b8263fd5b43adb19cb778832c8f5189d8c6a2b4ba81eac3a06ceeb08",
+      "source_revision": "f336dead312cc842207f0dd365c7d5ec719be6cd",
+      "workflow_run": 34434593863,
+      "platform": "linux/amd64",
+      "runtime_base": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "bitsandbytes_version": "0.50.2",
+      "bnb_plugin_version": "0.0.2",
+      "profiles": {
+        "qwen3-14b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen3-32b-awq": {
+          "quantization": "awq",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen38-27b-bnb": {
+          "quantization": "bitsandbytes",
+          "status": "cpu_only",
+          "note": "Profile and CLI build checks passed; this exact wrapper/profile combination has no GPU result."
+        },
+        "qwen38-27b-fp8": {
+          "quantization": "fp8",
+          "status": "startup_only",
+          "note": "2026-09-10 shared dev: exact image/model identity, direct inference and application smoke passed; no quality evaluation. See image-rollout-validation-2026-09-10.md."
         }
       },
       "profiles_sha256": "4e4c8937b0c4cceb0f31d5f9ff564d3cce370e9caea7c3e75dfd591a8e6d87f9"

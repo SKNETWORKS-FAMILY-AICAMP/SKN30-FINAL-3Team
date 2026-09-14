@@ -1,0 +1,20 @@
+{
+  "seed": "L1",
+  "mode": "stream-diagnostic",
+  "input_chars": 3978,
+  "ok": true,
+  "finish_reason": "stop",
+  "usage": {
+    "completion_tokens": 997,
+    "prompt_tokens": 1805,
+    "total_tokens": 2802,
+    "completion_tokens_details": null,
+    "prompt_tokens_details": null
+  },
+  "total_s": 69.93,
+  "first_token_s": 2.279189052002039,
+  "chars": 2472,
+  "whitespace_chars": 937,
+  "trailing_whitespace": 0,
+  "schema_valid": true
+}

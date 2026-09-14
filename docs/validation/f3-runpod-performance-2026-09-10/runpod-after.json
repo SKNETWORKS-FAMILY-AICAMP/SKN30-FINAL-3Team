@@ -1,0 +1,298 @@
+[
+  {
+    "label": "runpod-stream-300",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 300.0,
+    "anchor_type": "LISTING",
+    "cache": "cold",
+    "repetition": 1,
+    "run_id": 7,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 48.37,
+    "pickup_ms": 73.51,
+    "total_ms": 431219.88,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 111483.31,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 31.81,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 172680.37,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 146923.61,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "input_chars": 3980,
+        "provider_ms": 111380.06219999806,
+        "usage": {
+          "input_tokens": 1807,
+          "output_tokens": 1604,
+          "total_tokens": 3411
+        },
+        "wall_ms": 111380.88
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3362,
+        "provider_ms": 54270.150636002654,
+        "usage": {
+          "input_tokens": 1605,
+          "output_tokens": 772,
+          "total_tokens": 2377
+        },
+        "wall_ms": 54270.75
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3385,
+        "provider_ms": 64531.8394829992,
+        "usage": {
+          "input_tokens": 1632,
+          "output_tokens": 925,
+          "total_tokens": 2557
+        },
+        "wall_ms": 118797.18
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3305,
+        "provider_ms": 53467.944340998656,
+        "usage": {
+          "input_tokens": 1577,
+          "output_tokens": 763,
+          "total_tokens": 2340
+        },
+        "wall_ms": 172266.51
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "input_chars": 13487,
+        "provider_ms": 146790.57843199917,
+        "usage": {
+          "input_tokens": 5101,
+          "output_tokens": 1326,
+          "total_tokens": 6427
+        },
+        "wall_ms": 146791.52
+      }
+    ]
+  },
+  {
+    "label": "runpod-stream-300",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 300.0,
+    "anchor_type": "LISTING",
+    "cache": "warm",
+    "repetition": 1,
+    "run_id": 8,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 3,
+    "carded": 3,
+    "intake_ms": 14.65,
+    "pickup_ms": 28.39,
+    "total_ms": 150846.71,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 70.53,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 19.69,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 143.51,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 150569.73,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "input_chars": 13487,
+        "provider_ms": 150498.85449199792,
+        "usage": {
+          "input_tokens": 5101,
+          "output_tokens": 1579,
+          "total_tokens": 6680
+        },
+        "wall_ms": 150499.64
+      }
+    ]
+  },
+  {
+    "label": "runpod-stream-300",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 300.0,
+    "anchor_type": "REQUIREMENT",
+    "cache": "cold",
+    "repetition": 1,
+    "run_id": 9,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 12.32,
+    "pickup_ms": 23.15,
+    "total_ms": 273051.67,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 52454.24,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 26.74,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 141620.85,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 78911.65,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "ANCHOR_CARD",
+        "ok": true,
+        "input_chars": 3362,
+        "provider_ms": 52394.81725299993,
+        "usage": {
+          "input_tokens": 1605,
+          "output_tokens": 747,
+          "total_tokens": 2352
+        },
+        "wall_ms": 52394.91
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3980,
+        "provider_ms": 85887.35511899722,
+        "usage": {
+          "input_tokens": 1807,
+          "output_tokens": 1097,
+          "total_tokens": 2904
+        },
+        "wall_ms": 85889.66
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "ok": true,
+        "input_chars": 3626,
+        "provider_ms": 55601.480338998954,
+        "usage": {
+          "input_tokens": 1622,
+          "output_tokens": 795,
+          "total_tokens": 2417
+        },
+        "wall_ms": 141484.18
+      },
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "input_chars": 9897,
+        "provider_ms": 78844.00303800066,
+        "usage": {
+          "input_tokens": 3714,
+          "output_tokens": 1123,
+          "total_tokens": 4837
+        },
+        "wall_ms": 78844.13
+      }
+    ]
+  },
+  {
+    "label": "runpod-stream-300",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "timeout_seconds": 300.0,
+    "anchor_type": "REQUIREMENT",
+    "cache": "warm",
+    "repetition": 1,
+    "run_id": 10,
+    "outcome": "COMPLETED",
+    "status": "COMPLETED",
+    "candidates": 2,
+    "carded": 2,
+    "intake_ms": 11.72,
+    "pickup_ms": 23.08,
+    "total_ms": 78232.13,
+    "stages": [
+      {
+        "stage": "ANCHOR_CARD",
+        "wall_ms": 44.93,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_SELECTION",
+        "wall_ms": 18.72,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "CANDIDATE_CARDS",
+        "wall_ms": 95.66,
+        "outcome": "ADVANCED"
+      },
+      {
+        "stage": "JUDGMENT",
+        "wall_ms": 78035.44,
+        "outcome": "COMPLETED"
+      }
+    ],
+    "model_calls": [
+      {
+        "stage": "JUDGMENT",
+        "ok": true,
+        "input_chars": 9897,
+        "provider_ms": 77967.2176109998,
+        "usage": {
+          "input_tokens": 3714,
+          "output_tokens": 1123,
+          "total_tokens": 4837
+        },
+        "wall_ms": 77968.13
+      }
+    ]
+  }
+]

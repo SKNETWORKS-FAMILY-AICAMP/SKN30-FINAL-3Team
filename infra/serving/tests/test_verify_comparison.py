@@ -8,7 +8,7 @@ from pathlib import Path
 
 SERVING = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVING))
-import verify_comparison as verifier
+import verify_comparison as verifier  # noqa: E402 - load the repository script after adding its path
 
 
 class StoredComparison(unittest.TestCase):

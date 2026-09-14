@@ -88,11 +88,14 @@ class ModelTargets:
         )
         known = {}
         incompatible = set()
+        pending = set()
         for row in preview["targets"]:
             key = f"{row['brokerage_id']}:{row['capability']}"
             known[key] = row
             if row["current"] and not row["compatible"]:
                 incompatible.add(key)
+            if row["pending_work"]:
+                pending.add(key)
             print(
                 json.dumps(
                     {
@@ -105,10 +108,6 @@ class ModelTargets:
                     sort_keys=True,
                 )
             )
-        if any(row["pending_work"] for row in preview["targets"]):
-            raise ToolError(
-                "queued/in-progress requests exist; settle requests before model changes/start"
-            )
         raw = input_fn(
             "Change targets (comma-separated BROKERAGE_ID:CAPABILITY; empty keeps all): "
         )
@@ -116,6 +115,11 @@ class ModelTargets:
         if not set(selected) <= known.keys():
             raise ToolError(
                 "unknown DB target; choose explicit IDs from the displayed list"
+            )
+        if selected and pending:
+            raise ToolError(
+                "queued/in-progress requests exist; keep all models unchanged to resume "
+                "them, or settle requests before selecting DB changes"
             )
         remaining = incompatible - set(selected)
         if remaining:
@@ -144,6 +148,8 @@ class ModelTargets:
     def apply(self, selection: dict, targets: list[str], snapshot: str) -> dict:
         if not re.fullmatch(r"[0-9a-f]{64}", snapshot):
             raise ToolError("reviewed DB snapshot required")
+        if not targets:
+            return {"applied": [], "skipped": []}
         arguments = ["--apply", "--workloads-stopped", "--expected-snapshot", snapshot]
         for target in targets:
             identifier, separator, capability = target.partition(":")
@@ -168,9 +174,5 @@ class ModelTargets:
             raise ToolError(
                 "incompatible active DB configurations block app start: "
                 + ", ".join(incompatible)
-            )
-        if any(row["pending_work"] for row in result["targets"]):
-            raise ToolError(
-                "queued/in-progress requests block model transition/app start"
             )
         return result

@@ -71,11 +71,23 @@ class ModelTargetsTest(unittest.TestCase):
             ["7:CHATBOT"],
         )
 
-    def test_pending_requests_block_without_prompting(self):
-        ask = Mock()
+    def test_pending_requests_allow_unchanged_models_to_resume(self):
+        self.assertEqual(
+            ModelTargets.choose(preview(compatible=True, pending=1), input_fn=lambda _: ""),
+            [],
+        )
+
+    def test_pending_requests_block_explicit_model_changes(self):
         with self.assertRaisesRegex(ToolError, "queued"):
-            ModelTargets.choose(preview(pending=1), input_fn=ask)
-        ask.assert_not_called()
+            ModelTargets.choose(
+                preview(compatible=True, pending=1), input_fn=lambda _: "7:CHATBOT"
+            )
+
+    def test_empty_apply_skips_backend_cli(self):
+        serving = Mock()
+        result = ModelTargets(serving).apply(SELECTION, [], "a" * 64)
+        self.assertEqual(result, {"applied": [], "skipped": []})
+        serving.command.assert_not_called()
 
     def test_apply_transmits_reviewed_snapshot_and_only_explicit_targets(self):
         serving = Mock()

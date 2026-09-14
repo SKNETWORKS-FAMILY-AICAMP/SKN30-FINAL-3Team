@@ -2,6 +2,9 @@ target_account_id            = "000000000000"
 expires_at                   = "2026-09-23"
 pipeline_operator_user_names = ["example-infra-user"]
 
+# 초기 기동처럼 Alarm 전이가 많을 수 있는 작업에서만 false로 두며, Alarm·metric·로그는 유지한다.
+alarm_discord_notifications_enabled = true
+
 # 계정 생성 전에는 null을 유지해 Backend 개발 세션 경로와 Frontend 버튼을 모두 닫는다.
 development_auth = null
 

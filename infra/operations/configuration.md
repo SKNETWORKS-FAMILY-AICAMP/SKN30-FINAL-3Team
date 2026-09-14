@@ -21,7 +21,7 @@ Backend·AI의 dev/test/prod는 dotenv를 읽지 않는다. F3 opt-in도 같은 
 | GHCR 읽기 credential | AWS `runpod/ghcr-registry`, RunPod Console registry | AWS GPU 호스트와 RunPod가 각자 사용; 앱에 주입하지 않음 |
 | DB runtime credential | AWS `backend/runtime-database-url` | 구조화 JSON → API/Worker `DB_URL` |
 | DB migration | 개인/Instance Role IAM 인증 | migration 전용 `DB_MIGRATION_URL`; 빈 호환 Secret은 정상 |
-| Discord webhook | delivery / observability 전용 AWS Secret | 각각의 Lambda만 사용 |
+| Discord webhook | delivery / observability 전용 AWS Secret | 각각의 Lambda만 사용. CloudWatch Alarm 전달만 잠시 끌 때는 dev Terraform 입력 `alarm_discord_notifications_enabled=false`로 SNS→Lambda 구독만 제거하며 Alarm·metric·로그·Secret은 유지 |
 | F2/general endpoint | 운영자가 갱신하는 SSM endpoint 문서 | API/Worker 환경파일 재생성; Terraform은 값 덮어쓰기 제외 |
 | 이미지·Template·registry 등록 | 작업별 SSM control 문서 | 최초 `runpod-register*`; 이후 통합 시작 계획이 기존 Template 차이를 반영·검증·재등록. 기동 성공과 구분 |
 | 선택 cloud·GPU·모델·release·이미지 | SSM `serving/SELECTION` v2 | `ai-select` 명시 저장; 선택 ID·변경자·시각, 자동 모델 선택 없음 |

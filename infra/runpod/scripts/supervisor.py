@@ -185,6 +185,10 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         str(config.sllm_max_model_len),
         "--gpu-memory-utilization",
         str(config.sllm_gpu_memory_utilization),
+        # vLLM 0.11 V1 reads this from engine config, not per-request params.
+        # Unbounded JSON whitespace can exhaust F2 max_tokens before the closing brace.
+        "--structured-outputs-config",
+        json.dumps({"backend": "xgrammar", "disable_any_whitespace": True}),
         "--chat-template",
         str(SLLM_CHAT_TEMPLATE),
     ]
@@ -243,6 +247,14 @@ def _proxy_environment(
     result["F2_PROXY_API_KEY"] = api_key
     result["F2_SERVING_IDENTITY"] = json.dumps(identity or {})
     return result
+
+
+def _stt_identity(environment: dict[str, str], config: RuntimeConfig) -> dict[str, str]:
+    """Keep the logical model ID when inference reads a local snapshot path."""
+    return {
+        "model": environment.get("F2_STT_MODEL_ID", ""),
+        "revision": config.stt_model_revision,
+    }
 
 
 def _start(command: list[str], environment: dict[str, str]) -> subprocess.Popen[bytes]:
@@ -357,7 +369,7 @@ def run() -> int:
             _proxy_environment(
                 environment,
                 config.stt_api_key,
-                {"model": config.stt_model_id, "revision": config.stt_model_revision},
+                _stt_identity(environment, config),
             ),
         )
         _wait_for_model(

@@ -50,7 +50,8 @@ from brokerage_ai.f3.judgment_validation import (
 from brokerage_ai.providers.ports import LlmProvider
 from brokerage_ai.providers.repair import generate_with_repair
 
-BROKERAGE_JUDGMENT_WORKFLOW_VERSION = "brokerage-judgment-workflow:v1"
+BROKERAGE_JUDGMENT_WORKFLOW_VERSION = "brokerage-judgment-workflow:v2"
+BROKERAGE_JUDGMENT_MAX_OUTPUT_TOKENS = 2048
 
 # 같은 카드 집합에서 같은 등급·기각이 나와야 재현성이 성립한다 (F3-NF-08).
 BROKERAGE_JUDGMENT_TEMPERATURE = 0.0
@@ -96,6 +97,9 @@ class LlmBrokerageJudgmentGenerator:
             route=self._route,
             messages=build_brokerage_judgment_messages(request),
             temperature=BROKERAGE_JUDGMENT_TEMPERATURE,
+            # 최대 후보 5건 파일럿의 관측 최대 1,468 tokens에 약 40% 여유를 둔다.
+            # 정상 출력을 줄이는 수단이 아니라 비정상 장문을 중단시키는 tail guard다.
+            max_output_tokens=BROKERAGE_JUDGMENT_MAX_OUTPUT_TOKENS,
         )
 
         def finalize(

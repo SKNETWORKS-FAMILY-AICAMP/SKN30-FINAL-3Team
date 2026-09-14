@@ -37,6 +37,29 @@ class ObservabilityContractTests(unittest.TestCase):
             ],
         )
 
+    def test_alarm_discord_delivery_can_be_muted_without_removing_alarms(self) -> None:
+        variables = read("infra/environments/dev/variables.tf")
+        observability = read("infra/environments/dev/observability.tf")
+        variable = section(
+            variables,
+            'variable "alarm_discord_notifications_enabled"',
+            'variable "development_auth"',
+        )
+        subscription = section(
+            observability,
+            'resource "aws_sns_topic_subscription" "cloudwatch_alarm_notifier"',
+            'resource "aws_cloudwatch_log_metric_filter" "backend_unhandled_error"',
+        )
+
+        self.assertIn("type        = bool", variable)
+        self.assertIn("default     = true", variable)
+        self.assertIn(
+            "count = var.alarm_discord_notifications_enabled ? 1 : 0",
+            subscription,
+        )
+        self.assertIn("topic_arn = aws_sns_topic.cloudwatch_alarms.arn", subscription)
+        self.assertIn('resource "aws_cloudwatch_metric_alarm"', observability)
+
     def test_alarm_webhook_is_an_external_value_container(self) -> None:
         observability = read("infra/environments/dev/observability.tf")
 

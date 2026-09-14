@@ -1,6 +1,6 @@
 ---
 status: 결정
-updated: 2026-08-18
+updated: 2026-09-11
 ---
 
 # Infra reference 인덱스
@@ -10,6 +10,7 @@ updated: 2026-08-18
 | 문서 | 읽는 조건 |
 |---|---|
 | [개발자 운영](../../../../infra/operations/README.md) | 설정·상태 점검, 최초 배포와 사용자 기동 검증 명령을 찾을 때 |
+| [dev 기능 설정 재적용](../../../../infra/operations/dev-feature-configuration-2026-09-10.md) | 최신 dev 배포 후 챗봇 활성화·DB 모델·API 연결과 추가 설정 누락 감사 범위를 확인할 때 |
 | [설정 관리 위치](../../../../infra/operations/configuration.md) | 환경변수·Secret의 이름·소유자·주입 경로를 확인할 때 |
 | [F2 모델 목록](../../../../infra/runpod/releases.json) | 기존 dev 모델과 신규 consultation-v3를 구분·선택할 때 |
 | [resource-inventory.md](resource-inventory.md) | 아키텍처에 필요한 AWS·RunPod 자원과 도입 상태를 확인할 때 |
@@ -21,6 +22,9 @@ updated: 2026-08-18
 | [aws-account-bootstrap.md](aws-account-bootstrap.md) | AWS 계정 인증, state bootstrap, 비용·IAM 기본 설정을 다룰 때 |
 | [decisions/index.md](decisions/index.md) | Infra 내부 구조나 운영 방식을 변경하기 전에 승인 결정을 확인할 때 |
 | [open-questions.md](open-questions.md) | 아직 승인되지 않은 배포·보안·운영 선택에 의존할 때 |
+| [F2 공백 반복 검증](../../../../infra/serving/f2-whitespace-validation-2026-09-10.md) | F2 503·출력 길이 종료의 로컬 재현과 서버 설정 변경 근거를 확인할 때 |
+| [서빙 이미지 게시·적용 검증](../../../../infra/serving/image-rollout-validation-2026-09-10.md) | 2026-09-10 새 F2/general digest와 CI 수정, 공유 선택 적용 및 실제 기동 검증 범위를 확인할 때 |
+| [AWS GPU 공유 dev 기동 검증](../../../../infra/serving/aws-shared-dev-validation-2026-09-11.md) | F2/general AWS 전환, 캐시 재사용, F3 재개와 실제 `dev-start`·`dev-verify` 결과를 확인할 때 |
 | [Qwen JSON 기록](../../../../infra/serving/qwen-records.md) | 평가·이미지 JSON 선행 반영과 후속 #107의 구현 경계를 확인할 때 |
 | [AWS·RunPod LLM 운영](../../../../infra/serving/README.md) | f2/general 등록, local 연결, 전환, GPU 캐시·전원과 실제 검증을 수행할 때 |
 

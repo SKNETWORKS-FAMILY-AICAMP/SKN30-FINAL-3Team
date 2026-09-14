@@ -323,17 +323,22 @@ async def generate_and_store_candidate_cards(
             failed(candidate_ordinal, error)
             raise
 
-    # 2단계. cache miss 만 **동시에** 부른다. vLLM 은 continuous batching 이라 동시 요청을
-    # 거의 공짜로 처리하는데, 한 장씩 부르면 GPU 를 한 번에 하나씩만 쓴다. 후보 5장 기준
-    # 순차 85초가 동시 20초로 줄어드는 것을 실측했다. 후보 수는 선별 단계가 5건으로 제한한다.
-    #
-    # transaction 은 준비 단계에서 이미 닫혔다. 이 구간은 DB 를 건드리지 않는다.
+    # 2단계. cache miss만 병렬 생성한다. 모델 대기 중 transaction은 없다.
+    # 현재 Provider의 실제 병렬 경과 시간은 f3_timing으로 측정한다.
     produced: dict[int, PositionCardGenerationResult] = {}
     misses = [
         (index, prepared.request)
         for index, (_, _, prepared) in enumerate(prepared_cards)
         if prepared.request is not None
     ]
+    logger.info(
+        "f3_card_cache",
+        run_id=run_id,
+        attempt=attempt_count,
+        candidate_count=len(prepared_cards),
+        cache_misses=len(misses),
+        cache_hits=len(prepared_cards) - len(misses),
+    )
     if misses:
         outcomes = await asyncio.gather(
             *(binding.generator.generate_position_card(request) for _, request in misses),

@@ -161,6 +161,7 @@ export function AppShell() {
   const [detailRow, setDetailRow] = useState(null);
   const [f2FocusRequest, setF2FocusRequest] = useState(0);
   const [crossMatchOpen, setCrossMatchOpen] = useState(false);
+  const crossMatchReturnFocusRef = useRef(null);
   /** 교차 판정 패널로 스크롤·포커스를 옮겨도 되는 시점. 사용자가 직접 열었을 때만 올린다. */
   const [crossMatchFocusRequest, setCrossMatchFocusRequest] = useState(0);
   const [viewState, setViewState] = useState("normal");
@@ -610,15 +611,28 @@ export function AppShell() {
     window.requestAnimationFrame(() => target?.focus());
   };
   const openCrossMatch = () => {
+    crossMatchReturnFocusRef.current = document.activeElement;
     setCrossMatchOpen(true);
     setCrossMatchFocusRequest((current) => current + 1);
+  };
+
+  const closeCrossMatch = () => {
+    const trigger = crossMatchReturnFocusRef.current;
+    setCrossMatchOpen(false);
+    window.requestAnimationFrame(() => {
+      // The section opener is removed while F3 is open and recreated on close.
+      const target = trigger?.isConnected
+        ? trigger
+        : trigger?.id ? document.getElementById(trigger.id) : null;
+      target?.focus();
+    });
   };
 
   /* 앵커 도출과 실행 확보는 타입 검사를 받는 `CrossMatchSection`이 소유한다. */
   const crossMatchPanel = <CrossMatchSection
     isOpen={crossMatchOpen}
     focusRequest={crossMatchFocusRequest}
-    onClose={() => setCrossMatchOpen(false)}
+    onClose={closeCrossMatch}
     row={detailRow}
     parentContext={isBuyerDetail ? "buyer-detail" : "unit-detail"}
     /* 후보 표시 이름은 판정 응답에 없다. 이미 불러온 반대편 장부에서 찾는다. */

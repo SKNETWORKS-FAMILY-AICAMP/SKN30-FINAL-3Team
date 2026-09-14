@@ -2,13 +2,14 @@
 
 공유 dev의 설정은 `ai-select`, 실행은 `dev-*`, 새 앱 배포는 `app-deploy`로 관리한다.
 모든 명령은 `infra/`에서 실행한다. 루트에서는 `just -f infra/justfile <명령>`을 사용한다.
-이번 통합은 코드·자동 검사 범위이며 **클라우드 적용, 새 이미지 게시와 실제 기동·추론은 사용자가 수행한다.**
-과거 후보 검증을 새 이미지·release의 검증 완료로 간주하지 않는다.
-
-**현재 catalog에 고정된 F2 `ca2cfefb…`와 general `801473c8…` 이미지는 새 identity/VRAM
-계측 코드보다 이전 이미지다. 이 이미지 그대로는 강화된 `dev-verify`에서 계측 누락으로 실패한다.**
-아래 최초 배포 2단계의 이미지 게시·artifact 검토·Git catalog 변경 후, 완전히 정지된 상태에서
-`ai-select`로 새 digest를 저장해야 한다. 이번 구현에서는 이미지 게시를 실행하지 않았다.
+새 이미지 게시·선택 저장과 실제 기동·추론의 검증 상태는
+[2026-09-10 이미지 적용 기록](../serving/image-rollout-validation-2026-09-10.md)에서 구분한다.
+해당 작업은 F2 공백 제한과 identity/VRAM 계측을 포함한 두 이미지를 게시하고 정지 상태에서
+새 digest를 공유 선택에 저장하고 공식 `dev-start`·`dev-verify`를 통과했다.
+identity 일치·VRAM 관측 결과와 RunPod REST의 GPU 식별 제한·별도 GraphQL 보완 확인은 적용 기록에 있다.
+과거 후보 검증이나 게시 성공을 새 이미지·release의 기동 검증 완료로 간주하지 않는다.
+최신 앱 배포 후 기능 flag·DB 모델·API 연결을 함께 확인한 범위는
+[dev 기능 설정 재적용 기록](dev-feature-configuration-2026-09-10.md)을 참고한다.
 
 새 checkout에는 개인 `.env`, Terraform 입력과 모델 파일이 복제되지 않는다.
 `infra/.env.example`에서 `infra/.env`를 준비하고 계정 ID를 넣은 뒤
@@ -104,7 +105,9 @@ DB 대상은 GPU 기동 전 RDS·maintenance 호스트에서 조회한다. 허�
 `POSITION_CARD`, `BROKERAGE_JUDGMENT`, `CHATBOT`이다. 명시하지 않은 대상과 업무 데이터·기존
 run snapshot은 보존한다. 같은 모델이면 버전을 추가하지 않으며 클라우드만 바뀌어도 DB 이력은 유지한다.
 
-대기·진행 요청이 있거나 선택하지 않은 비호환 활성 모델이 남으면 앱 기동을 차단한다.
+대기·진행 요청이 있어도 현재 활성 모델이 선택과 모두 호환되고 DB 변경 대상을 비워 두면 같은
+모델·endpoint로 Worker를 다시 시작해 영속 실행을 재개한다. DB 변경 대상을 하나라도 선택한 경우에는
+대기·진행 요청을 먼저 정리해야 한다. 선택하지 않은 비호환 활성 모델은 항상 앱 기동을 차단한다.
 대상을 추가해 다시 확인하거나 이전 모델을 선택한다. 확인한 DB snapshot이 바뀌면 다시 조회·확인한다.
 준비 중인 DB 변경은 Backend CLI의 단일 트랜잭션으로 적용하며 Infra가 직접 SQL을 쓰지 않는다.
 
@@ -123,6 +126,11 @@ run snapshot은 보존한다. 같은 모델이면 버전을 추가하지 않으�
 기록하지 않는다. DB 반영 후 후속 앱 검증이 실패해도 이전 버전을 삭제하거나 자동 되돌리지 않는다.
 
 ## 비용·deep 종료·검증 기록
+
+초기 기동처럼 Alarm 전이가 많이 발생할 수 있는 작업에서는 dev Terraform 입력
+`alarm_discord_notifications_enabled=false`를 별도 plan으로 먼저 적용해 CloudWatch Alarm의
+SNS→Discord Lambda 구독만 잠시 제거할 수 있다. Alarm·metric·로그와 전용 Secret은 유지된다.
+다시 알림을 받을 때는 값을 `true`로 되돌려 별도 plan/apply와 후속 drift를 확인한다.
 
 현재 공급자 견적을 확인해 `--hourly-usd f2=RATE --hourly-usd general=RATE --hours 2`로 전달한다.
 RATE는 USD/시간의 양수이며 생략하면 TTY에서 작업별 현재 견적을 묻고 계산 결과를 다시 보여준다.
