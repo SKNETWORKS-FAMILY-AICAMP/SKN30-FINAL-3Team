@@ -3,15 +3,28 @@
 ZIPKEKE(Propeller AI) 제품 소개용 정적 랜딩 페이지와 그 생성 자료를 둔다.
 제품 애플리케이션이 아니다. 실제 서비스 UI는 [frontend/](../frontend/)에 있다.
 
-> **범위 주의** — 이 폴더는 [AGENTS.md](../AGENTS.md)가 정의한 루트 모듈(`frontend/` `backend/` `ai/` `data/` `infra/`)에 속하지 않는 대외 홍보용 자료다. 제품 코드나 빌드 파이프라인에 연결되어 있지 않으며, 여기의 문구는 승인된 요구사항이 아니다.
+> **범위 주의** — 이 폴더는 [AGENTS.md](../AGENTS.md)가 정의한 루트 모듈(`frontend/` `backend/` `ai/` `data/` `infra/`)에 속하지 않는 대외 홍보용 자료다. 제품 코드나 제품 빌드 파이프라인에 연결되어 있지 않으며, 여기의 문구는 승인된 요구사항이 아니다.
 
 ## 구성
 
 | 경로 | 내용 |
 |---|---|
-| [index.html](index.html) | 현재 랜딩 페이지. Tailwind CDN 기반 단일 HTML. 빌드 없이 브라우저에서 바로 연다 |
+| [main.html](main.html) | 현재 랜딩 페이지. 배포 시 루트 진입점인 `index.html`로도 복사한다 |
+| [how-it-works.html](how-it-works.html) | 음성메모 입력과 멀티 에이전트 교차 판정 흐름을 설명하는 페이지 |
+| [contact-us.html](contact-us.html) | 핵심 팀 소개와 GitHub·이메일 연락처를 제공하는 Contact Us 페이지 |
 | [prompts/how-it-works.md](prompts/how-it-works.md) | 상단 내비게이션 `How it works` 페이지를 UI 생성 AI로 만들기 위한 프롬프트 |
 | [assets/](assets/) | 집크크 로고와 에이전트 아이콘. 아래 표 참고 |
+
+## GitHub Pages 배포
+
+[GitHub Pages 워크플로](../.github/workflows/deploy-site-pages.yml)가 `main` 브랜치의 `site/`를 정적 사이트로 배포한다. 별도 빌드나 배포용 브랜치는 만들지 않는다.
+
+- 예상 주소: `https://sknetworks-family-aicamp.github.io/SKN30-FINAL-3Team/`
+- 자동 배포: `main`에서 `site/**` 또는 워크플로 파일이 바뀔 때
+- 수동 배포: GitHub의 **Actions → Deploy introduction site to GitHub Pages → Run workflow**에서 `main`을 선택할 때
+- 최초 설정: 저장소 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 선택한다.
+
+배포 artifact에는 `site/`만 들어가므로 제품 앱과 내부 문서는 공개 사이트에 포함되지 않는다. GitHub Pages 배포 권한은 워크플로의 `pages: write`와 `id-token: write`로 제한한다.
 
 ## 로고
 
@@ -39,14 +52,13 @@ ZIPKEKE(Propeller AI) 제품 소개용 정적 랜딩 페이지와 그 생성 자
 
 Property·Customer 아이콘의 원본은 1254px·1296px에 합계 1.5MB였다. 80px 자리에 쓰기에 과해서 긴 변 256px로 축소해 넣었다(각 42KB·31KB). 더 큰 크기가 필요하면 원본을 다시 받아 축소 배율만 바꾼다.
 
-## How it works 페이지 만드는 순서
+## 페이지와 연락처 관리
 
-1. [prompts/how-it-works.md](prompts/how-it-works.md)의 `## 프롬프트 본문` 이후 전체를 복사한다.
-2. UI 생성 AI(v0, Stitch, Figma Make, Claude Artifacts 등)에 붙여넣어 단일 HTML을 받는다.
-3. 결과를 `site/how-it-works.html`로 저장한다.
-4. [index.html](index.html)의 내비게이션에서 `How it works` 링크 `href`를 `#`에서 `how-it-works.html`로 바꾼다.
-   같은 링크의 클래스를 활성 상태(`text-secondary` + `font-bold` + `border-b-2 border-secondary`)로 옮기는 작업은 새 페이지 쪽에서 한다.
-5. 아래 점검 항목을 확인하고 커밋한다.
+- 공개 원본 페이지는 [main.html](main.html), [how-it-works.html](how-it-works.html), [contact-us.html](contact-us.html) 세 개다.
+- 세 페이지의 내비게이션은 `Features`, `How it works`, `Contact Us`만 제공한다.
+- 상단 내비게이션의 `Contact Us`는 별도 [contact-us.html](contact-us.html) 페이지로 이동한다. 기존 페이지 푸터의 연락처 목록은 유지한다.
+- 팀원별 공개 이름과 GitHub URL 또는 이메일은 [contact-us.html](contact-us.html)과 기존 페이지 푸터에서 관리한다. 저장소에서 확인되는 커밋 이메일을 동의 없이 공개 연락처로 사용하지 않는다.
+- [prompts/how-it-works.md](prompts/how-it-works.md)는 페이지를 다시 생성하거나 디자인 대안을 만들 때 참고하는 생성 자료다.
 
 ## 문구 점검 기준
 
@@ -57,12 +69,3 @@ Property·Customer 아이콘의 원본은 1254px·1296px에 합계 1.5MB였다. 
 - 판정 실행 시점을 정확히 쓴다. 저장은 포지션 카드까지만 만들고, 후보 조회와 판정은 `[교차 판정]` 버튼이 시작한다 ([F3 교차 판정](../docs/requirements/f3/cross-judgment.md) F3-CR-01~04).
 - 정기 배치나 자동 발송이 있는 것처럼 쓰지 않는다. F3는 사용자 행동에만 반응한다 (F3-CM-01).
 - 실제 개인 이름·연락처·주소를 예시로 넣지 않는다.
-
-## 알려진 정리 대상
-
-현재 [index.html](index.html)에 남아 있는 항목이며, 아직 손대지 않았다.
-
-- `이동 중에도 접근` 카드의 "모바일과 데스크톱 실시간 동기화" 문구는 요구사항 문서에 근거가 없다.
-- `등록 매물 128건` `등록 고객 84명`은 예시값인데 실적처럼 읽힌다.
-- 기능 카드 1의 삽화 1개가 아직 `lh3.googleusercontent.com` 외부 URL을 참조한다. 생성형 도구가 발급한 임시 URL이라 만료되면 페이지가 깨진다. 로고와 아이콘은 저장소 파일로 옮겼고, 이 삽화도 같은 방식으로 옮기는 편이 안전하다.
-- 그 삽화는 생성형 도구가 만든 가상의 제품 화면이라 한글이 뭉개져 있고 화면 안 수치도 실제 값이 아니다. 실제 화면 캡처나 추상화된 삽화로 교체가 필요하다.

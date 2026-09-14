@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="집크크의 음성메모 입력과 멀티 에이전트 교차 판정 흐름을 소개합니다.">
+  <title>How it works | ZIPKEKE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#0b1c30',
+            muted: '#526276',
+            brand: '#0051d5',
+            mint: '#4edea3',
+            canvas: '#f8f9ff',
+            panel: '#eff4ff',
+            line: '#c6d4e8',
+            background: '#f8f9ff',
+            secondary: '#0051d5',
+            'secondary-fixed': '#dbe1ff',
+            'on-surface-variant': '#45464d',
+            'inverse-on-surface': '#eaf1ff',
+            'outline-variant': '#c6c6cd'
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+            'label-md': ['JetBrains Mono']
+          },
+          spacing: {
+            xs: '8px',
+            gutter: '24px',
+            'margin-mobile': '16px',
+            'margin-desktop': '40px'
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="min-h-screen bg-canvas font-sans text-ink antialiased">
+  <header class="fixed inset-x-0 top-0 z-50 border-b border-outline-variant/30 bg-background/80 backdrop-blur-md">
+    <div class="relative mx-auto flex h-20 max-w-7xl items-center justify-between px-margin-mobile md:px-margin-desktop">
+      <a href="main.html" aria-label="메인 페이지로 이동"><img src="assets/logo-header-transparent.png" alt="집크크" class="h-12 w-auto object-contain md:h-14"></a>
+      <nav aria-label="주요 메뉴" class="flex items-center gap-xs md:absolute md:left-1/2 md:-translate-x-1/2 md:gap-gutter">
+        <a href="main.html" class="font-label-md text-xs text-on-surface-variant transition-colors hover:text-secondary md:text-sm">Features</a>
+        <a href="how-it-works.html" aria-current="page" class="border-b-2 border-secondary font-label-md text-xs font-bold text-secondary transition-opacity hover:opacity-90 md:text-sm">How it works</a>
+        <a href="contact-us.html" class="font-label-md text-xs text-on-surface-variant transition-colors hover:text-secondary md:text-sm">Contact Us</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="pt-20">
+    <section class="overflow-hidden bg-gradient-to-b from-panel to-canvas px-4 py-20 md:px-10 md:py-28">
+      <div class="mx-auto max-w-5xl text-center">
+        <p class="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-brand">How it works</p>
+        <h1 class="text-4xl font-bold tracking-tight md:text-6xl">기록은 가볍게,<br class="md:hidden"> 판단은 근거 있게</h1>
+        <p class="mx-auto mt-6 max-w-3xl text-base leading-8 text-muted md:text-lg">
+          집크크는 상담 후 남긴 음성메모를 장부 입력 제안으로 바꾸고,
+          사용자가 저장한 장부와 상담 로그를 바탕으로 매물과 손님의 중개 가능성을 검토합니다.
+        </p>
+      </div>
+    </section>
+
+    <section aria-labelledby="record-flow" class="mx-auto max-w-7xl px-4 py-16 md:px-10 md:py-24">
+      <div class="mb-10 max-w-3xl">
+        <p class="mb-2 text-sm font-bold uppercase tracking-[0.15em] text-brand">01 · 상담 기록</p>
+        <h2 id="record-flow" class="text-3xl font-bold tracking-tight md:text-4xl">음성메모에서 장부 저장까지</h2>
+        <p class="mt-4 leading-7 text-muted">AI가 제안하고 사용자가 확인합니다. 검토와 승인 전에는 확정 장부에 자동 저장하지 않습니다.</p>
+      </div>
+
+      <ol class="grid gap-5 md:grid-cols-3">
+        <li class="rounded-2xl border border-line bg-white p-6 shadow-sm">
+          <span class="mb-5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">1</span>
+          <h3 class="text-xl font-bold">음성메모 업로드</h3>
+          <p class="mt-3 leading-7 text-muted">장부의 상세 화면에서 상담 후 작성한 음성 파일을 선택합니다.</p>
+        </li>
+        <li class="rounded-2xl border border-line bg-white p-6 shadow-sm">
+          <span class="mb-5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">2</span>
+          <h3 class="text-xl font-bold">전사와 정보 제안</h3>
+          <p class="mt-3 leading-7 text-muted">STT가 음성을 텍스트로 바꾸고, AI가 빈 장부 필드와 상담 로그 초안을 제안합니다.</p>
+        </li>
+        <li class="rounded-2xl border border-line bg-white p-6 shadow-sm">
+          <span class="mb-5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">3</span>
+          <h3 class="text-xl font-bold">검토 후 저장</h3>
+          <p class="mt-3 leading-7 text-muted">사용자가 제안값을 선택·수정하고 최종 확인한 내용만 장부와 상담 로그에 저장합니다.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="judgment-flow" class="bg-ink px-4 py-16 text-white md:px-10 md:py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-12 max-w-3xl">
+          <p class="mb-2 text-sm font-bold uppercase tracking-[0.15em] text-mint">02 · 교차 판정</p>
+          <h2 id="judgment-flow" class="text-3xl font-bold tracking-tight md:text-4xl">서로 다른 관점을 모아 중개 가능성을 판단</h2>
+          <p class="mt-4 leading-7 text-slate-300">저장 시에는 대상의 포지션 카드까지만 준비합니다. 후보 조회와 판정은 사용자가 교차 판정 버튼을 눌렀을 때 시작합니다.</p>
+        </div>
+
+        <div class="grid gap-5 md:grid-cols-3">
+          <article class="rounded-2xl border border-white/15 bg-white/5 p-6">
+            <img src="assets/icon-property-agent-how-it-works.png" alt="" class="mb-5 h-16 w-16 object-contain">
+            <h3 class="text-xl font-bold">Property Agent</h3>
+            <p class="mt-3 leading-7 text-slate-300">매물의 구조화 정보와 상담 맥락을 읽고 가격·조건·조정 가능성을 정리합니다.</p>
+          </article>
+          <article class="rounded-2xl border border-mint/50 bg-white/10 p-6 shadow-[0_0_32px_rgba(78,222,163,0.12)]">
+            <img src="assets/icon-customer-agent.png" alt="" class="mb-5 h-16 w-16 object-contain">
+            <h3 class="text-xl font-bold">Customer Agent</h3>
+            <p class="mt-3 leading-7 text-slate-300">손님의 예산과 희망 조건, 상담 로그에 담긴 우선순위와 제약을 정리합니다.</p>
+          </article>
+          <article class="rounded-2xl border border-white/15 bg-white/5 p-6">
+            <img src="assets/icon-matching-agent.png" alt="" class="mb-5 h-16 w-16 object-contain">
+            <h3 class="text-xl font-bold">Matching Agent</h3>
+            <p class="mt-3 leading-7 text-slate-300">양측 관점과 결정적으로 추린 후보를 비교해 등급, 근거, 걸림돌과 양보 지점을 제안합니다.</p>
+          </article>
+        </div>
+
+        <div class="mt-8 rounded-2xl border border-white/15 bg-white/5 p-6 md:flex md:items-center md:justify-between md:gap-8">
+          <div>
+            <p class="text-sm font-bold text-mint">사용자 주도 실행</p>
+            <p class="mt-2 max-w-3xl leading-7 text-slate-300">장부 저장만으로 후보 판정을 자동 실행하지 않습니다. 사용자가 결과를 확인하려는 시점에 직접 실행하고, 각 판단의 근거를 함께 검토합니다.</p>
+          </div>
+          <a href="main.html" class="mt-5 inline-flex shrink-0 rounded-lg bg-mint px-5 py-3 font-bold text-ink transition-opacity hover:opacity-90 md:mt-0">주요 기능으로 돌아가기</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="contact" class="scroll-mt-24 bg-[#131b2e] px-4 py-12 text-white md:px-10">
+    <div class="mx-auto grid max-w-7xl gap-8 md:grid-cols-2">
+      <div>
+        <img src="assets/logo-footer.png" alt="집크크" class="mb-4 h-12 w-auto object-contain">
+        <p class="text-sm text-slate-400">© 2026 ZIPKEKE. All rights reserved.</p>
+      </div>
+      <div>
+        <h2 class="mb-3 text-sm font-bold">Contact Us</h2>
+        <ul class="grid grid-cols-2 gap-2 text-sm text-slate-300">
+          <li><a href="https://github.com/Hong1008" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@Hong1008</a></li>
+          <li><a href="https://github.com/SJ-log" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@SJ-log</a></li>
+          <li><a href="https://github.com/taesik002288" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@taesik002288</a></li>
+          <li><a href="https://github.com/dosupdebongu" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@dosupdebongu</a></li>
+          <li class="col-span-2 mt-1"><a href="https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">Project Repository</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

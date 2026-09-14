@@ -1,7 +1,7 @@
 <!DOCTYPE html><html class="light" lang="ko" style=""><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
-<title>Propeller AI - 부동산 AI 비서</title>
+<title>부동산 AI 비서</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
@@ -120,25 +120,20 @@
 <body class="bg-background text-on-background font-body-md min-h-screen flex flex-col" data-mode="connect">
 <!-- TopNavBar -->
 <nav class="bg-background/80 dark:bg-background/80 backdrop-blur-md fixed top-0 w-full z-50 border-b border-outline-variant/30 dark:border-outline/20">
-<div class="flex justify-between items-center h-20 px-margin-desktop max-w-7xl mx-auto">
-<div class="font-display text-headline-md text-on-background dark:text-inverse-on-surface tracking-tight"><img src="assets/logo-header.png" alt="집크크 로고" class="h-14 w-auto object-contain"></div>
-<div class="hidden md:flex gap-gutter items-center">
-<a class="font-label-md text-label-md text-secondary dark:text-secondary-fixed font-bold border-b-2 border-secondary hover:opacity-90 hover:scale-[0.98] transition-all" href="#">Features</a>
-<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">How it works</a>
-<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">Pricing</a>
-<a class="font-label-md text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors hover:opacity-90 hover:scale-[0.98]" href="#">Contact Us</a>
+<div class="relative flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-7xl mx-auto">
+<div class="font-display text-headline-md text-on-background dark:text-inverse-on-surface tracking-tight"><a href="main.html" aria-label="메인 페이지로 이동"><img src="assets/logo-header.png" alt="집크크" class="h-12 md:h-14 w-auto object-contain"></a></div>
+<div class="flex gap-xs md:gap-gutter items-center md:absolute md:left-1/2 md:-translate-x-1/2">
+<a aria-current="page" class="font-label-md text-xs md:text-label-md text-secondary dark:text-secondary-fixed font-bold border-b-2 border-secondary hover:opacity-90 transition-opacity" href="main.html">Features</a>
+<a class="font-label-md text-xs md:text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors" href="how-it-works.html">How it works</a>
+<a class="font-label-md text-xs md:text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors" href="contact-us.html">Contact Us</a>
 </div>
-<button class="hidden md:block bg-secondary text-on-secondary px-sm py-xs rounded-lg font-label-md hover:bg-secondary-container transition-colors">Start Free</button>
-<button class="md:hidden text-on-surface">
-<span class="material-symbols-outlined">menu</span>
-</button>
 </div>
 </nav>
 <main class="flex-grow pt-24 pb-xl">
 <!-- Hero Section -->
 <section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-24 text-center">
 <h1 class="font-display text-display text-on-background mb-sm">통화가 끝나면, 장부 정리가 시작됩니다</h1>
-<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl mx-auto mb-lg">공인중개사를 위한 가장 똑똑한 AI 상담 비서, 프로펠러 AI. 통화 기록부터 장부 저장까지 한 번에.</p>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl mx-auto mb-lg">공인중개사를 위한 AI 상담 비서, 집크크. 음성메모 분석부터 사용자 검토와 장부 저장까지 한 흐름으로 연결합니다.</p>
 <div class="flex flex-col md:flex-row justify-center items-center gap-xs md:gap-gutter mt-xl">
 <!-- Process Indicators -->
 <div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
@@ -165,7 +160,7 @@
 </div>
 </div>
 <div class="mt-lg">
-<button class="bg-gradient-to-r from-secondary to-tertiary-fixed-dim text-on-secondary px-lg py-sm rounded-lg font-label-md hover:opacity-90 transition-opacity">무료로 시작하기</button>
+<a class="inline-flex bg-gradient-to-r from-secondary to-tertiary-fixed-dim text-on-secondary px-lg py-sm rounded-lg font-label-md hover:opacity-90 transition-opacity" href="how-it-works.html">작동 방식 보기</a>
 </div>
 </section>
 <!-- Feature Bento Grid -->
@@ -175,10 +170,19 @@
 <!-- Card 1 -->
 <div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card overflow-hidden relative">
 <span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Recording</span>
-<h3 class="font-headline-md text-headline-md text-on-background mb-sm">상담 내용을 장부에 자동 기록</h3>
-<p class="font-body-md text-body-md text-on-surface-variant mb-md">통화 내용을 텍스트로 변환하고 핵심 정보를 구조화하여, 각 항목에 맞는 내용을 장부에 자동으로 입력합니다.</p>
-<div class="bg-surface-dim h-48 rounded-lg relative overflow-hidden">
-<img class="object-cover w-full h-full opacity-80 mix-blend-multiply" data-alt="A modern software interface showing a real-time audio waveform being transcribed into text on a clean, light-mode background with navy blue and bright mint green accents. The design is sleek, professional, and corporate, emphasizing information density." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1oF9DAkf5HY9ygY8ZVSVXp0EBLxA_gHLVzkcneW25N-kvUwV2nPdzvkNSXszmb-5EB5ExTI1uqBM6zwxLJ7JZNu7H5VveUOUSeHVEuJjup7O2hVuG6EaOWl-vP1_h5VPvfc2jmWBsIljQf3vZtU17HtEvr8ujIOlHE4POroYbzgRImcMzEeNH0sAOcTCNhvAU0g9S1C2sJ9T7EFj2dc65GqhmsagtwJzkFbtziyyDJOLlpbpLOp9mFQ">
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">음성메모를 장부 입력 제안으로</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">상담 후 남긴 음성 파일을 텍스트로 변환하고, 확인된 내용을 빈 장부 필드와 상담 로그 초안으로 제안합니다.</p>
+<div class="bg-surface-container h-48 rounded-lg p-sm flex flex-col justify-between border border-outline-variant/30">
+<div class="flex items-center justify-between border-b border-outline-variant/30 pb-xs">
+<span class="font-label-md text-label-md text-on-surface">음성메모 파일</span>
+<span class="font-label-sm text-label-sm text-secondary">STT 완료</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant bg-surface-container-lowest rounded p-xs">“방배동 34평형 전세 15억 이하로 보고 있어요.”</p>
+<div class="flex flex-wrap gap-xs">
+<span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-xs py-1 rounded">지역 · 방배동</span>
+<span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-xs py-1 rounded">평형 · 34평</span>
+<span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded">예산 · 15억 이하</span>
+</div>
 </div>
 </div>
 <!-- Card 2 -->
@@ -189,25 +193,25 @@
 <div class="flex flex-col gap-xs">
 <div class="bg-surface-container p-xs rounded border border-outline-variant/30 flex justify-between items-center">
 <span class="font-label-md text-label-md text-on-surface-variant">매물장</span>
-<span class="font-label-md text-label-md text-on-background">등록 매물 128건</span>
+<span class="font-label-md text-label-md text-on-background">매도·임대 정보</span>
 </div>
 <div class="bg-surface-container p-xs rounded border border-outline-variant/30 flex justify-between items-center">
 <span class="font-label-md text-label-md text-on-surface-variant">구입장</span>
-<span class="font-label-md text-label-md text-on-background">등록 고객 84명</span>
+<span class="font-label-md text-label-md text-on-background">매수·임차 조건</span>
 </div>
 </div>
 </div>
 <!-- Card 3 -->
 <div class="md:col-span-4 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card">
-<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">Mobile Sync</span>
-<h3 class="font-headline-md text-headline-md text-on-background mb-sm">어디서나 접근</h3>
-<p class="font-body-md text-body-md text-on-surface-variant">모바일과 데스크톱이 실시간으로 동기화되어 외부 현장에서도 기록을 확인할 수 있습니다.</p>
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">Human Review</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">사용자가 최종 확인</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">AI 제안은 바로 확정되지 않습니다. 제안값과 근거를 검토하고 수정한 뒤 사용자가 저장합니다.</p>
 <div class="mt-md text-center">
-<span class="material-symbols-outlined text-display text-outline-variant">devices</span>
+<span class="material-symbols-outlined text-display text-outline-variant">fact_check</span>
 </div>
 </div>
 <!-- Card 4 -->
-<div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Smart MATCHING</span><h3 class="font-headline-md text-headline-md text-on-background mb-sm">매물과 고객을 서로 맞춤 추천</h3><p class="font-body-md text-body-md text-on-surface-variant mb-md">매도 고객의 매물에는 적합한 매수 고객을, 매수 고객에게는 조건에 맞는 매물을 찾아 연결합니다.</p><div class="bg-surface-dim h-32 rounded-lg relative overflow-hidden flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-secondary mx-xs">sync_alt</span></div></div>
+<div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Smart MATCHING</span><h3 class="font-headline-md text-headline-md text-on-background mb-sm">매물과 고객의 중개 가능성 검토</h3><p class="font-body-md text-body-md text-on-surface-variant mb-md">사용자가 교차 판정을 실행하면 조건에 맞는 후보를 추리고, 양측의 장부와 상담 로그를 근거로 판정 결과를 제안합니다.</p><div class="bg-surface-dim h-32 rounded-lg relative overflow-hidden flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-secondary mx-xs">sync_alt</span></div></div>
 </div>
 </section>
 <!-- Multi-Agent Architecture -->
@@ -233,26 +237,20 @@
 </section>
 </main>
 <!-- Footer -->
-<footer class="bg-on-primary-fixed dark:bg-surface-container-lowest w-full py-xl mt-xl border-t border-outline-variant/20">
-<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter px-margin-desktop max-w-7xl mx-auto">
-<div class="col-span-1 md:col-span-2">
-<div class="font-display text-headline-md text-primary-fixed-dim dark:text-primary mb-sm"><img src="assets/logo-footer.png" alt="집크크 로고" class="h-12 w-auto object-contain mb-sm"></div>
-<p class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant mb-md">
-                    © 2026 ZIPKEKE. All rights reserved.
-                </p>
+<footer id="contact" class="scroll-mt-24 bg-[#131b2e] px-4 py-12 text-white md:px-10">
+<div class="mx-auto grid max-w-7xl gap-8 md:grid-cols-2">
+<div>
+<img src="assets/logo-footer.png" alt="집크크" class="mb-4 h-12 w-auto object-contain">
+<p class="text-sm text-slate-400">© 2026 ZIPKEKE. All rights reserved.</p>
 </div>
-<div class="col-span-1">
-<h4 class="font-label-sm text-label-sm text-on-primary dark:text-on-surface mb-sm">Legal</h4>
-<ul class="flex flex-col gap-xs">
-<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">Privacy Policy</a></li>
-<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">Terms of Service</a></li>
-</ul>
-</div>
-<div class="col-span-1">
-<h4 class="font-label-sm text-label-sm text-on-primary dark:text-on-surface mb-sm">Connect</h4>
-<ul class="flex flex-col gap-xs">
-<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">Security</a></li>
-<li class=""><a class="font-body-sm text-body-sm text-on-primary-fixed-variant dark:text-on-surface-variant hover:text-white transition-colors hover:underline hover:opacity-80" href="#">LinkedIn</a></li>
+<div>
+<h2 class="mb-3 text-sm font-bold">Contact Us</h2>
+<ul class="grid grid-cols-2 gap-2 text-sm text-slate-300">
+<li><a href="https://github.com/Hong1008" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@Hong1008</a></li>
+<li><a href="https://github.com/SJ-log" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@SJ-log</a></li>
+<li><a href="https://github.com/taesik002288" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@taesik002288</a></li>
+<li><a href="https://github.com/dosupdebongu" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@dosupdebongu</a></li>
+<li class="col-span-2 mt-1"><a href="https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">Project Repository</a></li>
 </ul>
 </div>
 </div>
