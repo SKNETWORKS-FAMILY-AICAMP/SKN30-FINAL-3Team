@@ -9,5 +9,5 @@ export { analyzeNewIntake, analyzeVoiceMemo } from "./api/f2Api.ts";
 export type { IntakeAnalysis, VoiceAnalysis, VoiceProposal } from "./api/f2Api.ts";
 export { describeF2Error, isF2Canceled } from "./api/errors.ts";
 export { appendVoiceMemoToLog, formatLogStamp, stampVoiceMemo } from "./model/consultationLog.ts";
-export { LEDGER_LABEL, routeConsultation } from "./model/consultationRouting.ts";
+export { LEDGER_LABEL } from "./model/consultationRouting.ts";
 export type { LedgerType } from "./model/consultationRouting.ts";

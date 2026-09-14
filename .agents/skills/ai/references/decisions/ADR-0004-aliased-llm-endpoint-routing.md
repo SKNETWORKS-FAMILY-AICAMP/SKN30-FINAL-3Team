@@ -5,6 +5,8 @@ updated: 2026-09-03
 
 # ADR-0004: 범용 생성 Provider는 endpoint alias로 정확히 routing한다
 
+> 환경 입력·Worker 실행 계약은 [프로젝트 ADR-0034](../../../project-wiki/references/decisions/ADR-0034-module-owned-environment.md)에서 부분 대체한다.
+
 - 상태: 부분 대체됨·코드 구현
 - 결정일: 2026-09-03
 - 상위 결정: [프로젝트 ADR-0026](../../../project-wiki/references/decisions/ADR-0026-general-ai-provider-and-model-profiles.md)

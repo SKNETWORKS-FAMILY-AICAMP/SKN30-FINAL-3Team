@@ -9,9 +9,14 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "manage_dev_powe
 SPEC = importlib.util.spec_from_file_location("manage_dev_power", SCRIPT_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load manage_dev_power.py")
-MODULE = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = MODULE
-SPEC.loader.exec_module(MODULE)
+# Reuse the shared module: replacing it during discovery splits exception classes
+# between the lifecycle helpers and their caller.
+if SPEC.name in sys.modules:
+    MODULE = sys.modules[SPEC.name]
+else:
+    MODULE = importlib.util.module_from_spec(SPEC)
+    sys.modules[SPEC.name] = MODULE
+    SPEC.loader.exec_module(MODULE)
 
 
 class ManageDevPowerTest(unittest.TestCase):

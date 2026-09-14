@@ -17,7 +17,7 @@ import { isBuyerRow, isUnsavedDraft } from "./row.ts";
  * 빈 행도 저장 상태는 "임시저장"이고 저장 실패가 남으면 sync가 달라진다.
  * 사용자가 무엇을 적었는지와 무관하므로 비교에서 제외한다.
  */
-const META_KEYS = new Set(["id", "serverId", "rowVersion", "sync", "customFields", "saveState"]);
+const META_KEYS = new Set(["id", "serverId", "rowVersion", "sync", "customFields", "saveState", "savedInteractionContent"]);
 
 /**
  * 사용자가 값을 하나도 넣지 않은 미저장 행인지.

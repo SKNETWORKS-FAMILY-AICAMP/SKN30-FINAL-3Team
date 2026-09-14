@@ -20,7 +20,6 @@ export const httpTransport: TimeKeeperTransport = {
       query: {
         within_days: query.withinDays,
         overdue_days: query.overdueDays,
-        recontact_days: query.recontactDays,
         revalidation_days: query.revalidationDays,
         per_category_limit: query.perCategoryLimit,
         limit: query.limit,

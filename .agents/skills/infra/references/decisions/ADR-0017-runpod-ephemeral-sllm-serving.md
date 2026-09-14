@@ -5,7 +5,10 @@ updated: 2026-09-03
 
 # ADR-0017: RunPod 임시 SLLM dev 서빙
 
+> 2026-09-07 부분 대체: GPU 배치·local/dev 연결·전원 범위는 [ADR-0022](ADR-0022-dual-cloud-gpu-lifecycle.md)를 따른다. 아래 내용은 기존 결정의 기록이다.
+
 - 상태: 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용
+- 후속 변경: endpoint 전환은 [ADR-0020](ADR-0020-runpod-console-registration.md)의 API 전용 refresh를 따른다.
 - 대체: [ADR-0016](ADR-0016-runpod-shared-f2-serving.md)
 - 확장: 최초 구축·비밀 회전·관측과 reconcile은 [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md)이 대체한다.
 - 확장: LoRA·base release v2, S3 cross-hash와 모델명 health는

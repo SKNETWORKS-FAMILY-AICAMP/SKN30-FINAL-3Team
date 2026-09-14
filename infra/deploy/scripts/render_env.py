@@ -13,20 +13,43 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from serving_contract import (
+    GENERAL_ALIAS,
+    GENERAL_KEY,
+    aws_base_url,
+    endpoint_urls,
+    validate_general_endpoint,
+)
+
 MIGRATION_USER = "app_migrator"
 ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 PUBLIC_NAMESPACES = frozenset({"backend", "ai"})
-IGNORED_OPERATIONAL_PARAMETER_PATHS = frozenset({"runpod/RUNPOD_CONTROL_SET"})
+IGNORED_OPERATIONAL_PARAMETER_PATHS = frozenset(
+    {
+        "runpod/RUNPOD_CONTROL_SET",
+        "runpod/GENERAL_CONTROL_SET",
+        "serving/SELECTION",
+        "serving/APPLIED",
+    }
+)
 INJECTED_NAMES = frozenset({"DB_URL", "DB_MIGRATION_URL"})
 SENSITIVE_SUFFIXES = ("_API_KEY", "_PASSWORD", "_PRIVATE_KEY", "_SECRET", "_TOKEN")
 F2_AI_PROVIDER_KEYS = (
     "AI_VLLM_SLLM_API_KEY",
     "AI_VLLM_STT_API_KEY",
 )
+F2_ENV_NAMES = frozenset(
+    {
+        "_f2_status",
+        "AI_VLLM_SLLM_BASE_URL",
+        "AI_VLLM_STT_BASE_URL",
+        *F2_AI_PROVIDER_KEYS,
+    }
+)
 F2_API_KEY = re.compile(r"^[A-Za-z0-9_-]{43,128}$")
 AI_VLLM_ENDPOINT_SET_NAME = "AI_VLLM_ENDPOINT_SET"
 AI_VLLM_BASE_URL_NAMES = frozenset(
-    {"AI_VLLM_SLLM_BASE_URL", "AI_VLLM_STT_BASE_URL", "AI_F2_PROVIDER_STATUS"}
+    {"AI_VLLM_SLLM_BASE_URL", "AI_VLLM_STT_BASE_URL", "_f2_status"}
 )
 AI_VLLM_ENDPOINT_SET_FIELDS = frozenset(
     {
@@ -135,6 +158,21 @@ def validate_runpod_base_url(value: Any, *, pod_id: str, port: int) -> str:
 
 def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
     payload = endpoint_set_json_object(raw)
+    cloud = "runpod"
+    instance_id = private_ip = None
+    if "schema_version" in payload:
+        if payload.get("schema_version") != 2 or payload.get("cloud") not in {
+            "aws",
+            "runpod",
+        }:
+            raise SystemExit("unsupported F2 endpoint schema or cloud")
+        payload = dict(payload)
+        cloud = payload.pop("cloud")
+        payload.pop("schema_version")
+        instance_id = payload.pop("instance_id", None)
+        private_ip = payload.pop("private_ip", None)
+        if cloud == "runpod" and (instance_id is not None or private_ip is not None):
+            raise SystemExit("RunPod endpoint must not contain AWS identity")
     fields = set(payload)
     if fields != AI_VLLM_ENDPOINT_SET_FIELDS:
         missing = AI_VLLM_ENDPOINT_SET_FIELDS - fields
@@ -167,6 +205,8 @@ def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
     pod_id = payload["pod_id"]
     release_id = payload["sllm_release_id"]
     if status == "offline":
+        if instance_id is not None or private_ip is not None:
+            raise SystemExit("offline endpoint must not contain AWS identity")
         if any(
             value is not None
             for value in (
@@ -179,8 +219,33 @@ def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
             raise SystemExit(
                 "offline AI vLLM endpoint set must have null Pod, release and URLs"
             )
-        return {"AI_F2_PROVIDER_STATUS": "offline"}
+        return {"_f2_status": "offline"}
 
+    if cloud == "aws":
+        if (
+            pod_id is not None
+            or not isinstance(release_id, str)
+            or not SLLM_RELEASE_ID.fullmatch(release_id)
+        ):
+            raise SystemExit("AWS endpoint requires a release and no Pod ID")
+        try:
+            return {
+                "_f2_status": "active",
+                "AI_VLLM_SLLM_BASE_URL": aws_base_url(
+                    payload["sllm_base_url"],
+                    instance_id=instance_id,
+                    private_ip=private_ip,
+                    port=8001,
+                ),
+                "AI_VLLM_STT_BASE_URL": aws_base_url(
+                    payload["stt_base_url"],
+                    instance_id=instance_id,
+                    private_ip=private_ip,
+                    port=8002,
+                ),
+            }
+        except ValueError as error:
+            raise SystemExit(str(error)) from None
     if (
         not isinstance(pod_id, str)
         or pod_id == "unconfigured"
@@ -190,7 +255,7 @@ def parse_ai_vllm_endpoint_set(raw: str) -> dict[str, str]:
     if not isinstance(release_id, str) or not SLLM_RELEASE_ID.fullmatch(release_id):
         raise SystemExit("active AI vLLM endpoint set sllm_release_id is invalid")
     return {
-        "AI_F2_PROVIDER_STATUS": "active",
+        "_f2_status": "active",
         "AI_VLLM_SLLM_BASE_URL": validate_runpod_base_url(
             payload["sllm_base_url"], pod_id=pod_id, port=8001
         ),
@@ -215,6 +280,48 @@ def expand_ai_vllm_endpoint_set(
             + ", ".join(sorted(collisions))
         )
     ai.update(parse_ai_vllm_endpoint_set(raw))
+    general_raw = ai.pop("AI_GENERAL_ENDPOINT_SET", None)
+    if general_raw is not None:
+        general = json_object(general_raw, label="general endpoint")
+        if general.get("status") not in {"active", "offline"}:
+            raise SystemExit("invalid general endpoint status")
+        if general["status"] == "active":
+            try:
+                expected_url = endpoint_urls(
+                    general.get("cloud"),
+                    general.get("resource_id"),
+                    "general",
+                    general.get("private_ip"),
+                )[0]
+            except (ValueError, TypeError):
+                raise SystemExit("invalid general deployment identity") from None
+            if general.get("base_url") != expected_url:
+                raise SystemExit(
+                    "general endpoint does not match its deployment identity"
+                )
+            entry = {
+                "alias": GENERAL_ALIAS,
+                "provider": "vllm",
+                "base_url": general.get("base_url"),
+                "api_key_env": GENERAL_KEY,
+            }
+            try:
+                validate_general_endpoint(entry)
+            except ValueError as error:
+                raise SystemExit(str(error)) from None
+            if ai.get("AI_GENERAL_PROVIDER") == "vllm":
+                if (
+                    not general.get("model_profile")
+                    or not ai.get("AI_GENERAL_MODEL")
+                    or general.get("model") != ai["AI_GENERAL_MODEL"]
+                ):
+                    raise SystemExit(
+                        "general endpoint model must match AI_GENERAL_MODEL; "
+                        "review the selected serving profile and Terraform settings"
+                    )
+                if ai.get("AI_GENERAL_BASE_URL"):
+                    raise SystemExit("general endpoint collides with explicit base URL")
+                ai["AI_GENERAL_BASE_URL"] = str(general["base_url"])
     return expanded
 
 
@@ -372,7 +479,7 @@ def build_process_environments(
         )
 
     f2_keys: dict[str, str] = {}
-    if ai.get("AI_F2_PROVIDER_STATUS") == "active":
+    if ai.get("_f2_status") == "active":
         missing = [name for name in F2_AI_PROVIDER_KEYS if name not in ai_provider_keys]
         if missing:
             raise SystemExit(
@@ -381,8 +488,37 @@ def build_process_environments(
             )
         f2_keys = {name: ai_provider_keys[name] for name in F2_AI_PROVIDER_KEYS}
 
-    api = {**backend, **ai, **f2_keys, "DB_URL": runtime_url}
-    worker = {**backend, **ai, "DB_URL": runtime_url, **ai_provider_keys}
+    general_keys = {}
+    provider = ai.get("AI_GENERAL_PROVIDER", "openai")
+    key_name = "AI_OPENAI_API_KEY" if provider == "openai" else GENERAL_KEY
+    if provider == "openai" or (
+        provider in {"vllm", "llama_cpp"} and ai.get("AI_GENERAL_BASE_URL")
+    ):
+        # Preserve the existing Secrets Manager key; normalize only at injection.
+        key = ai_provider_keys.get(key_name)
+        if key:
+            general_keys[GENERAL_KEY] = key
+        elif ai.get("AI_GENERAL_BASE_URL"):
+            raise SystemExit("active general endpoint requires a provider API key")
+    ai.pop("_f2_status", None)
+    if any(name.startswith("AI_") for name in backend) or any(
+        not name.startswith("AI_") for name in ai
+    ):
+        raise SystemExit("public configuration violates module ownership")
+    api = {**backend, **ai, **f2_keys, **general_keys, "DB_URL": runtime_url}
+    worker = {
+        name: value
+        for name, value in api.items()
+        if name not in F2_ENV_NAMES and not name.startswith(("AI_F2_", "AI_VLLM_"))
+    }
+    if backend.get("CHATBOT_ENABLED", "").strip().lower() not in {
+        "true",
+        "1",
+        "yes",
+        "on",
+    }:
+        api.pop(GENERAL_KEY, None)
+        api.pop("AI_GENERAL_BASE_URL", None)
     migration = {"DB_MIGRATION_URL": migration_url}
     return api, worker, migration
 
@@ -412,17 +548,90 @@ def write_env(path: Path, values: Mapping[str, str]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def refresh_f2_environment(
+    path: Path, endpoint_raw: str, keys: Mapping[str, str]
+) -> None:
+    """Replace only F2 settings; preserve the running release's unrelated values."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        raise SystemExit(
+            "API environment is missing; deploy Backend before F2 refresh"
+        ) from None
+    values: dict[str, str] = {}
+    for line in lines:
+        name, separator, value = line.partition("=")
+        if not separator or not ENVIRONMENT_NAME.fullmatch(name) or name in values:
+            raise SystemExit(
+                "API environment is invalid; deploy Backend before F2 refresh"
+            )
+        values[name] = value
+    endpoint = parse_ai_vllm_endpoint_set(endpoint_raw)
+    if endpoint["_f2_status"] == "active":
+        if not all(name in keys for name in F2_AI_PROVIDER_KEYS):
+            raise SystemExit("active F2 endpoint requires both API keys")
+        endpoint.update({name: keys[name] for name in F2_AI_PROVIDER_KEYS})
+    preserved = {
+        name: value for name, value in values.items() if name not in F2_ENV_NAMES
+    }
+    endpoint.pop("_f2_status", None)
+    write_env(path, {**preserved, **endpoint})
+
+
+def read_ai_keys(secret_id: str, region: str) -> dict[str, str]:
+    if not secret_has_current_version(secret_id, region):
+        return {}
+    return parse_ai_provider_keys(
+        aws(
+            "secretsmanager",
+            "get-secret-value",
+            "--secret-id",
+            secret_id,
+            "--query",
+            "SecretString",
+            "--output",
+            "text",
+            "--region",
+            region,
+        )
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--api-output", required=True, type=Path)
-    parser.add_argument("--worker-output", required=True, type=Path)
-    parser.add_argument("--migration-output", required=True, type=Path)
+    parser.add_argument("--worker-output", type=Path)
+    parser.add_argument("--migration-output", type=Path)
+    parser.add_argument("--f2-only", action="store_true")
     args = parser.parse_args()
 
     region = required_environment("AWS_REGION")
     parameter_prefix = required_environment("APP_PARAMETER_PREFIX")
-    runtime_secret_id = required_environment("BACKEND_RUNTIME_DATABASE_SECRET_ID")
     ai_secret_id = required_environment("AI_PROVIDER_SECRET_ID")
+    if args.f2_only:
+        endpoint_raw = aws(
+            "ssm",
+            "get-parameter",
+            "--name",
+            f"{parameter_prefix.rstrip('/')}/ai/AI_VLLM_ENDPOINT_SET",
+            "--query",
+            "Parameter.Value",
+            "--output",
+            "text",
+            "--region",
+            region,
+        )
+        endpoint = parse_ai_vllm_endpoint_set(endpoint_raw)
+        keys = (
+            read_ai_keys(ai_secret_id, region)
+            if endpoint["_f2_status"] == "active"
+            else {}
+        )
+        refresh_f2_environment(args.api_output, endpoint_raw, keys)
+        return
+    if args.worker_output is None or args.migration_output is None:
+        parser.error("full render requires --worker-output and --migration-output")
+    runtime_secret_id = required_environment("BACKEND_RUNTIME_DATABASE_SECRET_ID")
     ca_path = required_environment("RDS_CA_CONTAINER_FILE")
     if not ca_path.startswith("/"):
         raise SystemExit("RDS_CA_CONTAINER_FILE must be an absolute container path")
@@ -461,22 +670,7 @@ def main() -> None:
         ),
         parameter_prefix,
     )
-    ai_provider_keys: dict[str, str] = {}
-    if secret_has_current_version(ai_secret_id, region):
-        ai_provider_keys = parse_ai_provider_keys(
-            aws(
-                "secretsmanager",
-                "get-secret-value",
-                "--secret-id",
-                ai_secret_id,
-                "--query",
-                "SecretString",
-                "--output",
-                "text",
-                "--region",
-                region,
-            )
-        )
+    ai_provider_keys = read_ai_keys(ai_secret_id, region)
 
     token = aws(
         "rds",

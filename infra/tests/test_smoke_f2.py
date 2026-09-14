@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import unittest
@@ -24,6 +25,49 @@ class Headers:
 
 
 class F2SmokeTests(unittest.TestCase):
+    def test_expected_fields_match_backend_response_contract(self) -> None:
+        tree = ast.parse(
+            (REPOSITORY_ROOT / "backend/src/api/schemas/f2.py").read_text()
+        )
+        response = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "F2AnalysisResponse"
+        )
+        fields = {
+            node.target.id
+            for node in response.body
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+        }
+        self.assertEqual(smoke_f2.EXPECTED_RESPONSE_FIELDS, fields)
+
+    def test_ledger_type_accepts_contract_values_and_rejects_unknown(self) -> None:
+        for ledger_type in ("매물장", "구입장", None, "unknown", []):
+            with self.subTest(ledger_type=ledger_type):
+                analysis = {
+                    "consultation_type": "매수문의",
+                    "ledger_type": ledger_type,
+                    "ledger_mismatch": False,
+                    "proposals": [],
+                    "uncertainties": [],
+                    "consultation_log_draft": "synthetic fixture",
+                    "privacy_confirmed_at": "2026-09-01T00:00:00Z",
+                }
+                responses = [
+                    (
+                        200,
+                        Headers(["session=synthetic", "csrf=synthetic"]),
+                        json.dumps({"csrf_token": "synthetic"}).encode(),
+                    ),
+                    (200, Headers(), json.dumps(analysis).encode()),
+                ]
+                with mock.patch.object(smoke_f2, "_request", side_effect=responses):
+                    if ledger_type in (None, "매물장", "구입장"):
+                        smoke_f2.run("http://localhost:8000", FIXTURE_PATH)
+                    else:
+                        with self.assertRaises(smoke_f2.SmokeFailure):
+                            smoke_f2.run("http://localhost:8000", FIXTURE_PATH)
+
     def test_loopback_client_disables_proxies_and_redirects(self) -> None:
         handlers = smoke_f2.LOOPBACK_OPENER.handlers
 
@@ -49,6 +93,7 @@ class F2SmokeTests(unittest.TestCase):
         )
         analysis = {
             "consultation_type": "매수문의",
+            "ledger_type": "구입장",
             "ledger_mismatch": False,
             "proposals": [],
             "uncertainties": [],

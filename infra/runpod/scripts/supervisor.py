@@ -20,6 +20,7 @@ from healthcheck import check
 
 SHUTDOWN_GRACE_SECONDS = 30
 STARTUP_TIMEOUT_SECONDS = 1500
+SLLM_CHAT_TEMPLATE = Path("/tmp/f2-sllm-chat-template.jinja")
 API_KEY_PATTERN = re.compile(r"[A-Za-z0-9_-]{43,128}\Z")
 MODEL_ID_PATTERN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*\Z"
@@ -136,6 +137,27 @@ def load_config(
     )
 
 
+def prepare_chat_template(config: RuntimeConfig) -> None:
+    """Keep Qwen non-thinking mode on the pinned vLLM 0.11 CLI."""
+    if config.sllm_model_id == "/models/sllm":
+        source = Path(config.sllm_model_id, "tokenizer_config.json")
+    else:
+        from huggingface_hub import hf_hub_download
+
+        source = Path(
+            hf_hub_download(
+                repo_id=config.sllm_model_id,
+                filename="tokenizer_config.json",
+                revision=config.sllm_model_revision,
+                token=False,
+            )
+        )
+    template = json.loads(source.read_text())["chat_template"]
+    if not isinstance(template, str) or not template.strip():
+        raise ConfigurationError("pinned SLLM chat template is missing")
+    SLLM_CHAT_TEMPLATE.write_text("{% set enable_thinking = false %}" + template)
+
+
 def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str]]:
     common = [
         "--host",
@@ -163,8 +185,12 @@ def build_commands(config: RuntimeConfig, executable: str) -> dict[str, list[str
         str(config.sllm_max_model_len),
         "--gpu-memory-utilization",
         str(config.sllm_gpu_memory_utilization),
-        "--default-chat-template-kwargs",
-        '{"enable_thinking":false}',
+        # vLLM 0.11 V1 reads this from engine config, not per-request params.
+        # Unbounded JSON whitespace can exhaust F2 max_tokens before the closing brace.
+        "--structured-outputs-config",
+        json.dumps({"backend": "xgrammar", "disable_any_whitespace": True}),
+        "--chat-template",
+        str(SLLM_CHAT_TEMPLATE),
     ]
     if config.release_mode == "lora":
         if config.sllm_adapter_path is None:
@@ -214,10 +240,21 @@ def _model_environment(
     return result
 
 
-def _proxy_environment(environment: dict[str, str], api_key: str) -> dict[str, str]:
+def _proxy_environment(
+    environment: dict[str, str], api_key: str, identity: dict | None = None
+) -> dict[str, str]:
     result = _clean_environment(environment)
     result["F2_PROXY_API_KEY"] = api_key
+    result["F2_SERVING_IDENTITY"] = json.dumps(identity or {})
     return result
+
+
+def _stt_identity(environment: dict[str, str], config: RuntimeConfig) -> dict[str, str]:
+    """Keep the logical model ID when inference reads a local snapshot path."""
+    return {
+        "model": environment.get("F2_STT_MODEL_ID", ""),
+        "revision": config.stt_model_revision,
+    }
 
 
 def _start(command: list[str], environment: dict[str, str]) -> subprocess.Popen[bytes]:
@@ -296,6 +333,7 @@ def run() -> int:
     signal.signal(signal.SIGINT, lambda number, _frame: requested.append(number))
     serving: dict[str, subprocess.Popen[bytes]] = {}
     try:
+        prepare_chat_template(config)
         deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
         print(
             f"f2-serving: starting sllm release {release.release_id} and stt",
@@ -307,7 +345,16 @@ def run() -> int:
         )
         serving["sllm-proxy"] = _start(
             _proxy_command("sllm", 8001, 18001),
-            _proxy_environment(environment, config.sllm_api_key),
+            _proxy_environment(
+                environment,
+                config.sllm_api_key,
+                {
+                    "release_id": release.release_id,
+                    "model": release.base_model_id,
+                    "revision": release.base_model_revision,
+                    "artifact_sha256": environment.get("F2_SLLM_BUNDLE_SHA256"),
+                },
+            ),
         )
         # Avoid overlapping the two engines' GPU memory profiling and warmup.
         _wait_for_model(
@@ -319,7 +366,11 @@ def run() -> int:
         )
         serving["stt-proxy"] = _start(
             _proxy_command("stt", 8002, 18002),
-            _proxy_environment(environment, config.stt_api_key),
+            _proxy_environment(
+                environment,
+                config.stt_api_key,
+                _stt_identity(environment, config),
+            ),
         )
         _wait_for_model(
             serving, requested, deadline, 8002, "AI_VLLM_STT_API_KEY", "stt"
@@ -344,8 +395,10 @@ def run() -> int:
                 )
                 return process.returncode if process.returncode not in (None, 0) else 1
             time.sleep(0.25)
-    except (OSError, RuntimeError):
-        print("f2-serving startup failed; stopping container", file=sys.stderr, flush=True)
+    except (OSError, RuntimeError, ValueError, KeyError):
+        print(
+            "f2-serving startup failed; stopping container", file=sys.stderr, flush=True
+        )
         return 128 + requested[0] if requested else 1
     finally:
         _stop(list(serving.values()))

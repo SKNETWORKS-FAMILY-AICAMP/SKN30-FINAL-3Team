@@ -2,7 +2,7 @@
 
 DB 상태가 재개 지점의 정본이다. 한 번 선점한 실행은 같은 lease 아래에서 가능한 단계까지
 진행하고, 프로세스가 중단되면 다음 Worker가 저장된 상태부터 이어받는다. 별도 scheduler,
-heartbeat 또는 메모리 checkpoint를 만들지 않는다.
+메모리 checkpoint를 만들지 않는다. 모델 대기 중 lease는 별도 세션으로 갱신한다.
 """
 
 from __future__ import annotations
@@ -41,6 +41,7 @@ from domain.agent_execution.candidate_cards import (
     generate_and_store_candidate_cards,
 )
 from domain.agent_execution.candidates import AnchorCardMissingError, store_candidate_selection
+from domain.agent_execution.execution_policy import ExecutionStep, next_step
 from domain.agent_execution.judgment import (
     JudgmentAlreadyStoredError,
     JudgmentBinding,
@@ -49,13 +50,8 @@ from domain.agent_execution.judgment import (
     judge_and_store,
 )
 from domain.agent_execution.models import (
-    ANCHOR_READY_STATUS,
-    CANDIDATE_CARDS_READY_STATUS,
-    CANDIDATES_READY_STATUS,
     FAILED_TERMINAL_STATUS,
-    JUDGING_STATUS,
     LEDGER_SAVE_TRIGGER_TYPE,
-    RUNNING_STATUS,
     SUPERSEDED_FAILURE_CODE,
     SUPERSEDED_FAILURE_MESSAGE,
     SUPERSEDED_STATUS,
@@ -64,6 +60,7 @@ from domain.agent_execution.models import (
     InputVersionChangedError,
     LeaseNotHeldError,
 )
+from domain.agent_execution.timing import measure
 
 logger = structlog.get_logger()
 
@@ -149,15 +146,10 @@ def _judgment_binding(bindings: ExecutionBindings) -> JudgmentBinding | None:
 
 def failure_stage(status: str) -> FailureStage:
     """DB 상태를 사용자 데이터가 없는 집계 단계로 바꿔 돌려준다."""
-    if status == RUNNING_STATUS:
-        return FailureStage.ANCHOR_CARD
-    if status == ANCHOR_READY_STATUS:
-        return FailureStage.CANDIDATE_SELECTION
-    if status == CANDIDATES_READY_STATUS:
-        return FailureStage.CANDIDATE_CARDS
-    if status in {CANDIDATE_CARDS_READY_STATUS, JUDGING_STATUS}:
-        return FailureStage.JUDGMENT
-    return FailureStage.EXECUTION
+    step = next_step(status)
+    if step is ExecutionStep.IDLE:
+        return FailureStage.EXECUTION
+    return FailureStage(step.value)
 
 
 def failure_category(error: BaseException) -> FailureCategory:
@@ -226,8 +218,9 @@ async def _advance(
     """저장된 상태에 대응하는 application 유스케이스 하나를 실행한다."""
     run_id = run.id or 0
     attempt_count = run.attempt_count
+    step = next_step(run.status)
 
-    if run.status == RUNNING_STATUS:
+    if step is ExecutionStep.ANCHOR_CARD:
         await generate_and_store_anchor_position_card(
             session,
             run_id=run_id,
@@ -237,7 +230,7 @@ async def _advance(
         )
         return StepOutcome.ADVANCED
 
-    if run.status == ANCHOR_READY_STATUS:
+    if step is ExecutionStep.CANDIDATE_SELECTION:
         # 저장이 만든 실행은 여기까지다. 앵커 포지션 카드만 만들어 두고 후보 조회와 판정은
         # 사용자가 상세에서 요청할 때 돈다(F3-CR-01~04, ADR-0018).
         #
@@ -259,7 +252,7 @@ async def _advance(
         store_candidate_selection(session, run_id, worker_id, attempt_count)
         return StepOutcome.ADVANCED
 
-    if run.status == CANDIDATES_READY_STATUS:
+    if step is ExecutionStep.CANDIDATE_CARDS:
         await generate_and_store_candidate_cards(
             session,
             run_id=run_id,
@@ -269,7 +262,7 @@ async def _advance(
         )
         return StepOutcome.ADVANCED
 
-    if run.status in {CANDIDATE_CARDS_READY_STATUS, JUDGING_STATUS}:
+    if step is ExecutionStep.JUDGMENT:
         # JUDGING 재선점은 06번 유스케이스가 최초 바인딩과 후보 집합을 다시 검증한다.
         await judge_and_store(
             session,
@@ -342,49 +335,57 @@ def advance_run(
     worker_id: str,
     bindings: ExecutionBindings | BindingResolver,
     loop: asyncio.AbstractEventLoop,
+    renew_lease: Callable[[], bool] | None = None,
 ) -> StepOutcome:
     """한 단계를 진행하고 예외를 저장 가능한 실행 결과로 수렴시킨다."""
-    try:
-        resolved = bindings(run) if callable(bindings) else bindings
-        return loop.run_until_complete(_advance(session, run, worker_id, resolved))
-    except BaseException as error:  # noqa: BLE001 - 실행 하나의 실패를 격리하는 경계다.
-        outcome = classify(error)
-        stage = failure_stage(run.status).value
-        category = failure_category(error).value
-        location = exception_location(error)
-        logger.warning(
-            "f3_step_failed",
-            run_id=run.id,
-            status=run.status,
-            failure_stage=stage,
-            attempt=run.attempt_count,
-            outcome=outcome.value,
-            failure_category=category,
-            error_type=type(error).__name__,
-            error_location=location,
-        )
-        if outcome is StepOutcome.LEASE_LOST:
-            session.rollback()
-            return outcome
-        if outcome is StepOutcome.RETRY:
-            return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
-        if not record_failure(session, run, worker_id, outcome):
-            return StepOutcome.LEASE_LOST
-        if outcome is StepOutcome.FAILED_TERMINAL:
-            # Emit the alarm signal only after FAILED_TERMINAL was durably committed.
-            logger.error(
-                "ai_terminal_failure",
-                component="ai",
-                source="f3",
+    stage = failure_stage(run.status).value
+    with measure(stage, run_id=run.id):
+        try:
+            resolved = bindings(run) if callable(bindings) else bindings
+            operation = _advance(session, run, worker_id, resolved)
+            if renew_lease is not None:
+                from domain.agent_execution.lease import protect
+
+                return loop.run_until_complete(protect(operation, renew_lease))
+            return loop.run_until_complete(operation)
+        except BaseException as error:  # noqa: BLE001 - 실행 하나의 실패를 격리하는 경계다.
+            outcome = classify(error)
+            stage = failure_stage(run.status).value
+            category = failure_category(error).value
+            location = exception_location(error)
+            logger.warning(
+                "f3_step_failed",
                 run_id=run.id,
-                status=FAILED_TERMINAL_STATUS,
+                status=run.status,
                 failure_stage=stage,
                 attempt=run.attempt_count,
+                outcome=outcome.value,
                 failure_category=category,
                 error_type=type(error).__name__,
                 error_location=location,
             )
-        return outcome
+            if outcome is StepOutcome.LEASE_LOST:
+                session.rollback()
+                return outcome
+            if outcome is StepOutcome.RETRY:
+                return outcome if _release(session, run, worker_id) else StepOutcome.LEASE_LOST
+            if not record_failure(session, run, worker_id, outcome):
+                return StepOutcome.LEASE_LOST
+            if outcome is StepOutcome.FAILED_TERMINAL:
+                # Emit the alarm signal only after FAILED_TERMINAL was durably committed.
+                logger.error(
+                    "ai_terminal_failure",
+                    component="ai",
+                    source="f3",
+                    run_id=run.id,
+                    status=FAILED_TERMINAL_STATUS,
+                    failure_stage=stage,
+                    attempt=run.attempt_count,
+                    failure_category=category,
+                    error_type=type(error).__name__,
+                    error_location=location,
+                )
+            return outcome
 
 
 def drive_run(
@@ -394,10 +395,11 @@ def drive_run(
     bindings: ExecutionBindings | BindingResolver,
     loop: asyncio.AbstractEventLoop,
     should_stop: Callable[[], bool] | None = None,
+    renew_lease: Callable[[], bool] | None = None,
 ) -> StepOutcome:
     """같은 lease 아래에서 완료·실패·중단 지점까지 실행을 진행한다."""
     while True:
-        outcome = advance_run(session, run, worker_id, bindings, loop)
+        outcome = advance_run(session, run, worker_id, bindings, loop, renew_lease)
         if outcome is not StepOutcome.ADVANCED:
             return outcome
         if should_stop is not None and should_stop():

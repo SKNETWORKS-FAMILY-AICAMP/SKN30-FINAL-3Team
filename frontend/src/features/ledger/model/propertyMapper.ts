@@ -190,6 +190,7 @@ export function toPropertyRow(dto: PropertyUnitRowDto, assigneeName = ""): Prope
     lastContact: formatTimestampAsDate(dto.last_contact_at),
     // 목록 응답이 최신 상담 로그 1건을 함께 싣는다. 상세를 열면 같은 값으로 덮어쓴다.
     log: textOrEmpty(dto.latest_interaction_content),
+    savedInteractionContent: textOrEmpty(dto.latest_interaction_content),
     memo: textOrEmpty(dto.memo),
 
     ...partyFields(dto.parties),
@@ -264,7 +265,7 @@ export function applyServerIdentity(
 
 /** 상담 로그 최신 1건을 행에 반영한다(F1-GR-05). */
 export function applyLatestInteraction(row: PropertyRow, content: string): PropertyRow {
-  return { ...row, log: content };
+  return { ...row, log: content, savedInteractionContent: content };
 }
 
 /**

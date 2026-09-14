@@ -111,7 +111,7 @@ def test_session_and_csrf_cookie_names_must_differ() -> None:
         AUTH_CSRF_COOKIE_NAME="same-cookie",
     )
 
-    with pytest.raises(ValidationError, match="must use different names"):
+    with pytest.raises(ConfigurationError, match="Removed Backend"):
         bind_config(values)
 
 
@@ -119,7 +119,6 @@ def test_local_environment_merges_team_personal_and_process_values(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    team_ready_file = tmp_path / "team-worker-ready"
     (tmp_path / ".env.local").write_text(
         "\n".join(
             (
@@ -127,8 +126,6 @@ def test_local_environment_merges_team_personal_and_process_values(
                 "DB_TARGET=development",
                 "DB_URL=postgresql+psycopg://app:team@localhost:5432/brokerage",
                 "DB_POOL_SIZE=3",
-                "WORKER_ENABLED=false",
-                f"WORKER_READY_FILE={team_ready_file}",
                 "",
             )
         ),
@@ -139,7 +136,6 @@ def test_local_environment_merges_team_personal_and_process_values(
             (
                 "DB_URL=postgresql+psycopg://app:personal@localhost:5432/brokerage",
                 "DB_POOL_SIZE=7",
-                "WORKER_ENABLED=true",
                 "",
             )
         ),
@@ -161,8 +157,6 @@ def test_local_environment_merges_team_personal_and_process_values(
         == "postgresql+psycopg://app:process@localhost:5432/brokerage"
     )
     assert config.db.pool.size == 11
-    assert config.worker.enabled is True
-    assert config.worker.ready_file == team_ready_file
 
 
 def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment(
@@ -175,7 +169,7 @@ def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment
                 "APP_ENV=local",
                 "DB_TARGET=development",
                 "DB_URL=postgresql+psycopg://app:team@localhost:5432/brokerage",
-                "WORKER_ID=${CONFIG_DOTENV_SENTINEL}",
+                "AUTH_DEVELOPMENT_LOGIN_ID=${CONFIG_DOTENV_SENTINEL}",
                 "CONFIG_DOTENV_SENTINEL=must-not-leak",
                 "",
             )
@@ -187,7 +181,7 @@ def test_local_dotenv_loading_is_literal_and_does_not_mutate_process_environment
 
     config = load_config(AppEnvironment.LOCAL, environ={})
 
-    assert config.worker.worker_id == "${CONFIG_DOTENV_SENTINEL}"
+    assert config.auth.development.login_id == "${CONFIG_DOTENV_SENTINEL}"
     assert "CONFIG_DOTENV_SENTINEL" not in os.environ
 
 
@@ -242,19 +236,29 @@ def test_invalid_app_env_is_rejected_before_binding() -> None:
         load_config(environ=config_values(APP_ENV="preview"))
 
 
-def test_worker_settings_use_the_same_validated_mapping(tmp_path: Path) -> None:
-    ready_file = tmp_path / "nondefault-worker-ready"
-    config = bind_config(
-        config_values(
-            WORKER_ENABLED="true",
-            WORKER_READY_FILE=str(ready_file),
-            WORKER_ID="configured-worker",
-        )
-    )
+@pytest.mark.parametrize("process_override", [None, "false", "true"])
+def test_f3_opt_in_uses_worker_dotenv_precedence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, process_override: str | None
+) -> None:
+    from worker import require_synthetic_prototype_opt_in
 
-    assert config.worker.enabled is True
-    assert config.worker.ready_file == ready_file
-    assert config.worker.worker_id == "configured-worker"
+    defaults = config_values(APP_ENV="local", DB_TARGET="development")
+    defaults.update(F3_ALLOW_SYNTHETIC_PROTOTYPE="false")
+    (tmp_path / ".env.local").write_text("\n".join(f"{k}={v}" for k, v in defaults.items()))
+    (tmp_path / ".env").write_text("F3_ALLOW_SYNTHETIC_PROTOTYPE=true\n")
+    monkeypatch.setattr(config_module, "BACKEND_ROOT", tmp_path)
+    process = {} if process_override is None else {"F3_ALLOW_SYNTHETIC_PROTOTYPE": process_override}
+    config = load_config("local", process)
+    if process_override == "false":
+        with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE"):
+            require_synthetic_prototype_opt_in(config)
+    else:
+        require_synthetic_prototype_opt_in(config)
+
+
+def test_invalid_privacy_opt_in_is_rejected_by_config() -> None:
+    with pytest.raises(ConfigurationError, match="F3_ALLOW_SYNTHETIC_PROTOTYPE"):
+        bind_config(config_values(F3_ALLOW_SYNTHETIC_PROTOTYPE="sometimes"))
 
 
 def test_f2_has_no_feature_flag_and_keeps_request_limits() -> None:
@@ -269,12 +273,27 @@ def test_f2_has_no_feature_flag_and_keeps_request_limits() -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "value", "message"),
-    (
-        ("WORKER_ENABLED", "sometimes", "WORKER_ENABLED"),
-        ("WORKER_READY_FILE", "relative/worker-ready", "absolute path"),
-    ),
+    "name", ["APP_OPENAPI_ENABLED", "WORKER_ENABLED", "WORKER_READY_FILE", "WORKER_ID"]
 )
-def test_invalid_worker_settings_fail_fast(name: str, value: str, message: str) -> None:
-    with pytest.raises((ConfigurationError, ValidationError), match=message):
-        bind_config(config_values(**{name: value}))
+def test_removed_settings_fail_with_migration_hint(name: str) -> None:
+    with pytest.raises(ConfigurationError, match="Removed Backend"):
+        bind_config(config_values(**{name: "anything"}))
+
+
+@pytest.mark.parametrize(
+    "env,target,docs",
+    [
+        ("local", "development", True),
+        ("test", "test", True),
+        ("dev", "development", False),
+        ("prod", "production", False),
+    ],
+)
+def test_openapi_is_derived_from_environment(env, target, docs):
+    assert bind_config(config_values(APP_ENV=env, DB_TARGET=target)).app.openapi_enabled is docs
+
+
+@pytest.mark.parametrize("key,value", [("LOG_LEVEL", "trace"), ("LOG_FORMAT", "yaml")])
+def test_log_choices_are_enums(key, value):
+    with pytest.raises(ValueError):
+        bind_config(config_values(**{key: value}))

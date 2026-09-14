@@ -22,6 +22,7 @@ from brokerage_ai.f3 import (
     DateSignals,
     Evidence,
     EvidenceKind,
+    InferenceEvidence,
     InputPrivacyMode,
     IntentAssessment,
     ListingAnchorContext,
@@ -37,6 +38,7 @@ from brokerage_ai.f3 import (
     PositionCondition,
     PriceAssessment,
     PriceKind,
+    QuoteEvidence,
     RequirementAnchorContext,
     SourceIdentity,
     TimingAssessment,
@@ -121,11 +123,11 @@ def listing_request(**overrides: object) -> PositionCardGenerationRequest:
 
 
 def quote_evidence(interaction_id: int = 11, text: str = QUOTE) -> Evidence:
-    return Evidence(kind=EvidenceKind.QUOTE, interaction_id=interaction_id, quote_text=text)
+    return QuoteEvidence(interaction_id=interaction_id, quote_text=text)
 
 
 def inference_evidence(note: str = "최근 6개월 접촉 이력이 없다") -> Evidence:
-    return Evidence(kind=EvidenceKind.INFERENCE, note=note)
+    return InferenceEvidence(note=note)
 
 
 def analysis(**overrides: object) -> PositionCardAnalysis:
@@ -349,32 +351,77 @@ def test_unknown_values_round_trip_as_explicit_results() -> None:
 # --- Evidence -----------------------------------------------------------------
 
 
-def test_quote_evidence_requires_an_interaction_id() -> None:
+def test_evidence_missing_its_required_field_is_rejected() -> None:
+    """필수 필드가 빠지면 거절한다. 예전의 네 가지 조합 검사를 대신한다.
+
+    "INFERENCE 인데 인용을 들고 있다" 같은 잘못된 조합은 이제 타입에 자리가 없어 정적으로도
+    거절되므로 실행 시 검사를 남겨 둘 이유가 없다.
+    """
     with pytest.raises(ValidationError):
-        Evidence(kind=EvidenceKind.QUOTE, quote_text=QUOTE)
-
-
-def test_quote_evidence_requires_quote_text() -> None:
+        QuoteEvidence.model_validate({"kind": "QUOTE", "quote_text": QUOTE})
     with pytest.raises(ValidationError):
-        Evidence(kind=EvidenceKind.QUOTE, interaction_id=11)
-
-
-def test_inference_evidence_requires_a_note() -> None:
+        QuoteEvidence.model_validate({"kind": "QUOTE", "interaction_id": 11})
     with pytest.raises(ValidationError):
-        Evidence(kind=EvidenceKind.INFERENCE)
-
-
-def test_inference_evidence_must_not_carry_a_quote() -> None:
+        InferenceEvidence.model_validate({"kind": "INFERENCE"})
+    # 선언하지 않은 필드는 받지 않는다 (extra="forbid").
     with pytest.raises(ValidationError):
-        Evidence(kind=EvidenceKind.INFERENCE, note="추정", interaction_id=11, quote_text=QUOTE)
+        InferenceEvidence.model_validate(
+            {"kind": "INFERENCE", "note": "추정", "interaction_id": 11}
+        )
+
+
+def test_legacy_evidence_with_null_placeholders_still_revives() -> None:
+    """예전 계약으로 저장된 카드가 지금도 읽혀야 한다.
+
+    이전 `Evidence` 는 네 필드를 모두 담고 해당 없는 자리를 `null` 로 저장했다. 판정 단계는
+    저장된 `analysis_snapshot` 을 되살려 입력으로 쓰므로, 이 관용이 없으면 기존 카드가 전부
+    읽히지 않아 판정이 통째로 막힌다.
+    """
+    legacy_quote = {"kind": "QUOTE", "interaction_id": 11, "quote_text": QUOTE, "note": None}
+    legacy_inference = {
+        "kind": "INFERENCE",
+        "interaction_id": None,
+        "quote_text": None,
+        "note": "정황",
+    }
+
+    assert QuoteEvidence.model_validate(legacy_quote).quote_text == QUOTE
+    assert InferenceEvidence.model_validate(legacy_inference).note == "정황"
+
+
+def test_legacy_tolerance_does_not_accept_a_value_in_the_wrong_slot() -> None:
+    """`null` 자리 표시만 버린다. 값이 들어 있으면 예전에도 지금도 잘못된 근거다."""
+    with pytest.raises(ValidationError):
+        QuoteEvidence.model_validate(
+            {"kind": "QUOTE", "interaction_id": 11, "quote_text": QUOTE, "note": "메모"}
+        )
+    with pytest.raises(ValidationError):
+        InferenceEvidence.model_validate({"kind": "INFERENCE", "note": "정황", "quote_text": QUOTE})
 
 
 def test_evidence_does_not_expose_quote_offsets() -> None:
     """offset 은 Backend 가 실제 원문에서 계산한다. 모델이 만들 자리가 없어야 한다."""
-    fields = set(Evidence.model_fields)
+    for variant in (QuoteEvidence, InferenceEvidence):
+        fields = set(variant.model_fields)
 
-    assert "quote_start_offset" not in fields
-    assert "quote_end_offset" not in fields
+        assert "quote_start_offset" not in fields
+        assert "quote_end_offset" not in fields
+
+
+def test_evidence_variants_make_the_wrong_combination_unrepresentable() -> None:
+    """종류별 필수 필드를 `model_validator` 가 아니라 타입이 강제한다.
+
+    예전에는 네 필드를 모두 가진 하나의 `Evidence` 에 검증기를 걸었고, 그 규칙은 JSON schema
+    로 표현할 수 없어 프롬프트 문장에만 의존했다. 로컬 모델이 `interaction_id` 를 비운 QUOTE
+    를 반복해 되먹임 3회로도 못 고친 사례가 있다.
+    """
+    assert set(QuoteEvidence.model_fields) == {"kind", "interaction_id", "quote_text"}
+    assert set(InferenceEvidence.model_fields) == {"kind", "note"}
+
+    # 읽는 쪽은 종류를 나눠 보지 않아도 되도록 자리는 맞춰 둔다.
+    assert QuoteEvidence(interaction_id=1, quote_text="원문").note is None
+    assert InferenceEvidence(note="정황").interaction_id is None
+    assert InferenceEvidence(note="정황").quote_text is None
 
 
 def test_conditions_without_evidence_are_rejected() -> None:

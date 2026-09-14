@@ -49,15 +49,24 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         self.assertIn("count = var.dev_edge_enabled ? 1 : 0", load_balancer)
         self.assertIn("count = var.dev_edge_enabled ? 1 : 0", listener)
         self.assertNotIn("count =", target_group)
+        self.assertIn("target_group_arns   = [aws_lb_target_group.app.arn]", runtime)
         self.assertIn(
-            "target_group_arns   = [aws_lb_target_group.app.arn]", runtime
+            'autoscaling_groups     = var.app_deployment_mode == "automatic" ? '
+            "[aws_autoscaling_group.app.name] : []",
+            delivery,
         )
         self.assertIn(
-            "autoscaling_groups     = [aws_autoscaling_group.app.name]", delivery
+            'for_each = var.app_deployment_mode == "maintenance" ? {', delivery
         )
-        self.assertEqual(
-            observability.count("count = var.dev_edge_enabled ? 1 : 0"), 2
-        )
+        for exact_tag in (
+            "Project     = var.project_name",
+            "Environment = local.environment",
+            'Name        = "${local.name_prefix}-app-asg"',
+        ):
+            self.assertIn(exact_tag, delivery)
+        self.assertIn('dynamic "ec2_tag_set"', delivery)
+        self.assertIn('type  = "KEY_AND_VALUE"', delivery)
+        self.assertEqual(observability.count("count = var.dev_edge_enabled ? 1 : 0"), 2)
 
     def test_state_moves_preserve_existing_singletons(self) -> None:
         runtime = read("infra/environments/dev/runtime.tf")
@@ -71,9 +80,7 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
             self.assertIn(f"to   = {after}\n", runtime)
 
         for name in ("alb_unhealthy_hosts", "alb_target_5xx"):
-            self.assertIn(
-                f"from = aws_cloudwatch_metric_alarm.{name}\n", observability
-            )
+            self.assertIn(f"from = aws_cloudwatch_metric_alarm.{name}\n", observability)
             self.assertIn(
                 f"to   = aws_cloudwatch_metric_alarm.{name}[0]\n", observability
             )
@@ -101,8 +108,7 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         self.assertIn("aws_lb.app[*].dns_name", configuration)
         self.assertIn('["localhost", "127.0.0.1"]', configuration)
         self.assertIn(
-            "tostring(var.dev_edge_enabled && "
-            "var.integrated_pipeline_detect_changes)",
+            "tostring(var.dev_edge_enabled && var.integrated_pipeline_detect_changes)",
             delivery,
         )
         self.assertIn(
@@ -120,7 +126,7 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         )
         start_recipe = section(
             justfile,
-            "dev-deep-start:",
+            "dev-deep-start *options:",
             "# Terraform state의 edge mode",
         )
 
@@ -129,9 +135,11 @@ class DevDeepLifecycleContractTests(unittest.TestCase):
         self.assertIn("-var=dev_edge_enabled=true", justfile)
         self.assertIn("-out=dev-deep-start.tfplan", justfile)
         self.assertIn("apply dev-deep-stop.tfplan", stop_recipe)
-        self.assertLess(stop_recipe.index(" stop --apply"), stop_recipe.index(" apply "))
-        self.assertIn("apply dev-deep-start.tfplan", start_recipe)
-        self.assertLess(start_recipe.index(" apply "), start_recipe.index(" start --apply"))
+        self.assertLess(
+            stop_recipe.index(" stop --apply"), stop_recipe.index(" apply ")
+        )
+        self.assertIn("just dev-start {{ options }}", start_recipe)
+        self.assertNotIn("terraform", start_recipe)
         self.assertNotIn("aws elbv2 delete-load-balancer", justfile)
         self.assertNotIn("aws elbv2 create-load-balancer", justfile)
 

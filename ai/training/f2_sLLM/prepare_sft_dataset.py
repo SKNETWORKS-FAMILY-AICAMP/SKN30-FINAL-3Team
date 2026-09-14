@@ -19,13 +19,13 @@ CLASSIFICATION_SYSTEM_PROMPT = """당신은 부동산 상담 유형 분류기입
 {"consultation_type": "매도의뢰|매수문의|기타상담"}"""
 
 FULL_OUTPUT_SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
-입력으로 STT 상담 텍스트와 현재 장부 종류만 받습니다.
+입력으로 STT 상담 텍스트만 받습니다.
 
 반드시 다음 규칙을 지키세요.
 - 매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류합니다.
 - 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류합니다.
-- 매물장에서 매수문의이거나 구입장에서 매도의뢰이면 ledger_mismatch를 true로 둡니다.
-- ledger_mismatch가 true이거나 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
+- 매도의뢰이면 매물장 필드만, 매수문의이면 구입장 필드만 추출합니다.
+- 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
 - 원문에서 명확히 확인된 값만 fields에 넣습니다.
 - 불명확한 숫자, 날짜, 동, 호 또는 충돌하는 값은 확정하지 말고 uncertainties에 적습니다.
 - 기존 장부 값을 추측하거나 자동으로 덮어쓰지 않습니다.
@@ -35,7 +35,6 @@ FULL_OUTPUT_SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니
 출력 형식:
 {
   "consultation_type": "매도의뢰|매수문의|기타상담",
-  "ledger_mismatch": false,
   "fields": {"필드명": "값"},
   "evidence": {"필드명": "원문 근거"},
   "uncertainties": ["불명확하거나 충돌한 내용"],
@@ -62,7 +61,7 @@ def parse_args() -> argparse.Namespace:
         "--task",
         choices=("classification", "full"),
         default="classification",
-        help="classification: 상담 유형만 학습, full: 분류·장부 불일치·필드·근거·요약 학습",
+        help="classification: 상담 유형만 학습, full: 분류·유형별 필드·근거·요약 학습",
     )
     parser.add_argument("--force", action="store_true", help="기존 결과 덮어쓰기")
     return parser.parse_args()
@@ -98,10 +97,7 @@ def convert_classification_sample(sample: dict[str, Any], source: str) -> dict[s
             {"role": "user", "content": f"STT 상담 텍스트:\n{sample['transcript']}"},
         ],
         "completion": [{"role": "assistant", "content": answer}],
-        "task": "classification",
-        "label": sample["label"],
         "source_group_id": sample["source_group_id"],
-        "split": sample["split"],
     }
 
 
@@ -111,8 +107,13 @@ def expected_mismatch(ledger_type: str, label: str) -> bool:
     )
 
 
-def convert_full_sample(sample: dict[str, Any], source: str) -> dict[str, Any]:
-    """full-output 사례를 현재 장부+STT 입력과 전체 JSON 정답으로 변환한다."""
+def convert_full_sample(sample: dict[str, Any], source: str) -> dict[str, Any] | None:
+    """full-output 사례를 STT 입력과 유형별 필드 JSON 정답으로 변환한다.
+
+    기존 장부 불일치 사례는 필드 정답이 비어 있어 자동 장부 선택·추출
+    학습에 쓸 수 없으므로 출력에서 제외한다. 원천의 ledger_type은 정합성
+    검증과 제외 근거로 계속 보존한다.
+    """
 
     required = {
         "sample_id",
@@ -159,31 +160,28 @@ def convert_full_sample(sample: dict[str, Any], source: str) -> dict[str, Any]:
             raise ValueError(f"{source}: 원문에 없는 evidence {field_name!r}")
     if (mismatch or sample["label"] == "기타상담") and (expected["fields"] or expected["evidence"]):
         raise ValueError(f"{source}: 장부 불일치·기타상담은 필드를 제안할 수 없습니다")
+    if mismatch:
+        return None
 
-    answer = json.dumps(expected, ensure_ascii=False, separators=(",", ":"))
+    completion = {key: value for key, value in expected.items() if key != "ledger_mismatch"}
+    answer = json.dumps(completion, ensure_ascii=False, separators=(",", ":"))
     return {
         "id": sample["sample_id"],
         "prompt": [
             {"role": "system", "content": FULL_OUTPUT_SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": (
-                    f"현재 장부 종류: {sample['ledger_type']}\n"
-                    f"STT 상담 텍스트:\n{sample['transcript']}"
-                ),
+                "content": f"STT 상담 텍스트:\n{sample['transcript']}",
             },
         ],
         "completion": [{"role": "assistant", "content": answer}],
-        "task": "full",
-        "label": sample["label"],
         "source_group_id": sample["source_group_id"],
-        "split": sample["split"],
     }
 
 
 def convert_sample(
     sample: dict[str, Any], source: str, task: str = "classification"
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """선택한 과제의 원본 사례를 SFT prompt-completion 한 건으로 변환한다."""
 
     if task == "classification":
@@ -210,6 +208,8 @@ def convert_file(
                 continue
             sample = json.loads(line)
             result = convert_sample(sample, f"{input_path}:{line_number}", task)
+            if result is None:
+                continue
             if result["id"] in ids:
                 raise ValueError(f"{input_path}:{line_number}: 중복 id {result['id']!r}")
             ids.add(result["id"])

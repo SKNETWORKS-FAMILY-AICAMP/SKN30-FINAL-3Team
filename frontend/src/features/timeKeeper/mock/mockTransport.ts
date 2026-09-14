@@ -113,30 +113,21 @@ function calendarItem(
 }
 
 /** 주기 규칙으로 만드는 종류. 서버와 같이 되돌아보는 창을 적용하지 않는다. */
-const RULE_CATEGORIES = new Set([
-  "LISTING_RECONTACT",
-  "CLIENT_RECONTACT",
-  "LISTING_REVALIDATION",
-]);
+const RULE_CATEGORIES = new Set(["LISTING_REVALIDATION"]);
 
 /** 기한이 이른 순. 지난 건, 오늘, 앞으로가 모두 한 번씩 나오게 둔다. */
 const ITEMS: readonly AgendaItemDto[] = [
-  // 1년 넘게 접촉이 없는 손님. 되돌아보는 창에 걸리지 않고 목록 맨 위에 온다.
-  clientItem("CLIENT_RECONTACT", -370, 39, "묵은손님", "010-1111-0000"),
   unitItem("TENANCY_EXPIRY", -2, "101", "1503", [
     { role: "TENANT", name: "박임차", phone: "010-2345-6789" },
   ]),
-  clientItem("CLIENT_RECONTACT", 0, 41, "이손님", "010-3456-7890"),
+  // 오래 묵은 매물. 되돌아보는 창에 걸리지 않고 목록 맨 위에 온다.
   {
-    ...unitItem("LISTING_REVALIDATION", 4, "103", "902", [
+    ...unitItem("LISTING_REVALIDATION", -370, "103", "902", [
       { role: "LANDLORD", name: "김임대", phone: "010-1234-5678" },
     ]),
     listing_id: 9021,
   },
   clientItem("MOVE_IN", 12, 44, "정손님", "010-7890-1234"),
-  unitItem("LISTING_RECONTACT", 18, "102", "204", [
-    { role: "LANDLORD", name: "한임대", phone: "010-6789-0123" },
-  ]),
   clientItem("CLIENT_TENANCY_EXPIRY", 31, 58, "최손님", "010-5678-9012"),
   clientItem("REQUEST_EXPIRY", 62, 58, "최손님", "010-5678-9012"),
   calendarItem(9001, "임장", 3, "행복아파트 임장", "행복아파트 101동"),

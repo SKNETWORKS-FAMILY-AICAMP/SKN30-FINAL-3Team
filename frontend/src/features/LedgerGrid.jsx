@@ -302,7 +302,7 @@ function ValueFilter({ rows, field, onChange, accepted }) {
   return <details className="ledger-grid__value-filter"><summary>값 필터 · {values.length}개</summary><div className="ledger-grid__value-filter-menu"><div className="ledger-grid__value-filter-actions"><button type="button" onClick={() => onChange(new Set(values.map(([key]) => key)))}>전체 선택</button><button type="button" onClick={() => onChange(new Set())}>전체 해제</button></div>{values.map(([key, count]) => <label key={key}><input type="checkbox" checked={Boolean(accepted?.has(key))} onChange={() => toggle(key)} /><span>{key === "__EMPTY__" ? "(비어 있음)" : key}</span><small>{count}</small></label>)}</div></details>;
 }
 
-export function LedgerGrid({ rows = [], onRowsChange, onOpenDetail, onSelectionChange, viewState = "normal", searchQuery = "", complexFilter = "전체", saveFilter = "전체", onRetry, onClearFilters, onAddRow, readOnly = false, selectedRowIds = [], selectionResetToken = 0, columnPreset = "basic" }) {
+export function LedgerGrid({ onDisplayedCountChange, rows = [], onRowsChange, onOpenDetail, onSelectionChange, viewState = "normal", searchQuery = "", complexFilter = "전체", saveFilter = "전체", onRetry, onClearFilters, onAddRow, readOnly = false, selectedRowIds = [], selectionResetToken = 0, columnPreset = "basic", focusRowId = null, focusToken = 0 }) {
   const gridApiRef = useRef(null);
   const [valueFilterField, setValueFilterField] = useState("complex");
   const [valueFilters, setValueFilters] = useState({});
@@ -318,15 +318,38 @@ export function LedgerGrid({ rows = [], onRowsChange, onOpenDetail, onSelectionC
   const columnDefs = useMemo(() => PROPERTY_COLUMNS.map((definition) => { const next = { ...definition, hide: !visibleFields.has(definition.field) }; if (definition.field === "complex" || definition.field === "owner") next.cellRenderer = (params) => <DetailLinkCell {...params} onOpenDetail={onOpenDetail} field={definition.field} />; return next; }), [onOpenDetail, visibleFields]);
   const handleCellValueChanged = useCallback(({ data, newValue, oldValue }) => { if (readOnly || !data || Object.is(newValue, oldValue)) return; const nextRows = safeRows.map((row) => String(row.id) === String(data.id) ? { ...row, ...data, saveState: "임시저장" } : row); if (typeof onRowsChange === "function") onRowsChange(nextRows); }, [onRowsChange, readOnly, safeRows]);
   const handleSelectionChanged = useCallback(({ api }) => { if (typeof onSelectionChange === "function") onSelectionChange(api.getSelectedRows()); }, [onSelectionChange]);
-  const handleGridReady = useCallback(({ api }) => { gridApiRef.current = api; api.setGridAriaProperty("label", "매물장 세대 그리드"); }, []);
+  /*
+   * 동·호 조회의 강조.
+   *
+   * F1-SR-01의 "이동·선택·상세 표시"를 팝업이 아닌 그리드 안에서 구현한다. 조회로 찾은 행이
+   * 지금 화면에 있으면(필터는 호출부가 이미 해제했다) 스크롤해 보여주고 셀을 잠깐 반짝여
+   * 눈으로 바로 찾게 한다. 없으면(그리드가 아직 데이터를 안 받았거나 늦게 붙는 경우)
+   * onGridReady에서도 같은 시도를 한다.
+   */
+  const appliedFocusTokenRef = useRef(0);
+  const applyFocusRow = useCallback(() => {
+    const api = gridApiRef.current;
+    if (!api || !focusToken || focusRowId == null) return;
+    // 이미 이번 조회로 강조했으면 값 필터 해제 등 뒤이은 재렌더에서 다시 반짝이지 않는다.
+    if (appliedFocusTokenRef.current === focusToken) return;
+    const node = api.getRowNode(String(focusRowId));
+    if (!node) return; // 아직 데이터·필터 해제가 반영되지 않았다. 다음 렌더에서 다시 시도한다.
+    api.ensureNodeVisible(node, "middle");
+    api.flashCells({ rowNodes: [node] });
+    appliedFocusTokenRef.current = focusToken;
+  }, [focusRowId, focusToken]);
+  const handleGridReady = useCallback(({ api }) => { gridApiRef.current = api; api.setGridAriaProperty("label", "매물장 세대 그리드"); applyFocusRow(); }, [applyFocusRow]);
   useEffect(() => { gridApiRef.current?.deselectAll(); }, [selectionResetToken]);
-  const handleFirstDataRendered = useCallback(({ api }) => { const ids = new Set(selectedRowIds.map(String)); if (ids.size === 0) return; const nodes = []; api.forEachNode((node) => { if (node.data?.id && ids.has(String(node.data.id))) nodes.push(node); }); if (nodes.length > 0) api.setNodesSelected({ nodes, newValue: true }); }, [selectedRowIds]);
+  // 동·호 조회로 찾은 행이 값 필터에 가려 있으면 강조할 수 없다. 호출부가 못 지우는 그리드 내부 필터라 여기서 함께 지운다.
+  useEffect(() => { if (focusToken) setValueFilters({}); }, [focusToken]);
+  useEffect(applyFocusRow, [applyFocusRow, valueFilters]);
+  const handleFirstDataRendered = useCallback(({ api }) => { const ids = new Set(selectedRowIds.map(String)); if (ids.size === 0) return; const nodes = []; api.forEachNode((node) => { if (node.data?.id && ids.has(String(node.data.id))) nodes.push(node); }); if (nodes.length > 0) api.setNodesSelected({ nodes, newValue: true }); applyFocusRow(); }, [selectedRowIds, applyFocusRow]);
   const valueFilterRows = useMemo(() => safeRows.filter((row) => matchesSearch(row, searchQuery) && matchesChoice(row.complex, complexFilter) && matchesChoice(row.saveState, saveFilter)), [safeRows, searchQuery, complexFilter, saveFilter]);
   const currentAccepted = valueFilters[valueFilterField] || new Set();
   const handleClearFilters = useCallback(() => { setValueFilters({}); onClearFilters?.(); }, [onClearFilters]);
   return <section id="ledger-grid-panel" role="tabpanel" aria-labelledby="ledger-tab-0" className={`ledger-grid ledger-grid--${normalizedViewState}${readOnly ? " ledger-grid--read-only" : ""}`} aria-label="매물장 세대 그리드" aria-busy={normalizedViewState === "loading"} aria-readonly={readOnly} data-screen-id="F1-PG-010" data-requirement-ids="F1-GR-01~45, F1-SR-01~08, F1-TR-01~03, F2-LIST-01~04">
     <div className="ledger-grid__controls" aria-label="그리드 값 필터"><label className="ledger-grid__value-filter-select"><span>값 목록 필터</span><select value={valueFilterField} onChange={(event) => setValueFilterField(event.target.value)}>{VALUE_FILTER_COLUMNS.map(({ field, headerName }) => <option key={field} value={field}>{headerName}</option>)}</select></label><ValueFilter rows={valueFilterRows} field={valueFilterField} accepted={currentAccepted} onChange={(next) => setValueFilters((current) => ({ ...current, [valueFilterField]: next }))} />{Object.keys(valueFilters).length > 0 && <Button variant="link" onClick={() => setValueFilters({})}>값 필터 해제</Button>}</div>
-    <div className="ledger-grid__ag-grid"><AgGridReact theme={ledgerGridTheme} ariaLabel="매물장 세대 그리드" localeText={{ ariaHeaderSelection: "전체 행 선택 열", ariaRowSelectAll: "Space 키로 현재 필터 결과 전체 선택 전환", ariaRowToggleSelection: "Space 키로 행 선택 전환", ariaRowSelect: "Space 키로 이 행 선택", ariaRowDeselect: "Space 키로 이 행 선택 해제", ariaRowSelectionDisabled: "이 행은 선택할 수 없음", ariaToggleCellValue: "Space 키로 셀 값 전환" }} onGridReady={handleGridReady} rowData={rowData} columnDefs={columnDefs} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.id)} rowHeight={40} headerHeight={40} animateRows={false} ensureDomOrder enableCellTextSelection enterNavigatesVertically enterNavigatesVerticallyAfterEdit singleClickEdit stopEditingWhenCellsLoseFocus undoRedoCellEditing undoRedoCellEditingLimit={PROTOTYPE_ASSUMPTIONS.grid.undoLimit} rowSelection={rowSelection} selectionColumnDef={selectionColumnDef} onCellValueChanged={handleCellValueChanged} onSelectionChanged={handleSelectionChanged} onFirstDataRendered={handleFirstDataRendered} activeOverlay={overlayState ? GridStateOverlay : undefined} activeOverlayParams={overlayState ? { state: overlayState, onRetry, onClearFilters: handleClearFilters, onAddRow } : undefined} suppressOverlays={["noRows"]} tooltipShowDelay={300} /></div>
+    <div className="ledger-grid__ag-grid"><AgGridReact theme={ledgerGridTheme} ariaLabel="매물장 세대 그리드" localeText={{ ariaHeaderSelection: "전체 행 선택 열", ariaRowSelectAll: "Space 키로 현재 필터 결과 전체 선택 전환", ariaRowToggleSelection: "Space 키로 행 선택 전환", ariaRowSelect: "Space 키로 이 행 선택", ariaRowDeselect: "Space 키로 이 행 선택 해제", ariaRowSelectionDisabled: "이 행은 선택할 수 없음", ariaToggleCellValue: "Space 키로 셀 값 전환" }} onModelUpdated={({ api }) => onDisplayedCountChange?.(api.getDisplayedRowCount())} onGridReady={handleGridReady} rowData={rowData} columnDefs={columnDefs} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.id)} rowHeight={40} headerHeight={40} animateRows={false} ensureDomOrder enableCellTextSelection enterNavigatesVertically enterNavigatesVerticallyAfterEdit singleClickEdit stopEditingWhenCellsLoseFocus undoRedoCellEditing undoRedoCellEditingLimit={PROTOTYPE_ASSUMPTIONS.grid.undoLimit} rowSelection={rowSelection} selectionColumnDef={selectionColumnDef} onCellValueChanged={handleCellValueChanged} onSelectionChanged={handleSelectionChanged} onFirstDataRendered={handleFirstDataRendered} activeOverlay={overlayState ? GridStateOverlay : undefined} activeOverlayParams={overlayState ? { state: overlayState, onRetry, onClearFilters: handleClearFilters, onAddRow } : undefined} suppressOverlays={["noRows"]} tooltipShowDelay={300} /></div>
   </section>;
 }
 export default LedgerGrid;

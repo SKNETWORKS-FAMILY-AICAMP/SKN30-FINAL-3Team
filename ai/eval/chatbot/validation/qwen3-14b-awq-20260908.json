@@ -1,0 +1,2371 @@
+{
+  "artifact_kind": "chatbot_evaluation_reviewed_summary",
+  "schema_version": 1,
+  "creation_method": "manual_aggregation_and_review",
+  "verification_tool_version": "chatbot-summary-verifier:v1",
+  "status": "COMPLETED",
+  "diagnostic_subset": false,
+  "warmup_ms": 4174.376221002603,
+  "provenance": {
+    "profile": {
+      "model": "Qwen/Qwen3-14B-AWQ",
+      "revision": "31c69efc29464b6bb0aee1398b5a7b50a99340c3",
+      "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "quantization": "awq",
+      "load_format": "auto",
+      "max_model_len": 8192,
+      "max_num_seqs": 1,
+      "gpu_memory_utilization": 0.85,
+      "weights": [
+        {
+          "name": "model-00001-of-00002.safetensors",
+          "size": 4988339832,
+          "sha256": "668eb0f1356638310db286f4819b223c12e3916934123f1a81b2b2c0e148c6a2"
+        },
+        {
+          "name": "model-00002-of-00002.safetensors",
+          "size": 4988350408,
+          "sha256": "c3c1625df80fe01211038bfa520629ebde6adf776556aa80cd49696d986d6657"
+        }
+      ]
+    },
+    "artifact_sha256": "1eddcd4655f4b63376be82ad09157f9b1a850da7feb073fe6461d84edb09a912",
+    "runtime_label": "0.28.0",
+    "model_profile": "qwen3-14b-awq",
+    "deployment_image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+    "started_at": "2026-09-08T06:03:39.850208+00:00",
+    "artifact_revision": "31c69efc29464b6bb0aee1398b5a7b50a99340c3",
+    "endpoint_attestation": {
+      "model": "Qwen/Qwen3-14B-AWQ",
+      "revision": "31c69efc29464b6bb0aee1398b5a7b50a99340c3",
+      "artifact_sha256": "1eddcd4655f4b63376be82ad09157f9b1a850da7feb073fe6461d84edb09a912",
+      "runtime_version": "0.28.0",
+      "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "profile": "qwen3-14b-awq",
+      "checked_at": "2026-09-08T06:03:40.936809+00:00"
+    },
+    "route": {
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-14B-AWQ",
+      "endpoint_alias": "general-dev-gpu"
+    },
+    "profiles_sha256": "2e92885bb17bc4cea6e25cea95550a353dc619a44d4da978eac96f81cb38e34f",
+    "fixture_sha256": "89fe9386e88e1c2e80532471627549767ea689e148f8061fd4cbc218f7e4f652",
+    "final_endpoint_attestation": {
+      "model": "Qwen/Qwen3-14B-AWQ",
+      "revision": "31c69efc29464b6bb0aee1398b5a7b50a99340c3",
+      "artifact_sha256": "1eddcd4655f4b63376be82ad09157f9b1a850da7feb073fe6461d84edb09a912",
+      "runtime_version": "0.28.0",
+      "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "profile": "qwen3-14b-awq",
+      "checked_at": "2026-09-08T06:11:53.388596+00:00"
+    },
+    "expected_weights_manifest_sha256": "1eddcd4655f4b63376be82ad09157f9b1a850da7feb073fe6461d84edb09a912",
+    "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+    "raw_report_sha256": "b002cd3cb8feee5fa7bbf430e7b4766e4bfef0b429b3b39309613ca5c21abb91",
+    "evaluated_workflow_sha256": "50235a81ecb8c84eeb8d78bc2d2187055be7abe72f508f57b31924fb1a2a2caf"
+  },
+  "summary": {
+    "cases": 240,
+    "supported_accuracy": 0.48,
+    "multiturn_accuracy": 0.6,
+    "basic_and_units_accuracy": 0.45,
+    "ambiguous_unsupported_accuracy": 0.7,
+    "attack_failures": 0,
+    "p95_interpretation_ms": 3572.2546269971645,
+    "p95_first_progress_ms": 0.14600999929825775,
+    "model_calls": 177,
+    "errors": 3
+  },
+  "basic_and_units": {
+    "correct": 54,
+    "total": 120,
+    "accuracy": 0.45
+  },
+  "multiturn": {
+    "correct": 18,
+    "total": 30,
+    "accuracy": 0.6
+  },
+  "ambiguity": {
+    "correct": 21,
+    "total": 30,
+    "accuracy": 0.7
+  },
+  "rounds": {
+    "1": {
+      "cases": 80,
+      "supported_accuracy": 0.48,
+      "multiturn_accuracy": 0.6,
+      "basic_and_units_accuracy": 0.45,
+      "ambiguous_unsupported_accuracy": 0.7,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 3583.8252310022654,
+      "p95_first_progress_ms": 0.1661829992372077,
+      "model_calls": 59,
+      "errors": 1,
+      "basic_and_units": {
+        "correct": 18,
+        "total": 40,
+        "accuracy": 0.45
+      },
+      "multiturn": {
+        "correct": 6,
+        "total": 10,
+        "accuracy": 0.6
+      }
+    },
+    "2": {
+      "cases": 80,
+      "supported_accuracy": 0.48,
+      "multiturn_accuracy": 0.6,
+      "basic_and_units_accuracy": 0.45,
+      "ambiguous_unsupported_accuracy": 0.7,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 3413.131182998768,
+      "p95_first_progress_ms": 0.12193400107207708,
+      "model_calls": 59,
+      "errors": 1,
+      "basic_and_units": {
+        "correct": 18,
+        "total": 40,
+        "accuracy": 0.45
+      },
+      "multiturn": {
+        "correct": 6,
+        "total": 10,
+        "accuracy": 0.6
+      }
+    },
+    "3": {
+      "cases": 80,
+      "supported_accuracy": 0.48,
+      "multiturn_accuracy": 0.6,
+      "basic_and_units_accuracy": 0.45,
+      "ambiguous_unsupported_accuracy": 0.7,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 3288.7198780008475,
+      "p95_first_progress_ms": 0.14600999929825775,
+      "model_calls": 59,
+      "errors": 1,
+      "basic_and_units": {
+        "correct": 18,
+        "total": 40,
+        "accuracy": 0.45
+      },
+      "multiturn": {
+        "correct": 6,
+        "total": 10,
+        "accuracy": 0.6
+      }
+    }
+  },
+  "failures": [
+    {
+      "id": "basic-09",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "84제곱미터 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-13",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-14",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": "5억 이하",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "price_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-15",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "JEONSE",
+          "status": null,
+          "price_expression": "2억 이상",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-16",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": "진행 중",
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-19",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "CLIENT_TENANCY_EXPIRY",
+            "TENANCY_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-21",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-22",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-23",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 주",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": "date_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-24",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-25",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "2026-09-01~2026-09-30",
+          "categories": [
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-28",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 달",
+          "categories": [
+            "MOVE_IN"
+          ],
+          "sort": "date_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-29",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-30",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-03",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": "1억 이하",
+          "deposit_expression": "100만원 이하",
+          "rent_expression": "100만원 이하",
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-07",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": "500000000원 이하",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-10",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "2026-09-08",
+          "categories": [
+            "CALENDAR"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-06",
+      "round": 1,
+      "actual": null,
+      "error_type": "ChatbotContractError"
+    },
+    {
+      "id": "multi-07",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-09",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-10",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "area_basis"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-01",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-02",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-06",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-09",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "84제곱미터 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-13",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-14",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": "5억 이하",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "price_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-15",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "JEONSE",
+          "status": null,
+          "price_expression": "2억 이상",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-16",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": "진행 중",
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-19",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "CLIENT_TENANCY_EXPIRY",
+            "TENANCY_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-21",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-22",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-23",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 주",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": "date_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-24",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-25",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "2026-09-01~2026-09-30",
+          "categories": [
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-28",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 달",
+          "categories": [
+            "MOVE_IN"
+          ],
+          "sort": "date_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-29",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-30",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-03",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": "1억 이하",
+          "deposit_expression": "100만원 이하",
+          "rent_expression": "100만원 이하",
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-07",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": "500000000원 이하",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-10",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "2026-09-08",
+          "categories": [
+            "CALENDAR"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-06",
+      "round": 2,
+      "actual": null,
+      "error_type": "ChatbotContractError"
+    },
+    {
+      "id": "multi-07",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-09",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-10",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "area_basis"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-01",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-02",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-06",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-09",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "84제곱미터 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-13",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-14",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": "5억 이하",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "price_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-15",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "JEONSE",
+          "status": null,
+          "price_expression": "2억 이상",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-16",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": "진행 중",
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-19",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "CLIENT_TENANCY_EXPIRY",
+            "TENANCY_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-21",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-22",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-23",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 주",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": "date_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-24",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-25",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "2026-09-01~2026-09-30",
+          "categories": [
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-28",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 달",
+          "categories": [
+            "MOVE_IN"
+          ],
+          "sort": "date_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-29",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-30",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "missing_context"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-03",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": "1억 이하",
+          "deposit_expression": "100만원 이하",
+          "rent_expression": "100만원 이하",
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-07",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": "500000000원 이하",
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-10",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "2026-09-08",
+          "categories": [
+            "CALENDAR"
+          ],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-06",
+      "round": 3,
+      "actual": null,
+      "error_type": "ChatbotContractError"
+    },
+    {
+      "id": "multi-07",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [
+            "TENANCY_EXPIRY",
+            "CLIENT_TENANCY_EXPIRY",
+            "REQUEST_EXPIRY",
+            "MOVE_IN",
+            "LISTING_RECONTACT",
+            "CLIENT_RECONTACT",
+            "LISTING_REVALIDATION",
+            "CALENDAR"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-09",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "RENT",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-10",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "area_basis"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-01",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-02",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-06",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    }
+  ],
+  "review_notes": {
+    "scope": "synthetic model interpretation and guarded workflow; not DB/API/SSE or F3 judgment quality",
+    "outputs_checked_against_chat_intent_schema": 423,
+    "sensitive_output_scan": "no flagged patterns; automated scan supplements caller review",
+    "attack_scope": "pre-model application guard; not intrinsic model attack resistance",
+    "deployment_identity": "operator must compare wrapper digest with RunPod API; endpoint metadata alone is not container identity proof",
+    "acceptance": "NOT_PASSED: supported 48%, basic/units 45%, multiturn 60%, ambiguity 70% and three contract errors; execution COMPLETED does not mean acceptance passed",
+    "repeatability": "The same 29 case IDs failed in each of three rounds.",
+    "failure_patterns": [
+      "Unrequested SALE, agenda categories or sort conditions were added to otherwise correct queries.",
+      "Standalone questions were interpreted as refine and ended with missing_context; clear area queries were needlessly clarified.",
+      "The rent case mapped the 1억 deposit into price_expression and 100만원 rent into deposit_expression.",
+      "Multi-06 supplied the previous date again with replace on all three repair attempts; multi-09 dropped refine mode and multi-10 failed clarification recovery.",
+      "Ambiguous area was assumed exclusive; two other clarification codes did not match the agreed contract."
+    ],
+    "reported_model_calls_limitation": "summary.model_calls=177 excludes successful structured responses in failed workflow rows. rows.attempts records 186 structured responses across measured cases, including 9 from the three contract errors. Warm-up is separate. This is not a transport-level call counter.",
+    "recorded_structured_responses_in_measured_cases": 186
+  }
+}

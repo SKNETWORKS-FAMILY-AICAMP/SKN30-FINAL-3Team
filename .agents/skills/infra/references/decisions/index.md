@@ -1,12 +1,13 @@
 ---
 status: 결정
-updated: 2026-09-04
+updated: 2026-09-11
 ---
 
 # Infra 결정 인덱스
 
 | ADR | 상태 | 결정 |
 |---|---|---|
+| [ADR-0023](ADR-0023-developer-operations-entrypoints.md) | 부분 대체됨(ADR-0024)·사용자 요청·코드 구현·팀 검토 전·기동 미실행 | 개발자 진단·검증 진입점, stale plan 차단과 state version 보호 코드 |
 | [ADR-0001](ADR-0001-terraform-layout-and-state.md) | 승인됨 | 계정 bootstrap과 환경별 root, S3 native state 잠금 사용 |
 | [ADR-0002](ADR-0002-dev-demo-aws-runpod-architecture.md) | 부분 대체됨 | NAT 없는 EC2·RDS·S3 유지; 전달은 ADR-0011, RunPod 운영은 프로젝트 ADR-0020이 대체 |
 | [ADR-0003](ADR-0003-dev-storage-database-and-configuration.md) | 부분 대체됨 | 개발 환경 RDS·업무용 S3·설정 저장소와 보존 기준 |
@@ -24,5 +25,10 @@ updated: 2026-09-04
 | [ADR-0015](ADR-0015-cloudwatch-alarm-discord-delivery.md) | 부분 대체됨·코드 구현, 미적용 | CloudWatch Alarm을 전용 SNS·Lambda와 새 Discord webhook Secret으로 분리 전달 |
 | [ADR-0016](ADR-0016-runpod-shared-f2-serving.md) | 대체됨 | 영속 Volume과 stop/start 기반 RunPod 공유 F2 서빙 운영 |
 | [ADR-0017](ADR-0017-runpod-ephemeral-sllm-serving.md) | 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용 | private S3 SLLM release와 RunPod create/delete, active/offline endpoint로 공유 dev 서빙; release v2와 미평가 dev 경로는 프로젝트 ADR-0022·0023 적용 |
-| [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md) | 승인됨·코드 구현, 외부 자원 미적용 | RunPod 단일 bootstrap, AWS 값 정본·회전, 읽기 전용 감시와 수동 reconcile |
+| [ADR-0018](ADR-0018-runpod-bootstrap-secrets-monitoring.md) | 후속 사용자 승인으로 부분 대체·감시 제거 적용 확인·팀 병합 검토 대기 | bootstrap·회전은 ADR-0020, 자체 감시·복구 정책은 ADR-0021로 대체 |
 | [ADR-0019](ADR-0019-bedrock-luna-dev-poc.md) | 승인됨·코드 구현, AWS 미적용 | Bedrock Luna Global POC의 최소 권한 Instance Role, SigV4·IMDSv2 hop 2와 합성 dev gate |
+| [ADR-0020](ADR-0020-runpod-console-registration.md) | 부분 대체됨(ADR-0024)·사용자 Console 방식 선택·코드 구현·등록/원격 후보 검증 확인·팀 병합 검토 대기 | Console 자원 ID·digest 단일 등록, Template drift 검증과 API 전용 F2 refresh |
+| [ADR-0021](ADR-0021-runpod-operational-reduction.md) | 사용자 감시 제거 명시 선택·기반 제거 적용 승인·2026-09-07 적용 및 drift 확인·팀 병합 검토 대기 | 감시 자원·key·GraphQL 제거, 단방향 offline 복구와 명시적 재시도 |
+| [ADR-0022](ADR-0022-dual-cloud-gpu-lifecycle.md) | 부분 대체됨(ADR-0024)·사용자 구현·기반 적용 승인·SSM/IAM 적용 및 AWS 후보 사설 검증 완료·팀 병합 검토 대기·정식 배포/왕복 검증 미완료 | 독립 GPU EC2·gp3 캐시·고정 SSM 터널과 일반/deep 전원 통합 |
+
+| [ADR-0024](ADR-0024-shared-serving-selection-lifecycle.md) | 기반 병합·2026-09-11 AWS F2/general 전체 앱 기동·직접 검증 완료·팀 변경 검토 대기 | 공유 선택 기반 계획·Template API 조정·maintenance·실패 정리·검증 인계 |

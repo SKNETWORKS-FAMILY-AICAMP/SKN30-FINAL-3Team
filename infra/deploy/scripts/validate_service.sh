@@ -5,6 +5,13 @@ set -euo pipefail
 source /opt/brokerage/revision/scripts/common.sh
 require_backend_image
 
+if [[ -f "${APP_ROOT}/serving-maintenance" ]]; then
+  [[ -z "$(compose ps --status running --quiet api worker)" ]]
+  compose run --rm --no-deps -T worker python src/model_selection.py --help >/dev/null
+  echo 'Maintenance installation validated; application readiness is pending dev-start.'
+  exit 0
+fi
+
 for attempt in $(seq 1 24); do
   api_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' brokerage-dev-api-1 2>/dev/null || true)"
   worker_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' brokerage-dev-worker-1 2>/dev/null || true)"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from brokerage_ai.f2 import F2PipelineResult, ProposalStatus
+from brokerage_ai.f2 import F2PipelineResult, LedgerType, ProposalStatus
 from pydantic import BaseModel, ConfigDict
 
 
@@ -21,6 +21,7 @@ class F2AnalysisResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     consultation_type: str
+    ledger_type: LedgerType | None
     ledger_mismatch: bool
     proposals: list[F2ProposalResponse]
     uncertainties: list[str]
@@ -36,6 +37,7 @@ class F2AnalysisResponse(BaseModel):
     ) -> F2AnalysisResponse:
         return cls(
             consultation_type=result.consultation_type.value,
+            ledger_type=result.ledger_type,
             ledger_mismatch=result.ledger_mismatch,
             proposals=[
                 F2ProposalResponse(

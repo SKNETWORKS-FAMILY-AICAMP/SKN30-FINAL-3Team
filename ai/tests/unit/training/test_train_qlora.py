@@ -11,20 +11,12 @@ from training.f2_sLLM.train_qlora import (
 )
 
 
-def write_sft(
-    path: Path,
-    *,
-    split: str = "train",
-    group_id: str = "group-1",
-    task: str = "full",
-) -> None:
+def write_sft(path: Path, *, group_id: str = "group-1") -> None:
     sample = {
         "id": "sample-1",
         "prompt": [{"role": "user", "content": "상담 내용"}],
         "completion": [{"role": "assistant", "content": "{}"}],
         "source_group_id": group_id,
-        "split": split,
-        "task": task,
     }
     path.write_text(json.dumps(sample, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -51,21 +43,27 @@ def test_full_output_config_uses_longer_context() -> None:
     assert config["training"]["per_device_train_batch_size"] == 2
 
 
-def test_validate_sft_file_rejects_test_as_training_input(tmp_path: Path) -> None:
-    path = tmp_path / "test.jsonl"
-    write_sft(path, split="test")
+def test_validate_sft_file_requires_source_group_id(tmp_path: Path) -> None:
+    path = tmp_path / "train.jsonl"
+    sample = {
+        "id": "sample-1",
+        "prompt": [{"role": "user", "content": "상담 내용"}],
+        "completion": [{"role": "assistant", "content": "{}"}],
+    }
+    path.write_text(json.dumps(sample, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="split은 'train'"):
-        validate_sft_file(path, "train")
+    with pytest.raises(ValueError, match="source_group_id"):
+        validate_sft_file(path)
 
 
-def test_validate_sft_file_returns_full_task(tmp_path: Path) -> None:
+def test_validate_sft_file_returns_ids_and_groups(tmp_path: Path) -> None:
     path = tmp_path / "train.jsonl"
     write_sft(path)
 
-    _, _, tasks = validate_sft_file(path, "train")
+    ids, groups = validate_sft_file(path)
 
-    assert tasks == {"full"}
+    assert ids == {"sample-1"}
+    assert groups == {"group-1"}
 
 
 class WordTokenizer:

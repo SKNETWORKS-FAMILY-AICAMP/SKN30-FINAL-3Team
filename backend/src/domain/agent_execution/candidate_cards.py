@@ -20,12 +20,14 @@
 
 ## 병렬화
 
-후보를 **순차로** 처리한다. SQLModel `Session` 은 여러 async task 가 공유할 수 없고, 카드
-하나가 곧 transaction 하나라 세션을 나누면 커넥션 수와 fencing 이 함께 복잡해진다.
+입력 준비와 카드 저장은 순차로 처리하고, DB transaction을 닫은 뒤 cache miss의 모델
+호출만 병렬로 실행한다. SQLModel `Session`을 async task 사이에서 공유하지 않는다.
+모델 호출 일부가 실패해도 성공 카드는 개별 재검증 후 저장하며, 전체 확보 전에는 진행하지 않는다.
 """
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -37,6 +39,7 @@ from domain.agent_execution import repository
 from domain.agent_execution.anchor_card import (
     CardTarget,
     GenerationBinding,
+    PreparedGeneration,
     prepare_generation,
     store_position_card,
 )
@@ -284,24 +287,83 @@ async def generate_and_store_candidate_cards(
     moment = as_of or datetime.now(UTC)
     plan = plan_candidate_cards(session, run_id, worker_id, attempt_count)
 
-    cards: list[CandidateCard] = []
-    input_tokens = output_tokens = latency_ms = 0
+    def failed(ordinal: int, error: BaseException) -> None:
+        # 후보 순번과 고정 오류 타입만 남긴다. 후보 표시명, 상담 본문,
+        # Provider 응답과 예외 메시지는 로그하지 않는다.
+        logger.warning(
+            "f3_candidate_card_failed",
+            run_id=run_id,
+            attempt=attempt_count,
+            candidate_ordinal=ordinal,
+            candidate_count=len(plan.candidate_ids),
+            error_type=type(error).__name__,
+        )
+
+    # 1단계. 모든 후보의 입력을 조립한다. 각 호출이 자기 transaction 을 닫고 나온다.
+    prepared_cards: list[tuple[int, int, PreparedGeneration]] = []
     for candidate_ordinal, candidate_id in enumerate(plan.candidate_ids, start=1):
         try:
-            prepared = prepare_generation(
-                session,
-                run_id,
-                worker_id,
-                attempt_count,
-                binding,
-                target=CardTarget(anchor_type=plan.candidate_side, anchor_id=candidate_id),
-                expected_status=CANDIDATES_READY_STATUS,
-                as_of=moment,
+            prepared_cards.append(
+                (
+                    candidate_ordinal,
+                    candidate_id,
+                    prepare_generation(
+                        session,
+                        run_id,
+                        worker_id,
+                        attempt_count,
+                        binding,
+                        target=CardTarget(anchor_type=plan.candidate_side, anchor_id=candidate_id),
+                        expected_status=CANDIDATES_READY_STATUS,
+                        as_of=moment,
+                    ),
+                )
             )
-            result: PositionCardGenerationResult | None = None
-            if prepared.request is not None:
-                # cache miss 일 때만 모델을 부른다. transaction 은 이미 닫혀 있다.
-                result = await binding.generator.generate_position_card(prepared.request)
+        except BaseException as error:
+            failed(candidate_ordinal, error)
+            raise
+
+    # 2단계. cache miss만 병렬 생성한다. 모델 대기 중 transaction은 없다.
+    # 현재 Provider의 실제 병렬 경과 시간은 f3_timing으로 측정한다.
+    produced: dict[int, PositionCardGenerationResult] = {}
+    misses = [
+        (index, prepared.request)
+        for index, (_, _, prepared) in enumerate(prepared_cards)
+        if prepared.request is not None
+    ]
+    logger.info(
+        "f3_card_cache",
+        run_id=run_id,
+        attempt=attempt_count,
+        candidate_count=len(prepared_cards),
+        cache_misses=len(misses),
+        cache_hits=len(prepared_cards) - len(misses),
+    )
+    if misses:
+        outcomes = await asyncio.gather(
+            *(binding.generator.generate_position_card(request) for _, request in misses),
+            return_exceptions=True,
+        )
+        first_error: tuple[int, BaseException] | None = None
+        for (index, _), outcome in zip(misses, outcomes, strict=True):
+            if isinstance(outcome, BaseException):
+                if first_error is None:
+                    first_error = (prepared_cards[index][0], outcome)
+                continue
+            produced[index] = outcome
+    else:
+        first_error = None
+
+    # 3단계. 요청 순서대로 저장한다. 실패가 있어도 **성공한 카드는 저장하고** 예외를 올린다.
+    # 그래야 다음 시도가 cache hit 으로 건너뛴다. 상태는 아래에서 전부 확보됐을 때만 옮긴다.
+    cards: list[CandidateCard] = []
+    input_tokens = output_tokens = latency_ms = 0
+    for index, (candidate_ordinal, candidate_id, prepared) in enumerate(prepared_cards):
+        if prepared.request is not None and index not in produced:
+            continue  # 생성 실패만 건너뛴다. 후행 성공 카드도 저장해야 재시도에서 재사용된다.
+        result = produced.get(index)
+        try:
+            if result is not None:
                 diagnostics = result.diagnostics
                 usage = diagnostics.usage if diagnostics else None
                 if usage is not None:
@@ -329,17 +391,12 @@ async def generate_and_store_candidate_cards(
                 )
             )
         except BaseException as error:
-            # 후보 순번과 고정 오류 타입만 남긴다. 후보 표시명, 상담 본문,
-            # Provider 응답과 예외 메시지는 로그하지 않는다.
-            logger.warning(
-                "f3_candidate_card_failed",
-                run_id=run_id,
-                attempt=attempt_count,
-                candidate_ordinal=candidate_ordinal,
-                candidate_count=len(plan.candidate_ids),
-                error_type=type(error).__name__,
-            )
+            failed(candidate_ordinal, error)
             raise
+
+    if first_error is not None:
+        failed(*first_error)
+        raise first_error[1]
 
     stored = tuple(cards)
     _record_cards(

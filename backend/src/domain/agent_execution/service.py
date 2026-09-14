@@ -30,7 +30,7 @@ from domain.agent_execution.models import (
 
 logger = structlog.get_logger()
 
-# Worker 선점 정책. heartbeat 없이 lease 만료만으로 장애 Worker의 작업을 회수한다.
+# Worker 선점 정책. 실행 중에는 별도 세션의 heartbeat가 유효 lease를 갱신한다.
 LEASE_DURATION_SECONDS = 300
 MAX_CLAIM_ATTEMPTS = 3
 

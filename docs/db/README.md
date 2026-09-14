@@ -25,7 +25,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 
 ## 현재 기준선
 
-현재 기준선은 28개 테이블과 18개 전진 migration이다.
+현재 기준선은 31개 테이블과 19개 전진 migration이다.
 
 | 파일 | 도메인 | 테이블 수 | 주요 테이블 |
 |---|---|---:|---|
@@ -47,6 +47,7 @@ archive의 F1/F2/F3 표기는 원문 추적을 위해 유지한다. 실행 migra
 | 016_ALTER_AGENT_EXECUTION_JUDGMENT_CLAIM_INDEX.sql | 에이전트 실행 확장 | 0 | 중개 판정 중 상태 lease 회수용 선점 인덱스 |
 | 017_ALTER_PROPERTY_LEDGER_AGENDA_INDEX.sql | 매물·수요 원장 확장 | 0 | 일정·할 일 조회용 의뢰 만기·희망 입주일·최종 접촉·접수일 부분 인덱스 |
 | 018_CREATE_CALENDAR.sql | 캘린더 | 1 | calendar_event |
+| 019_CREATE_CHATBOT.sql | F4 챗봇 | 3 | chat_conversation, chat_request, chat_message |
 
 판단 품질 평가를 위해 다음 추적 사슬을 유지한다.
 
@@ -137,3 +138,7 @@ NNN_ACTION_SCOPE.sql
 - 개인정보별 법정·업무 보존 기간과 자동 파기 절차
 - 실제 고객 데이터 사용 여부와 동의·접근 감사 범위
 - 업무 상태값의 최종 목록과 상태 전이 규칙
+
+## F3 확장 롤백 경계
+
+#116·#117·#118 폐기로 020·021 migration 파일을 제거했다. 번호는 재사용하지 않는다. 이미 적용한 schema·trigger·적용 이력·시드 데이터는 Git revert로 복구되지 않는다. 기존 DB 전환 전 확인할 범위는 [ADR-0037](../../.agents/skills/project-wiki/references/decisions/ADR-0037-f3-expansion-retirement.md)의 운영 경계를 따른다.

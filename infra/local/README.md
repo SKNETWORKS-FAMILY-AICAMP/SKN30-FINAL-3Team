@@ -1,3 +1,10 @@
+# 로컬 개발 실행
+
+API·Worker·모델 선택은 저장소 루트에서 `just -f infra/justfile local-config`, `local-api`,
+`local-worker`, `local-model`을 사용한다. 각 변수의 소유·이전과 단계별 명령은
+[환경변수 관리](../../docs/development/environment-variables.md)가 정본이다.
+`run.py`는 Backend·AI 파일을 각각 읽어 검증하며 비밀값을 출력하거나 다른 파일로 복사하지 않는다.
+
 # 로컬 개발 DB
 
 backend를 실제 PostgreSQL에 붙여 보기 위한 컨테이너 구성이다. 운영 인프라는
@@ -42,7 +49,7 @@ uv run yoyo apply --batch
 uv run python src/manage.py create-development-user \
   --brokerage-name "개발 중개사무소" --login-id developer \
   --display-name "Developer" --role OWNER
-uv run python src/server.py
+uv run --locked python ../infra/local/run.py api
 ```
 
 출력된 `brokerage_id`, `login_id`와 `AUTH_DEVELOPMENT_ENABLED=true`를 Git에서 제외된

@@ -283,8 +283,24 @@ export interface PropertyListingUpdateDto extends Partial<PropertyListingCreateD
   row_version: number;
 }
 
+/**
+ * 구입장 생성과 함께 만드는 새 손님.
+ *
+ * 화면에는 기존 인물을 고르는 검색이 없다. 매물장이 세대 생성 시 `parties`로 임대인·임차인을
+ * 함께 만드는 것과 같은 방식으로, 새 손님도 구입장 생성 요청 한 번에 함께 만든다.
+ */
+export interface PropertyRequirementNewPartyDto {
+  name: string;
+  phone: string | null;
+}
+
 export interface PropertyRequirementCreateDto {
-  party_id: number;
+  /** 기존 인물에 새 구입장을 이을 때만 쓴다. 지금 화면은 이 경로를 쓰지 않는다. */
+  party_id?: number;
+  /** 새 손님을 만들 때 쓴다. `party_id`와 `new_party` 중 하나가 필수다. */
+  new_party?: PropertyRequirementNewPartyDto;
+  /** `new_party`를 쓸 때만 의미가 있다. 동의 없이는 저장이 거절된다(F1-DM-16). */
+  privacy_consent?: boolean;
   demand_type: string;
   received_at: string | null;
   desired_pyeongs: number[] | null;
@@ -305,7 +321,7 @@ export interface PropertyRequirementCreateDto {
 }
 
 export interface PropertyRequirementUpdateDto
-  extends Partial<Omit<PropertyRequirementCreateDto, "party_id">> {
+  extends Partial<Omit<PropertyRequirementCreateDto, "party_id" | "new_party" | "privacy_consent">> {
   row_version: number;
 }
 

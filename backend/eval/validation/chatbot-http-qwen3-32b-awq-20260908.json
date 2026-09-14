@@ -1,0 +1,458 @@
+{
+  "provider": "vllm",
+  "model": "Qwen/Qwen3-32B-AWQ",
+  "revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+  "endpoint_alias": "general-dev-gpu",
+  "rounds": 3,
+  "samples": 36,
+  "first_progress_p95_ms": 221.13513200019952,
+  "completion_p95_ms": 4818.982575998234,
+  "deleted": true,
+  "passed": false,
+  "rows": [
+    {
+      "case": 0,
+      "warmup": true,
+      "first_progress_ms": 484.1786420001881,
+      "elapsed_ms": 4648.4951979982725,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 1,
+      "warmup": false,
+      "first_progress_ms": 148.5429380009009,
+      "elapsed_ms": 3247.0192770015274,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 2,
+      "warmup": false,
+      "first_progress_ms": 143.6626670001715,
+      "elapsed_ms": 4281.138432997977,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 15,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 3,
+      "warmup": false,
+      "first_progress_ms": 136.54835700072,
+      "elapsed_ms": 4005.6040870003926,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 4,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 4,
+      "warmup": false,
+      "first_progress_ms": 183.49784800011548,
+      "elapsed_ms": 5246.501412999351,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 6,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 5,
+      "warmup": false,
+      "first_progress_ms": 179.82636599845137,
+      "elapsed_ms": 4583.003452997218,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 6,
+      "warmup": false,
+      "first_progress_ms": 151.6729229988414,
+      "elapsed_ms": 4023.2365020019643,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 7,
+      "warmup": false,
+      "first_progress_ms": 131.63647199689876,
+      "elapsed_ms": 4010.4014149983414,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 8,
+      "warmup": false,
+      "first_progress_ms": 139.84622900170507,
+      "elapsed_ms": 4280.596577998949,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 9,
+      "warmup": false,
+      "first_progress_ms": 221.13513200019952,
+      "elapsed_ms": 4399.698791999981,
+      "status": "COMPLETED",
+      "result_kind": "clarification",
+      "total": 0,
+      "passed": false,
+      "restored": true
+    },
+    {
+      "case": 10,
+      "warmup": false,
+      "first_progress_ms": 143.65795599951525,
+      "elapsed_ms": 4284.243705998961,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 11,
+      "warmup": false,
+      "first_progress_ms": 248.06813599934685,
+      "elapsed_ms": 4459.444977997919,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 12,
+      "warmup": false,
+      "first_progress_ms": 139.41370699831168,
+      "elapsed_ms": 4030.7978359996923,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 13,
+      "warmup": false,
+      "first_progress_ms": 136.03020300070057,
+      "elapsed_ms": 4280.063498998061,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 14,
+      "warmup": false,
+      "first_progress_ms": 140.02796999920974,
+      "elapsed_ms": 4017.21051399727,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 15,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 15,
+      "warmup": false,
+      "first_progress_ms": 155.68398899995373,
+      "elapsed_ms": 4008.889378997992,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 4,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 16,
+      "warmup": false,
+      "first_progress_ms": 139.16885800063028,
+      "elapsed_ms": 4289.5842070029175,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 6,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 17,
+      "warmup": false,
+      "first_progress_ms": 139.88053499997477,
+      "elapsed_ms": 4266.478331999679,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 18,
+      "warmup": false,
+      "first_progress_ms": 143.40939300018363,
+      "elapsed_ms": 4028.219023002748,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 19,
+      "warmup": false,
+      "first_progress_ms": 139.1983520006761,
+      "elapsed_ms": 4274.829133999447,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 20,
+      "warmup": false,
+      "first_progress_ms": 175.25048300012713,
+      "elapsed_ms": 4057.590230000642,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 21,
+      "warmup": false,
+      "first_progress_ms": 135.7885340003122,
+      "elapsed_ms": 4818.982575998234,
+      "status": "COMPLETED",
+      "result_kind": "clarification",
+      "total": 0,
+      "passed": false,
+      "restored": true
+    },
+    {
+      "case": 22,
+      "warmup": false,
+      "first_progress_ms": 143.81280800080276,
+      "elapsed_ms": 4289.67789699891,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 23,
+      "warmup": false,
+      "first_progress_ms": 139.98586000161595,
+      "elapsed_ms": 4029.0764609999314,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 24,
+      "warmup": false,
+      "first_progress_ms": 131.59683699996094,
+      "elapsed_ms": 4257.38529299997,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 25,
+      "warmup": false,
+      "first_progress_ms": 139.750930997252,
+      "elapsed_ms": 3992.6490869984264,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 26,
+      "warmup": false,
+      "first_progress_ms": 135.76685499720043,
+      "elapsed_ms": 4280.728688998352,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 15,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 27,
+      "warmup": false,
+      "first_progress_ms": 151.88570200189133,
+      "elapsed_ms": 4281.255397003406,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 4,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 28,
+      "warmup": false,
+      "first_progress_ms": 147.74704499723157,
+      "elapsed_ms": 4291.35051999765,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 6,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 29,
+      "warmup": false,
+      "first_progress_ms": 143.44541500031482,
+      "elapsed_ms": 4067.3301739989256,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 30,
+      "warmup": false,
+      "first_progress_ms": 199.86438900014036,
+      "elapsed_ms": 4355.888030000642,
+      "status": "COMPLETED",
+      "result_kind": "properties",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 31,
+      "warmup": false,
+      "first_progress_ms": 140.16307400015648,
+      "elapsed_ms": 4014.8639649996767,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 5,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 32,
+      "warmup": false,
+      "first_progress_ms": 140.06006099953083,
+      "elapsed_ms": 4584.978522998426,
+      "status": "COMPLETED",
+      "result_kind": "buyers",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 33,
+      "warmup": false,
+      "first_progress_ms": 164.08058000160963,
+      "elapsed_ms": 4069.128022001678,
+      "status": "COMPLETED",
+      "result_kind": "clarification",
+      "total": 0,
+      "passed": false,
+      "restored": true
+    },
+    {
+      "case": 34,
+      "warmup": false,
+      "first_progress_ms": 135.84730299771763,
+      "elapsed_ms": 4020.181946998491,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 35,
+      "warmup": false,
+      "first_progress_ms": 178.63819799822522,
+      "elapsed_ms": 4100.5063359989435,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 25,
+      "passed": true,
+      "restored": true
+    },
+    {
+      "case": 36,
+      "warmup": false,
+      "first_progress_ms": 151.44353399955435,
+      "elapsed_ms": 4306.452737997461,
+      "status": "COMPLETED",
+      "result_kind": "agenda",
+      "total": 0,
+      "passed": true,
+      "restored": true
+    }
+  ],
+  "model_profile": "qwen3-32b-awq",
+  "deployment_image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+  "artifact_sha256": "eee6ecb34a0b1c032e76f5f58d9af08736696cba8bdfa6247c670b065dd9c1ac",
+  "profiles_sha256": "2e92885bb17bc4cea6e25cea95550a353dc619a44d4da978eac96f81cb38e34f",
+  "profile": {
+    "model": "Qwen/Qwen3-32B-AWQ",
+    "revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+    "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+    "runtime_version": "0.28.0",
+    "quantization": "awq",
+    "load_format": "auto",
+    "max_model_len": 8192,
+    "max_num_seqs": 1,
+    "gpu_memory_utilization": 0.85,
+    "weights": [
+      {
+        "name": "model-00001-of-00004.safetensors",
+        "size": 4966384688,
+        "sha256": "ab7988215e3b087c884e0c14ce1994a64aac31dc9a37a4bcf29f5b45f3506e2e"
+      },
+      {
+        "name": "model-00002-of-00004.safetensors",
+        "size": 4998723112,
+        "sha256": "46faff349f1dd18ffe76993edd3d9fd32941d042331dc590525409bbe3d37edf"
+      },
+      {
+        "name": "model-00003-of-00004.safetensors",
+        "size": 4949671152,
+        "sha256": "6e9f763d8c31ad19f1cd67b0b599a38edffd76a4465a22ff5f7fcac46d820e63"
+      },
+      {
+        "name": "model-00004-of-00004.safetensors",
+        "size": 4410702792,
+        "sha256": "87f180889fead12b00b1bdf4dca3a3a14e4510e1e200bf56e31898e120b993d8"
+      }
+    ]
+  }
+}

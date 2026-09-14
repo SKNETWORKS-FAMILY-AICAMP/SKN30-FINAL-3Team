@@ -26,11 +26,15 @@
   평가·승격을 대체하지 않고 전용 `runpod-create-dev(-plan)`에서만 허용된다. 기반 commit과 adapter
   checksum 결속은 생략하지 않는다.
 - 실행 메타데이터에는 설정, 입력 체크섬, 코드 revision과 지표를 남기되 상담 전문은 남기지 않는다.
-- 학습 입력 변환은 `classification`과 `full`을 지원한다. `full`은 현재 장부 종류와
-  STT 텍스트를 prompt로, 상담 유형·장부 불일치·필드·근거·불확실성·요약의
-  6-key `expected`를 completion으로 사용한다.
+- 학습 입력 변환은 `classification`과 `full`을 지원한다. `full`은 STT 텍스트만 prompt로,
+  상담 유형·유형별 필드·근거·불확실성·요약의 5-key JSON을 completion으로 사용한다.
+  원천의 `ledger_type`과 `ledger_mismatch`는 기존 데이터 정합성 검증과 불일치 행 제외에만
+  사용하며 모델 입력·출력에는 넣지 않는다. 장부 추천과 기존 상세의 불일치 보호는 운영
+  pipeline이 상담 유형에서 결정적으로 처리한다. 변환된 SFT 레코드는 `id`,
+  `source_group_id`, `prompt`, `completion`만 보존하며 학습 과제는 `train_qlora.py`의
+  필수 `--task` 인자로 지정한다.
 - full-output 변환은 장부·라벨 불일치, fields/evidence 키 대응, evidence의 원문 포함과
-  필드 제안 금지 구간을 학습 전에 검사한다.
+  필드 제안 금지 구간을 학습 전에 검사하고, 기존 장부와 상담 유형이 불일치한 행은 제외한다.
 - full-output 학습은 별도 2048 토큰 설정을 사용하며, 채팅 템플릿 적용 후 전체
   prompt+completion이 설정 길이를 넘으면 잘라지 않고 학습을 중단한다.
 - test split은 SFT 변환 입력에서 차단하고 최종 비교에만 사용한다.

@@ -5,7 +5,7 @@
 1. models.yaml에서 Qwen3 모델 ID와 공통 생성 설정을 읽는다.
 2. 평가용 JSONL에서 STT 텍스트와 사람이 검수한 정답을 읽는다.
 3. Qwen3 모델을 한 번에 하나씩 로드해 모든 사례를 추론한다.
-4. 분류·필드 추출·장부 불일치·근거·지연시간 지표를 계산한다.
+4. 분류·유형별 필드 추출·근거·지연시간 지표를 계산한다.
 5. 모델별 상세 예측과 전체 비교용 summary.json을 저장한다.
 
 네 모델을 동시에 GPU에 올리는 코드가 아니다. 모델 하나의 평가가 끝나면 메모리에서
@@ -35,13 +35,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 # 모델마다 프롬프트가 달라지면 크기에 따른 성능을 공정하게 비교할 수 없으므로
 # 모든 후보가 이 프롬프트를 공통으로 사용한다.
 SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
-입력으로 STT 상담 텍스트와 현재 장부 종류만 받습니다.
+입력으로 STT 상담 텍스트만 받습니다.
 
 반드시 다음 규칙을 지키세요.
 - 매도·임대 의뢰는 매도의뢰, 매수·임차 수요는 매수문의로 분류합니다.
 - 공동중개, 단순문의, 불명확하거나 혼합된 상담은 기타상담으로 분류합니다.
-- 매물장에서 매수문의이거나 구입장에서 매도의뢰이면 ledger_mismatch를 true로 둡니다.
-- ledger_mismatch가 true이거나 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
+- 매도의뢰이면 매물장 필드만, 매수문의이면 구입장 필드만 추출합니다.
+- 기타상담이면 fields와 evidence는 빈 객체로 둡니다.
 - 원문에서 명확히 확인된 값만 fields에 넣습니다.
 - 불명확한 숫자, 날짜, 동, 호 또는 충돌하는 값은 확정하지 말고 uncertainties에 적습니다.
 - 기존 장부 값을 추측하거나 자동으로 덮어쓰지 않습니다.
@@ -51,7 +51,6 @@ SYSTEM_PROMPT = """당신은 부동산 상담 메모 분석기입니다.
 출력 형식:
 {
   "consultation_type": "매도의뢰|매수문의|기타상담",
-  "ledger_mismatch": false,
   "fields": {"필드명": "값"},
   "evidence": {"필드명": "원문 근거"},
   "uncertainties": ["불명확하거나 충돌한 내용"],
@@ -224,7 +223,8 @@ def load_dataset(
     """평가 JSONL을 한 줄씩 읽고 필수 필드가 있는지 검사한다.
 
     각 줄은 하나의 상담 사례다. classification은 transcript만 입력하고 label을 정답으로
-    사용한다. full은 transcript와 ledger_type을 입력하고 expected를 정답으로 사용한다.
+    사용한다. full은 transcript만 입력하고 expected에서 장부 불일치
+    사례를 제외한 뒤 유형별 필드를 정답으로 사용한다.
     어느 모드에서도 정답은 모델 프롬프트에 넣지 않는다.
     """
 
@@ -254,6 +254,8 @@ def load_dataset(
                     raise ValueError(f"{path}:{line_number}: label must be one of {allowed_types}")
             elif not isinstance(sample["expected"], dict):
                 raise ValueError(f"{path}:{line_number}: expected must be an object")
+            if task == "full" and sample["expected"].get("ledger_mismatch") is True:
+                continue
             samples.append(sample)
             if limit is not None and len(samples) >= limit:
                 break
@@ -306,14 +308,12 @@ def model_load_kwargs(quantization: str) -> dict[str, Any]:
 
 
 def build_user_prompt(sample: dict[str, Any], task: str) -> str:
-    """현재 장부 종류와 STT 결과만 모델의 사용자 입력으로 만든다.
+    """STT 결과만 모델의 사용자 입력으로 만든다.
 
     평가 정답 expected가 입력에 섞이면 모델이 답을 미리 보게 되므로 포함하지 않는다.
     """
 
-    if task == "classification":
-        return f"STT 상담 텍스트:\n{sample['transcript']}"
-    return f"현재 장부 종류: {sample['ledger_type']}\nSTT 상담 텍스트:\n{sample['transcript']}"
+    return f"STT 상담 텍스트:\n{sample['transcript']}"
 
 
 def extract_json(text: str) -> dict[str, Any]:
@@ -423,8 +423,7 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
     true_positive: Counter[str] = Counter()
     false_positive: Counter[str] = Counter()
     false_negative: Counter[str] = Counter()
-    mismatch_correct = 0
-    field_tp = field_fp = field_fn = unsupported_fields = 0
+    field_tp = field_fp = field_fn = 0
     evidence_grounding_violations = 0
 
     for row in parsed:
@@ -441,9 +440,6 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
             elif expected_class == label and predicted_class != label:
                 false_negative[label] += 1
 
-        if prediction.get("ledger_mismatch") is expected.get("ledger_mismatch"):
-            mismatch_correct += 1
-
         # 필드명과 정규화된 값이 모두 일치해야 올바른 추출로 인정한다.
         expected_fields = field_pairs(expected.get("fields", {}))
         predicted_fields = field_pairs(prediction.get("fields", {}))
@@ -453,9 +449,6 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
         field_fp += len(predicted_fields - expected_fields)
         field_fn += len(expected_fields - predicted_fields)
         evidence_grounding_violations += row["evidence_grounding_violations"]
-        # 장부가 맞지 않을 때 fields를 제안하면 금지 동작으로 집계한다.
-        if expected.get("ledger_mismatch") is True:
-            unsupported_fields += len(predicted_fields)
 
     class_f1: dict[str, float] = {}
     for label in allowed_types:
@@ -481,12 +474,10 @@ def calculate_metrics(rows: list[dict[str, Any]], allowed_types: list[str]) -> d
         "classification_accuracy": safe_divide(class_correct, len(parsed)),
         "classification_macro_f1": statistics.fmean(class_f1.values()) if class_f1 else 0.0,
         "classification_f1_by_class": class_f1,
-        "ledger_mismatch_accuracy": safe_divide(mismatch_correct, len(parsed)),
         "field_precision": field_precision,
         "field_recall": field_recall,
         "field_f1": safe_divide(2 * field_precision * field_recall, field_precision + field_recall),
         "evidence_grounding_violations": evidence_grounding_violations,
-        "unsupported_field_proposals_on_mismatch": unsupported_fields,
         "mean_latency_seconds": statistics.fmean(latencies) if latencies else None,
         "p95_latency_seconds": percentile(latencies, 0.95),
     }

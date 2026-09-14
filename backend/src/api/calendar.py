@@ -57,6 +57,17 @@ def create_calendar_event(
     return CalendarEventResponse.from_domain(event)
 
 
+@router.get("/events/{event_id}", response_model=CalendarEventResponse)
+def get_calendar_event(
+    event_id: int,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> CalendarEventResponse:
+    """Revalidate a saved chatbot reference before opening its calendar detail."""
+    event = service.require_calendar_event(db, user.brokerage_id, event_id)
+    return CalendarEventResponse.from_domain(event)
+
+
 @router.patch("/events/{event_id}", response_model=CalendarEventResponse)
 def update_calendar_event(
     event_id: int,

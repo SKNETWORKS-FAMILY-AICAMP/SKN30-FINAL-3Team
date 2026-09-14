@@ -454,8 +454,24 @@ class PropertyRequirementDetailResponse(BaseModel):
     desired_complexes: list[RequirementComplexResponse]
 
 
+class PropertyRequirementNewPartyRequest(BaseModel):
+    """구입장을 만들며 함께 등록하는 새 손님.
+
+    구입장은 인물이 행의 주체라 `party_id`가 서버 필수값이지만, 화면에는 기존 인물을
+    고르는 검색이 없다. 매물장이 세대 생성 시 `parties`로 임대인·임차인을 함께 만드는 것과
+    같은 방식으로, 새 손님도 구입장 생성 요청 한 번에 함께 만든다.
+    """
+
+    name: str = Field(min_length=1, max_length=150)
+    phone: str | None = Field(default=None, max_length=320)
+
+
 class PropertyRequirementCreateRequest(BaseModel):
-    party_id: int
+    party_id: int | None = None
+    #: `party_id`가 없으면 이 값으로 새 인물을 만든다. 실명이 아닌 별칭을 허용한다(F1-DM-08).
+    new_party: PropertyRequirementNewPartyRequest | None = None
+    #: 새 인물을 만들 때만 의미가 있다. 동의 없이는 저장을 거절한다(F1-DM-16).
+    privacy_consent: bool = False
     demand_type: str = Field(min_length=1, max_length=20)
     received_at: date | None = None
     desired_pyeongs: list[Decimal] | None = None

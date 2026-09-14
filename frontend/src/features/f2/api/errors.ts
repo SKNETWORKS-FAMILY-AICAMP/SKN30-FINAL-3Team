@@ -32,6 +32,8 @@ function messageForCode(code: string | undefined): string | null {
       return "음성메모를 처리하지 못했습니다. 원본 파일을 유지한 채 다시 분석할 수 있습니다.";
     case "F2_UNAVAILABLE":
       return "음성 분석 서비스를 현재 사용할 수 없습니다. 잠시 후 다시 분석해 주세요.";
+    case "F2_BUSY":
+      return "다른 음성메모를 분석 중입니다. 잠시 후 다시 분석해 주세요.";
     default:
       return null;
   }
@@ -54,6 +56,7 @@ function messageForKind(kind: ApiErrorKind): string {
     case "validation":
       return "음성 파일과 입력 조건을 확인한 뒤 다시 분석해 주세요.";
     case "server":
+    case "rateLimited":
       return "음성메모 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
     case "contract":
       return "음성 분석 응답 형식이 예상과 다릅니다. 배포 상태를 확인해 주세요.";

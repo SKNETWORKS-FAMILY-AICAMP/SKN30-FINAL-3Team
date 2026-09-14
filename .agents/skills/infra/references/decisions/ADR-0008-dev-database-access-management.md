@@ -1,13 +1,13 @@
 ---
 status: 결정
-updated: 2026-09-03
+updated: 2026-09-09
 ---
 
 # ADR-0008: 개발 DB 계정과 IAM 인증 관리
 
 - 상태: 승인됨
 - 결정일: 2026-08-19
-- 수정일: 2026-09-03
+- 수정일: 2026-09-09
 
 ## 맥락
 
@@ -26,7 +26,7 @@ Backend는 현재 일반 실행에도 `DB_MIGRATION_URL`을 요구하므로 migr
 - `app_migrator`는 비밀번호 없이 IAM DB 인증을 사용하고 `app_owner`로 전환할 수 있다. 미래 delivery identity의 migration 연결점으로 남긴다.
 - `team-db-tunnel`의 모든 IAM 사용자는 같은 이름의 PostgreSQL LOGIN 역할, `rds_iam`, `app_owner` 권한을 받는다.
 - 개인 DDL 권한은 개발 환경에만 허용한다. DDL은 커밋된 Yoyo migration으로만 실행하고 운영 승격 전 개인 `app_owner` 권한을 제거한다.
-- Yoyo는 `PGOPTIONS=-c role=app_owner`로 실행해 객체 소유자가 개인 계정이 되지 않게 한다.
+- Yoyo는 `PGOPTIONS=-c role=app_owner`로 실행해 객체 소유자가 개인 계정이 되지 않게 한다. delivery의 migration 컨테이너에도 같은 설정을 적용해 app_migrator가 새 테이블을 직접 소유하여 app_rw default privileges를 누락하지 않도록 한다. API·Worker에는 역할 전환을 주입하지 않는다.
 
 ### Secret과 Terraform 경계
 

@@ -39,6 +39,8 @@ export interface LedgerRowMeta {
   rowVersion: number | null;
   sync: RowSyncState;
   customFields: Record<string, unknown>;
+  /** 편집 전 마지막 서버 상담 내용. 화면 초안과 구분해 중복 추가를 막는다. */
+  savedInteractionContent?: string;
 }
 
 export interface PropertyRawText {
@@ -205,6 +207,7 @@ const SAVED_IDENTITY_KEYS = [
   "listingRowVersion",
   "partyId",
   "customFields",
+  "savedInteractionContent",
 ] as const;
 
 /**

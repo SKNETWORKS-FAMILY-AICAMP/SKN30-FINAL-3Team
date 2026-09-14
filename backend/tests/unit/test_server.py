@@ -11,4 +11,4 @@ def test_server_uses_configured_nondefault_listener() -> None:
     with patch("server.uvicorn.run") as run:
         serve(config)
 
-    run.assert_called_once_with("main:app", host="0.0.0.0", port=8123)
+    run.assert_called_once_with("main:app", host="0.0.0.0", port=8123, workers=1)

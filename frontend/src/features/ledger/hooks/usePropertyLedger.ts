@@ -138,13 +138,19 @@ export function usePropertyLedger(
         }
 
         // 상담 로그는 추가 전용이다. 실제로 바뀌었을 때만 새 로그를 남긴다.
-        const newLog = newInteractionContent(row.log, "");
+        // 최신 서버 로그와 비교하므로 다른 필드 저장과 후속 조회 실패 뒤 재시도도 중복을 만들지 않는다.
+        const changedLog = newInteractionContent(row.log, row.savedInteractionContent);
+        const latestLogs = changedLog == null ? null
+          : await ledgerTransport.listClientInteractions({ unitId: unitId, limit: 1 });
+        const newLog = changedLog == null ? null
+          : newInteractionContent(changedLog, latestLogs?.items[0]?.interaction_content);
         if (newLog != null) {
           await ledgerTransport.createClientInteraction({
             interaction_content: newLog,
             unit_id: unitId,
           });
         }
+        patchRow(row.id, (current) => ({ ...current, savedInteractionContent: row.log }));
 
         const refreshed = await ledgerTransport.getPropertyUnit(unitId);
         const saved = applyLatestInteraction(

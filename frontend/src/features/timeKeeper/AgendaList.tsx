@@ -67,8 +67,7 @@ function ContactLine({ item }: { item: AgendaItemDto }) {
  * 종류 하나의 묶음.
  *
  * ``renderItems``만 그리고 ``hidden``은 ``group``(창 전체 참값 기준)으로 그대로 잰다. 밀린
- * 재연락·재확인이 아래 별도 묶음으로 빠져도 "상한에 걸려 아예 못 받은 건수"라는 뜻은 바뀌지
- * 않는다.
+ * 재확인이 아래 별도 묶음으로 빠져도 "상한에 걸려 아예 못 받은 건수"라는 뜻은 바뀌지 않는다.
  */
 function AgendaGroupSection({
   group,
@@ -123,7 +122,7 @@ function AgendaGroupSection({
 }
 
 /**
- * 되돌아보는 기간을 넘겨 밀린 재연락·재확인 한 줄.
+ * 되돌아보는 기간을 넘겨 밀린 재확인 한 줄.
  *
  * 여러 종류가 한 묶음에 섞이므로 행마다 종류 이름을 함께 세운다. "다시 보지 않기"는 이
  * 브라우저에서만 감추고, 다시 연락해 기한이 새로 생기면 감춘 기록과 무관하게 다시 보인다.
@@ -173,9 +172,9 @@ function NeglectedSection({
   if (items.length === 0) return null;
 
   return (
-    <section className="time-keeper__group time-keeper__group--neglected" aria-label="밀린 재연락·재확인">
+    <section className="time-keeper__group time-keeper__group--neglected" aria-label="밀린 재확인">
       <h3 className="time-keeper__group-heading">
-        <span className="time-keeper__group-name">밀린 재연락·재확인</span>
+        <span className="time-keeper__group-name">밀린 재확인</span>
         <span className="time-keeper__group-count">{items.length}건</span>
       </h3>
       <p className="time-keeper__group-note">
@@ -223,7 +222,7 @@ export function AgendaList({
   // 비어 있어 어느 값을 써도 화면에 드러나지 않으므로 문서화된 기본값(7일)으로 충분하다.
   const effectiveOverdueDays = overdueDays ?? 7;
   const groups = groupAgenda(items, categories);
-  // 감춘 건은 완전히 빠진다. 밀린 재연락·재확인이 "다가오는 일정" 쪽으로 되돌아가지 않는다.
+  // 감춘 건은 완전히 빠진다. 밀린 재확인이 "다가오는 일정" 쪽으로 되돌아가지 않는다.
   const neglected = items.filter(
     (item) =>
       isNeglected(item, effectiveOverdueDays) && !dismissed.isDismissed(neglectedDismissKey(item)),

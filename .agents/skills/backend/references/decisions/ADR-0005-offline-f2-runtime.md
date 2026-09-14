@@ -5,6 +5,8 @@ updated: 2026-09-01
 
 # ADR-0005: Infra endpoint 상태에 따른 F2 offline runtime
 
+> 환경 입력·Worker 실행 계약은 [프로젝트 ADR-0034](../../../project-wiki/references/decisions/ADR-0034-module-owned-environment.md)에서 부분 대체한다.
+
 - 상태: 승인됨
 - 대체: [ADR-0004](ADR-0004-always-on-f2-runtime.md)의 Backend 시작 시 F2 runtime 항상 초기화 조항
 

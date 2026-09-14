@@ -1,16 +1,42 @@
 # Frontend
 
+부동산 중개 원장(F1), 음성 AI 입력 자동화(F2), 멀티 에이전트 중개 판단(F3), 그리고 지능형 업무 어시스턴트 챗봇을 제공하는 React 19 기반 웹 애플리케이션입니다.
+
+---
+
+## 주요 기능
+
+- **중개 원장 및 상담 관리 (F1 / `src/features/ledger`, `timeKeeper`)**:
+  - AG Grid 기반 매물 및 구입 원장 그리드 (고속 필터링, 정렬, 행 추가/수정/삭제)
+  - 상세 워크스페이스, 고객/단지 마스터 연동 및 상담 로그 타임라인
+- **음성 상담 AI 입력 자동화 (F2 / `src/features/f2`)**:
+  - 현장 상담 음성메모 파일 업로드 및 STT 전사·필드 추출 진행 상태 표시
+  - 원문 근거(Evidence) 및 기존 장부값과의 차이점(Diff) 검토 모달
+  - 중개사 수정 및 1-Click 승인을 통한 원장 데이터 자동 반영
+- **멀티 에이전트 중개 판단 (F3 / `src/features/f3`)**:
+  - 매물 및 손님 측 포지션 카드(입장, 제약, 유연성) 뷰어
+  - 비동기 에이전트 실행 상태 폴링 및 결과 조회
+  - 중개 성사 가능성(High/Med/Low), 타협안, 리스크를 포함한 판정 리포트 렌더링
+- **지능형 업무 어시스턴트 챗봇 (`src/features/chatbot`)**:
+  - 자연어 질의를 통한 장부 조건 검색(매물, 구입 조건, 일정 등)
+  - Server-Sent Events (SSE) 기반 실시간 스트리밍 응답
+  - 대화 히스토리 영속화 및 F2 음성 분석 모달 직접 호출 연동
+- **인증 및 세션 (`src/features/auth`)**:
+  - 로컬/개발 환경용 개발 세션 원클릭 로그인 지원 (`VITE_AUTH_DEVELOPMENT_ENABLED=true`)
+  - 안전한 세션 쿠키 기반 API 통신
+
+---
+
 ## 요구사항
 
 로컬에서 `frontend/`를 설치하고 실행하려면 다음 환경이 필요합니다.
 
-- Node.js `22.18.0` 이상(CodeBuild와 같은 22 major version 권장)
-- Node.js 22에 포함된 npm
-- 의존성 설치를 위한 인터넷 연결 및 npm 레지스트리 접근 권한
-- 개발 서버에 접속할 최신 웹 브라우저
-- 저장소를 내려받고 `frontend/` 디렉터리를 읽고 실행할 수 있는 권한
+- **Node.js `22.18.0` 이상** (CodeBuild와 동일한 22 major version 권장)
+- **npm `11.x` 이상**
+- 개발 서버에 접속할 최신 웹 브라우저 (Chrome 권장)
+- (선택) 전체 기능 확인 시 로컬 Backend API 서버(`http://127.0.0.1:8000`)
 
-별도의 백엔드 서버, 데이터베이스 또는 환경변수는 현재 로컬 프로토타입 실행에 필요하지 않습니다.
+---
 
 ## 설치
 
@@ -21,11 +47,9 @@ cd frontend
 npm ci
 ```
 
-의존성 버전은 `package-lock.json`으로 고정되어 있습니다. 잠금 파일을 갱신해야 하는 경우에만 다음 명령을 사용합니다.
+의존성 버전은 `package-lock.json`으로 고정되어 있습니다.
 
-```bash
-npm install
-```
+---
 
 ## 로컬 실행
 
@@ -36,44 +60,68 @@ cd frontend
 npm run dev
 ```
 
-터미널에 표시된 로컬 주소를 브라우저에서 엽니다. Vite 개발 서버는 기본적으로 `5173` 포트를 사용하며, 설정상 컨테이너·원격 환경에서도 접근할 수 있도록 열려 있습니다.
+터미널에 표시된 로컬 주소(`http://localhost:5173`)를 브라우저에서 엽니다.
 
-주요 npm 명령은 다음과 같습니다.
+### 주요 npm 명령어
 
 ```bash
-npm run dev       # 개발 서버
-npm run preview   # 빌드 결과 미리보기
-npm run typecheck # TypeScript strict 검사
-npm run test:ledger # 원장 변환 테스트
-npm run test:auth   # 인증 계약·로그인 화면 테스트
-npm run test:env    # 환경변수 우선순위·검증 테스트
-npm run build     # 프로덕션 빌드
-npm run test:release # dist/client release 구조 검사
+npm run dev           # Vite 개발 서버 실행 (기본 포트: 5173)
+npm run build         # 프로덕션 번들 빌드 (dist/client)
+npm run preview       # 빌드 결과 로컬 미리보기
+npm run typecheck     # TypeScript strict 타입 검사
+npm run test:ledger   # 원장 변환 및 데이터 매핑 테스트
+npm run test:auth     # 인증 계약 및 로그인 화면 테스트
+npm run test:env      # 환경변수 우선순위 및 유효성 검증 테스트
+npm run test:release  # release 산출물 구조 검사
 ```
 
-## 환경변수
+---
+
+## 환경변수 설정
 
 - `frontend/.env.local`은 비민감 팀 공통 로컬 값으로 Git에서 관리합니다.
-- 개인 재정의가 필요하면 Git에서 제외된 `frontend/.env`에 바꿀 키만 작성합니다.
-- npm script는 Node의 env-file 기능으로 `.env.local` 다음 선택적 `.env`를 읽습니다. 최종 우선순위는 `process env > .env > .env.local`입니다.
-- `.env.production`, `.env.development`, `.env.prod` 같은 profile 파일은 사용하지 않으며, 존재하면 Vite가 시작을 거부합니다.
-- `VITE_` 변수는 브라우저 번들에 포함되므로 비밀값을 넣지 않습니다. 앱은 승인된 여섯 개의 `VITE_` 키만 검증해 번들에 넣습니다.
-- `VITE_AUTH_DEVELOPMENT_ENABLED` 는 비밀값이 아닌 편의용 표시 플래그입니다. 문자열 `true` 또는 `false`만 허용하며, `true`일 때만 로그인 화면에 `개발용 세션으로 로그인` 버튼을 표시합니다. 실제 API 활성화 여부는 Backend 설정이 최종 통제합니다.
-- `VITE_API_BASE_URL`은 CloudFront 동일 origin의 `/api` 또는 `/api/...` 상대 경로여야 합니다. 절대 URL과 외부 origin은 빌드 시 거부됩니다.
-- `FRONTEND_BACKEND_ORIGIN`은 로컬 Vite proxy 전용입니다. `VITE_` prefix가 없어 브라우저 번들에 포함되지 않습니다.
-- 기존 개인 `.env`에 `VITE_BACKEND_ORIGIN`이 있다면 `FRONTEND_BACKEND_ORIGIN`으로 이름을 바꿔야 합니다.
+- 개인별 재정의가 필요하면 Git에서 제외된 `frontend/.env`에 변경할 키만 작성합니다.
+- 우선순위는 `process env > .env > .env.local`입니다.
+- `.env.production`, `.env.development` 같은 profile 파일은 사용하지 않습니다.
 
-## 참고
+| 환경변수 | 기본값 | 설명 |
+|---|---|---|
+| `VITE_API_BASE_URL` | `/api` | API 호출 상대 경로 (CloudFront 및 Vite Proxy 대상) |
+| `FRONTEND_BACKEND_ORIGIN` | `http://127.0.0.1:8000` | 로컬 Vite proxy 대상 Backend 주소 (번들에 미포함) |
+| `VITE_AUTH_DEVELOPMENT_ENABLED` | `true` (로컬) | 로그인 화면의 '개발용 세션으로 로그인' 버튼 노출 여부 |
 
-- 진입점: `src/main.jsx`
-- 애플리케이션 조합: `src/AppShell.jsx`
-- 주요 기능: `src/features/`
-- 프로토타입 데이터: `src/data/ledgerData.js`
-- 프로토타입 가정값: `src/config/prototypeAssumptions.js`
-- 스타일: `src/styles.css`, `src/shell.css`, `src/features/*.css`
-- 빌드 설정: `vite.config.mjs`
-- CodeBuild 검증 단계와 같은 정적·원장·환경 검사는 저장소 루트에서 `infra/delivery/scripts/verify_frontend.sh`로 실행합니다.
-- release 산출물 생성 계약은 `infra/delivery/scripts/build_frontend_release.sh`로 별도 검증합니다.
-- release artifact는 Vite가 생성한 `dist/client`이며 OpenAI Sites worker·server bundle은 만들지 않습니다.
+> [!NOTE]
+> `VITE_` prefix가 붙은 변수는 브라우저 번들에 포함되므로 비밀값을 절대 기록하지 않습니다.
 
-프로토타입 가정값은 제품 정책이나 운영 제한으로 간주하지 않습니다. 운영 기능을 추가할 때는 API 계약, 개인정보 처리 기준, 인증·권한과 실제 저장 방식을 별도로 확인해야 합니다.
+---
+
+## 디렉터리 구조 및 주요 컴포넌트
+
+```text
+frontend/
+├── src/
+│   ├── main.jsx                  # React 진입점
+│   ├── AppShell.jsx              # 전체 레이아웃 (네비게이션, 챗봇 플로팅 패널)
+│   ├── features/
+│   │   ├── auth/                 # 로그인 화면, 세션 관리 훅
+│   │   ├── ledger/               # 매물/구입 원장 AG Grid 및 워크스페이스
+│   │   ├── f2/                   # 음성 업로드, STT 결과, Diff 검토 모달
+│   │   ├── f3/                   # 포지션 카드, 판정 리포트 뷰어
+│   │   ├── chatbot/              # 챗봇 패널, SSE 스트리밍 훅, 검색 카드
+│   │   ├── timeKeeper/           # 상담 로그 및 고객 타임라인
+│   │   └── calendar/             # 일정 캘린더
+│   ├── data/                     # 프로토타입/목업 데이터
+│   └── styles.css                # 공통 스타일
+├── package.json
+└── vite.config.mjs               # Vite 및 프록시 설정
+```
+
+---
+
+## 코드 품질 검증
+
+저장소 루트에서 다음 스크립트를 실행하여 CI와 동일한 정적 검사를 수행할 수 있습니다.
+
+```bash
+infra/delivery/scripts/verify_frontend.sh
+```

@@ -1,4 +1,3 @@
-import json
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
@@ -7,7 +6,7 @@ import pytest
 from botocore.credentials import Credentials, ReadOnlyCredentials
 from openai import AsyncOpenAI
 
-from brokerage_ai.core.config import AiProfile, bind_ai_config
+from brokerage_ai.core.config import AiProfile, BedrockLlmEndpointConfig, bind_ai_config
 from brokerage_ai.core.types import ProviderKind
 from brokerage_ai.runtime import ClientFactory, HttpClientFactory, create_ai_runtime
 
@@ -15,13 +14,52 @@ from brokerage_ai.runtime import ClientFactory, HttpClientFactory, create_ai_run
 class FakeClient:
     def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
-        self.close = AsyncMock()
+        http_client = options.get("http_client")
+        self.close = AsyncMock(side_effect=http_client.aclose if http_client is not None else None)
 
 
 class FakeHttpClient:
     def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
         self.aclose = AsyncMock()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "provider,model", [("vllm", "Qwen/Qwen3.8-27B-FP8"), ("openai", "gpt-5.6-luna")]
+)
+async def test_general_timeout_does_not_change_shared_endpoint_f2_or_embeddings(provider, model):
+    created: list[FakeClient] = []
+
+    def factory(**options: Any) -> AsyncOpenAI:
+        client = FakeClient(options)
+        created.append(client)
+        return cast(AsyncOpenAI, client)
+
+    config = bind_ai_config(
+        {
+            "AI_REQUEST_TIMEOUT_SECONDS": "60",
+            "AI_GENERAL_REQUEST_TIMEOUT_SECONDS": "300",
+            "AI_GENERAL_PROVIDER": provider,
+            "AI_GENERAL_MODEL": model,
+            "AI_GENERAL_BASE_URL": "https://shared.example/v1",
+            "AI_GENERAL_API_KEY": "same-key",
+            "AI_VLLM_SLLM_BASE_URL": "https://shared.example/v1",
+            "AI_VLLM_SLLM_API_KEY": "same-key",
+            "AI_VLLM_STT_BASE_URL": "https://shared.example/stt/v1",
+            "AI_VLLM_EMBEDDING_BASE_URL": "https://shared.example/v1",
+            "AI_VLLM_EMBEDDING_API_KEY": "same-key",
+        },
+        AiProfile.TEST,
+    )
+    runtime = create_ai_runtime(config, client_factory=factory)
+    assert len(created) == 2
+    assert sorted(client.options["timeout"] for client in created) == [60, 300]
+    assert all(client.options["max_retries"] == 0 for client in created)
+    await runtime.close()
+    await runtime.close()
+    for client in created:
+        client.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -36,7 +74,6 @@ async def test_runtime_reuses_client_for_equal_vllm_endpoints_and_closes_once() 
     config = bind_ai_config(
         {
             "AI_REQUEST_TIMEOUT_SECONDS": "12.5",
-            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "http://localhost:8000/v1",
             "AI_VLLM_STT_BASE_URL": "http://localhost:8002/v1",
             "AI_VLLM_EMBEDDING_BASE_URL": "http://localhost:8000/v1",
@@ -68,7 +105,7 @@ async def test_runtime_context_manager_closes_clients() -> None:
         created.append(client)
         return cast(AsyncOpenAI, client)
 
-    config = bind_ai_config({"AI_OPENAI_API_KEY": "test-key"}, AiProfile.TEST)
+    config = bind_ai_config({"AI_GENERAL_API_KEY": "test-key"}, AiProfile.TEST)
 
     async with create_ai_runtime(
         config, client_factory=cast(ClientFactory, client_factory)
@@ -87,22 +124,15 @@ async def test_runtime_keeps_default_and_aliased_vllm_routes_separate() -> None:
         created.append(client)
         return cast(AsyncOpenAI, client)
 
-    address_book = [
-        {
-            "alias": "general-dev-gpu",
-            "provider": "vllm",
-            "base_url": "https://pod.example/v1",
-            "api_key_env": "AI_GENERAL_DEV_GPU_API_KEY",
-        }
-    ]
     config = bind_ai_config(
         {
-            "AI_F2_PROVIDER_STATUS": "active",
             "AI_VLLM_SLLM_BASE_URL": "https://pod.example/v1",
             "AI_VLLM_SLLM_API_KEY": "shared-key",
             "AI_VLLM_STT_BASE_URL": "https://pod.example/stt/v1",
-            "AI_LLM_ENDPOINTS": json.dumps(address_book),
-            "AI_GENERAL_DEV_GPU_API_KEY": "shared-key",
+            "AI_GENERAL_PROVIDER": "vllm",
+            "AI_GENERAL_MODEL": "Qwen/Qwen3.8-27B-FP8",
+            "AI_GENERAL_BASE_URL": "https://pod.example/v1",
+            "AI_GENERAL_API_KEY": "shared-key",
         },
         AiProfile.DEV,
     )
@@ -112,7 +142,9 @@ async def test_runtime_keeps_default_and_aliased_vllm_routes_separate() -> None:
     default = runtime.providers.get_llm(ProviderKind.VLLM)
     aliased = runtime.providers.get_llm(ProviderKind.VLLM, "general-dev-gpu")
     assert default is not aliased
-    assert len(created) == 1
+    assert len(created) == 2
+    assert "http_client" not in created[0].options
+    assert isinstance(created[1].options["http_client"], httpx.AsyncClient)
     await runtime.close()
 
 
@@ -131,22 +163,24 @@ async def test_runtime_reuses_and_closes_bedrock_http_client_once() -> None:
     config = bind_ai_config(
         {
             "AI_REQUEST_TIMEOUT_SECONDS": "15",
-            "AI_LLM_ENDPOINTS": json.dumps(
-                [
-                    {
-                        "alias": "general-dev-bedrock",
-                        "provider": "bedrock",
-                        "aws_region": "ap-northeast-2",
-                    },
-                    {
-                        "alias": "general-staging-bedrock",
-                        "provider": "bedrock",
-                        "aws_region": "us-east-1",
-                    },
-                ]
-            ),
+            "AI_GENERAL_PROVIDER": "bedrock",
+            "AI_GENERAL_MODEL": "global.openai.gpt-5.6-luna",
+            "AI_GENERAL_AWS_REGION": "ap-northeast-2",
         },
         AiProfile.DEV,
+    )
+
+    config = config.model_copy(
+        update={
+            "llm_endpoints": (
+                *config.llm_endpoints,
+                BedrockLlmEndpointConfig(
+                    alias="general-staging-bedrock",
+                    provider=ProviderKind.BEDROCK,
+                    aws_region="us-east-1",
+                ),
+            )
+        }
     )
 
     runtime = create_ai_runtime(

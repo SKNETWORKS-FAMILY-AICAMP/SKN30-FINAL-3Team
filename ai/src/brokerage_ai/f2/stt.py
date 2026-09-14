@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import wave
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -9,6 +11,55 @@ from openai import OpenAI, OpenAIError
 from brokerage_ai.core.errors import translate_openai_error
 from brokerage_ai.f2.errors import AudioInputError, EmptyTranscriptionError, F2DependencyError
 from brokerage_ai.f2.types import Transcription
+
+# 확장자는 전사 서버가 읽을 수 있는지를 보장하지 않는다. libsndfile은 MP4 컨테이너와 AAC를
+# 열지 못하고, WAV라도 48kHz 스테레오나 24bit·float이면 거부될 수 있다. Whisper가 어차피
+# 16kHz mono로 다시 샘플링하므로 입력 형식을 하나로 정규화해서 보낸다.
+TRANSCODE_SAMPLE_RATE = 16000
+
+
+def _frame_bytes(frame: Any) -> bytes:
+    """packed s16 mono frame에서 정렬 padding을 제외한 실제 샘플만 꺼낸다."""
+
+    return bytes(frame.planes[0])[: frame.samples * 2]
+
+
+def decode_to_wav_bytes(path: Path) -> bytes:
+    """업로드된 음성을 16kHz mono WAV 바이트로 디코딩한다.
+
+    Whisper가 어차피 16kHz mono로 다시 샘플링하므로 여기서 맞춰 보내면 업로드 크기도
+    줄어든다. PyAV는 ffmpeg 라이브러리를 wheel에 포함하므로 시스템 ffmpeg가 필요없다.
+    """
+
+    try:
+        av = import_module("av")
+    except ModuleNotFoundError as error:
+        raise F2DependencyError("av가 설치되어 있지 않아 음성을 변환할 수 없습니다.") from error
+
+    resampler = av.AudioResampler(format="s16", layout="mono", rate=TRANSCODE_SAMPLE_RATE)
+    chunks: list[bytes] = []
+    try:
+        with av.open(str(path)) as container:
+            streams = container.streams.audio
+            if not streams:
+                raise AudioInputError(f"음성 트랙이 없습니다: {path.name}")
+            for frame in container.decode(streams[0]):
+                chunks.extend(_frame_bytes(resampled) for resampled in resampler.resample(frame))
+            chunks.extend(_frame_bytes(resampled) for resampled in resampler.resample(None))
+    except (OSError, av.FFmpegError) as error:
+        raise AudioInputError(f"음성 파일을 디코딩할 수 없습니다: {path.name}") from error
+
+    payload = b"".join(chunks)
+    if not payload:
+        raise AudioInputError(f"디코딩 결과가 비어 있습니다: {path.name}")
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(TRANSCODE_SAMPLE_RATE)
+        wav_file.writeframes(payload)
+    return buffer.getvalue()
 
 
 class VllmWhisperTranscriber:
@@ -30,21 +81,24 @@ class VllmWhisperTranscriber:
         if not path.is_file():
             raise AudioInputError(f"음성 파일을 찾을 수 없습니다: {path}")
 
-        try:
-            with path.open("rb") as audio_file:
-                response = self._client.audio.transcriptions.create(
-                    model=self._model_id,
-                    file=audio_file,
-                    language=self._language,
-                    response_format="json",
-                )
-        except OpenAIError as error:
-            raise translate_openai_error(error) from None
+        upload: Any = (f"{path.stem}.wav", decode_to_wav_bytes(path), "audio/wav")
+        response = self._create(upload)
 
         text = response.text.strip()
         if not text:
             raise EmptyTranscriptionError("STT 결과가 비어 있어 sLLM 분석을 중단했습니다.")
         return Transcription(text=text, model=self._model_id)
+
+    def _create(self, upload: Any) -> Any:
+        try:
+            return self._client.audio.transcriptions.create(
+                model=self._model_id,
+                file=upload,
+                language=self._language,
+                response_format="json",
+            )
+        except OpenAIError as error:
+            raise translate_openai_error(error) from None
 
 
 class FasterWhisperTranscriber:

@@ -137,7 +137,7 @@ test("캘린더 갈래의 응답도 계약을 지키면 필드를 잃지 않고 
 });
 
 test("해당되는 내용이 없는 종류는 묶음 자체가 생기지 않는다", () => {
-  // 임대차 만기 2건만 있는 날. 재연락·입주일 같은 나머지 종류는 흔적도 남기지 않는다.
+  // 임대차 만기 2건만 있는 날. 재확인·입주일 같은 나머지 종류는 흔적도 남기지 않는다.
   const groups = groupAgenda(
     [unitItem({ unit_id: 1 }), unitItem({ unit_id: 2, days_until_due: 40 })],
     [{ category: "TENANCY_EXPIRY", total: 2 }],
@@ -158,18 +158,18 @@ test("묶음 순서는 종류 이름이 아니라 급한 순을 따른다", () =
   // 서버가 이미 기한 순으로 보내므로 먼저 나온 종류가 더 급한 종류다.
   const groups = groupAgenda(
     [
-      unitItem({ category: "LISTING_RECONTACT", days_until_due: -1 }),
+      unitItem({ category: "LISTING_REVALIDATION", days_until_due: -1 }),
       unitItem({ category: "TENANCY_EXPIRY", days_until_due: 12 }),
     ],
     [
-      { category: "LISTING_RECONTACT", total: 1 },
+      { category: "LISTING_REVALIDATION", total: 1 },
       { category: "TENANCY_EXPIRY", total: 1 },
     ],
   );
 
   assert.deepEqual(
     groups.map((group) => group.category),
-    ["LISTING_RECONTACT", "TENANCY_EXPIRY"],
+    ["LISTING_REVALIDATION", "TENANCY_EXPIRY"],
   );
 });
 
@@ -256,9 +256,9 @@ test("같은 종류의 캘린더 일정끼리도 키가 겹치지 않는다", ()
 
 test("같은 대상이 여러 종류로 걸려도 키가 겹치지 않는다", () => {
   const expiry = unitItem({ category: "TENANCY_EXPIRY" });
-  const recontact = unitItem({ category: "LISTING_RECONTACT" });
+  const revalidation = unitItem({ category: "LISTING_REVALIDATION" });
 
-  assert.notEqual(agendaItemKey(expiry), agendaItemKey(recontact));
+  assert.notEqual(agendaItemKey(expiry), agendaItemKey(revalidation));
 });
 
 test("D-day는 지난 건과 오늘을 문구로 구분한다", () => {
@@ -317,10 +317,10 @@ test("저장된 날짜 종류는 아무리 지나도 밀린 묶음으로 가지 
   assert.equal(isNeglected(unitItem({ category: "TENANCY_EXPIRY", days_until_due: -400 }), 7), false);
 });
 
-test("재연락·재확인은 되돌아보는 기간을 넘겨야만 밀린 것으로 본다", () => {
-  const atBoundary = unitItem({ category: "CLIENT_RECONTACT", days_until_due: -7 });
-  const pastBoundary = unitItem({ category: "CLIENT_RECONTACT", days_until_due: -8 });
-  const wayPast = unitItem({ category: "LISTING_RECONTACT", days_until_due: -370 });
+test("재확인은 되돌아보는 기간을 넘겨야만 밀린 것으로 본다", () => {
+  const atBoundary = unitItem({ category: "LISTING_REVALIDATION", days_until_due: -7 });
+  const pastBoundary = unitItem({ category: "LISTING_REVALIDATION", days_until_due: -8 });
+  const wayPast = unitItem({ category: "LISTING_REVALIDATION", days_until_due: -370 });
 
   // 경계값(overdueDays)까지는 "다가오는 일정" 쪽에 남는다. 저장된 날짜 종류의 되돌아보는
   // 창이 양끝을 포함하는 것과 같은 기준이다.
@@ -330,15 +330,15 @@ test("재연락·재확인은 되돌아보는 기간을 넘겨야만 밀린 것�
 });
 
 test("확인 키는 기한이 바뀌면 함께 바뀐다", () => {
-  const first = unitItem({ category: "CLIENT_RECONTACT", due_date: "2026-01-01" });
-  const renewed = unitItem({ category: "CLIENT_RECONTACT", due_date: "2026-03-01" });
+  const first = unitItem({ category: "LISTING_REVALIDATION", due_date: "2026-01-01" });
+  const renewed = unitItem({ category: "LISTING_REVALIDATION", due_date: "2026-03-01" });
 
-  // 손님에게 다시 연락하면 서버가 새 기한을 만든다. 예전 확인 기록이 새 기한까지 감추면 안 된다.
+  // 매물을 다시 접수하면 서버가 새 기한을 만든다. 예전 확인 기록이 새 기한까지 감추면 안 된다.
   assert.notEqual(neglectedDismissKey(first), neglectedDismissKey(renewed));
 });
 
 test("배지 건수는 받아 온 행 중 확인한 만큼만 덜어 낸다", () => {
-  const stale = unitItem({ category: "LISTING_RECONTACT", unit_id: 9, days_until_due: -400 });
+  const stale = unitItem({ category: "LISTING_REVALIDATION", unit_id: 9, days_until_due: -400 });
   const items = [unitItem(), stale];
 
   assert.equal(
@@ -355,7 +355,7 @@ test("배지 건수는 받아 온 행 중 확인한 만큼만 덜어 낸다", ()
 
 test("배지 건수는 음수로 내려가지 않는다", () => {
   // 조회 사이에 총계가 뒤처지는 경우와 같은 방어다 (총계가 실린 건수보다 작아도 음수를 만들지 않는다).
-  const stale = unitItem({ category: "LISTING_RECONTACT", days_until_due: -400 });
+  const stale = unitItem({ category: "LISTING_REVALIDATION", days_until_due: -400 });
 
   assert.equal(visibleAgendaTotal([stale], 7, 0, () => true), 0);
 });

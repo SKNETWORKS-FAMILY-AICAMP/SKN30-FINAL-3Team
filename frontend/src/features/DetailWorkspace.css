@@ -445,6 +445,10 @@
   min-width: 0;
 }
 
+.detail-field__select-toggle {
+  width: 100%;
+}
+
 .detail-field__label {
   display: inline-block;
   margin-bottom: 0;

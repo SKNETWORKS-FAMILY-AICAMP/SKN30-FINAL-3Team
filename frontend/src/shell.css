@@ -41,7 +41,7 @@ button, input, select, textarea { font: inherit; }
 .f1-ledger-switch button { min-width: 72px; padding: 0 14px; border: 0; border-bottom: 3px solid transparent; color: #94a3b8; background: transparent; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
 .f1-ledger-switch button:hover { color: #f1f5f9; background: rgba(255,255,255,0.04); }
 .f1-ledger-switch button.active { border-bottom-color: #38bdf8; color: #ffffff; font-weight: 700; }
-.f1-ledger-switch button:focus-visible, .f1-quick-nav button:focus-visible, .ledger-tabs button:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
+.f1-ledger-switch button:focus-visible, .f1-quick-nav button:focus-visible { outline: 2px solid #38bdf8; outline-offset: -2px; }
 
 .f1-topbar .jump-control { flex: 0 0 230px; width: 230px; height: 32px; margin: 0; display: flex; align-items: center; gap: 4px; }
 .f1-topbar .jump-control input { height: 32px; min-width: 0; flex: 1; padding: 0 10px; border: 1px solid #334155; border-radius: 6px; background: #1e293b; color: #f8fafc; font-size: 12px; transition: border-color 0.15s; outline: none; }
@@ -88,11 +88,6 @@ button, input, select, textarea { font: inherit; }
 .f1-control-strip__top-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 48px; padding: 6px 16px; border-bottom: 1px solid #f1f5f9; background: #ffffff; }
 .f1-control-strip__left-group, .f1-control-strip__right-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .f1-control-strip__bottom-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 42px; padding: 4px 16px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
-
-.ledger-tabs { display: inline-flex; align-items: center; height: 34px; padding: 2px; border-radius: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; }
-.ledger-tabs button { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: #64748b; cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; transition: all 0.15s ease; line-height: 1; }
-.ledger-tabs button.active { background: #ffffff; color: #0284c7; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-.ledger-tabs button:disabled { color: #94a3b8; background: transparent; cursor: not-allowed; opacity: 0.6; }
 
 .f1-control-strip .pf-v6-c-button,
 .f1-control-strip .pf-v6-c-menu-toggle { display: inline-flex !important; align-items: center !important; justify-content: center !important; height: 34px !important; min-height: 34px !important; max-height: 34px !important; margin: 0 !important; padding: 0 12px !important; border-radius: 6px !important; font-size: 13px !important; font-weight: 500 !important; line-height: 1 !important; white-space: nowrap !important; }

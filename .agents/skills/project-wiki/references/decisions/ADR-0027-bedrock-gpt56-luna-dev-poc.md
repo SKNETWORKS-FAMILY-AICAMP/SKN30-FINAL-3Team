@@ -5,6 +5,8 @@ updated: 2026-09-07
 
 # ADR-0027: 범용 생성 모델은 Bedrock GPT-5.6 Luna로 dev POC한다
 
+> 2026-09-07 부분 대체: GPU 배치·local/dev 연결·전원 범위는 [ADR-0030](ADR-0030-local-dev-dual-cloud-serving.md)를 따른다. 아래 내용은 기존 결정의 기록이다.
+
 - 상태: 승인됨·코드 구현, AWS 미적용
 - 결정일: 2026-09-04
 - 부분 대체: [ADR-0026](ADR-0026-general-ai-provider-and-model-profiles.md)의 환경별 활성

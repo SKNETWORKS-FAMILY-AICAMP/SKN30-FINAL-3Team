@@ -19,6 +19,26 @@ class FakeF2Runtime:
         self.closed = True
 
 
+def test_shutdown_finishes_active_analysis_before_closing_runtime(config) -> None:
+    runtime = FakeF2Runtime()
+    completed = False
+
+    async def analysis():
+        nonlocal completed
+        await asyncio.sleep(0)
+        assert not runtime.closed
+        completed = True
+
+    async def run_lifespan():
+        app = create_app(config=config, f2_runtime_factory=lambda: cast(F2Runtime, runtime))
+        async with app.router.lifespan_context(app):
+            app.state.f2_analysis_task = asyncio.create_task(analysis())
+        assert completed
+        assert runtime.closed
+
+    asyncio.run(run_lifespan())
+
+
 def test_f2_runtime_accepts_dev_ai_profile(make_config, monkeypatch: pytest.MonkeyPatch) -> None:
     config = make_config(
         {
@@ -103,11 +123,12 @@ def test_offline_f2_does_not_call_injected_runtime_factory(
     asyncio.run(run_lifespan())
 
 
-def test_f2_endpoints_do_not_call_runtime_factory_without_explicit_status(
+def test_missing_f2_urls_do_not_call_runtime_factory(
     make_config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = make_config({"APP_ENV": "dev", "DB_TARGET": "development"})
-    monkeypatch.delenv("AI_F2_PROVIDER_STATUS")
+    monkeypatch.delenv("AI_VLLM_SLLM_BASE_URL")
+    monkeypatch.delenv("AI_VLLM_STT_BASE_URL")
 
     def unexpected_factory() -> F2Runtime:
         raise AssertionError("F2 endpoints must not implicitly activate the runtime")

@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+install -d -m 0700 /opt/brokerage-gpu
+bootstrap_archive=/tmp/brokerage-gpu-bootstrap.tar.gz
+for attempt in {1..30}; do
+  if aws s3api get-object --region ap-northeast-2 --bucket '${bootstrap_bucket}' --key '${bootstrap_key}' "$bootstrap_archive" >/dev/null; then
+    break
+  fi
+  rm -f "$bootstrap_archive"
+  sleep 5
+done
+test -s "$bootstrap_archive"
+printf '%s  %s\n' '${bootstrap_sha256}' "$bootstrap_archive" | sha256sum -c - >/dev/null
+tar -xzf "$bootstrap_archive" -C /opt/brokerage-gpu --no-same-owner --no-same-permissions
+chmod 0600 /opt/brokerage-gpu/*
+rm -f "$bootstrap_archive"
+printf '%s' '${config}' | base64 -d > /opt/brokerage-gpu/config.json
+# The reviewed DLAMI provides NVIDIA driver, container toolkit, Docker, AWS CLI and SSM.
+systemctl enable --now docker
+docker info >/dev/null
+docker compose version >/dev/null
+aws --version >/dev/null
+nvidia-smi >/dev/null
+cat > /etc/systemd/system/brokerage-gpu.service <<'UNIT'
+[Unit]
+Description=Prepare pinned inference models and start GPU containers
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/brokerage-gpu/gpu_host.py
+ExecStop=-/usr/bin/docker compose -f /opt/brokerage-gpu/compose.json down --timeout 120
+TimeoutStartSec=2700
+TimeoutStopSec=180
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable brokerage-gpu.service
+# First inference preparation is explicit in ai-switch/dev-start after cloud-init completes.

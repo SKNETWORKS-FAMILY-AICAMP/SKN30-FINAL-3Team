@@ -11,9 +11,14 @@ ROOT = Path(__file__).resolve().parents[2]
 PATH = ROOT / "infra/scripts/manage_sllm_artifact.py"
 SPEC = importlib.util.spec_from_file_location("manage_sllm_artifact", PATH)
 assert SPEC is not None and SPEC.loader is not None
-MODULE = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = MODULE
-SPEC.loader.exec_module(MODULE)
+# Reuse the shared module: replacing it during discovery splits exception classes
+# between the lifecycle helpers and their caller.
+if SPEC.name in sys.modules:
+    MODULE = sys.modules[SPEC.name]
+else:
+    MODULE = importlib.util.module_from_spec(SPEC)
+    sys.modules[SPEC.name] = MODULE
+    SPEC.loader.exec_module(MODULE)
 
 
 class BundleTests(unittest.TestCase):
@@ -374,6 +379,26 @@ class BundleTests(unittest.TestCase):
                 for path in sorted((root / "adapter").iterdir()):
                     archive.add(path, arcname=f"adapter/{path.name}")
             with self.assertRaises(MODULE.ToolError):
+                MODULE.inspect_bundle(bundle)
+
+    def test_consistent_checksums_do_not_approve_a_rejected_promotion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle = self.make_bundle(root)
+            approval = root / "promotion-approval.json"
+            value = json.loads(approval.read_text())
+            value["status"] = "rejected"
+            approval.write_text(json.dumps(value))
+            manifest_path = root / "release.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["evaluation"]["approval_sha256"] = MODULE.file_sha256(approval)
+            manifest_path.write_text(json.dumps(manifest))
+            with tarfile.open(bundle, "w:gz") as archive:
+                for path in (manifest_path, approval, root / "evaluation-summary.json"):
+                    archive.add(path, arcname=path.name)
+                for path in sorted((root / "adapter").iterdir()):
+                    archive.add(path, arcname=f"adapter/{path.name}")
+            with self.assertRaisesRegex(MODULE.ToolError, "promotion approval"):
                 MODULE.inspect_bundle(bundle)
 
 

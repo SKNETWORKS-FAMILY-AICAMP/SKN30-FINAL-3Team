@@ -5,6 +5,8 @@ updated: 2026-08-25
 
 # ADR-0014: 개발 환경 deep 전원 수명주기
 
+> 2026-09-07 부분 대체: GPU 배치·local/dev 연결·전원 범위는 [ADR-0022](ADR-0022-dual-cloud-gpu-lifecycle.md)를 따른다. 아래 내용은 기존 결정의 기록이다.
+
 - 상태: 승인됨
 - 결정일: 2026-08-25
 - 부분 대체: [ADR-0009](ADR-0009-dev-power-lifecycle.md)의 ASG·RDS 외 자원을 전원 도구가 변경하지 않는 경계와 ALB·public IPv4 잔여 비용 수용

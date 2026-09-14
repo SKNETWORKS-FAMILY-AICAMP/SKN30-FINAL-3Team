@@ -76,6 +76,7 @@ function messageFor(kind: ApiErrorKind): string {
     case "validation":
       return "입력값을 확인해 주세요.";
     case "server":
+    case "rateLimited":
       return "서버에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
     case "contract":
       return "서버 응답 형식이 예상과 다릅니다. 배포 버전을 확인해 주세요.";

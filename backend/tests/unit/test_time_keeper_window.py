@@ -20,7 +20,6 @@ from domain.time_keeper.models import (
     MAX_WITHIN_DAYS,
     build_window,
     days_until_due,
-    recontact_contact_deadline,
     revalidation_received_deadline,
     today_in_business_timezone,
 )
@@ -40,18 +39,16 @@ def test_window_without_overdue_starts_today() -> None:
     assert window.earliest == date(2026, 9, 3)
 
 
-def test_window_carries_the_rule_periods_used_to_derive_tasks() -> None:
-    """재연락과 매물 재확인은 저장된 날짜가 아니라 주기로 만든다."""
-    window = build_window(date(2026, 9, 3), 90, 7, recontact_days=45, revalidation_days=14)
+def test_window_carries_the_rule_period_used_to_derive_tasks() -> None:
+    """매물 재확인은 저장된 날짜가 아니라 주기로 만든다."""
+    window = build_window(date(2026, 9, 3), 90, 7, revalidation_days=14)
 
-    assert window.recontact_days == 45
     assert window.revalidation_days == 14
 
 
 def test_window_uses_documented_rule_defaults() -> None:
     window = build_window(date(2026, 9, 3), 90, 7)
 
-    assert window.recontact_days == 30
     assert window.revalidation_days == 30
 
 
@@ -66,21 +63,10 @@ def test_window_rejects_values_outside_the_supported_range(
         build_window(date(2026, 9, 3), within_days=within_days, overdue_days=overdue_days)
 
 
-@pytest.mark.parametrize(
-    ("recontact_days", "revalidation_days"),
-    [(0, 30), (MAX_RULE_DAYS + 1, 30), (30, 0), (30, MAX_RULE_DAYS + 1)],
-)
-def test_window_rejects_rule_periods_outside_the_supported_range(
-    recontact_days: int, revalidation_days: int
-) -> None:
+@pytest.mark.parametrize("revalidation_days", [0, MAX_RULE_DAYS + 1])
+def test_window_rejects_rule_periods_outside_the_supported_range(revalidation_days: int) -> None:
     with pytest.raises(ValidationError):
-        build_window(
-            date(2026, 9, 3),
-            90,
-            7,
-            recontact_days=recontact_days,
-            revalidation_days=revalidation_days,
-        )
+        build_window(date(2026, 9, 3), 90, 7, revalidation_days=revalidation_days)
 
 
 def test_days_until_due_is_zero_today_and_negative_once_passed() -> None:
@@ -97,32 +83,6 @@ def test_today_follows_the_brokerage_timezone_not_utc() -> None:
     assert today_in_business_timezone(datetime(2026, 9, 3, 23, 30, tzinfo=UTC)) == date(2026, 9, 4)
     # 서울 자정 직후는 아직 같은 날이다. UTC 로 읽으면 하루 전이 된다.
     assert today_in_business_timezone(datetime(2026, 9, 4, 0, 30, tzinfo=KST)) == date(2026, 9, 4)
-
-
-def test_recontact_deadline_moves_the_period_onto_the_constant_side() -> None:
-    """컬럼에 연산이 붙으면 인덱스를 타지 못하므로 주기를 경계 쪽으로 옮긴다."""
-    window = build_window(date(2026, 9, 3), 90, 7, recontact_days=30)
-
-    # 창의 끝(12/2)에 기한이 걸리는 마지막 접촉일은 11/2이며, 그날 하루를 통째로 담도록 끝을 연다.
-    assert recontact_contact_deadline(window) == datetime(2026, 11, 3, 0, 0, tzinfo=KST)
-
-
-def test_recontact_deadline_is_open_so_the_last_day_is_whole() -> None:
-    window = build_window(date(2026, 9, 3), 90, 7, recontact_days=30)
-    deadline = recontact_contact_deadline(window)
-
-    assert datetime(2026, 11, 2, 23, 59, tzinfo=KST) < deadline
-    assert datetime(2026, 11, 3, 0, 0, tzinfo=KST) >= deadline
-
-
-def test_recontact_has_no_lower_bound_so_neglected_targets_stay() -> None:
-    """되돌아보는 창을 재연락에도 걸면 오래 방치된 대상이 통째로 사라진다 (F1-AL-03)."""
-    window = build_window(date(2026, 9, 3), 90, 7, recontact_days=30)
-    deadline = recontact_contact_deadline(window)
-
-    # 1년 전에 접촉한 손님도, 5년 전에 접촉한 손님도 상한 안쪽이라 목록에 남는다.
-    assert datetime(2025, 9, 3, 12, 0, tzinfo=KST) < deadline
-    assert datetime(2021, 1, 1, 12, 0, tzinfo=KST) < deadline
 
 
 def test_revalidation_deadline_shifts_the_received_date() -> None:

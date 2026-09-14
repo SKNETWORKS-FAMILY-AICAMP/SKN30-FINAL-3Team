@@ -7,6 +7,7 @@ updated: 2026-09-03
 
 - 상태: 부분 대체됨·코드 구현, S3 dev release 게시 완료·RunPod/Terraform 미적용
 - 결정일: 2026-09-01
+- 후속 변경: API·Worker 동시 endpoint refresh는 [ADR-0031](ADR-0031-runpod-junior-operations.md)의 API 전용 refresh로 대체한다.
 - 상위 런타임 유지: [ADR-0008](ADR-0008-dev-demo-runtime-and-delivery.md)의
   `EC2 Backend + 설치형 brokerage-ai + RunPod 추론` 구조
 - 부분 대체: [Infra ADR-0002](../../../infra/references/decisions/ADR-0002-dev-demo-aws-runpod-architecture.md)의

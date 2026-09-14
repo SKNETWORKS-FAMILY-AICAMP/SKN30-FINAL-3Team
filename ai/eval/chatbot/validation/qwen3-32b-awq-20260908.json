@@ -1,0 +1,1094 @@
+{
+  "artifact_kind": "chatbot_evaluation_reviewed_summary",
+  "schema_version": 1,
+  "creation_method": "manual_aggregation_and_review",
+  "verification_tool_version": "chatbot-summary-verifier:v1",
+  "status": "COMPLETED",
+  "diagnostic_subset": false,
+  "warmup_ms": 6166.418202999921,
+  "provenance": {
+    "artifact_sha256": "eee6ecb34a0b1c032e76f5f58d9af08736696cba8bdfa6247c670b065dd9c1ac",
+    "endpoint_attestation": {
+      "model": "Qwen/Qwen3-32B-AWQ",
+      "revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+      "artifact_sha256": "eee6ecb34a0b1c032e76f5f58d9af08736696cba8bdfa6247c670b065dd9c1ac",
+      "runtime_version": "0.28.0",
+      "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "profile": "qwen3-32b-awq",
+      "checked_at": "2026-09-08T06:17:07.371209+00:00"
+    },
+    "runtime_label": "0.28.0",
+    "deployment_image": "ghcr.io/sknetworks-family-aicamp/skn30-final-3team/general-serving@sha256:ce0e6e07d3656b81c63b4698e82f04421548b4f06ab1e428e9de3778adf9da6e",
+    "expected_weights_manifest_sha256": "eee6ecb34a0b1c032e76f5f58d9af08736696cba8bdfa6247c670b065dd9c1ac",
+    "route": {
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B-AWQ",
+      "endpoint_alias": "general-dev-gpu"
+    },
+    "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+    "fixture_sha256": "89fe9386e88e1c2e80532471627549767ea689e148f8061fd4cbc218f7e4f652",
+    "model_profile": "qwen3-32b-awq",
+    "started_at": "2026-09-08T06:17:06.799496+00:00",
+    "profile": {
+      "model": "Qwen/Qwen3-32B-AWQ",
+      "revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+      "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "runtime_version": "0.28.0",
+      "quantization": "awq",
+      "load_format": "auto",
+      "max_model_len": 8192,
+      "max_num_seqs": 1,
+      "gpu_memory_utilization": 0.85,
+      "weights": [
+        {
+          "name": "model-00001-of-00004.safetensors",
+          "size": 4966384688,
+          "sha256": "ab7988215e3b087c884e0c14ce1994a64aac31dc9a37a4bcf29f5b45f3506e2e"
+        },
+        {
+          "name": "model-00002-of-00004.safetensors",
+          "size": 4998723112,
+          "sha256": "46faff349f1dd18ffe76993edd3d9fd32941d042331dc590525409bbe3d37edf"
+        },
+        {
+          "name": "model-00003-of-00004.safetensors",
+          "size": 4949671152,
+          "sha256": "6e9f763d8c31ad19f1cd67b0b599a38edffd76a4465a22ff5f7fcac46d820e63"
+        },
+        {
+          "name": "model-00004-of-00004.safetensors",
+          "size": 4410702792,
+          "sha256": "87f180889fead12b00b1bdf4dca3a3a14e4510e1e200bf56e31898e120b993d8"
+        }
+      ]
+    },
+    "final_endpoint_attestation": {
+      "model": "Qwen/Qwen3-32B-AWQ",
+      "revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+      "artifact_sha256": "eee6ecb34a0b1c032e76f5f58d9af08736696cba8bdfa6247c670b065dd9c1ac",
+      "runtime_version": "0.28.0",
+      "runtime_image": "vllm/vllm-openai@sha256:2286e8533ca8b6bc777594bae30524f1426ba46ca21797524e06df6a94b06635",
+      "profile": "qwen3-32b-awq",
+      "checked_at": "2026-09-08T06:29:28.848278+00:00"
+    },
+    "artifact_revision": "0499c3ac83fdef8810b907a23894ba91e95eddd8",
+    "profiles_sha256": "2e92885bb17bc4cea6e25cea95550a353dc619a44d4da978eac96f81cb38e34f",
+    "raw_report_sha256": "132e0af57c7b7604c87578a315208271c9e73201221248a209baf4938dc45347",
+    "evaluated_workflow_sha256": "50235a81ecb8c84eeb8d78bc2d2187055be7abe72f508f57b31924fb1a2a2caf"
+  },
+  "summary": {
+    "cases": 240,
+    "supported_accuracy": 0.78,
+    "multiturn_accuracy": 0.8,
+    "basic_and_units_accuracy": 0.775,
+    "ambiguous_unsupported_accuracy": 0.9,
+    "attack_failures": 0,
+    "p95_interpretation_ms": 7041.70338699987,
+    "p95_first_progress_ms": 0.12477000200306065,
+    "model_calls": 186,
+    "errors": 0
+  },
+  "basic_and_units": {
+    "correct": 93,
+    "total": 120,
+    "accuracy": 0.775
+  },
+  "multiturn": {
+    "correct": 24,
+    "total": 30,
+    "accuracy": 0.8
+  },
+  "ambiguity": {
+    "correct": 27,
+    "total": 30,
+    "accuracy": 0.9
+  },
+  "rounds": {
+    "1": {
+      "cases": 80,
+      "supported_accuracy": 0.78,
+      "multiturn_accuracy": 0.8,
+      "basic_and_units_accuracy": 0.775,
+      "ambiguous_unsupported_accuracy": 0.9,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 7793.516598001588,
+      "p95_first_progress_ms": 0.11676400026772171,
+      "model_calls": 62,
+      "errors": 0,
+      "basic_and_units": {
+        "correct": 31,
+        "total": 40,
+        "accuracy": 0.775
+      },
+      "multiturn": {
+        "correct": 8,
+        "total": 10,
+        "accuracy": 0.8
+      }
+    },
+    "2": {
+      "cases": 80,
+      "supported_accuracy": 0.78,
+      "multiturn_accuracy": 0.8,
+      "basic_and_units_accuracy": 0.775,
+      "ambiguous_unsupported_accuracy": 0.9,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 7041.70338699987,
+      "p95_first_progress_ms": 0.12300500020501204,
+      "model_calls": 62,
+      "errors": 0,
+      "basic_and_units": {
+        "correct": 31,
+        "total": 40,
+        "accuracy": 0.775
+      },
+      "multiturn": {
+        "correct": 8,
+        "total": 10,
+        "accuracy": 0.8
+      }
+    },
+    "3": {
+      "cases": 80,
+      "supported_accuracy": 0.78,
+      "multiturn_accuracy": 0.8,
+      "basic_and_units_accuracy": 0.775,
+      "ambiguous_unsupported_accuracy": 0.9,
+      "attack_failures": 0,
+      "p95_interpretation_ms": 7031.427493999217,
+      "p95_first_progress_ms": 0.14565500168828294,
+      "model_calls": 62,
+      "errors": 0,
+      "basic_and_units": {
+        "correct": 31,
+        "total": 40,
+        "accuracy": 0.775
+      },
+      "multiturn": {
+        "correct": 8,
+        "total": 10,
+        "accuracy": 0.8
+      }
+    }
+  },
+  "failures": [
+    {
+      "id": "basic-09",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "84제곱미터 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-16",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": "진행 중",
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "60제곱미터 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "90제곱미터 이하",
+          "area_basis": "supply",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-19",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": "price_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "최근",
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-30",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 달",
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 1,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 1,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "59.5제곱미터 초과",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-07",
+      "round": 1,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-10",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-01",
+      "round": 1,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-09",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "84제곱미터 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-16",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": "진행 중",
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "60제곱미터 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "90제곱미터 이하",
+          "area_basis": "supply",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-19",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": "price_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "최근",
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-30",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 달",
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 2,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 2,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "59.5제곱미터 초과",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-07",
+      "round": 2,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-10",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-01",
+      "round": 2,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-09",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "84제곱미터 이하",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-16",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": "진행 중",
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-17",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "60제곱미터 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-18",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "90제곱미터 이하",
+          "area_basis": "supply",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-19",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": "price_asc"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-20",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "최근",
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "basic-30",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "이번 달",
+          "categories": [
+            "REQUEST_EXPIRY"
+          ],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-05",
+      "round": 3,
+      "actual": {
+        "tool": "properties",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "30평 이상",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": "recent"
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "units-09",
+      "round": 3,
+      "actual": {
+        "tool": "buyers",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": "SALE",
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": "59.5제곱미터 초과",
+          "area_basis": "exclusive",
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-07",
+      "round": 3,
+      "actual": {
+        "tool": "agenda",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": "내일",
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": null
+      },
+      "error_type": null
+    },
+    {
+      "id": "multi-10",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    },
+    {
+      "id": "ambiguous-01",
+      "round": 3,
+      "actual": {
+        "tool": "clarification",
+        "mode": "replace",
+        "filters": {
+          "complex_name": null,
+          "transaction_type": null,
+          "status": null,
+          "price_expression": null,
+          "deposit_expression": null,
+          "rent_expression": null,
+          "area_expression": null,
+          "area_basis": null,
+          "date_expression": null,
+          "categories": [],
+          "sort": null
+        },
+        "reference_ordinal": null,
+        "clarification_code": "ambiguous_condition"
+      },
+      "error_type": null
+    }
+  ],
+  "review_notes": {
+    "scope": "synthetic model interpretation and guarded workflow; not DB/API/SSE or F3 judgment quality",
+    "outputs_checked_against_chat_intent_schema": 426,
+    "sensitive_output_scan": "no flagged patterns; automated scan supplements caller review",
+    "attack_scope": "pre-model application guard; not intrinsic model attack resistance",
+    "deployment_identity": "operator must compare wrapper digest with RunPod API; endpoint metadata alone is not container identity proof",
+    "acceptance": "NOT_PASSED: supported 78%, basic/units 77.5% and multiturn 80% are below 90%; ambiguity 90% and zero contract errors meet their respective interpretation checks. COMPLETED describes execution only.",
+    "repeatability": "The same 12 case IDs failed in each of three rounds; all group accuracies were identical across repeats.",
+    "comparison_with_qwen3_14b_awq": {
+      "supported_accuracy_percentage_point_change": 30,
+      "basic_and_units_accuracy_percentage_point_change": 32.5,
+      "multiturn_accuracy_percentage_point_change": 20,
+      "ambiguity_accuracy_percentage_point_change": 20,
+      "improved_unique_case_ids": [
+        "basic-13",
+        "basic-14",
+        "basic-15",
+        "basic-21",
+        "basic-22",
+        "basic-23",
+        "basic-24",
+        "basic-25",
+        "basic-28",
+        "basic-29",
+        "units-03",
+        "units-07",
+        "units-10",
+        "multi-06",
+        "multi-09",
+        "ambiguous-02",
+        "ambiguous-06"
+      ],
+      "regressed_unique_case_ids": [],
+      "interpretation_p95_ms": {
+        "qwen3_14b_awq": 3572.2546269971645,
+        "qwen3_32b_awq": 7041.70338699987
+      },
+      "scope": "Same synthetic fixture and workflow; interpretive accuracy and latency, not F3 judgment quality or HTTP/SSE performance."
+    },
+    "failure_patterns": [
+      "Nine unique basic/unit failures still add an unrequested SALE filter; basic-20 also adds date_expression=최근.",
+      "Multi-07 replaces instead of refining the current context.",
+      "Multi-10 does not recover the earlier area query after the user answers the clarification.",
+      "Ambiguous-01 asks for clarification but uses ambiguous_condition instead of the required area_basis code."
+    ],
+    "observed_improvements": "Agenda queries no longer add all categories or unnecessary sort orders; rent deposit/rent amounts are correctly separated; multi-06 repair succeeds and multi-09 preserves refine mode.",
+    "recorded_structured_responses_in_measured_cases": 186
+  }
+}

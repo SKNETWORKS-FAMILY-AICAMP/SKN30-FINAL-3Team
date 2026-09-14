@@ -1,0 +1,278 @@
+<!DOCTYPE html><html class="light" lang="ko" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>부동산 AI 비서</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline-variant": "#c6c6cd",
+                        "on-background": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#002113",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#6ffbbe",
+                        "inverse-primary": "#bec6e0",
+                        "on-secondary-container": "#fefcff",
+                        "primary-fixed": "#dae2fd",
+                        "surface-container": "#e5eeff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#cbdbf5",
+                        "secondary": "#0051d5",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "on-primary-fixed": "#131b2e",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#213145",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "secondary-container": "#316bf3",
+                        "background": "#f8f9ff",
+                        "surface-tint": "#565e74",
+                        "primary": "#000000",
+                        "error": "#ba1a1a",
+                        "tertiary": "#000000",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "surface": "#f8f9ff",
+                        "primary-container": "#131b2e",
+                        "on-tertiary-container": "#009668",
+                        "surface-container-high": "#dce9ff",
+                        "on-primary-container": "#7c839b",
+                        "on-secondary-fixed": "#00174b",
+                        "outline": "#76777d",
+                        "on-surface-variant": "#45464d",
+                        "surface-variant": "#d3e4fe",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-fixed": "#dbe1ff",
+                        "tertiary-container": "#002113",
+                        "surface-container-low": "#eff4ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "base": "4px",
+                        "xl": "48px",
+                        "sm": "16px",
+                        "gutter": "24px",
+                        "xs": "8px",
+                        "margin-mobile": "16px",
+                        "md": "24px",
+                        "margin-desktop": "40px",
+                        "lg": "32px"
+                    },
+                    fontFamily: {
+                        "label-md": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "display": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    fontSize: {
+                        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "display": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "label-sm": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+                        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .bento-card {
+            box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.08);
+            transition: all 0.3s ease;
+        }
+        .bento-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0px 20px 25px -5px rgba(15, 23, 42, 0.1);
+        }
+        .ai-glow {
+            box-shadow: inset 0 0 20px rgba(111, 251, 190, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col" data-mode="connect">
+<!-- TopNavBar -->
+<nav class="bg-background/80 dark:bg-background/80 backdrop-blur-md fixed top-0 w-full z-50 border-b border-outline-variant/30 dark:border-outline/20">
+<div class="relative flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-7xl mx-auto">
+<div class="font-display text-headline-md text-on-background dark:text-inverse-on-surface tracking-tight"><a href="main.html" aria-label="메인 페이지로 이동"><img src="assets/logo-header.png" alt="집크크" class="h-12 md:h-14 w-auto object-contain"></a></div>
+<div class="flex gap-xs md:gap-gutter items-center md:absolute md:left-1/2 md:-translate-x-1/2">
+<a aria-current="page" class="font-label-md text-xs md:text-label-md text-secondary dark:text-secondary-fixed font-bold border-b-2 border-secondary hover:opacity-90 transition-opacity" href="main.html">Features</a>
+<a class="font-label-md text-xs md:text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors" href="how-it-works.html">How it works</a>
+<a class="font-label-md text-xs md:text-label-md text-on-surface-variant dark:text-on-surface-variant hover:text-secondary transition-colors" href="contact-us.html">Contact Us</a>
+</div>
+</div>
+</nav>
+<main class="flex-grow pt-24 pb-xl">
+<!-- Hero Section -->
+<section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-24 text-center">
+<h1 class="font-display text-display text-on-background mb-sm">통화가 끝나면, 장부 정리가 시작됩니다</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-3xl mx-auto mb-lg">공인중개사를 위한 AI 상담 비서, 집크크. 음성메모 분석부터 사용자 검토와 장부 저장까지 한 흐름으로 연결합니다.</p>
+<div class="flex flex-col md:flex-row justify-center items-center gap-xs md:gap-gutter mt-xl">
+<!-- Process Indicators -->
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
+<span class="material-symbols-outlined text-secondary">mic</span>
+<span class="font-label-md text-label-md text-on-surface">STT 전사</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant hidden md:block">arrow_forward</span>
+<span class="material-symbols-outlined text-outline-variant md:hidden">arrow_downward</span>
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card ai-glow">
+<span class="material-symbols-outlined text-tertiary-fixed-dim">psychology</span>
+<span class="font-label-md text-label-md text-on-surface">정보 추출</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant hidden md:block">arrow_forward</span>
+<span class="material-symbols-outlined text-outline-variant md:hidden">arrow_downward</span>
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
+<span class="material-symbols-outlined text-secondary">fact_check</span>
+<span class="font-label-md text-label-md text-on-surface">사용자 검토</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant hidden md:block">arrow_forward</span>
+<span class="material-symbols-outlined text-outline-variant md:hidden">arrow_downward</span>
+<div class="flex items-center gap-xs bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/30 bento-card">
+<span class="material-symbols-outlined text-secondary">save</span>
+<span class="font-label-md text-label-md text-on-surface">장부 저장</span>
+</div>
+</div>
+<div class="mt-lg">
+<a class="inline-flex bg-gradient-to-r from-secondary to-tertiary-fixed-dim text-on-secondary px-lg py-sm rounded-lg font-label-md hover:opacity-90 transition-opacity" href="how-it-works.html">작동 방식 보기</a>
+</div>
+</section>
+<!-- Feature Bento Grid -->
+<section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl bg-surface-container-low rounded-xl">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-center mb-xl">주요 기능</h2>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md">
+<!-- Card 1 -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card overflow-hidden relative">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Recording</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">음성메모를 장부 입력 제안으로</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">상담 후 남긴 음성 파일을 텍스트로 변환하고, 확인된 내용을 빈 장부 필드와 상담 로그 초안으로 제안합니다.</p>
+<div class="bg-surface-container h-48 rounded-lg p-sm flex flex-col justify-between border border-outline-variant/30">
+<div class="flex items-center justify-between border-b border-outline-variant/30 pb-xs">
+<span class="font-label-md text-label-md text-on-surface">음성메모 파일</span>
+<span class="font-label-sm text-label-sm text-secondary">STT 완료</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant bg-surface-container-lowest rounded p-xs">“방배동 34평형 전세 15억 이하로 보고 있어요.”</p>
+<div class="flex flex-wrap gap-xs">
+<span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-xs py-1 rounded">지역 · 방배동</span>
+<span class="font-label-sm text-label-sm bg-secondary-fixed text-on-secondary-fixed px-xs py-1 rounded">평형 · 34평</span>
+<span class="font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed px-xs py-1 rounded">예산 · 15억 이하</span>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="md:col-span-4 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card ai-glow">
+<span class="font-label-sm text-label-sm text-tertiary-fixed-dim uppercase tracking-widest mb-xs block">DATABASE MANAGEMENT</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">매물장·구입장 통합 관리</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">매도·임대 정보는 매물장에, 매수·임차 조건은 구입장에 구분하여 저장하고 필요한 정보를 쉽고 체계적으로 관리합니다.</p>
+<div class="flex flex-col gap-xs">
+<div class="bg-surface-container p-xs rounded border border-outline-variant/30 flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">매물장</span>
+<span class="font-label-md text-label-md text-on-background">매도·임대 정보</span>
+</div>
+<div class="bg-surface-container p-xs rounded border border-outline-variant/30 flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">구입장</span>
+<span class="font-label-md text-label-md text-on-background">매수·임차 조건</span>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="md:col-span-4 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">Human Review</span>
+<h3 class="font-headline-md text-headline-md text-on-background mb-sm">사용자가 최종 확인</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">AI 제안은 바로 확정되지 않습니다. 제안값과 근거를 검토하고 수정한 뒤 사용자가 저장합니다.</p>
+<div class="mt-md text-center">
+<span class="material-symbols-outlined text-display text-outline-variant">fact_check</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="md:col-span-8 bg-surface-container-lowest rounded-lg border border-outline-variant/30 p-md bento-card"><span class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mb-xs block">AI Smart MATCHING</span><h3 class="font-headline-md text-headline-md text-on-background mb-sm">매물과 고객의 중개 가능성 검토</h3><p class="font-body-md text-body-md text-on-surface-variant mb-md">사용자가 교차 판정을 실행하면 조건에 맞는 후보를 추리고, 양측의 장부와 상담 로그를 근거로 판정 결과를 제안합니다.</p><div class="bg-surface-dim h-32 rounded-lg relative overflow-hidden flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-secondary mx-xs">sync_alt</span></div></div>
+</div>
+</section>
+<!-- Multi-Agent Architecture -->
+<section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-xl">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-center mb-xl">다중 에이전트 아키텍처</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="bg-surface-container-lowest p-md border border-outline-variant/30 rounded-lg text-center">
+<div class="h-20 w-20 mx-auto mb-sm flex items-center justify-center"><img src="assets/icon-property-agent.png" alt="Property Agent 아이콘" class="h-full w-full object-contain"></div>
+<h4 class="font-headline-md text-headline-md mb-xs">Property Agent</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">매물의 가격·평형·거래 조건 분석</p>
+</div>
+<div class="bg-surface-container-lowest p-md border border-outline-variant/30 rounded-lg text-center ai-glow">
+<div class="h-20 w-20 mx-auto mb-sm flex items-center justify-center"><img src="assets/icon-customer-agent.png" alt="Customer Agent 아이콘" class="h-full w-full object-contain"></div>
+<h4 class="font-headline-md text-headline-md mb-xs">Customer Agent</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">고객의 예산·희망 조건 분석</p>
+</div>
+<div class="bg-surface-container-lowest p-md border border-outline-variant/30 rounded-lg text-center">
+<div class="h-20 w-20 mx-auto mb-sm flex items-center justify-center"><img src="assets/icon-matching-agent.png" alt="Matching Agent 아이콘" class="h-full w-full object-contain"></div>
+<h4 class="font-headline-md text-headline-md mb-xs">Matching Agent</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">매물과 고객의 적합도 및 추천 근거 판정</p>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer id="contact" class="scroll-mt-24 bg-[#131b2e] px-4 py-12 text-white md:px-10">
+<div class="mx-auto grid max-w-7xl gap-8 md:grid-cols-2">
+<div>
+<img src="assets/logo-footer.png" alt="집크크" class="mb-4 h-12 w-auto object-contain">
+<p class="text-sm text-slate-400">© 2026 ZIPKEKE. All rights reserved.</p>
+</div>
+<div>
+<h2 class="mb-3 text-sm font-bold">Contact Us</h2>
+<ul class="grid grid-cols-2 gap-2 text-sm text-slate-300">
+<li><a href="https://github.com/Hong1008" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@Hong1008</a></li>
+<li><a href="https://github.com/SJ-log" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@SJ-log</a></li>
+<li><a href="https://github.com/taesik002288" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@taesik002288</a></li>
+<li><a href="https://github.com/dosupdebongu" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">@dosupdebongu</a></li>
+<li class="col-span-2 mt-1"><a href="https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN30-FINAL-3Team" target="_blank" rel="noreferrer" class="hover:text-white hover:underline">Project Repository</a></li>
+</ul>
+</div>
+</div>
+</footer>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>

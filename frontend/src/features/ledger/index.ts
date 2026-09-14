@@ -6,11 +6,14 @@
  */
 
 export { usePropertyLedger } from "./hooks/usePropertyLedger.ts";
+export { loadSavedProperty, loadSavedBuyer } from "./api/loadSavedDetail.ts";
 export type { PropertyLedger, UserNameLookup } from "./hooks/usePropertyLedger.ts";
 export { useBuyerLedger } from "./hooks/useBuyerLedger.ts";
 export type { BuyerLedger } from "./hooks/useBuyerLedger.ts";
 export { useComplexOptions } from "./hooks/useComplexOptions.ts";
 export type { ComplexCreateInput, ComplexOption, ComplexOptions } from "./hooks/useComplexOptions.ts";
+export { useComplexQuickAdd } from "./hooks/useComplexQuickAdd.ts";
+export type { ComplexQuickAddController, ComplexQuickAddInput } from "./hooks/useComplexQuickAdd.ts";
 export type { CollectionState, CollectionStatus, LedgerCollection } from "./hooks/useLedgerCollection.ts";
 
 export type { ColumnFilters, ListQuery } from "./api/transport.ts";

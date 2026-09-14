@@ -11,6 +11,7 @@ def serve(config: Config | None = None) -> None:
         "main:app",
         host=resolved_config.app.host,
         port=resolved_config.app.port,
+        workers=1,
     )
 
 

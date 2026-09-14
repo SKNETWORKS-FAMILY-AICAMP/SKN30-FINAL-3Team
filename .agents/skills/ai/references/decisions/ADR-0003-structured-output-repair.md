@@ -63,3 +63,9 @@ constraint 가 하나 이상 있어야 한다는 규칙(F3-PC-04)을 모델이 �
   그 책임이 지켜지는지는 `ai/tests/architecture/test_prompt_covers_output_contract.py` 가
   기계적으로 고정한다. 모델 출력 schema 에서 도달 가능한 모든 `model_validator` 는 프롬프트
   전달 표에 등록되어 있어야 한다.
+- 예외는 **모델에게 요구하는 것이 없는 validator** 뿐이다. 저장된 예전 형식을 되살리는 읽기
+  호환 정규화가 여기 해당한다. 이 예외는 같은 테스트의 `READ_COMPATIBILITY_ONLY` 에 이름을
+  적어 두고, 그 이유를 주석으로 남긴다. `mode="before"` 같은 기계적 성질로 면제하지 않는다.
+  그렇게 하면 앞으로 모델이 알아야 할 교차 필드 규칙을 `before` 로 구현했을 때 검사가 조용히
+  놓친다. 표에도 예외 목록에도 없는 validator 가 생기면 테스트가 깨지고, 그때 어느 쪽인지
+  사람이 정한다.

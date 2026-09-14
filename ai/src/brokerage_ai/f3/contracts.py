@@ -416,36 +416,83 @@ class PositionCardGenerationRequest(_Frozen):
         return {log.interaction_id: log.masked_content for log in self.consultation_logs}
 
 
-class Evidence(_Frozen):
-    """판정 1건의 근거. 원문 인용이거나 명시적 추정이다.
+class _EvidenceVariant(_Frozen):
+    """근거 변형의 공통 규칙.
 
-    offset은 담지 않는다. 모델이 임의로 만든 위치는 신뢰할 수 없고, 실제 원문 기준
-    offset은 Backend가 저장 전에 계산한다.
+    이전 계약은 네 필드를 모두 가진 하나의 `Evidence` 였고 해당 없는 자리를 `null` 로 채워
+    저장했다. 그 시절 카드가 지금도 되살아나야 판정이 예전 카드를 읽을 수 있다. `null` 로 온
+    남의 자리만 버리고, 값이 들어 있으면 버리지 않고 그대로 거절한다.
+
+    `extra="forbid"` 는 유지한다. 모델에게 보내는 JSON schema 의 `additionalProperties: false`
+    가 여기서 나오므로, 읽기 관용을 위해 그것까지 풀면 구조화 출력이 느슨해진다.
     """
 
-    kind: EvidenceKind
-    interaction_id: int | None = Field(default=None, ge=1)
-    quote_text: str | None = None
-    note: str | None = None
-
-    @field_validator("quote_text", "note")
+    @model_validator(mode="before")
     @classmethod
-    def text_must_not_be_blank(cls, value: str | None) -> str | None:
-        return _reject_blank(value)
+    def drop_legacy_null_placeholders(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        legacy = {"interaction_id", "quote_text", "note"} - set(cls.model_fields)
+        if not legacy:
+            return data
+        return {key: value for key, value in data.items() if not (key in legacy and value is None)}
 
-    @model_validator(mode="after")
-    def evidence_must_carry_what_its_kind_requires(self) -> Self:
-        if self.kind is EvidenceKind.QUOTE:
-            if self.interaction_id is None:
-                raise ValueError("QUOTE evidence requires interaction_id")
-            if self.quote_text is None:
-                raise ValueError("QUOTE evidence requires quote_text")
-            return self
-        if self.note is None:
-            raise ValueError("INFERENCE evidence requires note")
-        if self.interaction_id is not None or self.quote_text is not None:
-            raise ValueError("INFERENCE evidence must not carry a quote")
-        return self
+
+class QuoteEvidence(_EvidenceVariant):
+    """상담 로그 원문을 그대로 인용한 근거.
+
+    `interaction_id` 와 `quote_text` 가 **필수 필드**다. 예전에는 네 필드를 모두 가진 하나의
+    `Evidence` 에 `model_validator` 로 "QUOTE 면 이 둘이 있어야 한다"를 걸었는데, JSON schema
+    에 그 규칙을 적을 자리가 없어 모델은 스키마만 봐서는 알 수 없었다. 실제로 로컬 모델이
+    `interaction_id` 를 비운 QUOTE 를 반복해서 내 되먹임 3회로도 못 고쳤다. 종류별로 타입을
+    나누면 구조화 출력 문법이 강제하므로 모델이 규칙을 기억할 필요가 없다.
+
+    offset 은 담지 않는다. 모델이 임의로 만든 위치는 신뢰할 수 없고, 실제 원문 기준 offset 은
+    Backend 가 저장 전에 계산한다.
+    """
+
+    kind: Literal[EvidenceKind.QUOTE] = EvidenceKind.QUOTE
+    interaction_id: int = Field(ge=1)
+    quote_text: str = Field(min_length=1)
+
+    @field_validator("quote_text")
+    @classmethod
+    def text_must_not_be_blank(cls, value: str) -> str:
+        normalized = _reject_blank(value)
+        assert normalized is not None
+        return normalized
+
+    @property
+    def note(self) -> None:
+        """인용에는 정황 메모가 없다. 읽는 쪽이 종류를 나눠 보지 않아도 되게 자리만 맞춘다."""
+        return None
+
+
+class InferenceEvidence(_EvidenceVariant):
+    """상담 로그에 없고 정황으로 판단한 근거. `note` 가 필수 필드다."""
+
+    kind: Literal[EvidenceKind.INFERENCE] = EvidenceKind.INFERENCE
+    note: str = Field(min_length=1)
+
+    @field_validator("note")
+    @classmethod
+    def text_must_not_be_blank(cls, value: str) -> str:
+        normalized = _reject_blank(value)
+        assert normalized is not None
+        return normalized
+
+    @property
+    def interaction_id(self) -> None:
+        """정황 판단은 특정 로그를 가리키지 않는다."""
+        return None
+
+    @property
+    def quote_text(self) -> None:
+        return None
+
+
+# 근거는 종류가 형태를 정한다. `kind` 로 갈리는 판별 유니온이라 잘못된 조합이 표현되지 않는다.
+Evidence = Annotated[QuoteEvidence | InferenceEvidence, Field(discriminator="kind")]
 
 
 class IntentAssessment(_Frozen):

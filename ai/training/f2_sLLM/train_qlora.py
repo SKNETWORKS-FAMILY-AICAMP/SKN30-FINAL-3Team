@@ -32,6 +32,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train-data", type=Path, required=True, help="SFT train JSONL")
     parser.add_argument("--validation-data", type=Path, required=True, help="SFT validation JSONL")
     parser.add_argument(
+        "--task",
+        choices=("classification", "full"),
+        required=True,
+        help="학습 과제: 상담 유형 분류 또는 전체 구조화 출력",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=Path(__file__).parent / "configs" / "qwen3-4b-qlora.yaml",
@@ -121,12 +127,11 @@ def git_revision() -> str | None:
         return None
 
 
-def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[str], set[str]]:
-    """SFT JSONL의 최소 계약과 split을 확인하고 ID·그룹·과제를 반환한다."""
+def validate_sft_file(path: Path) -> tuple[set[str], set[str]]:
+    """SFT JSONL의 최소 계약을 확인하고 ID와 원천 그룹을 반환한다."""
 
     ids: set[str] = set()
     groups: set[str] = set()
-    tasks: set[str] = set()
     with path.open(encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
             if not line.strip():
@@ -134,18 +139,13 @@ def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[st
             sample = json.loads(line)
             if not isinstance(sample, dict):
                 raise TypeError(f"{path}:{line_number}: JSON object가 아닙니다")
-            required = {"id", "prompt", "completion", "source_group_id", "split"}
+            required = {"id", "prompt", "completion", "source_group_id"}
             if missing := required - sample.keys():
                 raise ValueError(f"{path}:{line_number}: 필수 필드 누락 {sorted(missing)}")
-            if sample["split"] != expected_split:
-                raise ValueError(f"{path}:{line_number}: split은 {expected_split!r}이어야 합니다")
             if not isinstance(sample["prompt"], list) or not sample["prompt"]:
                 raise ValueError(f"{path}:{line_number}: prompt 대화가 비어 있습니다")
             if not isinstance(sample["completion"], list) or not sample["completion"]:
                 raise ValueError(f"{path}:{line_number}: completion 대화가 비어 있습니다")
-            task = sample.get("task", "classification")
-            if task not in {"classification", "full"}:
-                raise ValueError(f"{path}:{line_number}: 알 수 없는 task {task!r}")
             sample_id = sample["id"]
             group_id = sample["source_group_id"]
             if not all(isinstance(value, str) and value.strip() for value in (sample_id, group_id)):
@@ -154,10 +154,9 @@ def validate_sft_file(path: Path, expected_split: str) -> tuple[set[str], set[st
                 raise ValueError(f"{path}:{line_number}: 중복 id {sample_id!r}")
             ids.add(sample_id)
             groups.add(group_id)
-            tasks.add(task)
     if not ids:
         raise ValueError(f"{path}: 데이터가 없습니다")
-    return ids, groups, tasks
+    return ids, groups
 
 
 def validate_token_lengths(
@@ -215,22 +214,14 @@ def main() -> None:
             raise FileNotFoundError(path)
     if args.train_data.resolve() == args.validation_data.resolve():
         raise ValueError("train-data와 validation-data는 서로 다른 파일이어야 합니다")
-    train_ids, train_groups, train_tasks = validate_sft_file(args.train_data, "train")
-    validation_ids, validation_groups, validation_tasks = validate_sft_file(
-        args.validation_data, "validation"
-    )
+    train_ids, train_groups = validate_sft_file(args.train_data)
+    validation_ids, validation_groups = validate_sft_file(args.validation_data)
     if overlap := train_ids & validation_ids:
         raise ValueError(f"train/validation에 중복 id가 있습니다: {sorted(overlap)[:5]}")
     if overlap := train_groups & validation_groups:
         raise ValueError(
             f"train/validation에 중복 source_group_id가 있습니다: {sorted(overlap)[:5]}"
         )
-    if len(train_tasks) != 1 or train_tasks != validation_tasks:
-        raise ValueError(
-            "train/validation은 동일한 단일 task여야 합니다: "
-            f"train={sorted(train_tasks)}, validation={sorted(validation_tasks)}"
-        )
-    training_task = next(iter(train_tasks))
     if args.resume_from_checkpoint and not args.resume_from_checkpoint.is_dir():
         raise FileNotFoundError(args.resume_from_checkpoint)
 
@@ -457,7 +448,7 @@ def main() -> None:
             },
         },
         "limits": {"max_samples": args.max_samples, "max_steps": args.max_steps},
-        "task": training_task,
+        "task": args.task,
         "token_lengths": token_length_stats,
         "metrics": {"train": train_result.metrics, "evaluation": evaluation},
         "versions": {

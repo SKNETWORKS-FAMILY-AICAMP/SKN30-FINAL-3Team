@@ -1,0 +1,29 @@
+{
+  "status": {
+    "samples": 30,
+    "p50_ms": 7.942,
+    "p95_ms": 11.049,
+    "sql_count": 1,
+    "sql_p50_ms": 1.583
+  },
+  "first_page": {
+    "samples": 30,
+    "p50_ms": 68.123,
+    "p95_ms": 90.253,
+    "sql_count": 6,
+    "sql_p50_ms": 32.729
+  },
+  "unjudged_page": {
+    "samples": 30,
+    "p50_ms": 47.696,
+    "p95_ms": 65.332,
+    "sql_count": 4,
+    "sql_p50_ms": 20.481
+  },
+  "listing_search": {
+    "samples": 30,
+    "p50_ms": 2.315,
+    "p95_ms": 8.422,
+    "rows": 15
+  }
+}

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 from brokerage_ai.core.types import ProviderDiagnostics
-from brokerage_ai.f2.types import ConsultationAnalysis, LedgerType, Transcription
+from brokerage_ai.f2.types import ConsultationAnalysis, Transcription
 
 
 class Transcriber(Protocol):
@@ -20,5 +20,4 @@ class ConsultationAnalyzer(Protocol):
         self,
         *,
         transcript: str,
-        ledger_type: LedgerType,
     ) -> tuple[ConsultationAnalysis, ProviderDiagnostics | None]: ...

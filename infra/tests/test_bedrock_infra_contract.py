@@ -12,10 +12,13 @@ class BedrockInfraContractTests(unittest.TestCase):
     def test_public_endpoint_address_book_has_no_secret(self) -> None:
         configuration = read("infra/environments/dev/configuration.tf")
 
-        self.assertIn("AI_LLM_ENDPOINTS = jsonencode([", configuration)
-        self.assertIn('alias      = "general-dev-bedrock"', configuration)
-        self.assertIn('provider   = "bedrock"', configuration)
-        self.assertIn("aws_region = var.aws_region", configuration)
+        self.assertIn("AI_GENERAL_PROVIDER", configuration)
+        self.assertIn('"bedrock"', configuration)
+        selection = read("infra/environments/dev/general-model.tf")
+        self.assertIn('"global.openai.gpt-5.6-luna"', selection)
+        self.assertIn("var.general_model_selection.provider", configuration)
+        self.assertIn("AI_GENERAL_AWS_REGION", configuration)
+        self.assertNotIn("AI_LLM_ENDPOINTS", configuration)
         self.assertNotIn("AI_BEDROCK_API_KEY", configuration)
 
     def test_runtime_role_is_luna_only_and_non_streaming(self) -> None:

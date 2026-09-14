@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import re
-from pathlib import Path
 from typing import cast
 
+import httpx
 import pytest
 from brokerage_ai.core.errors import ProviderTimeoutError
 from brokerage_ai.f2 import (
@@ -12,65 +13,12 @@ from brokerage_ai.f2 import (
     F2PipelineError,
     F2PipelineRequest,
     F2PipelineResult,
-    FieldProposal,
     LedgerType,
-    ProposalStatus,
 )
-from fastapi.testclient import TestClient
+from f2_fixtures import FakePipeline, app_with_pipeline, client_with_pipeline
 
 import main
-from api.f2 import get_f2_pipeline
-from domain.authentication.dependencies import get_current_user, require_csrf
-from domain.authentication.models import CurrentUser, UserRole
 from main import create_app
-
-
-class FakePipeline:
-    def __init__(self, error: Exception | None = None) -> None:
-        self.request: F2PipelineRequest | None = None
-        self.audio_bytes = b""
-        self.temp_path: Path | None = None
-        self.error = error
-
-    async def run(self, request: F2PipelineRequest) -> F2PipelineResult:
-        self.request = request
-        self.temp_path = request.audio_path
-        self.audio_bytes = request.audio_path.read_bytes()
-        if self.error is not None:
-            raise self.error
-        return F2PipelineResult(
-            transcript="한강아파트를 12억에 매도합니다.",
-            transcription_model="openai/whisper-large-v3-turbo",
-            ledger_type=request.ledger_type,
-            consultation_type=ConsultationType.SELL_REQUEST,
-            ledger_mismatch=False,
-            proposals=(
-                FieldProposal(
-                    field_name="매매가",
-                    current_value=None,
-                    proposed_value="12억",
-                    evidence="12억에 매도",
-                    status=ProposalStatus.CONFIRMED,
-                    selected_by_default=True,
-                ),
-            ),
-            uncertainties=(),
-            consultation_log_draft="한강아파트 12억 매도 의뢰.",
-        )
-
-
-def client_with_pipeline(config, pipeline: FakePipeline) -> TestClient:
-    app = create_app(config=config, readiness_probe=lambda request: True)
-    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id=1,
-        brokerage_id=1,
-        login_id="f2-test",
-        display_name="F2 검증",
-        role=UserRole.OWNER,
-    )
-    app.dependency_overrides[require_csrf] = lambda: None
-    app.dependency_overrides[get_f2_pipeline] = lambda: pipeline
-    return TestClient(app)
 
 
 def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
@@ -80,7 +28,7 @@ def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
             "/api/v1/f2/analyses",
             files={"audio": ("memo.wav", b"audio-content", "audio/wav")},
             data={
-                "ledger_type": "매물장",
+                "current_ledger_type": "매물장",
                 "current_fields": '{"매매가": null}',
                 "privacy_confirmed": "true",
             },
@@ -89,7 +37,7 @@ def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
     assert response.status_code == 200, response.text
     assert pipeline.audio_bytes == b"audio-content"
     assert pipeline.request is not None
-    assert pipeline.request.ledger_type is LedgerType.PROPERTY
+    assert pipeline.request.current_ledger_type is LedgerType.PROPERTY
     assert pipeline.request.current_fields == {"매매가": None}
     assert pipeline.temp_path is not None and not pipeline.temp_path.exists()
     assert response.json()["proposals"][0] == {
@@ -101,6 +49,25 @@ def test_analyzes_multipart_audio_and_removes_temporary_file(config) -> None:
         "selected_by_default": True,
     }
     assert "transcript" not in response.json()
+    assert response.json()["ledger_type"] == "매물장"
+
+
+def test_new_intake_omits_current_ledger_and_returns_recommended_buyer_ledger(config) -> None:
+    pipeline = FakePipeline(consultation_type=ConsultationType.BUY_REQUEST)
+    with client_with_pipeline(config, pipeline) as client:
+        response = client.post(
+            "/api/v1/f2/analyses",
+            files={"audio": ("memo.wav", b"audio-content", "audio/wav")},
+            data={"privacy_confirmed": "true"},
+        )
+
+    assert response.status_code == 200, response.text
+    assert pipeline.request is not None
+    assert pipeline.request.current_ledger_type is None
+    assert pipeline.request.current_fields == {}
+    assert response.json()["consultation_type"] == "매수문의"
+    assert response.json()["ledger_type"] == "구입장"
+    assert response.json()["ledger_mismatch"] is False
 
 
 def test_requires_privacy_confirmation(config) -> None:
@@ -212,3 +179,133 @@ def test_empty_transcription_remains_422_without_a_terminal_event(
     assert response.status_code == 422
     assert response.json()["code"] == "VALIDATION_FAILED"
     assert events == []
+
+
+class BlockingPipeline(FakePipeline):
+    def __init__(self) -> None:
+        super().__init__()
+        self.started = asyncio.Event()
+        self.finish = asyncio.Event()
+        self.calls = 0
+
+    async def run(self, request: F2PipelineRequest) -> F2PipelineResult:
+        self.calls += 1
+        self.temp_path = request.audio_path
+        self.started.set()
+        await self.finish.wait()
+        return await super().run(request)
+
+
+def test_ten_overlapping_analyses_admit_one_and_reject_nine_without_blocking_health(config):
+    async def scenario():
+        pipeline = BlockingPipeline()
+        app = app_with_pipeline(config, pipeline)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+
+            async def submit():
+                return await client.post(
+                    "/api/v1/f2/analyses",
+                    files={"audio": ("memo.wav", b"audio", "audio/wav")},
+                    data={
+                        "ledger_type": "매물장",
+                        "current_fields": "{}",
+                        "privacy_confirmed": "true",
+                    },
+                )
+
+            first = asyncio.create_task(submit())
+            try:
+                await asyncio.wait_for(pipeline.started.wait(), timeout=5)
+                responses = await asyncio.wait_for(
+                    asyncio.gather(*(submit() for _ in range(9))), timeout=5
+                )
+                assert all(response.status_code == 429 for response in responses)
+                assert all(response.json()["code"] == "F2_BUSY" for response in responses)
+                assert all(response.headers["Retry-After"] == "5" for response in responses)
+                assert pipeline.calls == 1
+                assert (await client.get("/health/live")).status_code == 200
+            finally:
+                pipeline.finish.set()
+                response = await first
+            assert response.status_code == 200
+            assert (await submit()).status_code == 200
+            assert pipeline.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_canceled_caller_keeps_file_and_slot_until_analysis_finishes(config):
+    async def scenario():
+        pipeline = BlockingPipeline()
+        app = app_with_pipeline(config, pipeline)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            caller = asyncio.create_task(
+                client.post(
+                    "/api/v1/f2/analyses",
+                    files={"audio": ("memo.wav", b"audio", "audio/wav")},
+                    data={
+                        "ledger_type": "매물장",
+                        "current_fields": "{}",
+                        "privacy_confirmed": "true",
+                    },
+                )
+            )
+            await asyncio.wait_for(pipeline.started.wait(), timeout=5)
+            analysis = app.state.f2_analysis_task
+            try:
+                caller.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await caller
+                assert app.state.f2_analysis_busy
+                assert not analysis.done()
+                assert pipeline.temp_path is not None and pipeline.temp_path.exists()
+            finally:
+                pipeline.finish.set()
+                await analysis
+            assert not app.state.f2_analysis_busy
+            assert app.state.f2_analysis_task is None
+            assert not pipeline.temp_path.exists()
+
+    asyncio.run(scenario())
+
+
+def test_busy_request_is_rejected_before_reading_upload(config):
+    class UnreadBody(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            raise AssertionError("busy requests must not consume the upload body")
+            yield b""  # pragma: no cover
+
+    async def scenario():
+        app = create_app(config=config)
+        app.state.f2_analysis_busy = True
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            response = await client.post("/api/v1/f2/analyses", content=UnreadBody())
+        assert response.status_code == 429
+        assert response.json()["code"] == "F2_BUSY"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("error", [ProviderTimeoutError(), F2PipelineError("private")])
+def test_failed_analysis_releases_capacity_for_retry(config, error):
+    pipeline = FakePipeline(error)
+    with client_with_pipeline(config, pipeline) as client:
+
+        def submit(content=b"audio"):
+            return client.post(
+                "/api/v1/f2/analyses",
+                files={"audio": ("memo.wav", content, "audio/wav")},
+                data={"ledger_type": "매물장", "current_fields": "{}", "privacy_confirmed": "true"},
+            )
+
+        assert submit().status_code in (502, 503)
+        assert pipeline.temp_path is not None and not pipeline.temp_path.exists()
+        pipeline.error = None
+        assert submit(b"").status_code == 422
+        assert submit().status_code == 200

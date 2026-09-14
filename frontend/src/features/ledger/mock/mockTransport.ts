@@ -489,15 +489,52 @@ export const mockTransport: LedgerTransport = {
   async createRequirement(payload, signal) {
     await delay(signal);
     const state = getState();
+    // 서버와 같은 규칙이다. `party_id`가 없으면 `new_party`로 인물까지 함께 만든다.
+    if (payload.party_id == null && payload.new_party == null) {
+      throw new ApiError({
+        kind: "validation",
+        message: "party_id or new_party is required",
+        status: 422,
+        code: "VALIDATION_FAILED",
+      });
+    }
+    if (payload.new_party != null && payload.new_party.name.trim() === "") {
+      throw new ApiError({
+        kind: "validation",
+        message: "new_party.name must not be empty",
+        status: 422,
+        code: "VALIDATION_FAILED",
+      });
+    }
+    if (payload.new_party != null && !payload.privacy_consent) {
+      throw new ApiError({
+        kind: "validation",
+        message: "개인정보 활용 동의 없이 구입장을 저장하려 함",
+        status: 422,
+        code: "PRIVACY_CONSENT_REQUIRED",
+      });
+    }
     const created: PropertyRequirementRowDto = {
       id: nextId(),
       party: {
-        id: payload.party_id,
+        id: payload.party_id ?? nextId(),
         party_type: "INDIVIDUAL",
-        name: "신규 손님",
+        name: payload.new_party?.name ?? "신규 손님",
         alternate_name: null,
         privacy_consent_at: new Date().toISOString(),
-        contacts: [],
+        contacts:
+          payload.new_party?.phone == null
+            ? []
+            : [
+                {
+                  id: nextId(),
+                  contact_method: "PHONE",
+                  contact_value: payload.new_party.phone,
+                  contact_label: null,
+                  is_primary: true,
+                  contactability_status: "UNKNOWN",
+                },
+              ],
       },
       received_at: payload.received_at,
       demand_type: payload.demand_type,

@@ -96,10 +96,10 @@ resource "aws_vpc_security_group_rules_exclusive" "alb" {
 resource "aws_vpc_security_group_rules_exclusive" "app" {
   security_group_id = aws_security_group.app.id
   ingress_rule_ids  = [aws_vpc_security_group_ingress_rule.app_from_alb.id]
-  egress_rule_ids = [
+  egress_rule_ids = concat([
     aws_vpc_security_group_egress_rule.app_https.id,
     aws_vpc_security_group_egress_rule.app_to_database.id,
-  ]
+  ], [for rule in aws_vpc_security_group_egress_rule.app_to_gpu : rule.id])
 }
 
 resource "aws_vpc_security_group_rules_exclusive" "database" {

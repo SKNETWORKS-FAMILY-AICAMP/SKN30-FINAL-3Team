@@ -3,18 +3,20 @@ import {
   Alert,
   Button,
   Checkbox,
-  FormSelect,
-  FormSelectOption,
+  MenuToggle,
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
+  Select,
+  SelectList,
+  SelectOption,
   TextArea,
   TextInput,
 } from "@patternfly/react-core";
-import { SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
+import { MicrophoneIcon, SaveIcon, SearchIcon, TimesIcon, TrashIcon } from "@patternfly/react-icons";
 import VoiceMemoModal from "./VoiceMemoModal.jsx";
-import { describeForUser } from "./ledger/index.ts";
+import { carrySavedIdentity, describeForUser } from "./ledger/index.ts";
 import { nextPhoneInput } from "./ledger/model/phone.ts";
 import "./DetailWorkspace.css";
 
@@ -52,8 +54,20 @@ function Field({ id, label, value, onChange, type = "text", inputMode, autoCompl
   return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><TextInput id={id} type={type} inputMode={inputMode} autoComplete={autoComplete} placeholder={placeholder} value={value || ""} onChange={(_event, next) => onChange(next)} /></label>;
 }
 
+/*
+ * 네이티브 <select>(FormSelect)는 Windows에서 드롭다운이 열려 있을 때 바깥을 클릭하면
+ * OS 팝업을 닫기만 하고 그 클릭을 아래 요소(저장 버튼 등)로 전달하지 않는다. 거래 구분을
+ * 열어 본 뒤 곧바로 저장을 누르면 첫 클릭이 먹히지 않는 문제로 이어져, JS로 그리는
+ * PatternFly Select(비 네이티브 목록)로 대체한다.
+ */
 function SelectField({ id, label, value, options, onChange }) {
-  return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><FormSelect id={id} value={value} onChange={(_event, next) => onChange(next)}>{options.map((option) => <FormSelectOption key={option} value={option} label={option} />)}</FormSelect></label>;
+  const [isOpen, setIsOpen] = useState(false);
+  const toggle = (toggleRef) => (
+    <MenuToggle ref={toggleRef} id={id} className="detail-field__select-toggle" onClick={() => setIsOpen((open) => !open)} isExpanded={isOpen}>
+      {value}
+    </MenuToggle>
+  );
+  return <label className="detail-field" htmlFor={id}><span className="detail-field__label">{label}</span><Select id={`${id}-menu`} isOpen={isOpen} selected={value} onSelect={(_event, next) => { onChange(next); setIsOpen(false); }} onOpenChange={setIsOpen} toggle={toggle}><SelectList>{options.map((option) => <SelectOption key={option} value={option} isSelected={option === value}>{option}</SelectOption>)}</SelectList></Select></label>;
 }
 
 export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onDiscard, onDelete, onOpenCrossMatch, isCrossMatchOpen = false, crossMatchPanel, focusF2Request = 0, currentUser = null }) {
@@ -136,12 +150,15 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
     if (!DEMAND_TYPES.includes(draft.category)) {
       blockers.push(`거래 구분: ${DEMAND_TYPES.join(" · ")} 중 하나를 골라 주세요.`);
     }
-    /* 계약상 구입장은 인물이 있어야 만들 수 있는데 인물 등록 API가 아직 없다. 저장 전에 알린다. */
-    if (draft.serverId == null && draft.partyId == null) {
-      blockers.push("손님 인물 연결: 새 손님은 아직 서버에 등록할 수 없습니다. 인물 등록 기능이 준비될 때까지 이 행은 화면에만 남습니다.");
+    /*
+     * 구입장은 인물이 있어야 만들 수 있다. 기존 인물을 고르는 검색이 없으므로 새 손님은
+     * 이름·별칭으로 인물을 함께 만든다(F1-DM-08). 이름이 없으면 요청 자체를 만들 수 없다.
+     */
+    if (draft.serverId == null && draft.partyId == null && !draft.buyer?.trim()) {
+      blockers.push("이름·별칭: 손님의 이름 또는 별칭을 입력해 주세요. 새 손님은 이름이 있어야 등록할 수 있습니다.");
     }
     return blockers;
-  }, [draft.category, draft.consent, draft.partyId, draft.serverId]);
+  }, [draft.buyer, draft.category, draft.consent, draft.partyId, draft.serverId]);
 
   /* 저장은 되지만 [저장 완료]로 남지 않는 칸. 무엇을 더 채우면 되는지 함께 알려준다. */
   const completionGaps = useMemo(() => [
@@ -239,6 +256,7 @@ export default function BuyerDetailWorkspace({ row, isOpen, onClose, onSave, onD
         <Button variant="primary" icon={<SaveIcon />} onClick={() => save()} isLoading={isSaving} isDisabled={isSaving}>저장</Button>
         <Button variant="secondary" icon={<TimesIcon />} onClick={requestClose}>상세 닫기</Button>
         <Button variant="secondary" icon={<SearchIcon />} onClick={() => onOpenCrossMatch?.(draft)} {...(isCrossMatchOpen ? { "aria-controls": "cross-match-panel" } : {})}>교차 판정</Button>
+        <Button className="buyer-detail-workspace__voice-entry" variant="secondary" icon={<MicrophoneIcon />} onClick={() => setF2Open(true)} aria-haspopup="dialog">음성 메모 입력</Button>
         <Button ref={deleteTriggerRef} variant="secondary" isDanger icon={<TrashIcon />} onClick={requestDelete} isDisabled={isSaving || isDeleting} aria-haspopup="dialog">삭제</Button>
       </div>
       <span className="buyer-detail-workspace__save-state" aria-live="polite">{dirty ? "저장하지 않은 변경 있음" : "모든 변경 저장됨"}</span>

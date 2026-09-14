@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from unittest.mock import patch
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPOSITORY_ROOT / "infra/deploy/scripts/render_env.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("render_env", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
 render_env = importlib.util.module_from_spec(SPEC)
@@ -17,6 +19,38 @@ SPEC.loader.exec_module(render_env)
 class RenderEnvironmentTests(unittest.TestCase):
     LLM_KEY = "l" * 43
     STT_KEY = "s" * 43
+
+    def test_general_endpoint_must_match_selected_model(self):
+        endpoint = {
+            "status": "active",
+            "cloud": "runpod",
+            "resource_id": "abc123def4567",
+            "base_url": "https://abc123def4567-8000.proxy.runpod.net/v1",
+            "model_profile": "qwen38-27b-fp8",
+            "model": "Qwen/Qwen3.8-27B-FP8",
+        }
+        public = {
+            "backend": {},
+            "ai": {
+                "AI_VLLM_ENDPOINT_SET": self.endpoint_set(),
+                "AI_GENERAL_PROVIDER": "vllm",
+                "AI_GENERAL_MODEL": endpoint["model"],
+                "AI_GENERAL_ENDPOINT_SET": json.dumps(endpoint),
+            },
+        }
+        result = render_env.expand_ai_vllm_endpoint_set(public)
+        self.assertEqual(result["ai"]["AI_GENERAL_BASE_URL"], endpoint["base_url"])
+        for mutation in (
+            {"model": "Qwen/Qwen3-14B-AWQ"},
+            {"model": None},
+            {"model_profile": None},
+        ):
+            with self.subTest(mutation=mutation):
+                public["ai"]["AI_GENERAL_ENDPOINT_SET"] = json.dumps(
+                    {**endpoint, **mutation}
+                )
+                with self.assertRaisesRegex(SystemExit, "must match AI_GENERAL_MODEL"):
+                    render_env.expand_ai_vllm_endpoint_set(public)
 
     def endpoint_set(self, **overrides: object) -> str:
         payload: dict[str, object] = {
@@ -30,6 +64,48 @@ class RenderEnvironmentTests(unittest.TestCase):
         }
         payload.update(overrides)
         return json.dumps(payload)
+
+    def test_f2_refresh_preserves_unrelated_values_and_removes_offline_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "api.env"
+            original = {
+                "DB_URL": "fixture=db-url",
+                "APP_ENV": "dev",
+                "NEW_SETTING": "keep",
+            }
+            render_env.write_env(path, original)
+            keys = {
+                "AI_VLLM_SLLM_API_KEY": self.LLM_KEY,
+                "AI_VLLM_STT_API_KEY": self.STT_KEY,
+            }
+            render_env.refresh_f2_environment(path, self.endpoint_set(), keys)
+            active = dict(line.split("=", 1) for line in path.read_text().splitlines())
+            self.assertIn("AI_VLLM_SLLM_BASE_URL", active)
+            self.assertNotIn("_f2_status", active)
+            for name, value in original.items():
+                self.assertEqual(active[name], value)
+            offline = self.endpoint_set(
+                status="offline",
+                pod_id=None,
+                sllm_release_id=None,
+                sllm_base_url=None,
+                stt_base_url=None,
+            )
+            render_env.refresh_f2_environment(path, offline, {})
+            result = dict(line.split("=", 1) for line in path.read_text().splitlines())
+            self.assertEqual(result, original)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    def test_f2_refresh_invalid_endpoint_leaves_existing_file_intact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "api.env"
+            path.write_text("DB_URL=existing\nAI_F2_PROVIDER_STATUS=offline\n")
+            previous = path.read_bytes()
+            with self.assertRaises(SystemExit):
+                render_env.refresh_f2_environment(
+                    path, self.endpoint_set(sllm_base_url="http://wrong"), {}
+                )
+            self.assertEqual(path.read_bytes(), previous)
 
     def test_public_parameters_accept_new_valid_names_without_an_allowlist(
         self,
@@ -120,7 +196,7 @@ class RenderEnvironmentTests(unittest.TestCase):
             expanded["ai"]["AI_VLLM_STT_BASE_URL"],
             "https://abc123def4567-8002.proxy.runpod.net/v1",
         )
-        self.assertEqual(expanded["ai"]["AI_F2_PROVIDER_STATUS"], "active")
+        self.assertEqual(expanded["ai"]["_f2_status"], "active")
         self.assertNotIn("AI_VLLM_ENDPOINT_SET", expanded["ai"])
         self.assertIn("AI_VLLM_ENDPOINT_SET", public["ai"])
 
@@ -188,7 +264,7 @@ class RenderEnvironmentTests(unittest.TestCase):
 
         result = render_env.parse_ai_vllm_endpoint_set(raw)
 
-        self.assertEqual(result, {"AI_F2_PROVIDER_STATUS": "offline"})
+        self.assertEqual(result, {"_f2_status": "offline"})
 
     def test_ai_vllm_endpoint_set_rejects_missing_and_legacy_parameters(self) -> None:
         with self.assertRaisesRegex(SystemExit, "Missing public parameter"):
@@ -253,7 +329,7 @@ class RenderEnvironmentTests(unittest.TestCase):
             public={
                 "backend": {"APP_ENV": "prod", "WORKER_ENABLED": "false"},
                 "ai": {
-                    "AI_OPENAI_BASE_URL": "https://openai.example/v1",
+                    "AI_GENERAL_BASE_URL": "https://openai.example/v1",
                     "AI_VLLM_ENDPOINT_SET": self.endpoint_set(),
                 },
             },
@@ -270,7 +346,9 @@ class RenderEnvironmentTests(unittest.TestCase):
         self.assertNotIn("AI_OPENAI_API_KEY", api)
         self.assertEqual(api["AI_VLLM_SLLM_API_KEY"], self.LLM_KEY)
         self.assertEqual(api["AI_VLLM_STT_API_KEY"], self.STT_KEY)
-        self.assertEqual(api["AI_OPENAI_BASE_URL"], "https://openai.example/v1")
+        self.assertNotIn("AI_GENERAL_BASE_URL", api)
+        self.assertNotIn("AI_GENERAL_API_KEY", api)
+        self.assertEqual(worker["AI_GENERAL_BASE_URL"], "https://openai.example/v1")
         self.assertEqual(
             api["AI_VLLM_SLLM_BASE_URL"],
             "https://abc123def4567-8001.proxy.runpod.net/v1",
@@ -280,18 +358,10 @@ class RenderEnvironmentTests(unittest.TestCase):
             "https://abc123def4567-8002.proxy.runpod.net/v1",
         )
         self.assertNotIn("AI_VLLM_ENDPOINT_SET", api)
-        self.assertEqual(worker["AI_OPENAI_API_KEY"], "openai-test")
-        self.assertEqual(worker["AI_VLLM_SLLM_API_KEY"], self.LLM_KEY)
-        self.assertEqual(worker["AI_VLLM_STT_API_KEY"], self.STT_KEY)
+        self.assertEqual(worker["AI_GENERAL_API_KEY"], "openai-test")
         self.assertEqual(worker["DB_URL"], "postgresql+psycopg://runtime")
-        self.assertEqual(
-            worker["AI_VLLM_SLLM_BASE_URL"],
-            "https://abc123def4567-8001.proxy.runpod.net/v1",
-        )
-        self.assertEqual(
-            worker["AI_VLLM_STT_BASE_URL"],
-            "https://abc123def4567-8002.proxy.runpod.net/v1",
-        )
+        self.assertNotIn("_f2_status", worker)
+        self.assertFalse((render_env.F2_ENV_NAMES - {"_f2_status"}) & worker.keys())
         self.assertNotIn("AI_VLLM_ENDPOINT_SET", worker)
         self.assertEqual(
             migration, {"DB_MIGRATION_URL": "postgresql+psycopg://migration"}
@@ -311,15 +381,9 @@ class RenderEnvironmentTests(unittest.TestCase):
             public={
                 "backend": {"APP_ENV": "dev"},
                 "ai": {
-                    "AI_LLM_ENDPOINTS": json.dumps(
-                        [
-                            {
-                                "alias": "general-dev-bedrock",
-                                "provider": "bedrock",
-                                "aws_region": "ap-northeast-2",
-                            }
-                        ]
-                    ),
+                    "AI_GENERAL_PROVIDER": "bedrock",
+                    "AI_GENERAL_MODEL": "global.openai.gpt-5.6-luna",
+                    "AI_GENERAL_AWS_REGION": "ap-northeast-2",
                     "AI_VLLM_ENDPOINT_SET": offline_endpoint_set,
                 },
             },
@@ -328,7 +392,8 @@ class RenderEnvironmentTests(unittest.TestCase):
             ai_provider_keys={},
         )
 
-        self.assertIn("AI_LLM_ENDPOINTS", worker)
+        self.assertEqual(worker["AI_GENERAL_PROVIDER"], "bedrock")
+        self.assertNotIn("AI_GENERAL_API_KEY", worker)
         self.assertNotIn("AI_OPENAI_API_KEY", worker)
         self.assertFalse(set(render_env.F2_AI_PROVIDER_KEYS) & api.keys())
         self.assertFalse(set(render_env.F2_AI_PROVIDER_KEYS) & worker.keys())

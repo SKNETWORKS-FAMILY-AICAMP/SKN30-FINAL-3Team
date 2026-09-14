@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 
 import structlog
-from brokerage_ai import load_ai_config
+from brokerage_ai import AiRuntime, create_ai_runtime
 from brokerage_ai.core.config import F2ProviderStatus
 from brokerage_ai.f2 import F2Runtime, create_f2_runtime
 from fastapi import FastAPI, Request
@@ -21,16 +22,20 @@ from starlette.responses import Response
 from api.health import database_is_ready
 from api.health import router as health_router
 from api.router import create_api_router
-from core.config import Config, get_config
+from chatbot_runtime import workflow_factory
+from core.config import Config, get_config, load_ai_config
 from core.errors import (
     ApplicationError,
     AuthenticationError,
+    F2BusyError,
     F2ProcessingError,
     F2UnavailableError,
 )
 from core.health_host import HealthAwareTrustedHostMiddleware
 from core.logging import configure_logging, exception_location
 from core.request_context import REQUEST_ID_HEADER, RequestContextMiddleware
+from domain.chatbot.errors import ChatBusy
+from domain.chatbot.manager import ChatbotManager
 from domain.engine import create_database_engine
 
 logger = structlog.get_logger()
@@ -66,6 +71,7 @@ def create_app(
     config: Config | None = None,
     readiness_probe: Callable[[Request], bool] | None = None,
     f2_runtime_factory: Callable[[], F2Runtime] | None = None,
+    chatbot_manager_factory: Callable[[FastAPI], ChatbotManager] | None = None,
 ) -> FastAPI:
     resolved_config = config or get_config()
     configure_logging(resolved_config.log)
@@ -73,6 +79,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         runtime: F2Runtime | None = None
+        chatbot_runtime: AiRuntime | None = None
         ai_config = load_ai_config(resolved_config.app.environment.value)
         if ai_config.f2.provider_status is F2ProviderStatus.ACTIVE:
             if f2_runtime_factory is not None:
@@ -81,8 +88,29 @@ def create_app(
                 runtime = create_f2_runtime(ai_config)
         app.state.f2_pipeline = runtime.pipeline if runtime is not None else None
         try:
+            if resolved_config.chatbot.enabled:
+                if chatbot_manager_factory is not None:
+                    app.state.chatbot_manager = chatbot_manager_factory(app)
+                else:
+                    chatbot_runtime = create_ai_runtime(ai_config)
+                    app.state.chatbot_manager = ChatbotManager(
+                        app.state.db_engine,
+                        workflow_factory=workflow_factory(
+                            app.state.db_engine, chatbot_runtime, resolved_config
+                        ),
+                        request_timeout_seconds=resolved_config.chatbot.request_timeout_seconds,
+                        heartbeat_seconds=resolved_config.chatbot.heartbeat_seconds,
+                        max_concurrent_requests=resolved_config.chatbot.max_concurrent_requests,
+                    )
+                await app.state.chatbot_manager.start()
             yield
         finally:
+            if app.state.chatbot_manager is not None:
+                await app.state.chatbot_manager.close()
+            if chatbot_runtime is not None:
+                await chatbot_runtime.close()
+            if app.state.f2_analysis_task is not None:
+                await asyncio.gather(app.state.f2_analysis_task, return_exceptions=True)
             if runtime is not None:
                 await runtime.close()
 
@@ -95,6 +123,9 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.config = resolved_config
+    app.state.f2_analysis_busy = False
+    app.state.f2_analysis_task = None
+    app.state.chatbot_manager = None
     app.state.db_engine = create_database_engine(resolved_config)
     app.state.readiness_probe = readiness_probe or database_is_ready
 
@@ -178,6 +209,7 @@ def create_app(
             status_code=exc.status_code,
             code=exc.code,
             message=exc.message,
+            headers={"Retry-After": "5"} if isinstance(exc, F2BusyError | ChatBusy) else None,
         )
 
     @app.exception_handler(Exception)

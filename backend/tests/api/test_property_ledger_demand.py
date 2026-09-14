@@ -53,6 +53,63 @@ def test_requirement_is_rejected_without_privacy_consent(config: Config) -> None
 
 
 @requires_database
+def test_requirement_can_be_created_with_a_new_party(config: Config) -> None:
+    """구입장 그리드에는 기존 인물을 고르는 검색이 없다. 새 손님은 `new_party`로 한 번에 만든다."""
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        response = client.post(
+            "/api/v1/property-requirements",
+            json={
+                "new_party": {"name": "인천사모님", "phone": "010-1234-5678"},
+                "privacy_consent": True,
+                "demand_type": "매수",
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        body = response.json()
+        party = body["requirement"]["party"]
+        assert party["name"] == "인천사모님"
+        assert party["privacy_consent_at"] is not None
+        assert [contact["contact_value"] for contact in party["contacts"]] == ["010-1234-5678"]
+
+
+@requires_database
+def test_requirement_new_party_without_consent_is_rejected(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        response = client.post(
+            "/api/v1/property-requirements",
+            json={"new_party": {"name": "동의 안 한 손님"}, "demand_type": "매수"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["code"] == "PRIVACY_CONSENT_REQUIRED"
+
+
+@requires_database
+def test_requirement_new_party_requires_a_name(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        response = client.post(
+            "/api/v1/property-requirements",
+            json={"new_party": {"name": "  "}, "privacy_consent": True, "demand_type": "매수"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["code"] == "VALIDATION_FAILED"
+
+
+@requires_database
+def test_requirement_requires_party_id_or_new_party(config: Config) -> None:
+    with ledger_client(config) as (client, session, brokerage_id, _user_id):
+        response = client.post(
+            "/api/v1/property-requirements",
+            json={"demand_type": "매수"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["code"] == "VALIDATION_FAILED"
+
+
+@requires_database
 def test_requirement_keeps_raw_text_multiple_pyeongs_and_desired_complexes(
     config: Config,
 ) -> None:

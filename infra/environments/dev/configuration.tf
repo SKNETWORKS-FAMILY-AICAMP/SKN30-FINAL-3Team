@@ -25,13 +25,9 @@ locals {
       name        = "/${local.name_prefix}/runpod/operator-api-key"
       description = "Container for the RunPod read-write operator API key populated outside Terraform"
     }
-    monitor_api_key = {
-      name        = "/${local.name_prefix}/runpod/monitor-api-key"
-      description = "Container for the RunPod read-only monitoring API key populated outside Terraform"
-    }
     ghcr_registry = {
       name        = "/${local.name_prefix}/runpod/ghcr-registry"
-      description = "Container for GHCR username and read-only PAT JSON populated outside Terraform"
+      description = "Read-only GHCR credentials for AWS GPU hosts; RunPod registry credentials remain Console-managed"
     }
   }
 
@@ -39,12 +35,10 @@ locals {
     backend = merge({
       APP_ENV                               = "dev"
       APP_HOST                              = "0.0.0.0"
-      APP_OPENAPI_ENABLED                   = "false"
       APP_PORT                              = "8000"
-      AUTH_CSRF_COOKIE_NAME                 = "brokerage_csrf"
+      CHATBOT_ENABLED                       = "true"
       AUTH_DEVELOPMENT_ENABLED              = tostring(local.development_auth_enabled)
       AUTH_SESSION_ABSOLUTE_TIMEOUT_MINUTES = "720"
-      AUTH_SESSION_COOKIE_NAME              = "brokerage_session"
       AUTH_SESSION_IDLE_TIMEOUT_MINUTES     = "30"
       AUTH_SESSION_LAST_SEEN_UPDATE_SECONDS = "300"
       DB_POOL_MAX_OVERFLOW                  = "5"
@@ -58,21 +52,19 @@ locals {
       HTTP_CORS_ALLOWED_ORIGINS    = "[]"
       LOG_FORMAT                   = "json"
       LOG_LEVEL                    = "INFO"
-      WORKER_ENABLED               = "true"
-      WORKER_READY_FILE            = "/tmp/brokerage-worker-ready"
       F3_ALLOW_SYNTHETIC_PROTOTYPE = "true"
     }, local.development_auth_identity_environment)
-    ai = {
-      AI_LLM_ENDPOINTS = jsonencode([
-        {
-          alias      = "general-dev-bedrock"
-          provider   = "bedrock"
-          aws_region = var.aws_region
-        },
-      ])
-      AI_OPENAI_BASE_URL         = "https://api.openai.com/v1"
-      AI_REQUEST_TIMEOUT_SECONDS = "60"
-    }
+    ai = merge({
+      # Shared provider/model choices are validated together in general-model.tf; restart after reviewed apply.
+      AI_GENERAL_PROVIDER                = var.general_model_selection.provider
+      AI_GENERAL_MODEL                   = var.general_model_selection.model
+      AI_REQUEST_TIMEOUT_SECONDS         = "60"
+      AI_GENERAL_REQUEST_TIMEOUT_SECONDS = "300"
+      AI_GENERAL_VLLM_MAX_IN_FLIGHT      = "1"
+      }, var.general_model_selection.provider == "bedrock" ? {
+      # Bedrock only: ap-northeast-2, matching this root's runtime role; omitted for API-key providers.
+      AI_GENERAL_AWS_REGION = var.general_model_selection.aws_region
+    } : {})
   }
 
   ai_vllm_endpoint_set_bootstrap = {
@@ -86,14 +78,12 @@ locals {
   }
 
   runpod_control_set_bootstrap = {
-    schema_version                = 1
-    status                        = "uninitialized"
-    generation                    = 0
-    registry_auth_id              = null
-    template_id                   = null
-    image                         = null
-    ai_provider_secret_version_id = null
-    updated_at                    = "1970-01-01T00:00:00Z"
+    schema_version   = 2
+    status           = "uninitialized"
+    registry_auth_id = null
+    template_id      = null
+    image            = null
+    updated_at       = "1970-01-01T00:00:00Z"
   }
 
   application_parameters = merge([
@@ -171,7 +161,7 @@ resource "aws_ssm_parameter" "ai_vllm_endpoint_set" {
 
 resource "aws_ssm_parameter" "runpod_control_set" {
   name        = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
-  description = "Non-sensitive RunPod bootstrap generation, immutable resource IDs, image digest, and secret synchronization state"
+  description = "Non-sensitive registration of Console-managed RunPod resource IDs and image digest"
   type        = "String"
   value       = jsonencode(local.runpod_control_set_bootstrap)
   tier        = "Standard"
@@ -184,11 +174,6 @@ resource "aws_ssm_parameter" "runpod_control_set" {
   tags = {
     Name = "/${local.name_prefix}/runpod/RUNPOD_CONTROL_SET"
   }
-}
-
-moved {
-  from = aws_ssm_parameter.application["ai_openai_base_url"]
-  to   = aws_ssm_parameter.application["ai_ai_openai_base_url"]
 }
 
 moved {

@@ -6,3 +6,4 @@
  */
 
 export { CalendarView } from "./CalendarView.tsx";
+export { loadSavedCalendarEvent } from "./api/loadSavedEvent.ts";

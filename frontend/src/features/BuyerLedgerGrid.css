@@ -19,17 +19,6 @@
   background: #f8fafc;
 }
 
-.buyer-ledger-grid__period {
-  display: flex;
-  gap: 6px;
-}
-
-.buyer-ledger-grid__period .pf-v6-c-button {
-  height: 32px;
-  border-radius: 6px;
-  font-size: 12px;
-}
-
 .buyer-ledger-grid__toolbar label {
   display: inline-flex;
   align-items: center;

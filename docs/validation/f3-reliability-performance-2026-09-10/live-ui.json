@@ -1,0 +1,42 @@
+[
+  {
+    "label": "listing",
+    "firstCardMs": 2918,
+    "firstCandidatesMs": 2918,
+    "done": true,
+    "completedMs": 56660,
+    "runId": 25,
+    "total": 3,
+    "posts": 1
+  },
+  {
+    "label": "listing-empty",
+    "firstCardMs": 8094,
+    "firstCandidatesMs": null,
+    "done": true,
+    "completedMs": 17545,
+    "runId": 26,
+    "total": 0,
+    "posts": 1
+  },
+  {
+    "label": "requirement",
+    "firstCardMs": 1375,
+    "firstCandidatesMs": 1375,
+    "done": true,
+    "completedMs": 29656,
+    "runId": 27,
+    "total": 2,
+    "posts": 1
+  },
+  {
+    "label": "requirement-empty",
+    "firstCardMs": 24017,
+    "firstCandidatesMs": null,
+    "done": true,
+    "completedMs": 31564,
+    "runId": 28,
+    "total": 0,
+    "posts": 1
+  }
+]

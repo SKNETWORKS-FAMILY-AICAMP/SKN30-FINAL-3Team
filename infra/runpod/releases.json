@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "selection_rule": "No default activation. Select by immutable release_id; bundle verification and serving validation are separate.",
+  "releases": [
+    {
+      "release_id": "dev-f2-handwritten-v05-qwen3-4b-full-v1",
+      "label": "기존 v0.5 개발용 LoRA",
+      "release_stage": "dev",
+      "release_mode": "lora",
+      "bundle_sha256": "7fe9f7731099b8ac4256455372b4395db5cd2c0d9925d8c587176b66210c442f",
+      "serving_validation": "candidate-tested; formal-deployment-pending"
+    },
+    {
+      "release_id": "consultation-v3",
+      "label": "신규 v0.5 Qwen3-4B LoRA (전달 파일 v2)",
+      "source_filename": "f2-consultation-v05-qwen3-4b-v2.tar.gz",
+      "release_stage": "verified",
+      "release_mode": "lora",
+      "base_model": "Qwen/Qwen3-4B",
+      "base_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "bundle_sha256": "2ca9f5ea643d2f689cc92d778a1152dd156315d49059126751ea46d4b1e1866d",
+      "bundle_size_bytes": 60693443,
+      "adapter_sha256": "faf9f3a626d7daa92c5f94989737609b5ef8e195566a472d67ede9535772af62",
+      "training_code_revision": null,
+      "evaluation_evidence": "Bundle contains full evaluation and promotion metadata; schema and cross-hashes validated, evaluation not rerun by Infra.",
+      "serving_validation": "pending-user-startup-check",
+      "publication_status": "published",
+      "publication_verified_date": "2026-09-09",
+      "s3_prefix": "s3://skn30-final-3team-dev-data-model-apse2-398563707017/releases/sllm/consultation-v3/",
+      "remote_content_sha256_verified": true
+    }
+  ]
+}
