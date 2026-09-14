@@ -6,6 +6,17 @@
 
 ---
 
+## 👥 Member
+
+| <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_bcm5y3UUxhhmBVv7GN7EyOZIZV35qaBJEXiZzHRU1owVmgOfF7Tb788d4riodliVPITukyW8BYeSBlk65CKfLuQys8RD5ZAB5gDwK2-ZheppndQC_oCqu-Z20EvALJ7cG-MxOOYna2jliaVrcku1i3-_LSf7GGMfpcj9VlYCKk4wiixpE3pVgLv0JEyyjadHQwgUHoVXnhU0n7wYbnLGkQ-VVCmrcZ8OEQ0TwxtwbzwsMhGhZsKojF6EY6BCzCTMblE" width="100"/> | <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuChJ4gstX4cFbARVRsgqfKwQOLXGggBIL0Yaly-HgD0KW263APd48490o41T9lkew-KJ95-zPoDQOUe0mv_CCEY4JMoA3J2jDfBrsLM61Qr2thhd-N3riAISYal9j1jiRuZ_L4m1ofPeG9HZrFJAipF8cCya1LJ_Ydb23GK7NdSqzL0Gd6scgKm3w5VvSkN1dxnYOmi0oFMCXpvwOB7jc6xe2jBfAyNThH7Ru86Hq40aOLN-1k8aOpN6d17QlZlB1lXaQs" width="100"/> | <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-C7CQT5vEFu99k25igVrr61JcoAViuJAky9YCRyTAnBqy2YLCaw28pRXe2QeAoCvj7fas_NlGCe4QTB7N892cASePogHVZxuBVvpOGmg5QDQ-UotXMBss__H7-qodsyEjX5UFUkMYKMKigZhyqTB0K06Ali4tXXN923dEKOTsqd-_aD6vZIMhgzrWheyqJN_V-tlYHWDJN_Nf90pAWTSqk0FJWz4sn_LikICR7rt5z9nANSTgwUDkFwsX8GHC4fUps5A" width="100"/> | <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGGIviLQvLtLqcCsUB4bxNePAfrr0NoaMwiKExT1kk1V-Yja3O_WxER8zkMuiqoMJCA6vKC-UGVfPWVTFesHYOBDJ0NOC66Sn21OAayQtqTz0j6QVT6x5GaM6EgLFcWh0z6W6mEgBkfTwh9NspzmJdTTVYaRz_NH7I659fqrnYniUKFPN5VgVuRXAjKgS0q2DBhZ61i5sFNypkqO-L1ehkMnP0DwZm6hkYtOjDasesy-j0VkUVKUhQJYeXPpm8h3K6n8Y" width="100"/> |
+| :---: | :---: | :---: | :---: |
+| **홍철민** (팀장) | **정민규** | **남태식** | **강성준** |
+| `infra` `ai` | `ai` `data` | `frontend` | `backend` `ai` |
+| 인프라· F4 챗봇 구현 | F2 학습 · 평가 · 데이터셋 생성 | React 화면 · F2/F3/F4 패널<br>상태 관리 | FastAPI API · Worker<br>F3 실행 · DB |
+| [![GitHub](https://img.shields.io/badge/GitHub-Hong1008-181717?style=flat-square&logo=github)](https://github.com/Hong1008) | [![GitHub](https://img.shields.io/badge/GitHub-dosupdebongu-181717?style=flat-square&logo=github)](https://github.com/dosupdebongu) | [![GitHub](https://img.shields.io/badge/GitHub-taesik002288-181717?style=flat-square&logo=github)](https://github.com/taesik002288) | [![GitHub](https://img.shields.io/badge/GitHub-SJ--log-181717?style=flat-square&logo=github)](https://github.com/SJ-log) |
+
+---
+
 ## 목차
 
 1. [프로젝트 소개](#프로젝트-소개)
