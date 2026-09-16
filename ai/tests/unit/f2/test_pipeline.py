@@ -207,3 +207,127 @@ async def test_stops_before_analysis_when_transcript_is_empty() -> None:
             )
         )
     assert analyzer.calls == []
+
+
+@pytest.mark.asyncio
+async def test_maps_buyer_field_aliases_to_canonical_names() -> None:
+    transcript = "월세 좀 알아보려고요. 이름은 홍길동이고 전화는 010-0000-0000입니다."
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.BUY_REQUEST,
+            fields={
+                "거래 구분": "월세",
+                "임대인 이름": "홍길동",
+                "임대인 전화": "010-0000-0000",
+            },
+            evidence={
+                "거래 구분": "월세 좀 알아보려고요",
+                "임대인 이름": "이름은 홍길동이고",
+                "임대인 전화": "전화는 010-0000-0000입니다",
+            },
+            summary="월세 매수 문의.",
+        )
+    )
+    pipeline = F2Pipeline(transcriber=FakeTranscriber(transcript), analyzer=analyzer)
+
+    result = await pipeline.run(
+        F2PipelineRequest(audio_path=Path("memo.wav"), current_ledger_type=LedgerType.BUYER)
+    )
+
+    assert [proposal.field_name for proposal in result.proposals] == [
+        "거래 구분",
+        "구입자 이름",
+        "전화번호",
+    ]
+    assert result.proposals[2].evidence == "전화는 010-0000-0000입니다"
+    assert "필드명을 정규화했습니다: 임대인 이름 → 구입자 이름" in result.uncertainties
+    assert "필드명을 정규화했습니다: 임대인 전화 → 전화번호" in result.uncertainties
+    assert not any(note.startswith("허용되지 않은") for note in result.uncertainties)
+
+
+@pytest.mark.asyncio
+async def test_alias_ignores_whitespace_and_skips_duplicate_canonical_field() -> None:
+    transcript = "전세 찾습니다. 연락처는 010-1111-2222, 아니 010-3333-4444로 주세요."
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.BUY_REQUEST,
+            fields={
+                "전화번호": "010-1111-2222",
+                "임차인전화": "010-3333-4444",
+            },
+            evidence={
+                "전화번호": "연락처는 010-1111-2222",
+                "임차인전화": "010-3333-4444로 주세요",
+            },
+            summary="전세 문의.",
+        )
+    )
+    pipeline = F2Pipeline(transcriber=FakeTranscriber(transcript), analyzer=analyzer)
+
+    result = await pipeline.run(
+        F2PipelineRequest(audio_path=Path("memo.wav"), current_ledger_type=LedgerType.BUYER)
+    )
+
+    assert [proposal.field_name for proposal in result.proposals] == ["전화번호"]
+    assert result.proposals[0].proposed_value == "010-1111-2222"
+    assert (
+        "같은 필드로 정규화된 중복 제안을 제외했습니다: 임차인전화 → 전화번호"
+        in result.uncertainties
+    )
+
+
+@pytest.mark.asyncio
+async def test_property_ledger_keeps_ambiguous_phone_field_excluded() -> None:
+    transcript = "집 내놓으려고요. 집주인 전화는 010-5555-6666이고 전화번호는 010-7777-8888."
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.SELL_REQUEST,
+            fields={
+                "집주인 전화": "010-5555-6666",
+                "전화번호": "010-7777-8888",
+            },
+            evidence={
+                "집주인 전화": "집주인 전화는 010-5555-6666",
+                "전화번호": "전화번호는 010-7777-8888",
+            },
+            summary="매도 의뢰.",
+        )
+    )
+    pipeline = F2Pipeline(transcriber=FakeTranscriber(transcript), analyzer=analyzer)
+
+    result = await pipeline.run(
+        F2PipelineRequest(audio_path=Path("memo.wav"), current_ledger_type=LedgerType.PROPERTY)
+    )
+
+    assert [proposal.field_name for proposal in result.proposals] == ["임대인 전화"]
+    assert "허용되지 않은 필드 제안을 제외했습니다: 전화번호" in result.uncertainties
+
+
+@pytest.mark.asyncio
+async def test_evidence_match_ignores_trailing_punctuation_and_phone_hyphens() -> None:
+    # 실제 시연 케이스: STT 마지막 문장에는 마침표가 없는데 모델 근거에는 붙어 있었다.
+    transcript = (
+        "혹시 이름과 전화번호를 남겨주시겠어요 네 이름은 홍윤정이고 전화번호는 010-12345678이에요"
+    )
+    analyzer = FakeAnalyzer(
+        ConsultationAnalysis(
+            consultation_type=ConsultationType.BUY_REQUEST,
+            fields={"임대인 이름": "홍윤정", "임대인 전화": "010-1234-5678"},
+            evidence={
+                "임대인 이름": "네 이름은 홍윤정이고 전화번호는 010-12345678이에요.",
+                "임대인 전화": "전화번호는 010-1234-5678이에요.",
+            },
+            summary="월세 문의.",
+        )
+    )
+    pipeline = F2Pipeline(transcriber=FakeTranscriber(transcript), analyzer=analyzer)
+
+    result = await pipeline.run(
+        F2PipelineRequest(audio_path=Path("memo.wav"), current_ledger_type=LedgerType.BUYER)
+    )
+
+    assert [(p.field_name, p.proposed_value) for p in result.proposals] == [
+        ("구입자 이름", "홍윤정"),
+        ("전화번호", "010-1234-5678"),
+    ]
+    assert not any(note.startswith("STT 원문 근거가 없는") for note in result.uncertainties)

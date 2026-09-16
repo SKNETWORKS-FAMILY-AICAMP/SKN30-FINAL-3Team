@@ -5,7 +5,7 @@ import re
 
 from brokerage_ai.f2.errors import EmptyTranscriptionError
 from brokerage_ai.f2.ports import ConsultationAnalyzer, Transcriber
-from brokerage_ai.f2.prompts import ALLOWED_FIELDS
+from brokerage_ai.f2.prompts import ALLOWED_FIELDS, FIELD_ALIASES
 from brokerage_ai.f2.types import (
     ConsultationAnalysis,
     ConsultationType,
@@ -14,6 +14,10 @@ from brokerage_ai.f2.types import (
     FieldProposal,
     LedgerType,
     ProposalStatus,
+)
+
+_EVIDENCE_NOISE = re.compile(
+    r"[\s.,!?;:'\"\u201c\u201d\u2018\u2019\u2026\u00b7~\-\u2013\u2014()\[\]]+"
 )
 
 
@@ -121,16 +125,27 @@ class F2Pipeline:
         proposals: list[FieldProposal] = []
         notes: list[str] = []
         allowed_fields = ALLOWED_FIELDS[ledger_type]
-        normalized_transcript = cls._without_whitespace(transcript)
+        transcript_key = cls._evidence_key(transcript)
+        seen_fields: set[str] = set()
 
-        for field_name, proposed_value in analysis.fields.items():
+        for raw_field_name, proposed_value in analysis.fields.items():
+            field_name = cls._canonical_field_name(ledger_type, raw_field_name)
             if field_name not in allowed_fields:
-                notes.append(f"허용되지 않은 필드 제안을 제외했습니다: {field_name}")
+                notes.append(f"허용되지 않은 필드 제안을 제외했습니다: {raw_field_name}")
                 continue
-            evidence = analysis.evidence.get(field_name, "").strip()
-            if not evidence or cls._without_whitespace(evidence) not in normalized_transcript:
-                notes.append(f"STT 원문 근거가 없는 필드 제안을 제외했습니다: {field_name}")
+            evidence = analysis.evidence.get(raw_field_name, "").strip()
+            if not evidence or cls._evidence_key(evidence) not in transcript_key:
+                notes.append(f"STT 원문 근거가 없는 필드 제안을 제외했습니다: {raw_field_name}")
                 continue
+            if field_name in seen_fields:
+                notes.append(
+                    "같은 필드로 정규화된 중복 제안을 제외했습니다: "
+                    f"{raw_field_name} → {field_name}"
+                )
+                continue
+            seen_fields.add(field_name)
+            if field_name != raw_field_name:
+                notes.append(f"필드명을 정규화했습니다: {raw_field_name} → {field_name}")
 
             current_value = current_fields.get(field_name)
             current_is_empty = current_value is None or not current_value.strip()
@@ -157,9 +172,32 @@ class F2Pipeline:
 
         return tuple(proposals), tuple(notes)
 
+    @classmethod
+    def _canonical_field_name(cls, ledger_type: LedgerType, field_name: str) -> str:
+        normalized = field_name.strip()
+        if normalized in ALLOWED_FIELDS[ledger_type]:
+            return normalized
+        aliases = FIELD_ALIASES[ledger_type]
+        if normalized in aliases:
+            return aliases[normalized]
+        compact = cls._without_whitespace(normalized)
+        for alias, canonical in aliases.items():
+            if cls._without_whitespace(alias) == compact:
+                return canonical
+        for canonical in ALLOWED_FIELDS[ledger_type]:
+            if cls._without_whitespace(canonical) == compact:
+                return canonical
+        return normalized
+
     @staticmethod
     def _without_whitespace(value: str) -> str:
         return re.sub(r"\s+", "", value)
+
+    @classmethod
+    def _evidence_key(cls, value: str) -> str:
+        # 모델이 근거 문장 끝에 마침표를 붙이거나 전화번호 하이픈을 다르게 쓰는 경우가
+        # 있어, 근거 대조는 공백과 구두점·하이픈을 뺀 글자만 비교한다.
+        return _EVIDENCE_NOISE.sub("", value)
 
     @staticmethod
     def _normalized_value(value: str) -> str:
