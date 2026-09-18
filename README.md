@@ -4,6 +4,8 @@
 
 단순 조건 검색에 그치지 않고, 상담 대화 속에 숨은 양측의 미묘한 의향·제약·유연성을 포착하여 중개사의 의사결정을 효과적으로 보조합니다.
 
+[서비스 소개 페이지](https://sknetworks-family-aicamp.github.io/SKN30-FINAL-3Team/)
+
 ---
 
 ## 👥 Member
